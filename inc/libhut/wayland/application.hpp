@@ -32,11 +32,12 @@
 
 namespace hut {
 
-class application : public base_application {
-public:
-protected:
-    virtual ~application() {}
-};
+    class application : public base_application {
+    public:
+    protected:
+        virtual ~application() {
+        }
+    };
 
 #define HUT_MAIN(app_type) int main(int argc, char** argv) { \
     app_type app; \

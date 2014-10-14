@@ -28,13 +28,9 @@
 
 #pragma once
 
-#include <string>
+#include <wayland-client.h>
 
-#include "libhut/vec.hpp"
-#include "libhut/event.hpp"
-
-#include "libhut/window.hpp"
-#include "libhut/surface.hpp"
+#include "libhut/egl/surface.hpp"
 
 namespace hut {
 

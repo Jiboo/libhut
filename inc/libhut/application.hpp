@@ -28,36 +28,37 @@
 
 #pragma once
 
-#include <string>
-#include <initializer_list>
-
 #include "libhut/event.hpp"
-#include "libhut/vec.hpp"
+#include "libhut/display.hpp"
+#include "libhut/window.hpp"
 
 namespace hut {
 
-    class window;
-    class display;
-
     class base_application {
     public:
-        static const display& auto_display();
+        static const display &auto_display();
 
         event<> on_create, on_pause, on_resume, on_destroy;
 
-        virtual ~base_application() {}
+        virtual ~base_application() {
+        }
 
         uint16_t max_texture_size() const;
-        window create_window(const display& d = auto_display());
+
+        window create_window(const display &d = auto_display());
 
     protected:
-        virtual int entry(int argc, char** argv);
+        virtual int entry(int argc, char **argv);
+
         bool loop();
+
         bool stop;
     };
 
 } //namespace hut
 
 #ifdef HUT_WAYLAND
-    #include "libhut/wayland/application.hpp"
+
+#include "libhut/wayland/application.hpp"
+
 #endif

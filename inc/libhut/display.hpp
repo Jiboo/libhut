@@ -28,7 +28,8 @@
 
 #pragma once
 
-#include "vec.hpp"
+#include <functional>
+#include <chrono>
 
 namespace hut {
 
@@ -37,10 +38,22 @@ namespace hut {
         virtual ~base_display() {
 
         }
+
+        void post(std::function<void()> calllback);
+
+        template<typename Rep, typename Period>
+        void post_delayed(std::function<void()> calllback, std::chrono::duration<Rep, Period> delay);
+
+        template<typename Rep, typename Period>
+        void schedule(std::function<void()> calllback, std::chrono::duration<Rep, Period> delay);
+
+        void flush();
     };
 
 } //namespace hut
 
 #ifdef HUT_WAYLAND
-    #include "libhut/wayland/display.hpp"
+
+#include "libhut/wayland/display.hpp"
+
 #endif

@@ -28,10 +28,8 @@
 
 #pragma once
 
-#include <string>
-
-#include "vec.hpp"
-#include "event.hpp"
+#include "libhut/vec.hpp"
+#include "libhut/event.hpp"
 
 namespace hut {
 
@@ -39,16 +37,19 @@ namespace hut {
 
     class base_surface {
     public:
-        virtual vec2 size() const = 0;
-        virtual unsigned short density() const = 0;
+        vec2 size() const;
+
+        unsigned short density() const;
 
         event<vec2 /*new_size*/> on_resize;
 
-        virtual void draw(const mesh& m) = 0;
+        void draw(const mesh &m);
     };
 
 } // namespace hut
 
 #ifdef HUT_WAYLAND
-    #include "libhut/wayland/surface.hpp"
+
+#include "libhut/wayland/surface.hpp"
+
 #endif

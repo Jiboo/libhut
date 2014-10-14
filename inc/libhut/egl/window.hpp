@@ -28,11 +28,6 @@
 
 #pragma once
 
-#include <string>
-
-#include "libhut/vec.hpp"
-#include "libhut/event.hpp"
-
 #include "libhut/window.hpp"
 
 #include "libhut/egl/surface.hpp"

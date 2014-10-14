@@ -35,7 +35,7 @@
 #include <type_traits>
 #include <utility>
 
-#include "vec.hpp"
+#include "libhut/vec.hpp"
 
 namespace hut {
 
@@ -45,8 +45,13 @@ namespace hut {
 
         col_type data[_RowCount];
 
-        col_type& operator[](const size_t i) { return data[i]; }
-        constexpr const col_type& operator[](const size_t i) const { return data[i]; }
+        col_type &operator[](const size_t i) {
+            return data[i];
+        }
+
+        constexpr const col_type &operator[](const size_t i) const {
+            return data[i];
+        }
     };
 
     using mat2 = mat<float, 2, 2>;
@@ -58,189 +63,188 @@ namespace hut {
     using dmat4 = mat<double, 4, 4>;
 
     template<typename _Type, size_t _RowCount, size_t _RowSize>
-    std::ostream& operator<<(std::ostream& os, const mat<_Type, _RowCount, _RowSize>& m)
-    {
+    std::ostream &operator<<(std::ostream &os, const mat<_Type, _RowCount, _RowSize> &m) {
         os << '{';
-        for(size_t i = 0; i < _RowCount - 1; i++)
+        for (size_t i = 0; i < _RowCount - 1; i++)
             os << m[i] << ", ";
         return os << m[_RowCount - 1] << '}';
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
-    inline bool operator==(const mat<_TypeA, _RowCount, _RowSize>& a, const mat<_TypeB, _RowCount, _RowSize>& b) {
-        return std::equal(a.data, a.data  + _RowCount, b.data);
+    inline bool operator==(const mat<_TypeA, _RowCount, _RowSize> &a, const mat<_TypeB, _RowCount, _RowSize> &b) {
+        return std::equal(a.data, a.data + _RowCount, b.data);
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
-    inline bool operator!=(const mat<_TypeA, _RowCount, _RowSize>& a, const mat<_TypeB, _RowCount, _RowSize>& b) {
+    inline bool operator!=(const mat<_TypeA, _RowCount, _RowSize> &a, const mat<_TypeB, _RowCount, _RowSize> &b) {
         return !(a == b);
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
-    inline bool operator<(const mat<_TypeA, _RowCount, _RowSize>& a, const mat<_TypeB, _RowCount, _RowSize>& b) {
+    inline bool operator<(const mat<_TypeA, _RowCount, _RowSize> &a, const mat<_TypeB, _RowCount, _RowSize> &b) {
         return std::lexicographical_compare(a.data, a.data + _RowCount, b.data, b.data + _RowCount);
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
-    inline bool operator>(const mat<_TypeA, _RowCount, _RowSize>& a, const mat<_TypeB, _RowCount, _RowSize>& b) {
+    inline bool operator>(const mat<_TypeA, _RowCount, _RowSize> &a, const mat<_TypeB, _RowCount, _RowSize> &b) {
         return b < a;
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
-    inline bool operator<=(const mat<_TypeA, _RowCount, _RowSize>& a, const mat<_TypeB, _RowCount, _RowSize>& b) {
+    inline bool operator<=(const mat<_TypeA, _RowCount, _RowSize> &a, const mat<_TypeB, _RowCount, _RowSize> &b) {
         return !(b < a);
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
-    inline bool operator>=(const mat<_TypeA, _RowCount, _RowSize>& a, const mat<_TypeB, _RowCount, _RowSize>& b) {
+    inline bool operator>=(const mat<_TypeA, _RowCount, _RowSize> &a, const mat<_TypeB, _RowCount, _RowSize> &b) {
         return !(a < b);
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
     mat<typename std::common_type<_TypeA, typename std::enable_if<std::is_arithmetic<_TypeB>::value, _TypeB>::type>::type, _RowCount, _RowSize>
-    operator+(const mat<_TypeA, _RowCount, _RowSize>& a, const _TypeB& b) {
+    operator+(const mat<_TypeA, _RowCount, _RowSize> &a, const _TypeB &b) {
         mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCount, _RowSize> result;
-        for(size_t i = 0; i < _RowCount; i++)
+        for (size_t i = 0; i < _RowCount; i++)
             result[i] = a[i] + b;
         return result;
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
     mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCount, _RowSize>
-    operator+(const mat<_TypeA, _RowCount, _RowSize>& a, const mat<_TypeB, _RowCount, _RowSize>& b) {
+    operator+(const mat<_TypeA, _RowCount, _RowSize> &a, const mat<_TypeB, _RowCount, _RowSize> &b) {
         mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCount, _RowSize> result;
-        for(size_t i = 0; i < _RowCount; i++)
+        for (size_t i = 0; i < _RowCount; i++)
             result[i] = a[i] + b[i];
         return result;
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
     mat<typename std::common_type<_TypeA, typename std::enable_if<std::is_arithmetic<_TypeB>::value, _TypeB>::type>::type, _RowCount, _RowSize>
-    operator+=(mat<_TypeA, _RowCount, _RowSize>& a, const _TypeB& b) {
-        for(size_t i = 0; i < _RowCount; i++)
+    operator+=(mat<_TypeA, _RowCount, _RowSize> &a, const _TypeB &b) {
+        for (size_t i = 0; i < _RowCount; i++)
             a[i] += b;
         return a;
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
     mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCount, _RowSize>
-    operator+=(mat<_TypeA, _RowCount, _RowSize>& a, const mat<_TypeB, _RowCount, _RowSize>& b) {
-        for(size_t i = 0; i < _RowCount; i++)
+    operator+=(mat<_TypeA, _RowCount, _RowSize> &a, const mat<_TypeB, _RowCount, _RowSize> &b) {
+        for (size_t i = 0; i < _RowCount; i++)
             a[i] += b[i];
         return a;
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
     mat<typename std::common_type<_TypeA, typename std::enable_if<std::is_arithmetic<_TypeB>::value, _TypeB>::type>::type, _RowCount, _RowSize>
-    operator-(const mat<_TypeA, _RowCount, _RowSize>& a, const _TypeB& b) {
+    operator-(const mat<_TypeA, _RowCount, _RowSize> &a, const _TypeB &b) {
         mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCount, _RowSize> result;
-        for(size_t i = 0; i < _RowCount; i++)
+        for (size_t i = 0; i < _RowCount; i++)
             result[i] = a[i] - b;
         return result;
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
     mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCount, _RowSize>
-    operator-(const mat<_TypeA, _RowCount, _RowSize>& a, const mat<_TypeB, _RowCount, _RowSize>& b) {
+    operator-(const mat<_TypeA, _RowCount, _RowSize> &a, const mat<_TypeB, _RowCount, _RowSize> &b) {
         mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCount, _RowSize> result;
-        for(size_t i = 0; i < _RowCount; i++)
+        for (size_t i = 0; i < _RowCount; i++)
             result[i] = a[i] - b[i];
         return result;
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
     mat<typename std::common_type<_TypeA, typename std::enable_if<std::is_arithmetic<_TypeB>::value, _TypeB>::type>::type, _RowCount, _RowSize>
-    operator-=(mat<_TypeA, _RowCount, _RowSize>& a, const _TypeB& b) {
-        for(size_t i = 0; i < _RowCount; i++)
+    operator-=(mat<_TypeA, _RowCount, _RowSize> &a, const _TypeB &b) {
+        for (size_t i = 0; i < _RowCount; i++)
             a[i] -= b;
         return a;
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
     mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCount, _RowSize>
-    operator-=(mat<_TypeA, _RowCount, _RowSize>& a, const mat<_TypeB, _RowCount, _RowSize>& b) {
-        for(size_t i = 0; i < _RowCount; i++)
+    operator-=(mat<_TypeA, _RowCount, _RowSize> &a, const mat<_TypeB, _RowCount, _RowSize> &b) {
+        for (size_t i = 0; i < _RowCount; i++)
             a[i] -= b[i];
         return a;
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
     mat<typename std::common_type<_TypeA, typename std::enable_if<std::is_arithmetic<_TypeB>::value, _TypeB>::type>::type, _RowCount, _RowSize>
-    operator*(const mat<_TypeA, _RowCount, _RowSize>& a, const _TypeB& b) {
+    operator*(const mat<_TypeA, _RowCount, _RowSize> &a, const _TypeB &b) {
         mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCount, _RowSize> result;
-        for(size_t i = 0; i < _RowCount; i++)
+        for (size_t i = 0; i < _RowCount; i++)
             result[i] = a[i] * b;
         return result;
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
     mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCount, _RowSize>
-    matrixCompMult(const mat<_TypeA, _RowCount, _RowSize>& a, const mat<_TypeB, _RowCount, _RowSize>& b) {
+    matrixCompMult(const mat<_TypeA, _RowCount, _RowSize> &a, const mat<_TypeB, _RowCount, _RowSize> &b) {
         mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCount, _RowSize> result;
-        for(size_t i = 0; i < _RowCount; i++)
+        for (size_t i = 0; i < _RowCount; i++)
             result[i] = a[i] * b[i];
         return result;
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
     mat<typename std::common_type<_TypeA, typename std::enable_if<std::is_arithmetic<_TypeB>::value, _TypeB>::type>::type, _RowCount, _RowSize>
-    operator*=(mat<_TypeA, _RowCount, _RowSize>& a, const _TypeB& b) {
-        for(size_t i = 0; i < _RowCount; i++)
+    operator*=(mat<_TypeA, _RowCount, _RowSize> &a, const _TypeB &b) {
+        for (size_t i = 0; i < _RowCount; i++)
             a[i] *= b;
         return a;
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
     mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCount, _RowSize>
-    matrixCompMultInPlace(mat<_TypeA, _RowCount, _RowSize>& a, const mat<_TypeB, _RowCount, _RowSize>& b) {
-        for(size_t i = 0; i < _RowCount; i++)
+    matrixCompMultInPlace(mat<_TypeA, _RowCount, _RowSize> &a, const mat<_TypeB, _RowCount, _RowSize> &b) {
+        for (size_t i = 0; i < _RowCount; i++)
             a[i] *= b[i];
         return a;
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
     mat<typename std::common_type<_TypeA, typename std::enable_if<std::is_arithmetic<_TypeB>::value, _TypeB>::type>::type, _RowCount, _RowSize>
-    operator/(const mat<_TypeA, _RowCount, _RowSize>& a, const _TypeB& b) {
+    operator/(const mat<_TypeA, _RowCount, _RowSize> &a, const _TypeB &b) {
         mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCount, _RowSize> result;
-        for(size_t i = 0; i < _RowCount; i++)
+        for (size_t i = 0; i < _RowCount; i++)
             result[i] = a[i] / b;
         return result;
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
     mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCount, _RowSize>
-    operator/(const mat<_TypeA, _RowCount, _RowSize>& a, const mat<_TypeB, _RowCount, _RowSize>& b) {
+    operator/(const mat<_TypeA, _RowCount, _RowSize> &a, const mat<_TypeB, _RowCount, _RowSize> &b) {
         mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCount, _RowSize> result;
-        for(size_t i = 0; i < _RowCount; i++)
+        for (size_t i = 0; i < _RowCount; i++)
             result[i] = a[i] / b[i];
         return result;
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
     mat<typename std::common_type<_TypeA, typename std::enable_if<std::is_arithmetic<_TypeB>::value, _TypeB>::type>::type, _RowCount, _RowSize>
-    operator/=(mat<_TypeA, _RowCount, _RowSize>& a, const _TypeB& b) {
-        for(size_t i = 0; i < _RowCount; i++)
+    operator/=(mat<_TypeA, _RowCount, _RowSize> &a, const _TypeB &b) {
+        for (size_t i = 0; i < _RowCount; i++)
             a[i] /= b;
         return a;
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCount, size_t _RowSize>
     mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCount, _RowSize>
-    operator/=(mat<_TypeA, _RowCount, _RowSize>& a, const mat<_TypeB, _RowCount, _RowSize>& b) {
-        for(size_t i = 0; i < _RowCount; i++)
+    operator/=(mat<_TypeA, _RowCount, _RowSize> &a, const mat<_TypeB, _RowCount, _RowSize> &b) {
+        for (size_t i = 0; i < _RowCount; i++)
             a[i] /= b[i];
         return a;
     }
 
     template<typename _TypeA, typename _TypeB, size_t _RowCountA, size_t _RowSizeA, size_t _RowCountB, size_t _RowSizeB>
     mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCountB, _RowSizeA>
-    operator*(const mat<_TypeA, _RowCountA, _RowSizeA>& a, const mat<_TypeB, _RowCountB, _RowSizeB>& b) {
+    operator*(const mat<_TypeA, _RowCountA, _RowSizeA> &a, const mat<_TypeB, _RowCountB, _RowSizeB> &b) {
         static_assert(_RowCountA == _RowSizeB, "Incompatible matrices");
         mat<typename std::common_type<_TypeA, _TypeB>::type, _RowCountB, _RowSizeA> result;
-        for(size_t i = 0; i < _RowCountB; i++) {
-            for(size_t j = 0; j < _RowSizeA; j++) {
+        for (size_t i = 0; i < _RowCountB; i++) {
+            for (size_t j = 0; j < _RowSizeA; j++) {
                 result[i][j] = 0;
-                for(size_t k = 0; k < _RowCountA; k++) {
+                for (size_t k = 0; k < _RowCountA; k++) {
                     result[i][j] += a[k][j] * b[i][k];
                 }
             }

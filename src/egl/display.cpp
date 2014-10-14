@@ -31,7 +31,7 @@
 #include <wayland-client.h>
 #include <wayland-egl.h>
 
-#include "libhut/egl/display.hpp"
+#include "libhut/display.hpp"
 #include "libhut/utils.hpp"
 #include "libhut/vec.hpp"
 

@@ -31,16 +31,10 @@
 #include <cstring>
 
 #include <string>
-#include <initializer_list>
 
 #include <wayland-client.h>
-#include <wayland-egl.h>
-#include "xdg-shell-client-protocol.h"
-
-#include <GLES2/gl2.h>
 
 #include "libhut/utils.hpp"
-#include "libhut/display.hpp"
 #include "libhut/egl/display.hpp"
 
 #define XDG_VERSION 4 /* The version of xdg-shell that we implement */
@@ -54,8 +48,9 @@ namespace hut {
         using native_type = NativeDisplayType;
         using egl_type = EGLDisplay;
 
-        display(const std::string& name);
-        display(const char* name);
+        display(const std::string &name);
+
+        display(const char *name);
 
         virtual ~display();
 
@@ -76,51 +71,66 @@ namespace hut {
         static void pointer_handle_enter(void *data, struct wl_pointer *pointer,
                 uint32_t serial, struct wl_surface *surface,
                 wl_fixed_t sx, wl_fixed_t sy);
+
         static void pointer_handle_leave(void *data, struct wl_pointer *pointer,
                 uint32_t serial, struct wl_surface *surface);
+
         static void pointer_handle_motion(void *data, struct wl_pointer *pointer,
                 uint32_t time, wl_fixed_t sx, wl_fixed_t sy);
+
         static void pointer_handle_button(void *data, struct wl_pointer *wl_pointer,
                 uint32_t serial, uint32_t time, uint32_t button,
                 uint32_t state);
+
         static void pointer_handle_axis(void *data, struct wl_pointer *wl_pointer,
                 uint32_t time, uint32_t axis, wl_fixed_t value);
 
         static void touch_handle_down(void *data, struct wl_touch *wl_touch,
                 uint32_t serial, uint32_t time, struct wl_surface *surface,
                 int32_t id, wl_fixed_t x_w, wl_fixed_t y_w);
+
         static void touch_handle_up(void *data, struct wl_touch *wl_touch,
                 uint32_t serial, uint32_t time, int32_t id);
+
         static void touch_handle_motion(void *data, struct wl_touch *wl_touch,
                 uint32_t time, int32_t id, wl_fixed_t x_w, wl_fixed_t y_w);
+
         static void touch_handle_frame(void *data, struct wl_touch *wl_touch);
+
         static void touch_handle_cancel(void *data, struct wl_touch *wl_touch);
 
         static void keyboard_handle_keymap(void *data, struct wl_keyboard *keyboard,
                 uint32_t format, int fd, uint32_t size);
+
         static void keyboard_handle_enter(void *data, struct wl_keyboard *keyboard,
                 uint32_t serial, struct wl_surface *surface, struct wl_array *keys);
+
         static void keyboard_handle_leave(void *data, struct wl_keyboard *keyboard,
                 uint32_t serial, struct wl_surface *surface);
+
         static void keyboard_handle_key(void *data, struct wl_keyboard *keyboard,
                 uint32_t serial, uint32_t time, uint32_t key, uint32_t state);
+
         static void keyboard_handle_modifiers(void *data, struct wl_keyboard *keyboard,
                 uint32_t serial, uint32_t mods_depressed, uint32_t mods_latched,
                 uint32_t mods_locked, uint32_t group);
+
         static void keyboard_handle_repeat_info(void *data, struct wl_keyboard *wl_keyboard,
                 int32_t rate, int32_t delay);
 
         static void seat_handle_capabilities(void *data, struct wl_seat *seat,
                 uint32_t caps);
+
         static void seat_handle_name(void *data, struct wl_seat *wl_seat,
                 const char *name);
 
         static void shell_ping(void *data, struct xdg_shell *shell, uint32_t serial);
 
         static void registry_handle_global(void *data, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version);
+
         static void registry_handle_global_remove(void *data, struct wl_registry *registry, uint32_t name);
 
-        const wl_registry_listener& registry_listener() {
+        const wl_registry_listener &registry_listener() {
             static wl_registry_listener listeners = {
 
                     &hut::display::registry_handle_global,

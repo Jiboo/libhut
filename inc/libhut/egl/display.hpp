@@ -28,14 +28,10 @@
 
 #pragma once
 
-#include <string>
-#include <initializer_list>
-
 #include <wayland-egl.h>
 #include <EGL/egl.h>
 
 #include "libhut/display.hpp"
-#include "libhut/window.hpp"
 
 namespace hut {
 

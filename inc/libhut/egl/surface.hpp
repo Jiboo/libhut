@@ -28,15 +28,8 @@
 
 #pragma once
 
-#include <string>
-
-#include <wayland-egl.h>
 #include <EGL/egl.h>
 
-#include "libhut/vec.hpp"
-#include "libhut/event.hpp"
-
-#include "libhut/window.hpp"
 #include "libhut/surface.hpp"
 
 namespace hut {

@@ -27,6 +27,7 @@
  */
 
 #include <wayland-cursor.h>
+#include "libhut/wayland/xdg-shell-client-protocol.h"
 
 #include "libhut/wayland/display.hpp"
 

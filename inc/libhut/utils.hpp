@@ -29,14 +29,12 @@
 #pragma once
 
 #include <string>
-#include <initializer_list>
-
-#include "libhut/window.hpp"
+#include <stdexcept>
 
 namespace hut {
 
-    inline void runtime_assert(bool test, const std::string& error) {
-        if(!test) {
+    inline void runtime_assert(bool test, const std::string &error) {
+        if (!test) {
             throw std::runtime_error(error);
         }
     }

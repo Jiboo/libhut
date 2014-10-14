@@ -28,9 +28,6 @@
 
 #pragma once
 
-#include <string>
-#include <initializer_list>
-
 #include "libhut/egl/window.hpp"
 #include "libhut/wayland/surface.hpp"
 #include "libhut/wayland/display.hpp"
@@ -42,21 +39,8 @@ namespace hut {
         using native_type = NativeWindowType;
         using egl_type = EGLDisplay;
 
-        virtual vec2 size() const {
-
-        }
-
-        virtual unsigned short density() const {
-
-        }
-
-        virtual void draw(const mesh& m) {
-
-        }
     protected:
-        window(const display& dpy) {
-
-        }
+        window(const display &dpy);
 
         struct wl_egl_window *wl_win;
     };

@@ -30,8 +30,8 @@
 
 #include <string>
 
-#include "vec.hpp"
-#include "event.hpp"
+#include "libhut/vec.hpp"
+#include "libhut/event.hpp"
 
 #include "libhut/surface.hpp"
 #include "libhut/window.hpp"
@@ -67,18 +67,23 @@ namespace hut {
         event<control_type, bool /*down*/> on_ctrl;
 
         void minimize(bool enable);
+
         bool is_minimized();
 
         void maximize(bool enable);
+
         bool is_maximized();
 
         void fullscreen(bool enable);
+
         bool is_fullscreen();
 
         void resize(ivec2 size);
+
         ivec2 size();
 
         void rename(std::string name);
+
         std::string name();
 
         void close();
@@ -87,5 +92,7 @@ namespace hut {
 } // namespace hut
 
 #ifdef HUT_WAYLAND
-    #include "libhut/wayland/window.hpp"
+
+#include "libhut/wayland/window.hpp"
+
 #endif

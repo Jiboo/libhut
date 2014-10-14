@@ -26,7 +26,10 @@
  * SOFTWARE.
  */
 
+#include <GLES2/gl2.h>
+
 #include "libhut/wayland/application.hpp"
+#include "libhut/wayland/window.hpp"
 
 namespace hut {
 

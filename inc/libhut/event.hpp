@@ -37,14 +37,14 @@ namespace hut {
     struct event {
         std::vector<std::function<bool(_ArgTypes...)>> cbs;
 
-        void connect(const std::function<bool(_ArgTypes...)>& callback) {
+        void connect(const std::function<bool(_ArgTypes...)> &callback) {
             cbs.emplace_back(callback);
         }
 
-        bool fire(const _ArgTypes&... args) {
+        bool fire(const _ArgTypes &... args) {
             bool handled = false;
 
-            for(auto& cb : cbs) {
+            for (auto &cb : cbs) {
                 handled |= cb(args...);
             }
 

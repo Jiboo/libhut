@@ -28,10 +28,6 @@
 
 #pragma once
 
-#include <cmath>
-
-#include "vec.hpp"
-
 namespace hut {
 
     enum {
