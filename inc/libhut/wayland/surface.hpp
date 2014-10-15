@@ -37,7 +37,7 @@ namespace hut {
     class wayland_surface : public egl_surface {
     public:
     protected:
-        struct wl_surface *surface;
+        struct wl_surface *wl_surf;
     };
 
 } //namespace hut

@@ -45,14 +45,19 @@
 namespace hut {
     class display : public egl_display {
     public:
-        using native_type = NativeDisplayType;
-        using egl_type = EGLDisplay;
-
         display(const std::string &name);
 
         display(const char *name);
 
         virtual ~display();
+
+        virtual void post(std::function<void()> calllback) override;
+
+        virtual void post_delayed(std::function<void()> calllback, std::chrono::milliseconds delay);
+
+        virtual void schedule(std::function<void()> calllback, std::chrono::milliseconds delay);
+
+        virtual void flush();
 
     protected:
         struct wl_display *wl_dpy;

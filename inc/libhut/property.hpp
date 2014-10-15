@@ -28,37 +28,57 @@
 
 #pragma once
 
-#include "libhut/event.hpp"
-#include "libhut/display.hpp"
-#include "libhut/window.hpp"
+#include <vector>
+#include <functional>
 
 namespace hut {
 
-    class base_application {
-    public:
-        static const display &auto_display();
-
-        event<> on_pause, on_resume;
-        bool stop;
-
-        virtual ~base_application() {
-        }
-
-        virtual uint16_t max_texture_size() = 0;
-
+    template<typename T>
+    class property {
     protected:
-        virtual int entry(int argc, char **argv) {
-            throw std::runtime_error("Entry not overloaded, rtfm.");
-            return EXIT_FAILURE;
+        using getter_t = std::function<const T&(void)>;
+        using setter_t = std::function<void(const T&)>;
+
+        getter_t getter;
+        setter_t setter;
+
+    public:
+        property(getter_t getter, setter_t setter) : getter(getter), setter(setter) { // Wow! Ugly.
+
         }
 
-        virtual bool loop() = 0;
+        const T& operator=(const T& data) {
+            setter(data);
+            return data;
+        }
+
+        operator const T&() {
+            return getter();
+        }
     };
 
-} //namespace hut
+    template<typename T>
+    class buffed {
+    protected:
+        using setter_t = std::function<void(const T&)>;
 
-#ifdef HUT_WAYLAND
+        T data;
+        setter_t setter;
 
-#include "libhut/wayland/application.hpp"
+    public:
+        buffed(setter_t setter) : setter(setter) { // Wow! Ugly.
 
-#endif
+        }
+
+        const T& operator=(const T& _data) {
+            data = _data;
+            setter(data);
+            return _data;
+        }
+
+        operator const T&() const {
+            return data;
+        }
+    };
+
+} // namespace hut

@@ -26,39 +26,53 @@
  * SOFTWARE.
  */
 
-#pragma once
-
-#include "libhut/event.hpp"
-#include "libhut/display.hpp"
-#include "libhut/window.hpp"
+#include "libhut/wayland/window.hpp"
 
 namespace hut {
 
-    class base_application {
-    public:
-        static const display &auto_display();
+    window::window(const display& dpy, const std::string& title, bool translucent, window_decoration_type deco)
+            : egl_window(dpy, title, translucent, deco) {
+    }
 
-        event<> on_pause, on_resume;
-        bool stop;
+    const ivec2& window::size() const {
 
-        virtual ~base_application() {
-        }
+    }
 
-        virtual uint16_t max_texture_size() = 0;
+    short unsigned int window::density() const {
 
-    protected:
-        virtual int entry(int argc, char **argv) {
-            throw std::runtime_error("Entry not overloaded, rtfm.");
-            return EXIT_FAILURE;
-        }
+    }
 
-        virtual bool loop() = 0;
-    };
+    void window::draw(const hut::mesh&) {
+
+    }
+
+    void window::draw(const hut::batch&) {
+
+    }
+
+    void window::minimize() {
+
+    }
+
+    void window::maximize() {
+
+    }
+
+    void window::close() {
+
+    }
+
+    void window::enable_fullscreen(bool) {
+
+    }
+
+    void window::resize(hut::ivec2) {
+
+    }
+
+    void window::rename(std::string) {
+
+    }
+
 
 } //namespace hut
-
-#ifdef HUT_WAYLAND
-
-#include "libhut/wayland/application.hpp"
-
-#endif

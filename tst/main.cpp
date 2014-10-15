@@ -8,7 +8,7 @@ public:
         ::testing::InitGoogleTest(&argc, argv);
         int result = RUN_ALL_TESTS();
 
-        auto w = create_window();
+        hut::window win {auto_display(), "Hello world"};
 
         result |= application::entry(argc, argv);
         return result;

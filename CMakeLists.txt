@@ -12,6 +12,7 @@ set(HUT_HEADERS
     inc/libhut/utils.hpp
     inc/libhut/color.hpp
     inc/libhut/event.hpp
+    inc/libhut/property.hpp
     inc/libhut/application.hpp
     inc/libhut/display.hpp
     inc/libhut/surface.hpp
@@ -40,6 +41,7 @@ set(WAYLAND_SOURCES
     src/wayland/display_keyboard.cpp
     src/wayland/display_pointer.cpp
     src/wayland/display_touch.cpp
+    src/wayland/window.cpp
 )
 
 set(TEST_FILES

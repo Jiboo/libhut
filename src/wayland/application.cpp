@@ -30,10 +30,11 @@
 
 #include "libhut/wayland/application.hpp"
 #include "libhut/wayland/window.hpp"
+#include "libhut/wayland/display.hpp"
 
 namespace hut {
 
-    uint16_t base_application::max_texture_size() const {
+    uint16_t application::max_texture_size() {
         int32_t result;
         glGetIntegerv(GL_MAX_TEXTURE_SIZE, &result);
         return result;
@@ -44,18 +45,14 @@ namespace hut {
         return def;
     }
 
-    window base_application::create_window(const display &d) {
-
-    }
-
-    int base_application::entry(int argc, char **argv) {
+    int application::entry(int argc, char **argv) {
         while(!this->stop && loop()) {
 
         }
         return EXIT_SUCCESS;
     }
 
-    bool base_application::loop() {
+    bool application::loop() {
         return false;
     }
 

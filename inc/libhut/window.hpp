@@ -32,17 +32,19 @@
 
 #include "libhut/vec.hpp"
 #include "libhut/event.hpp"
+#include "libhut/property.hpp"
 
+#include "libhut/display.hpp"
 #include "libhut/surface.hpp"
 #include "libhut/window.hpp"
 
 namespace hut {
 
-    enum class pointer_event_type {
+    enum pointer_event_type {
         MDOWN, MUP, MMOVE
     };
 
-    enum class control_type {
+    enum keyboard_control_type {
         KALT_LEFT, KALT_RIGHT,
         KCTRL_LEFT, KCTRL_RIGHT,
         KWHEEL_UP, KWHEEL_DOWN,
@@ -54,39 +56,60 @@ namespace hut {
         KF1, KF2, KF3, KF4, KF5, KF6, KF7, KF8, KF9,
     };
 
-    template<typename Tbase_surface = base_surface>
-    class base_window : public Tbase_surface {
-    public:
-        base_window(bool transparent = false);
+    enum window_decoration_type {
+        DSYSTEM,
+        DFULLSCREEN,
+        DOVERRIDE
+    };
 
-        event<> on_create, on_pause, on_resume, on_destroy;
+    class view_node {
+    public:
+        view_node* parent;
+
+        view_node(view_node* parent) : parent(parent) {}
+    };
+
+    class base_window : public base_surface, public view_node {
+    public:
+
+        event<> on_pause, on_resume;
         event<std::string /*path*/, vec2 /*pos*/> on_drop;
 
         event<uint8_t /*pointer*/, uint8_t /*button*/, pointer_event_type, vec2 /*pos*/> on_pointer;
         event<char32_t /*utf32_char*/, bool /*down*/> on_char;
-        event<control_type, bool /*down*/> on_ctrl;
+        event<keyboard_control_type, bool /*down*/> on_ctrl;
 
-        void minimize(bool enable);
+        buffed<bool> fullscreen { [this](auto b) { this->enable_fullscreen(b); } };
+        buffed<ivec2> size { [this](auto v) { this->resize(v); } };
+        buffed<std::string> name { [this](auto s) { this->rename(s); } };
 
-        bool is_minimized();
+        const display& dpy;
 
-        void maximize(bool enable);
+        base_window(const display& dpy, const std::string& title, bool translucent = false, window_decoration_type deco = DSYSTEM)
+                : view_node(nullptr), dpy(dpy) {
+        }
 
-        bool is_maximized();
+        virtual ~base_window() {
+            cleanup();
+        }
 
-        void fullscreen(bool enable);
+        virtual void minimize() = 0;
 
-        bool is_fullscreen();
+        virtual void maximize() = 0;
 
-        void resize(ivec2 size);
+        virtual void close() = 0;
 
-        ivec2 size();
+    protected:
+        /* Used as a second destructor pass */
+        virtual void cleanup() {
 
-        void rename(std::string name);
+        }
 
-        std::string name();
+        virtual void enable_fullscreen(bool enable) = 0;
 
-        void close();
+        virtual void resize(ivec2 size) = 0;
+
+        virtual void rename(std::string name) = 0;
     };
 
 } // namespace hut

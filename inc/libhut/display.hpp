@@ -36,18 +36,15 @@ namespace hut {
     class base_display {
     public:
         virtual ~base_display() {
-
         }
 
-        void post(std::function<void()> calllback);
+        virtual void post(std::function<void()> calllback) = 0;
 
-        template<typename Rep, typename Period>
-        void post_delayed(std::function<void()> calllback, std::chrono::duration<Rep, Period> delay);
+        virtual void post_delayed(std::function<void()> calllback, std::chrono::milliseconds delay) = 0;
 
-        template<typename Rep, typename Period>
-        void schedule(std::function<void()> calllback, std::chrono::duration<Rep, Period> delay);
+        virtual void schedule(std::function<void()> calllback, std::chrono::milliseconds delay) = 0;
 
-        void flush();
+        virtual void flush() = 0;
     };
 
 } //namespace hut

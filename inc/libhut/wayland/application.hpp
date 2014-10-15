@@ -37,6 +37,13 @@ namespace hut {
     protected:
         virtual ~application() {
         }
+
+        virtual uint16_t max_texture_size();
+
+    protected:
+        virtual int entry(int argc, char **argv);
+
+        virtual bool loop();
     };
 
 #define HUT_MAIN(app_type) int main(int argc, char** argv) { \

@@ -34,9 +34,24 @@
 
 namespace hut {
 
-    template<typename Tegl_surface = egl_surface>
-    class egl_window : public base_window<Tegl_surface> {
+    class egl_window : public base_window {
     public:
+        egl_window(const display& dpy, const std::string& title, bool translucent = false, window_decoration_type deco = DSYSTEM)
+                : base_window(dpy, title, translucent, deco) {
+        }
+
+        ~egl_window() {
+            eglMakeCurrent(this->dpy.egl_dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+            eglDestroySurface(this->dpy.egl_dpy, this->egl_surf);
+        }
+
+    protected:
+        EGLNativeWindowType native_win;
+        EGLSurface egl_surf;
+
+        void init_egl_window(EGLNativeWindowType win) {
+            egl_surf = eglCreateWindowSurface(this->dpy.egl_dpy, this->dpy.egl_conf, win, NULL);
+        }
     };
 
 } //namespace hut

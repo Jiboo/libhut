@@ -34,16 +34,17 @@
 namespace hut {
 
     class mesh;
+    class batch;
 
     class base_surface {
     public:
-        vec2 size() const;
+        event<ivec2 /*new_size*/> on_resize;
 
-        unsigned short density() const;
+        virtual const ivec2& size() const = 0;
+        virtual unsigned short density() const = 0;
 
-        event<vec2 /*new_size*/> on_resize;
-
-        void draw(const mesh &m);
+        virtual void draw(const mesh &m) = 0;
+        virtual void draw(const batch &b) = 0;
     };
 
 } // namespace hut

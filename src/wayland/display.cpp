@@ -149,7 +149,7 @@ namespace hut {
         wl_registry_add_listener(registry, &registry_listener(), this);
         wl_display_dispatch(wl_dpy);
 
-        egl_init(wl_dpy);
+        egl_init_display(wl_dpy);
     }
 
     display::~display() {
@@ -167,5 +167,21 @@ namespace hut {
 
         wl_display_flush(wl_dpy);
         wl_display_disconnect(wl_dpy);
+    }
+
+    void display::post(std::function<void()> calllback) {
+
+    }
+
+    void display::post_delayed(std::function<void()> calllback, std::chrono::milliseconds delay) {
+
+    }
+
+    void display::schedule(std::function<void()> calllback, std::chrono::milliseconds delay) {
+
+    }
+
+    void display::flush() {
+
     }
 } //namespace hut

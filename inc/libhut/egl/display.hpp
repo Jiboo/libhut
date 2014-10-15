@@ -36,6 +36,8 @@
 namespace hut {
 
     class egl_display : public base_display {
+        friend class egl_window;
+
     public:
         virtual ~egl_display() {
             eglTerminate(egl_dpy);
@@ -46,7 +48,7 @@ namespace hut {
         EGLConfig egl_conf = nullptr;
         EGLContext egl_ctx = nullptr;
 
-        void egl_init(NativeDisplayType display);
+        void egl_init_display(EGLNativeDisplayType display);
     };
 
 } //namespace hut

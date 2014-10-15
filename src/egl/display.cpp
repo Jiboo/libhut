@@ -37,7 +37,7 @@
 
 namespace hut {
 
-    void egl_display::egl_init(NativeDisplayType display) {
+    void egl_display::egl_init_display(NativeDisplayType display) {
         static const EGLint context_attribs[] = {
                 EGL_CONTEXT_CLIENT_VERSION, 2,
                 EGL_NONE
@@ -74,6 +74,7 @@ namespace hut {
         ret = eglChooseConfig(egl_dpy, config_attribs, configs, count, &n);
         runtime_assert(ret && n >= 1, "eglChooseConfig failed");
 
+        //TODO 8888, 565, 1111, 111 ?
         for(size_t i = 0; i < n; i++) {
             EGLint size;
             eglGetConfigAttrib(egl_dpy, configs[i], EGL_BUFFER_SIZE, &size);

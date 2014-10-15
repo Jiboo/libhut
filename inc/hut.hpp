@@ -29,36 +29,12 @@
 #pragma once
 
 #include "libhut/event.hpp"
+#include "libhut/property.hpp"
+#include "libhut/vec.hpp"
+#include "libhut/mat.hpp"
+#include "libhut/utils.hpp"
+
+#include "libhut/application.hpp"
 #include "libhut/display.hpp"
+#include "libhut/surface.hpp"
 #include "libhut/window.hpp"
-
-namespace hut {
-
-    class base_application {
-    public:
-        static const display &auto_display();
-
-        event<> on_pause, on_resume;
-        bool stop;
-
-        virtual ~base_application() {
-        }
-
-        virtual uint16_t max_texture_size() = 0;
-
-    protected:
-        virtual int entry(int argc, char **argv) {
-            throw std::runtime_error("Entry not overloaded, rtfm.");
-            return EXIT_FAILURE;
-        }
-
-        virtual bool loop() = 0;
-    };
-
-} //namespace hut
-
-#ifdef HUT_WAYLAND
-
-#include "libhut/wayland/application.hpp"
-
-#endif
