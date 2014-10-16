@@ -36,6 +36,7 @@ namespace hut {
     public:
     protected:
         virtual ~application() {
+            eglReleaseThread();
         }
 
         virtual uint16_t max_texture_size();

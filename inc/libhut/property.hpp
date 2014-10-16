@@ -66,8 +66,12 @@ namespace hut {
         setter_t setter;
 
     public:
-        buffed(setter_t setter) : setter(setter) { // Wow! Ugly.
+        buffed(setter_t setter, const T& seed) : data(seed), setter(setter) {
 
+        }
+
+        void cache(const T& _data) {
+            data = _data;
         }
 
         const T& operator=(const T& _data) {
@@ -77,6 +81,10 @@ namespace hut {
         }
 
         operator const T&() const {
+            return data;
+        }
+
+        const T& get() const {
             return data;
         }
     };

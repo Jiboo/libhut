@@ -37,6 +37,7 @@ namespace hut {
 
     class egl_display : public base_display {
         friend class egl_window;
+        friend class window;
 
     public:
         virtual ~egl_display() {

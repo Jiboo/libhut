@@ -36,7 +36,7 @@ namespace hut {
 
     class egl_window : public base_window {
     public:
-        egl_window(const display& dpy, const std::string& title, bool translucent = false, window_decoration_type deco = DSYSTEM)
+        egl_window(display& dpy, const std::string& title, bool translucent = false, window_decoration_type deco = DSYSTEM)
                 : base_window(dpy, title, translucent, deco) {
         }
 
@@ -46,7 +46,6 @@ namespace hut {
         }
 
     protected:
-        EGLNativeWindowType native_win;
         EGLSurface egl_surf;
 
         void init_egl_window(EGLNativeWindowType win) {

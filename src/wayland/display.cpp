@@ -30,12 +30,13 @@
 #include "libhut/wayland/xdg-shell-client-protocol.h"
 
 #include "libhut/wayland/display.hpp"
+#include "libhut/wayland/window.hpp"
 
 namespace hut {
 
     void display::seat_handle_capabilities(void *data, struct wl_seat *seat,
             uint32_t caps) {
-        static const struct wl_pointer_listener pointer_listener = {
+        static const struct wl_pointer_listener pointer_listeners = {
                 pointer_handle_enter,
                 pointer_handle_leave,
                 pointer_handle_motion,
@@ -47,13 +48,13 @@ namespace hut {
 
         if ((caps & WL_SEAT_CAPABILITY_POINTER) && !d->pointer) {
             d->pointer = wl_seat_get_pointer(seat);
-            wl_pointer_add_listener(d->pointer, &pointer_listener, d);
+            wl_pointer_add_listener(d->pointer, &pointer_listeners, d);
         } else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && d->pointer) {
             wl_pointer_destroy(d->pointer);
             d->pointer = NULL;
         }
 
-        static const struct wl_keyboard_listener keyboard_listener = {
+        static const struct wl_keyboard_listener keyboard_listeners = {
                 keyboard_handle_keymap,
                 keyboard_handle_enter,
                 keyboard_handle_leave,
@@ -64,13 +65,13 @@ namespace hut {
 
         if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !d->keyboard) {
             d->keyboard = wl_seat_get_keyboard(seat);
-            wl_keyboard_add_listener(d->keyboard, &keyboard_listener, d);
+            wl_keyboard_add_listener(d->keyboard, &keyboard_listeners, d);
         } else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && d->keyboard) {
             wl_keyboard_destroy(d->keyboard);
             d->keyboard = NULL;
         }
 
-        static const struct wl_touch_listener touch_listener = {
+        static const struct wl_touch_listener touch_listeners = {
                 touch_handle_down,
                 touch_handle_up,
                 touch_handle_motion,
@@ -81,7 +82,7 @@ namespace hut {
         if ((caps & WL_SEAT_CAPABILITY_TOUCH) && !d->touch) {
             d->touch = wl_seat_get_touch(seat);
             wl_touch_set_user_data(d->touch, d);
-            wl_touch_add_listener(d->touch, &touch_listener, d);
+            wl_touch_add_listener(d->touch, &touch_listeners, d);
         } else if (!(caps & WL_SEAT_CAPABILITY_TOUCH) && d->touch) {
             wl_touch_destroy(d->touch);
             d->touch = NULL;
@@ -106,7 +107,7 @@ namespace hut {
                 seat_handle_name
         };
 
-        static const struct xdg_shell_listener shell_listener = {
+        static const struct xdg_shell_listener shell_listeners = {
                 &hut::display::shell_ping,
         };
 
@@ -115,7 +116,7 @@ namespace hut {
 
         } else if (strcmp(interface, "xdg_shell") == 0) {
             d->shell = (xdg_shell*) wl_registry_bind(registry, name, &xdg_shell_interface, 1);
-            xdg_shell_add_listener(d->shell, &shell_listener, d);
+            xdg_shell_add_listener(d->shell, &shell_listeners, d);
             xdg_shell_use_unstable_version(d->shell, XDG_VERSION);
 
         } else if (strcmp(interface, "wl_seat") == 0) {
@@ -150,6 +151,10 @@ namespace hut {
         wl_display_dispatch(wl_dpy);
 
         egl_init_display(wl_dpy);
+
+        printf("EGL_VERSION = %s\n", eglQueryString(egl_dpy, EGL_VERSION));
+        printf("EGL_VENDOR = %s\n", eglQueryString(egl_dpy, EGL_VENDOR));
+        printf("EGL_EXTENSIONS = %s\n", eglQueryString(egl_dpy, EGL_EXTENSIONS));
     }
 
     display::~display() {
@@ -182,6 +187,13 @@ namespace hut {
     }
 
     void display::flush() {
-
+        wl_display_flush(wl_dpy);
     }
+
+    void display::dispatch_draw() {
+        for(window* win : active_wins) {
+            win->dispatch_draw();
+        }
+    }
+
 } //namespace hut

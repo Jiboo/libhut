@@ -88,6 +88,8 @@ namespace hut {
 
         egl_ctx = eglCreateContext(egl_dpy, egl_conf, EGL_NO_CONTEXT, context_attribs);
         runtime_assert(egl_ctx != nullptr, "eglCreateContext failed");
+
+        eglSwapInterval(egl_dpy, 0);
     }
 
 } //namespace hut

@@ -36,10 +36,10 @@ namespace hut {
 
     class base_application {
     public:
-        static const display &auto_display();
+        static display &auto_display();
 
-        event<> on_pause, on_resume;
-        bool stop;
+        event<> on_pause, on_resume, on_redraw;
+        bool stop = false;
 
         virtual ~base_application() {
         }

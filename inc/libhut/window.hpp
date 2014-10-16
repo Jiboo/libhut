@@ -79,13 +79,13 @@ namespace hut {
         event<char32_t /*utf32_char*/, bool /*down*/> on_char;
         event<keyboard_control_type, bool /*down*/> on_ctrl;
 
-        buffed<bool> fullscreen { [this](auto b) { this->enable_fullscreen(b); } };
-        buffed<ivec2> size { [this](auto v) { this->resize(v); } };
-        buffed<std::string> name { [this](auto s) { this->rename(s); } };
+        buffed<bool> fullscreen { [this](auto b) { this->enable_fullscreen(b); }, false };
+        buffed<ivec2> buffed_size { [this](auto v) { this->resize(v); }, {{0, 0}} };
+        buffed<std::string> name { [this](auto s) { this->rename(s); }, "" };
 
-        const display& dpy;
+        display& dpy;
 
-        base_window(const display& dpy, const std::string& title, bool translucent = false, window_decoration_type deco = DSYSTEM)
+        base_window(display& dpy, const std::string& title, bool translucent = false, window_decoration_type deco = DSYSTEM)
                 : view_node(nullptr), dpy(dpy) {
         }
 

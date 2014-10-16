@@ -31,6 +31,7 @@
 #include <cstring>
 
 #include <string>
+#include <list>
 
 #include <wayland-client.h>
 
@@ -43,7 +44,12 @@
 #endif
 
 namespace hut {
+    class window;
+
     class display : public egl_display {
+        friend class window;
+        friend class application;
+
     public:
         display(const std::string &name);
 
@@ -72,6 +78,7 @@ namespace hut {
         struct wl_cursor_theme *cursor_theme;
         struct wl_cursor *default_cursor;
         struct wl_surface *cursor_surface;
+        std::list<window*> active_wins;
 
         static void pointer_handle_enter(void *data, struct wl_pointer *pointer,
                 uint32_t serial, struct wl_surface *surface,
@@ -143,6 +150,8 @@ namespace hut {
             };
             return listeners;
         }
+
+        virtual void dispatch_draw();
     };
 
 } //namespace hut

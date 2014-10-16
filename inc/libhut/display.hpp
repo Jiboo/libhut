@@ -45,6 +45,9 @@ namespace hut {
         virtual void schedule(std::function<void()> calllback, std::chrono::milliseconds delay) = 0;
 
         virtual void flush() = 0;
+
+    protected:
+        virtual void dispatch_draw() = 0;
     };
 
 } //namespace hut

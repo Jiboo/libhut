@@ -40,7 +40,7 @@ namespace hut {
     public:
         event<ivec2 /*new_size*/> on_resize;
 
-        virtual const ivec2& size() const = 0;
+        virtual ivec2 size() const = 0;
         virtual unsigned short density() const = 0;
 
         virtual void draw(const mesh &m) = 0;

@@ -37,18 +37,19 @@
 namespace hut {
 
     class window : public egl_window {
+        friend class display;
+        friend void redraw_gl(window *window);
+
     public:
-        window(const display& dpy, const std::string& title, bool translucent = false,
+        window(display& dpy, const std::string& title, bool translucent = false,
                 window_decoration_type deco = DSYSTEM);
 
         ~window() {
+            dpy.active_wins.remove(this);
             wl_egl_window_destroy(wl_win);
-
-            if (callback)
-                wl_callback_destroy(callback);
         }
 
-        virtual const ivec2& size() const;
+        virtual ivec2 size() const;
         virtual short unsigned int density() const;
         virtual void draw(const hut::mesh&);
         virtual void draw(const hut::batch&);
@@ -63,14 +64,21 @@ namespace hut {
     protected:
         struct wl_egl_window *wl_win;
         struct wl_surface *wl_surf;
-        struct wl_callback *callback;
         struct xdg_surface *xdg_surface;
+        bool redraw = false;
 
         virtual void cleanup() {
             egl_window::cleanup();
             xdg_surface_destroy(xdg_surface);
             wl_surface_destroy(wl_surf);
         }
+
+        static void handle_surface_delete(void *data, struct xdg_surface *xdg_surface);
+        static void handle_surface_configure(void *data, struct xdg_surface *surface,
+                int32_t width, int32_t height,
+                struct wl_array *states, uint32_t serial);
+
+        virtual void dispatch_draw();
     };
 
 } //namespace hut

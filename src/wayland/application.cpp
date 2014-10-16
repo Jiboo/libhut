@@ -40,20 +40,22 @@ namespace hut {
         return result;
     }
 
-    const display &base_application::auto_display() {
+    display &base_application::auto_display() {
         static display def{nullptr};
         return def;
     }
 
     int application::entry(int argc, char **argv) {
         while(!this->stop && loop()) {
-
         }
         return EXIT_SUCCESS;
     }
 
     bool application::loop() {
-        return false;
+        //FIXME Dispatch all displays
+        wl_display_dispatch_pending(auto_display().wl_dpy);
+        auto_display().dispatch_draw();
+        return true;
     }
 
 } //namespace hut

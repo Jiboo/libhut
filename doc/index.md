@@ -10,19 +10,19 @@ libhut: hobby moden-C++ UI toolkit library.
 
 * Math
     * http://www.reedbeta.com/blog/2013/12/28/on-vector-math-libraries/
-    
+
 * Lines
     * http://artgrammer.blogspot.com/search/label/opengl
-    
+
 * PorterDuff
     * http://www.quake-1.com/docs/blending.jpg
     * http://image.slidesharecdn.com/08blend-120215155211-phpapp02/95/cs-354-blending-compositing-antialiasing-44-728.jpg?cb=1329343056
         * in http://slideshare.net/Mark_Kilgard/08blend
-        
+
 * Text
     * https://github.com/rougier/freetype-gl
     * http://http.developer.nvidia.com/GPUGems3/gpugems3_ch25.html
-    
+
 * Windows
     * https://code.google.com/p/angleproject/
 
@@ -103,4 +103,4 @@ libhut: hobby moden-C++ UI toolkit library.
 * All parameters that takes a color are RGBA uint32_t
 * Supported pixel formats are RGBA_8888, RGBA_4444, RGB_565, LA_88, L_8
 * Some custom units, with user literal operators: deg, rad, px, dp, sp, rel
-* Expose multiple: displays, windows, input devices, gpu?
+* Expose and assume multiple: displays, windows, input devices, gpu?

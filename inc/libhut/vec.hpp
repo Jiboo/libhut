@@ -141,9 +141,9 @@ namespace hut {
     using dvec3 = vec<double, 3>;
     using dvec4 = vec<double, 4>;
 
-    using ivec2 = vec<double, 2>;
-    using ivec3 = vec<double, 3>;
-    using ivec4 = vec<double, 4>;
+    using ivec2 = vec<int, 2>;
+    using ivec3 = vec<int, 3>;
+    using ivec4 = vec<int, 4>;
 
     template<typename _Type, size_t _Size>
     std::ostream &operator<<(std::ostream &os, const vec<_Type, _Size> &v) {
