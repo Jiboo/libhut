@@ -75,7 +75,8 @@ namespace hut {
         runtime_assert(ret && n >= 1, "eglChooseConfig failed");
 
         //TODO 8888, 565, 1111, 111 ?
-        for(size_t i = 0; i < n; i++) {
+        egl_conf = nullptr;
+        for(int i = 0; i < n; i++) {
             EGLint size;
             eglGetConfigAttrib(egl_dpy, configs[i], EGL_BUFFER_SIZE, &size);
             if (size == 32) {
@@ -84,12 +85,12 @@ namespace hut {
             }
         }
         free(configs);
-        runtime_assert(ret && n >= 1, "did not find config with buffer size 32");
+        runtime_assert(egl_conf != nullptr, "did not find config with buffer size 32");
 
         egl_ctx = eglCreateContext(egl_dpy, egl_conf, EGL_NO_CONTEXT, context_attribs);
         runtime_assert(egl_ctx != nullptr, "eglCreateContext failed");
 
-        eglSwapInterval(egl_dpy, 0);
+        runtime_assert(eglGetError() == EGL_SUCCESS, "EGL error");
     }
 
 } //namespace hut

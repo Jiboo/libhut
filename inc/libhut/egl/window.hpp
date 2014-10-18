@@ -46,10 +46,11 @@ namespace hut {
         }
 
     protected:
-        EGLSurface egl_surf;
+        EGLSurface egl_surf = nullptr;
 
         void init_egl_window(EGLNativeWindowType win) {
             egl_surf = eglCreateWindowSurface(this->dpy.egl_dpy, this->dpy.egl_conf, win, NULL);
+            runtime_assert(eglGetError() == EGL_SUCCESS, "eglCreateWindowSurface failed");
         }
     };
 

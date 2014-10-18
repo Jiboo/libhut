@@ -62,10 +62,10 @@ namespace hut {
         virtual void rename(std::string);
 
     protected:
-        struct wl_egl_window *wl_win;
-        struct wl_surface *wl_surf;
-        struct xdg_surface *xdg_surface;
-        bool redraw = false;
+        struct wl_egl_window *wl_win = nullptr;
+        struct wl_surface *wl_surf = nullptr;
+        struct xdg_surface *xdg_surface = nullptr;
+        bool redraw = true;
 
         virtual void cleanup() {
             egl_window::cleanup();

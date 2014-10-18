@@ -37,7 +37,7 @@ namespace hut {
     class egl_surface : public base_surface {
     public:
     protected:
-        EGLSurface egl_surf;
+        EGLSurface egl_surf = nullptr;
     };
 
 } //namespace hut

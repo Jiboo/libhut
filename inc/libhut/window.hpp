@@ -41,7 +41,7 @@
 namespace hut {
 
     enum pointer_event_type {
-        MDOWN, MUP, MMOVE
+        PDOWN, PUP, PMOVE, PENTER, PLEAVE
     };
 
     enum keyboard_control_type {
@@ -75,12 +75,13 @@ namespace hut {
         event<> on_pause, on_resume;
         event<std::string /*path*/, vec2 /*pos*/> on_drop;
 
-        event<uint8_t /*pointer*/, uint8_t /*button*/, pointer_event_type, vec2 /*pos*/> on_pointer;
+        event<uint8_t /*pointer*/, uint8_t /*button*/, pointer_event_type, ivec2 /*pos*/> on_cursor;
+        event<uint8_t /*touchscreen*/, uint8_t /*finger*/, pointer_event_type, ivec2 /*pos*/> on_touch;
         event<char32_t /*utf32_char*/, bool /*down*/> on_char;
         event<keyboard_control_type, bool /*down*/> on_ctrl;
 
         buffed<bool> fullscreen { [this](auto b) { this->enable_fullscreen(b); }, false };
-        buffed<ivec2> buffed_size { [this](auto v) { this->resize(v); }, {{0, 0}} };
+        buffed<ivec2> buffed_size { [this](auto v) { this->resize(v); }, {{500, 500}} };
         buffed<std::string> name { [this](auto s) { this->rename(s); }, "" };
 
         display& dpy;

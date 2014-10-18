@@ -149,9 +149,6 @@ namespace hut {
                 { 0, 0, 0, 1 }
         };
         static const uint32_t speed_div = 5, benchmark_interval = 5;
-        struct wl_region *region;
-        EGLint rect[4];
-        EGLint buffer_age = 0;
         struct timeval tv;
 
         gettimeofday(&tv, NULL);
@@ -202,19 +199,26 @@ namespace hut {
 
         xdg_surface_add_listener(xdg_surface, &xdg_surface_listeners, this);
 
-        wl_win = wl_egl_window_create(wl_surf, 200, 300);
+        wl_win = wl_egl_window_create(wl_surf, buffed_size.get()[0], buffed_size.get()[1]);
         init_egl_window(wl_win);
 
         xdg_surface_set_title(xdg_surface, title.c_str());
 
         //FIXME
-        EGLBoolean ret = eglMakeCurrent(dpy.egl_dpy, egl_surf, egl_surf, dpy.egl_ctx);
+        //xdg_surface_set_fullscreen(xdg_surface, NULL);
+
+        assert(eglMakeCurrent(dpy.egl_dpy, egl_surf, egl_surf, dpy.egl_ctx) == EGL_TRUE);
+
+        GLint ret = eglSwapInterval(dpy.egl_dpy, 0);
+        runtime_assert(ret == EGL_TRUE, "eglSwapInterval failed");
+
         init_gl(this);
 
         dpy.active_wins.emplace_back(this);
     }
 
     ivec2 window::size() const {
+
         ivec2 result;
         wl_egl_window_get_attached_size(wl_win, result.data, result.data + 1);
         return result;
@@ -249,7 +253,7 @@ namespace hut {
     }
 
     void window::resize(hut::ivec2) {
-
+        //xdg_surface_resize(xdg_surface, dpy.seat, , location);
     }
 
     void window::rename(std::string) {
@@ -304,9 +308,12 @@ namespace hut {
             } else {
                 wl_surface_set_opaque_region(wl_surf, NULL);
             }
-            eglSwapBuffers(wl_win, egl_surf);
+
+            ret = eglSwapBuffers(dpy.egl_dpy, egl_surf);
+            assert(ret == EGL_TRUE);
+
             frames++;
-            redraw = false;
+            //redraw = false; FIXME
         }
     }
 

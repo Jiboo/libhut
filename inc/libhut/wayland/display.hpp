@@ -51,8 +51,6 @@ namespace hut {
         friend class application;
 
     public:
-        display(const std::string &name);
-
         display(const char *name);
 
         virtual ~display();
@@ -66,18 +64,18 @@ namespace hut {
         virtual void flush();
 
     protected:
-        struct wl_display *wl_dpy;
-        struct wl_registry *registry;
-        struct wl_compositor *compositor;
-        struct xdg_shell *shell;
-        struct wl_seat *seat;
-        struct wl_pointer *pointer;
-        struct wl_touch *touch;
-        struct wl_keyboard *keyboard;
-        struct wl_shm *shm;
-        struct wl_cursor_theme *cursor_theme;
-        struct wl_cursor *default_cursor;
-        struct wl_surface *cursor_surface;
+        struct wl_display *wl_dpy = nullptr;
+        struct wl_registry *registry = nullptr;
+        struct wl_compositor *compositor = nullptr;
+        struct xdg_shell *shell = nullptr;
+        struct wl_seat *seat = nullptr;
+        struct wl_pointer *pointer = nullptr;
+        struct wl_touch *touch = nullptr;
+        struct wl_keyboard *keyboard = nullptr;
+        struct wl_shm *shm = nullptr;
+        struct wl_cursor_theme *cursor_theme = nullptr;
+        struct wl_cursor *default_cursor = nullptr;
+        struct wl_surface *cursor_surface = nullptr;
         std::list<window*> active_wins;
 
         static void pointer_handle_enter(void *data, struct wl_pointer *pointer,
@@ -144,7 +142,6 @@ namespace hut {
 
         const wl_registry_listener &registry_listener() {
             static wl_registry_listener listeners = {
-
                     &hut::display::registry_handle_global,
                     &hut::display::registry_handle_global_remove
             };

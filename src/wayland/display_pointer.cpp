@@ -42,7 +42,7 @@ namespace hut {
         if (false) // TODO window->fullscreen
             wl_pointer_set_cursor(pointer, serial, NULL, 0, 0);
         else if (cursor) {
-            image = d->default_cursor->images[0];
+            /*image = d->default_cursor->images[0];
             buffer = wl_cursor_image_get_buffer(image);
             if (!buffer)
                 return;
@@ -53,7 +53,7 @@ namespace hut {
             wl_surface_attach(d->cursor_surface, buffer, 0, 0);
             wl_surface_damage(d->cursor_surface, 0, 0,
                     image->width, image->height);
-            wl_surface_commit(d->cursor_surface);
+            wl_surface_commit(d->cursor_surface);*/
         }
     }
 

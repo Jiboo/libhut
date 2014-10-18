@@ -99,7 +99,7 @@ libhut: hobby moden-C++ UI toolkit library.
 #<cldoc:Conventions>
 
 * Matrices are row major
-* Origin is top-left, surface units (position/size) are all uint16_t pixels, density is in dpi
+* Origin is top-left, surface units (position/size) are all int32_t pixels, density is in dpi
 * All parameters that takes a color are RGBA uint32_t
 * Supported pixel formats are RGBA_8888, RGBA_4444, RGB_565, LA_88, L_8
 * Some custom units, with user literal operators: deg, rad, px, dp, sp, rel
