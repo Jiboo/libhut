@@ -44,8 +44,8 @@ namespace hut {
         TDOWN, TUP, TMOVE
     };
 
-    enum cursor_event_type {
-        PDOWN, PUP, PMOVE, PENTER, PLEAVE, PWHEEL_UP, PWHEEL_DOWN
+    enum mouse_event_type {
+        MDOWN, MUP, MMOVE, MENTER, MLEAVE, MWHEEL_UP, MWHEEL_DOWN
     };
 
     enum keyboard_control_type {
@@ -79,8 +79,9 @@ namespace hut {
         event<> on_pause, on_resume;
         event<std::string /*path*/, vec2 /*pos*/> on_drop;
 
-        event<uint8_t /*pointer*/, uint8_t /*button*/, touch_event_type, ivec2 /*pos*/> on_touch;
-        event<uint8_t /*touchscreen*/, uint8_t /*finger*/, cursor_event_type, ivec2 /*pos*/> on_cursor;
+        event<uint8_t /*finger*/, touch_event_type, ivec2 /*pos*/> on_touch;
+        event<uint8_t /*button*/, mouse_event_type, ivec2 /*pos*/> on_mouse;
+        event<uint8_t /*axis*/, float /*pos*/> on_axis;
         event<char32_t /*utf32_char*/, bool /*down*/> on_char;
         event<keyboard_control_type, bool /*down*/> on_ctrl;
 

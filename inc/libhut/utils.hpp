@@ -40,6 +40,7 @@ namespace hut {
     }
 
     inline std::string to_utf8(char32_t ch) {
+        //Credits to libcaca
         static const uint8_t mark[7] = {
                 0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC
         };

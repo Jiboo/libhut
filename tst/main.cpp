@@ -54,6 +54,21 @@ public:
             return true;
         });
 
+        main.on_mouse.connect([](uint8_t button, hut::mouse_event_type type, hut::ivec2 pos) {
+            std::cout << "mouse event ";
+            switch(type) {
+                case hut::MDOWN: std::cout << "MDOWN"; break;
+                case hut::MUP: std::cout << "MUP"; break;
+                case hut::MMOVE: std::cout << "MMOVE"; break;
+                case hut::MENTER: std::cout << "MENTER"; break;
+                case hut::MLEAVE: std::cout << "MLEAVE"; break;
+                case hut::MWHEEL_UP: std::cout << "MWHEEL_UP"; break;
+                case hut::MWHEEL_DOWN: std::cout << "MWHEEL_DOWN"; break;
+            }
+            std::cout << " at " << pos << " with button " << (int)button << std::endl;
+            return true;
+        });
+
         ::testing::InitGoogleTest(&argc, argv);
         int result = RUN_ALL_TESTS();
 

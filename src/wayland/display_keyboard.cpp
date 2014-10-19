@@ -102,41 +102,41 @@ namespace hut {
 
         for(window* win : d->active_wins) {
             switch(key) {
-                case KEY_F1: win->on_ctrl.fire(KF1, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_F2: win->on_ctrl.fire(KF2, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_F3: win->on_ctrl.fire(KF3, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_F4: win->on_ctrl.fire(KF4, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_F5: win->on_ctrl.fire(KF5, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_F6: win->on_ctrl.fire(KF6, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_F7: win->on_ctrl.fire(KF7, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_F8: win->on_ctrl.fire(KF8, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_F9: win->on_ctrl.fire(KF9, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
+                case KEY_F1: win->on_ctrl.fire(KF1, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_F2: win->on_ctrl.fire(KF2, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_F3: win->on_ctrl.fire(KF3, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_F4: win->on_ctrl.fire(KF4, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_F5: win->on_ctrl.fire(KF5, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_F6: win->on_ctrl.fire(KF6, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_F7: win->on_ctrl.fire(KF7, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_F8: win->on_ctrl.fire(KF8, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_F9: win->on_ctrl.fire(KF9, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
 
-                case KEY_ESC: win->on_ctrl.fire(KESCAPE, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
+                case KEY_ESC: win->on_ctrl.fire(KESCAPE, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
 
-                case KEY_BACKSPACE: win->on_ctrl.fire(KBACKSPACE, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_DELETE: win->on_ctrl.fire(KDELETE, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_INSERT: win->on_ctrl.fire(KINSER, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
+                case KEY_BACKSPACE: win->on_ctrl.fire(KBACKSPACE, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_DELETE: win->on_ctrl.fire(KDELETE, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_INSERT: win->on_ctrl.fire(KINSER, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
 
-                case KEY_UP: win->on_ctrl.fire(KUP, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_RIGHT: win->on_ctrl.fire(KRIGHT, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_DOWN: win->on_ctrl.fire(KDOWN, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_LEFT: win->on_ctrl.fire(KLEFT, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
+                case KEY_UP: win->on_ctrl.fire(KUP, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_RIGHT: win->on_ctrl.fire(KRIGHT, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_DOWN: win->on_ctrl.fire(KDOWN, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_LEFT: win->on_ctrl.fire(KLEFT, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
 
-                case KEY_VOLUMEUP: win->on_ctrl.fire(KVOLUME_UP, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_VOLUMEDOWN: win->on_ctrl.fire(KVOLUME_DOWN, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
+                case KEY_VOLUMEUP: win->on_ctrl.fire(KVOLUME_UP, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_VOLUMEDOWN: win->on_ctrl.fire(KVOLUME_DOWN, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
 
-                case KEY_PAGEUP: win->on_ctrl.fire(KPAGE_UP, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_PAGEDOWN: win->on_ctrl.fire(KPAGE_DOWN, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
+                case KEY_PAGEUP: win->on_ctrl.fire(KPAGE_UP, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_PAGEDOWN: win->on_ctrl.fire(KPAGE_DOWN, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
 
-                case KEY_LEFTALT: win->on_ctrl.fire(KALT_LEFT, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_RIGHTALT: win->on_ctrl.fire(KALT_RIGHT, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
+                case KEY_LEFTALT: win->on_ctrl.fire(KALT_LEFT, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_RIGHTALT: win->on_ctrl.fire(KALT_RIGHT, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
 
-                case KEY_LEFTCTRL: win->on_ctrl.fire(KCTRL_LEFT, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_RIGHTCTRL: win->on_ctrl.fire(KCTRL_RIGHT, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
+                case KEY_LEFTCTRL: win->on_ctrl.fire(KCTRL_LEFT, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_RIGHTCTRL: win->on_ctrl.fire(KCTRL_RIGHT, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
 
-                case KEY_LEFTSHIFT: win->on_ctrl.fire(KSHIFT_LEFT, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
-                case KEY_RIGHTSHIFT: win->on_ctrl.fire(KSHIFT_RIGHT, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0); break;
+                case KEY_LEFTSHIFT: win->on_ctrl.fire(KSHIFT_LEFT, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
+                case KEY_RIGHTSHIFT: win->on_ctrl.fire(KSHIFT_RIGHT, state == WL_KEYBOARD_KEY_STATE_PRESSED); break;
 
                 default: {
                     const xkb_keysym_t *syms;
@@ -147,7 +147,7 @@ namespace hut {
                     if (num_syms == 1) {
                         uint32_t ch = xkb_keysym_to_utf32(syms[0]);
                         if(ch != 0)
-                            win->on_char.fire(ch, (state & WL_KEYBOARD_KEY_STATE_PRESSED) != 0);
+                            win->on_char.fire(ch, state == WL_KEYBOARD_KEY_STATE_PRESSED);
                     }
                 }
             }

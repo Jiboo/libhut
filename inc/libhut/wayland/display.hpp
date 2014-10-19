@@ -40,6 +40,7 @@
 #include <xkbcommon/xkbcommon.h>
 
 #include "libhut/utils.hpp"
+#include "libhut/vec.hpp"
 #include "libhut/egl/display.hpp"
 
 #define XDG_VERSION 4 /* The version of xdg-shell that we implement */
@@ -82,7 +83,10 @@ namespace hut {
         xkb_mod_mask_t xkb_alt_mask;
         xkb_mod_mask_t xkb_shift_mask;
 
+        ivec2 last_pos;
+
         std::list<window*> active_wins;
+        window* active_win;
 
         static void pointer_handle_enter(void *data, struct wl_pointer *pointer,
                 uint32_t serial, struct wl_surface *surface,

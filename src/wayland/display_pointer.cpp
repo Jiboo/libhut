@@ -27,8 +27,11 @@
  */
 
 #include <wayland-cursor.h>
+#include <linux/input.h>
+#include <iostream>
 
 #include "libhut/wayland/display.hpp"
+#include "libhut/wayland/window.hpp"
 
 namespace hut {
 
@@ -55,26 +58,48 @@ namespace hut {
                     image->width, image->height);
             wl_surface_commit(d->cursor_surface);*/
         }
+
+        d->last_pos = {{wl_fixed_to_int(sx), wl_fixed_to_int(sy)}};
+
+        for(window* win : d->active_wins) {
+            if(win->wl_surf == surface) {
+                d->active_win = win;
+                win->on_mouse.fire(-1, MENTER, d->last_pos);
+            }
+        }
     }
 
     void display::pointer_handle_leave(void *data, struct wl_pointer *pointer,
             uint32_t serial, struct wl_surface *surface) {
+        display *d = (display*)data;
+
+        for(window* win : d->active_wins) {
+            if(win->wl_surf == surface)
+                win->on_mouse.fire(-1, MLEAVE, d->last_pos);
+        }
     }
 
     void display::pointer_handle_motion(void *data, struct wl_pointer *pointer,
             uint32_t time, wl_fixed_t sx, wl_fixed_t sy) {
+        display *d = (display*)data;
+
+        d->last_pos = {{wl_fixed_to_int(sx), wl_fixed_to_int(sy)}};
+
+        d->active_win->on_mouse.fire(-1, MMOVE, d->last_pos);
     }
 
     void display::pointer_handle_button(void *data, struct wl_pointer *wl_pointer,
             uint32_t serial, uint32_t time, uint32_t button, uint32_t state) {
-        //struct display *display = (display*)data;
+        display *d = (display*)data;
 
-        /*TODO if (button == BTN_LEFT && state == WL_POINTER_BUTTON_STATE_PRESSED)
-            xdg_surface_move(display->window->xdg_surface, display->seat, serial);*/
+        d->active_win->on_mouse.fire((button - 0x110), state == WL_POINTER_BUTTON_STATE_PRESSED ? MDOWN : MUP, d->last_pos);
     }
 
     void display::pointer_handle_axis(void *data, struct wl_pointer *wl_pointer,
             uint32_t time, uint32_t axis, wl_fixed_t value) {
+        display *d = (display*)data;
+
+        d->active_win->on_axis.fire(axis, value);
     }
 
 } //namespace hut
