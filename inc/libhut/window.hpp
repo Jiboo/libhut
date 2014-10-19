@@ -40,14 +40,18 @@
 
 namespace hut {
 
-    enum pointer_event_type {
-        PDOWN, PUP, PMOVE, PENTER, PLEAVE
+    enum touch_event_type {
+        TDOWN, TUP, TMOVE
+    };
+
+    enum cursor_event_type {
+        PDOWN, PUP, PMOVE, PENTER, PLEAVE, PWHEEL_UP, PWHEEL_DOWN
     };
 
     enum keyboard_control_type {
         KALT_LEFT, KALT_RIGHT,
         KCTRL_LEFT, KCTRL_RIGHT,
-        KWHEEL_UP, KWHEEL_DOWN,
+        KSHIFT_LEFT, KSHIFT_RIGHT,
         KPAGE_UP, KPAGE_DOWN,
         KVOLUME_UP, KVOLUME_DOWN,
         KUP, KRIGHT, KDOWN, KLEFT,
@@ -75,14 +79,16 @@ namespace hut {
         event<> on_pause, on_resume;
         event<std::string /*path*/, vec2 /*pos*/> on_drop;
 
-        event<uint8_t /*pointer*/, uint8_t /*button*/, pointer_event_type, ivec2 /*pos*/> on_cursor;
-        event<uint8_t /*touchscreen*/, uint8_t /*finger*/, pointer_event_type, ivec2 /*pos*/> on_touch;
+        event<uint8_t /*pointer*/, uint8_t /*button*/, touch_event_type, ivec2 /*pos*/> on_touch;
+        event<uint8_t /*touchscreen*/, uint8_t /*finger*/, cursor_event_type, ivec2 /*pos*/> on_cursor;
         event<char32_t /*utf32_char*/, bool /*down*/> on_char;
         event<keyboard_control_type, bool /*down*/> on_ctrl;
 
         buffed<bool> fullscreen { [this](auto b) { this->enable_fullscreen(b); }, false };
+        buffed<bool> maximized{ [this](auto b) { this->enable_maximize(b); }, false };
+
         buffed<ivec2> buffed_size { [this](auto v) { this->resize(v); }, {{500, 500}} };
-        buffed<std::string> name { [this](auto s) { this->rename(s); }, "" };
+        buffed<std::string> title { [this](auto s) { this->rename(s); }, "" };
 
         display& dpy;
 
@@ -94,11 +100,9 @@ namespace hut {
             cleanup();
         }
 
-        virtual void minimize() = 0;
-
-        virtual void maximize() = 0;
-
         virtual void close() = 0;
+
+        virtual void minimize() = 0;
 
     protected:
         /* Used as a second destructor pass */
@@ -108,9 +112,11 @@ namespace hut {
 
         virtual void enable_fullscreen(bool enable) = 0;
 
+        virtual void enable_maximize(bool enable) = 0;
+
         virtual void resize(ivec2 size) = 0;
 
-        virtual void rename(std::string name) = 0;
+        virtual void rename(const std::string& name) = 0;
     };
 
 } // namespace hut

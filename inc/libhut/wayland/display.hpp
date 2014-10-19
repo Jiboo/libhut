@@ -32,8 +32,12 @@
 
 #include <string>
 #include <list>
+#include <map>
+#include <functional>
+#include <vector>
 
 #include <wayland-client.h>
+#include <xkbcommon/xkbcommon.h>
 
 #include "libhut/utils.hpp"
 #include "libhut/egl/display.hpp"
@@ -55,12 +59,6 @@ namespace hut {
 
         virtual ~display();
 
-        virtual void post(std::function<void()> calllback) override;
-
-        virtual void post_delayed(std::function<void()> calllback, std::chrono::milliseconds delay);
-
-        virtual void schedule(std::function<void()> calllback, std::chrono::milliseconds delay);
-
         virtual void flush();
 
     protected:
@@ -76,6 +74,14 @@ namespace hut {
         struct wl_cursor_theme *cursor_theme = nullptr;
         struct wl_cursor *default_cursor = nullptr;
         struct wl_surface *cursor_surface = nullptr;
+
+        struct xkb_context *xkb_context;
+        struct xkb_keymap *xkb_keymap;
+        struct xkb_state *xkb_state;
+        xkb_mod_mask_t xkb_control_mask;
+        xkb_mod_mask_t xkb_alt_mask;
+        xkb_mod_mask_t xkb_shift_mask;
+
         std::list<window*> active_wins;
 
         static void pointer_handle_enter(void *data, struct wl_pointer *pointer,

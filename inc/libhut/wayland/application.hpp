@@ -28,28 +28,27 @@
 
 #pragma once
 
-#include "libhut/application.hpp"
+#include "libhut/egl/application.hpp"
+#include "libhut/window.hpp"
 
 namespace hut {
 
-    class application : public base_application {
+    class application : public egl_application {
     public:
     protected:
         virtual ~application() {
-            eglReleaseThread();
         }
 
-        virtual uint16_t max_texture_size();
-
     protected:
-        virtual int entry(int argc, char **argv);
+        virtual int entry(int argc, char **argv, window& main);
 
         virtual bool loop();
     };
 
 #define HUT_MAIN(app_type) int main(int argc, char** argv) { \
     app_type app; \
-    return app.entry(argc, argv); \
+    hut::window win {app.auto_display(), "lihbut app"}; \
+    return app.entry(argc, argv, win); \
 }
 
 } //namespace hut

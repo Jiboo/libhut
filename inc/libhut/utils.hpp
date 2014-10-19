@@ -39,4 +39,32 @@ namespace hut {
         }
     }
 
+    inline std::string to_utf8(char32_t ch) {
+        static const uint8_t mark[7] = {
+                0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC
+        };
+
+        if(ch < 0x80) {
+            return std::string {{(char)ch}};
+        }
+        else {
+            char result[4];
+            size_t bytes = (ch < 0x800) ? 2 : (ch < 0x10000) ? 3 : 4;
+
+            auto it = result + bytes;
+
+            switch(bytes)
+            {
+                case 4: *--it = (char)((ch | 0x80) & 0xbf); ch >>= 6;
+                case 3: *--it = (char)((ch | 0x80) & 0xbf); ch >>= 6;
+                case 2: *--it = (char)((ch | 0x80) & 0xbf); ch >>= 6;
+            }
+            *--it = (char)(ch | mark[bytes]);
+
+            return std::string {result, bytes};
+        }
+
+        return std::string {};
+    }
+
 } //namespace hut

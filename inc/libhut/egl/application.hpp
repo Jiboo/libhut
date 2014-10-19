@@ -28,35 +28,16 @@
 
 #pragma once
 
-#include "libhut/event.hpp"
-#include "libhut/display.hpp"
-#include "libhut/window.hpp"
+#include "libhut/application.hpp"
 
 namespace hut {
 
-    class base_application {
+    class egl_application : public base_application {
     public:
-        static display &auto_display();
-
-        event<> on_pause, on_resume;
-        bool stop = false;
-
-        virtual ~base_application() {
-        }
-
     protected:
-        virtual int entry(int argc, char **argv, window& main) {
-            throw std::runtime_error("Entry not overloaded, define HUT_MAIN with your application class.");
-            return EXIT_FAILURE;
+        virtual ~egl_application() {
+            eglReleaseThread();
         }
-
-        virtual bool loop() = 0;
     };
 
 } //namespace hut
-
-#ifdef HUT_WAYLAND
-
-#include "libhut/wayland/application.hpp"
-
-#endif

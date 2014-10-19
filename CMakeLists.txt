@@ -59,10 +59,10 @@ include_directories(inc)
 include_directories(/usr/include)
 
 add_library(hut STATIC ${HUT_SOURCES} ${WAYLAND_SOURCES})
-target_link_libraries(hut PUBLIC wayland-client wayland-egl wayland-cursor EGL GLESv2)
+target_link_libraries(hut PUBLIC wayland-client wayland-egl wayland-cursor xkbcommon EGL GLESv2)
 
 add_executable(unit-tests ${TEST_FILES} ${HUT_HEADERS})
-target_link_libraries(unit-tests gtest gtest_main hut)
+target_link_libraries(unit-tests gtest hut)
 
 add_custom_target(docs COMMAND
     cldoc generate -std=c++1y -Iinc -DHUT_WAYLAND --

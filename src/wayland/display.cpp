@@ -155,6 +155,9 @@ namespace hut {
         printf("EGL_VERSION = %s\n", eglQueryString(egl_dpy, EGL_VERSION));
         printf("EGL_VENDOR = %s\n", eglQueryString(egl_dpy, EGL_VENDOR));
         printf("EGL_EXTENSIONS = %s\n", eglQueryString(egl_dpy, EGL_EXTENSIONS));
+
+        xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+        runtime_assert(xkb_context != nullptr, "xkb_context_new failed");
     }
 
     display::~display() {
@@ -172,18 +175,9 @@ namespace hut {
 
         wl_display_flush(wl_dpy);
         wl_display_disconnect(wl_dpy);
-    }
 
-    void display::post(std::function<void()> calllback) {
-
-    }
-
-    void display::post_delayed(std::function<void()> calllback, std::chrono::milliseconds delay) {
-
-    }
-
-    void display::schedule(std::function<void()> calllback, std::chrono::milliseconds delay) {
-
+        xkb_state_unref(xkb_state);
+        xkb_keymap_unref(xkb_keymap);
     }
 
     void display::flush() {

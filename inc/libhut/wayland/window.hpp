@@ -55,13 +55,14 @@ namespace hut {
         virtual void draw(const hut::batch&);
 
         virtual void minimize();
-        virtual void maximize();
         virtual void close();
-        virtual void enable_fullscreen(bool);
-        virtual void resize(hut::ivec2);
-        virtual void rename(std::string);
 
     protected:
+        static void handle_surface_delete(void *data, struct xdg_surface *xdg_surface);
+        static void handle_surface_configure(void *data, struct xdg_surface *surface,
+                int32_t width, int32_t height,
+                struct wl_array *states, uint32_t serial);
+
         struct wl_egl_window *wl_win = nullptr;
         struct wl_surface *wl_surf = nullptr;
         struct xdg_surface *xdg_surface = nullptr;
@@ -73,12 +74,12 @@ namespace hut {
             wl_surface_destroy(wl_surf);
         }
 
-        static void handle_surface_delete(void *data, struct xdg_surface *xdg_surface);
-        static void handle_surface_configure(void *data, struct xdg_surface *surface,
-                int32_t width, int32_t height,
-                struct wl_array *states, uint32_t serial);
-
         virtual void dispatch_draw();
+
+        virtual void enable_fullscreen(bool);
+        virtual void enable_maximize(bool);
+        virtual void resize(hut::ivec2);
+        virtual void rename(const std::string&);
     };
 
 } //namespace hut

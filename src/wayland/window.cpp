@@ -218,14 +218,13 @@ namespace hut {
     }
 
     ivec2 window::size() const {
-
         ivec2 result;
         wl_egl_window_get_attached_size(wl_win, result.data, result.data + 1);
         return result;
     }
 
     short unsigned int window::density() const {
-        return 160;
+        return 160; //FIXME
     }
 
     void window::draw(const hut::mesh&) {
@@ -237,27 +236,38 @@ namespace hut {
     }
 
     void window::minimize() {
-
-    }
-
-    void window::maximize() {
-
+        xdg_surface_set_minimized(xdg_surface);
     }
 
     void window::close() {
+        if(xdg_surface)
+            xdg_surface_destroy(xdg_surface);
 
+        if(wl_surf)
+            wl_surface_destroy(wl_surf);
     }
 
-    void window::enable_fullscreen(bool) {
-
+    void window::enable_fullscreen(bool enable) {
+        if(enable)
+            xdg_surface_set_fullscreen(xdg_surface, NULL);
+        else
+            xdg_surface_unset_fullscreen(xdg_surface);
     }
 
-    void window::resize(hut::ivec2) {
-        //xdg_surface_resize(xdg_surface, dpy.seat, , location);
+    void window::enable_maximize(bool enable) {
+        if(enable)
+            xdg_surface_set_maximized(xdg_surface);
+        else
+            xdg_surface_unset_maximized(xdg_surface);
     }
 
-    void window::rename(std::string) {
+    void window::resize(hut::ivec2 size) {
+        if (wl_win)
+            wl_egl_window_resize(wl_win, size[0], size[1], 0, 0);
+    }
 
+    void window::rename(const std::string& title) {
+        xdg_surface_set_title(xdg_surface, title.c_str());
     }
 
     void window::handle_surface_delete(void *data, struct xdg_surface *xdg_surface) {
@@ -270,6 +280,7 @@ namespace hut {
         window* thiz = (window*)data;
 
         thiz->fullscreen.cache(false);
+        thiz->maximized.cache(false);
         thiz->buffed_size = {{width, height}};
 
         void *p;
@@ -279,6 +290,8 @@ namespace hut {
                 case XDG_SURFACE_STATE_FULLSCREEN:
                     thiz->fullscreen.cache(true);
                     break;
+                case XDG_SURFACE_STATE_MAXIMIZED:
+                    thiz->maximized.cache(true);
             }
         }
 

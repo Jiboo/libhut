@@ -44,6 +44,8 @@ namespace hut {
             eglTerminate(egl_dpy);
         }
 
+        virtual uint16_t max_texture_size();
+
     protected:
         EGLDisplay egl_dpy = nullptr;
         EGLConfig egl_conf = nullptr;

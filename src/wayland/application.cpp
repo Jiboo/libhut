@@ -34,18 +34,12 @@
 
 namespace hut {
 
-    uint16_t application::max_texture_size() {
-        int32_t result;
-        glGetIntegerv(GL_MAX_TEXTURE_SIZE, &result);
-        return result;
-    }
-
     display &base_application::auto_display() {
         static display def{nullptr};
         return def;
     }
 
-    int application::entry(int argc, char **argv) {
+    int application::entry(int argc, char **argv, window& main) {
         while(!this->stop && loop()) {
         }
         return EXIT_SUCCESS;

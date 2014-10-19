@@ -30,12 +30,19 @@
 
 #include <wayland-client.h>
 #include <wayland-egl.h>
+#include <GLES2/gl2.h>
 
 #include "libhut/display.hpp"
 #include "libhut/utils.hpp"
 #include "libhut/vec.hpp"
 
 namespace hut {
+
+    uint16_t egl_display::max_texture_size() {
+        int32_t result;
+        glGetIntegerv(GL_MAX_TEXTURE_SIZE, &result);
+        return (uint16_t)result;
+    }
 
     void egl_display::egl_init_display(NativeDisplayType display) {
         static const EGLint context_attribs[] = {
