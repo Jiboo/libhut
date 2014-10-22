@@ -26,30 +26,48 @@
  * SOFTWARE.
  */
 
-#include <wayland-cursor.h>
+#pragma once
 
-#include "libhut/wayland/display.hpp"
+#include "libhut/mat.hpp"
+#include "libhut/buffer.hpp"
 
 namespace hut {
 
-    void display::touch_handle_down(void *data, struct wl_touch *wl_touch,
-            uint32_t serial, uint32_t time, struct wl_surface *surface,
-            int32_t id, wl_fixed_t x_w, wl_fixed_t y_w) {
-        //struct display *d = (struct display *)data;
-    }
+    enum blend_mode {
+        BNONE = -1,
+        BCLEAR = 0, BSOURCE = 1, BDEST = 2, BXOR = 3,
+        BATOP = 4, BOVER = 5, BIN = 6, BOUT = 7,
+        BDEST_ATOP = 8, BDEST_OVER = 9, BDEST_IN = 10, BDEST_OUT = 11
+    };
 
-    void display::touch_handle_up(void *data, struct wl_touch *wl_touch,
-            uint32_t serial, uint32_t time, int32_t id) {
-    }
+    class texture;
+    class shader;
 
-    void display::touch_handle_motion(void *data, struct wl_touch *wl_touch,
-            uint32_t time, int32_t id, wl_fixed_t x_w, wl_fixed_t y_w) {
-    }
+    class shader_base {
+    public:
+        class factory {
+        public:
+            virtual factory& transform(const mat3&) = 0;
 
-    void display::touch_handle_frame(void *data, struct wl_touch *wl_touch) {
-    }
+            virtual factory& opacity(const float&) = 0;
 
-    void display::touch_handle_cancel(void *data, struct wl_touch *wl_touch) {
-    }
+            virtual factory& col(const uint32_t&, blend_mode = BOVER) = 0;
+            virtual factory& col(const uint32_t*, blend_mode = BOVER) = 0;
+            virtual factory& col(const buffer<uint32_t>&, size_t offset, size_t stride, size_t count, blend_mode = BOVER) = 0;
 
-} //namespace hut
+            virtual factory& tex(const texture&, const buffer<float>&, size_t offset, size_t stride, blend_mode = BOVER) = 0;
+            virtual factory& tex(const texture&, const float*, blend_mode = BOVER) = 0;
+
+            virtual factory& gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode = BOVER) = 0;
+
+            virtual shader compile() = 0;
+        };
+    };
+
+} // namespace hut
+
+#ifdef HUT_WAYLAND
+
+#include "libhut/egl/shader.hpp"
+
+#endif

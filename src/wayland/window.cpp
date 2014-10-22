@@ -130,6 +130,9 @@ namespace hut {
     void
     redraw_gl(window *window)
     {
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+
         display &display = window->dpy;
         static const GLfloat verts[3][2] = {
                 { -0.5, -0.5 },

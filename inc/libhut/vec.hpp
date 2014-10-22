@@ -37,24 +37,25 @@
 
 namespace hut {
 
+    #define HUT_VEC_SHARED(MSIZE) _Type &operator[](const size_t i) { return data[i]; } \
+        constexpr const _Type &operator[](const size_t i) const { return data[i]; } \
+        constexpr _Type mag() const { \
+            _Type sq = 0; \
+            for (size_t i = 0; i < MSIZE; i++) \
+                sq += data[i] * data[i]; \
+            return std::sqrt(sq); \
+        } \
+        constexpr static vec<_Type, MSIZE> init(const _Type& val = 0) { \
+            vec<_Type, MSIZE> result; \
+            std::fill(result.data, result.data + MSIZE, val); \
+            return result; \
+        }
+
     template<typename _Type, size_t _Size>
     struct vec {
         _Type data[_Size];
 
-        _Type &operator[](const size_t i) {
-            return data[i];
-        }
-
-        constexpr const _Type &operator[](const size_t i) const {
-            return data[i];
-        }
-
-        constexpr _Type mag() const {
-            _Type sq = 0;
-            for (size_t i = 0; i < _Size; i++)
-                sq += data[i] * data[i];
-            return std::sqrt(sq);
-        }
+        HUT_VEC_SHARED(_Size)
     };
 
     template<typename _Type>
@@ -66,17 +67,7 @@ namespace hut {
             };
         };
 
-        _Type &operator[](const size_t i) {
-            return data[i];
-        }
-
-        constexpr const _Type &operator[](const size_t i) const {
-            return data[i];
-        }
-
-        constexpr _Type mag() const {
-            return std::sqrt(x * x + y * y);
-        }
+        HUT_VEC_SHARED(2)
     };
 
     template<typename _Type>
@@ -92,17 +83,7 @@ namespace hut {
             vec<_Type, 2> xy;
         };
 
-        _Type &operator[](const size_t i) {
-            return data[i];
-        }
-
-        constexpr const _Type &operator[](const size_t i) const {
-            return data[i];
-        }
-
-        constexpr _Type mag() const {
-            return std::sqrt(x * x + y * y + z * z);
-        }
+        HUT_VEC_SHARED(3)
     };
 
     template<typename _Type>
@@ -120,17 +101,7 @@ namespace hut {
             vec<_Type, 3> rgb;
         };
 
-        _Type &operator[](const size_t i) {
-            return data[i];
-        }
-
-        constexpr const _Type &operator[](const size_t i) const {
-            return data[i];
-        }
-
-        constexpr _Type mag() const {
-            return std::sqrt(x * x + y * y + z * z + w * w);
-        }
+        HUT_VEC_SHARED(4)
     };
 
     using vec2 = vec<float, 2>;

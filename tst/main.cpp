@@ -69,6 +69,30 @@ public:
             return true;
         });
 
+        hut::buffer<hut::ivec2> buf_vertices {{
+                {0,  500},
+                {250, 0},
+                {500, 500}
+        }, hut::BSTREAM};
+
+        buf_vertices.update({{0,  0}}, 1);
+
+        hut::buffer<std::uint32_t> buf_colors {{
+                {0xff0000ff},
+                {0xff00ff00},
+                {0xffff0000}
+        }, hut::BSTATIC};
+
+        hut::mat3 trans1 = hut::mat3::init();
+        hut::mat3 trans2 = hut::mat3::init();
+        uint32_t tint1 = 0xff666666;
+        uint32_t tint2 = 0xff666666;
+        float opacity = 0.5f;
+        hut::shader shader_simple = hut::shader::factory()
+                .transform(trans1).transform(trans2)
+                .col(buf_colors, 0, 0, 3).col(tint1).col(tint2).opacity(opacity)
+                .compile();
+
         ::testing::InitGoogleTest(&argc, argv);
         int result = RUN_ALL_TESTS();
 

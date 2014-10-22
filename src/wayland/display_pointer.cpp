@@ -83,9 +83,11 @@ namespace hut {
             uint32_t time, wl_fixed_t sx, wl_fixed_t sy) {
         display *d = (display*)data;
 
-        d->last_pos = {{wl_fixed_to_int(sx), wl_fixed_to_int(sy)}};
-
-        d->active_win->on_mouse.fire(-1, MMOVE, d->last_pos);
+        ivec2 new_pos = {{wl_fixed_to_int(sx), wl_fixed_to_int(sy)}};
+        if(new_pos != d->last_pos) {
+            d->last_pos = new_pos;
+            d->active_win->on_mouse.fire(-1, MMOVE, d->last_pos);
+        }
     }
 
     void display::pointer_handle_button(void *data, struct wl_pointer *wl_pointer,

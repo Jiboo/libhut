@@ -1,4 +1,6 @@
-/* 
+// generated from weston 1.6.0
+
+/*
  * Copyright © 2008-2013 Kristian Høgsberg
  * Copyright © 2013      Rafael Antognolli
  * Copyright © 2013      Jasper St. Pierre

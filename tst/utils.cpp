@@ -2,7 +2,7 @@
 
 #include "hut.hpp"
 
-TEST(core, event) {
+TEST(utils, event) {
     hut::event<int> e1;
     e1.connect([](int a) -> bool {
         return a == 42;

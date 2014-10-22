@@ -17,19 +17,13 @@ set(HUT_HEADERS
     inc/libhut/display.hpp
     inc/libhut/surface.hpp
     inc/libhut/window.hpp
-)
-
-set(EGL_HEADERS
-    inc/libhut/egl/display.hpp
+    inc/libhut/buffer.hpp
+    inc/libhut/shader.hpp
 )
 
 set(EGL_SOURCES
     src/egl/display.cpp
-)
-
-set(WAYLAND_HEADERS
-    inc/libhut/wayland/application.hpp
-    inc/libhut/wayland/wayland.hpp
+    src/egl/shader.cpp
 )
 
 set(WAYLAND_SOURCES
@@ -56,7 +50,6 @@ elseif(WIN32)
 endif(APPLE)
 
 include_directories(inc)
-include_directories(/usr/include)
 
 add_library(hut STATIC ${HUT_SOURCES} ${WAYLAND_SOURCES})
 target_link_libraries(hut PUBLIC wayland-client wayland-egl wayland-cursor xkbcommon EGL GLESv2)

@@ -94,7 +94,7 @@ namespace hut {
         free(configs);
         runtime_assert(egl_conf != nullptr, "did not find config with buffer size 32");
 
-        egl_ctx = eglCreateContext(egl_dpy, egl_conf, EGL_NO_CONTEXT, context_attribs);
+        egl_ctx = eglCreateContext(egl_dpy, egl_conf, EGL_NO_CONTEXT, context_attribs); // FIXME Share contexts
         runtime_assert(egl_ctx != nullptr, "eglCreateContext failed");
 
         runtime_assert(eglGetError() == EGL_SUCCESS, "EGL error");

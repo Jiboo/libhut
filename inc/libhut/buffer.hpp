@@ -26,30 +26,38 @@
  * SOFTWARE.
  */
 
-#include <wayland-cursor.h>
+#pragma once
 
-#include "libhut/wayland/display.hpp"
+#include "libhut/event.hpp"
+#include "libhut/display.hpp"
+#include "libhut/window.hpp"
 
 namespace hut {
 
-    void display::touch_handle_down(void *data, struct wl_touch *wl_touch,
-            uint32_t serial, uint32_t time, struct wl_surface *surface,
-            int32_t id, wl_fixed_t x_w, wl_fixed_t y_w) {
-        //struct display *d = (struct display *)data;
-    }
+    enum buffer_hint {
+        BSTATIC, BDYNAMIC, BSTREAM
+    };
 
-    void display::touch_handle_up(void *data, struct wl_touch *wl_touch,
-            uint32_t serial, uint32_t time, int32_t id) {
-    }
+    template<typename T>
+    class base_buffer {
+    public:
+        //virtual base_buffer(const T*, size_t size, buffer_hint hint = BSTREAM) = 0;
+        //virtual base_buffer(const std::initializer_list<T>& list, buffer_hint hint = BSTREAM) = 0;
 
-    void display::touch_handle_motion(void *data, struct wl_touch *wl_touch,
-            uint32_t time, int32_t id, wl_fixed_t x_w, wl_fixed_t y_w) {
-    }
+        virtual ~base_buffer() {
 
-    void display::touch_handle_frame(void *data, struct wl_touch *wl_touch) {
-    }
+        }
 
-    void display::touch_handle_cancel(void *data, struct wl_touch *wl_touch) {
-    }
+        virtual size_t size() = 0;
+
+        virtual void update(const T*, size_t offset, size_t count) = 0;
+        virtual void update(const std::initializer_list<T>& list, size_t offset) = 0;
+    };
 
 } //namespace hut
+
+#ifdef HUT_WAYLAND
+
+#include "libhut/egl/buffer.hpp"
+
+#endif

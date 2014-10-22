@@ -38,3 +38,6 @@
 #include "libhut/display.hpp"
 #include "libhut/surface.hpp"
 #include "libhut/window.hpp"
+
+#include "libhut/buffer.hpp"
+#include "libhut/shader.hpp"

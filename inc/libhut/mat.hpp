@@ -52,6 +52,16 @@ namespace hut {
         constexpr const col_type &operator[](const size_t i) const {
             return data[i];
         }
+
+        static mat<_Type, _RowCount, _RowSize> init(const _Type& val = 1) {
+            mat<_Type, _RowCount, _RowSize> result;
+            for(size_t i = 0; i < _RowCount; i++) {
+                for(size_t j = 0; j < _RowSize; j++) {
+                    result[i][j] = i == j ? 1 : 0;
+                }
+            }
+            return result;
+        }
     };
 
     using mat2 = mat<float, 2, 2>;
