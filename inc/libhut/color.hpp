@@ -30,7 +30,7 @@
 
 namespace hut {
 
-    enum {
+    enum pixel_format {
         A8,
         L8,
         LA88,
@@ -38,6 +38,13 @@ namespace hut {
         RGBA4444,
         RGBA5551,
         RGBA8888
-    } pixel_format;
+    };
+
+    enum blend_mode {
+        BNONE = -1,
+        BCLEAR = 0, BSOURCE = 1, BDEST = 2, BXOR = 3,
+        BATOP = 4, BOVER = 5, BIN = 6, BOUT = 7,
+        BDEST_ATOP = 8, BDEST_OVER = 9, BDEST_IN = 10, BDEST_OUT = 11
+    };
 
 } // namespace hut

@@ -38,20 +38,23 @@ namespace hut {
         BSTATIC, BDYNAMIC, BSTREAM
     };
 
-    template<typename T>
     class base_buffer {
+    protected:
+        size_t alloc_size;
+
     public:
-        //virtual base_buffer(const T*, size_t size, buffer_hint hint = BSTREAM) = 0;
-        //virtual base_buffer(const std::initializer_list<T>& list, buffer_hint hint = BSTREAM) = 0;
-
-        virtual ~base_buffer() {
-
+        base_buffer(size_t size)
+            : alloc_size(size) {
         }
 
-        virtual size_t size() = 0;
+        virtual ~base_buffer() {
+        }
 
-        virtual void update(const T*, size_t offset, size_t count) = 0;
-        virtual void update(const std::initializer_list<T>& list, size_t offset) = 0;
+        size_t size() {
+            return alloc_size;
+        }
+
+        virtual void update(const uint8_t*, size_t offset, size_t count) = 0;
     };
 
 } //namespace hut

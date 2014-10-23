@@ -40,4 +40,4 @@
 #include "libhut/window.hpp"
 
 #include "libhut/buffer.hpp"
-#include "libhut/shader.hpp"
+#include "libhut/drawable.hpp"

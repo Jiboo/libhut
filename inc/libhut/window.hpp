@@ -77,6 +77,7 @@ namespace hut {
     public:
 
         event<> on_pause, on_resume;
+        event<> on_draw;
         event<std::string /*path*/, vec2 /*pos*/> on_drop;
 
         event<uint8_t /*finger*/, touch_event_type, ivec2 /*pos*/> on_touch;
@@ -92,6 +93,7 @@ namespace hut {
         buffed<std::string> title { [this](auto s) { this->rename(s); }, "" };
 
         display& dpy;
+        vec4 clear_color;
 
         base_window(display& dpy, const std::string& title, bool translucent = false, window_decoration_type deco = DSYSTEM)
                 : view_node(nullptr), dpy(dpy) {

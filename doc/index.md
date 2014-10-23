@@ -43,17 +43,6 @@ libhut: hobby moden-C++ UI toolkit library.
 * buffer/texture
     * Holds data on GPU side
 
-* shader
-    * Shader code can't be uploaded but the code is generated dynamically depending on the optional features requested
-    * Features:
-        * Vertex transform by n uniform matrices
-        * Tint (color output blended by a uniform color)
-        * Color attribute (data: color buffer and offsets)
-        * Color uniform (data: color)
-        * Texture (data: texture reference and texcoord attribute buffer and offsets)
-        * Gradients (data: data buffer and offset)
-    * Shader can be created through a factory, it handles the programs' cache
-
 * drawable
     * Holds everything needed for a draw:
         * Draw mode (points, line, polygons, triangle strip..)
@@ -61,7 +50,13 @@ libhut: hobby moden-C++ UI toolkit library.
         * Blend mode
         * Vertices' buffer and offsets
         * Indices' buffer and offsets (optional)
-        * Shader and it's data
+        * Shader program and it's data
+    * Shader code can't be uploaded but the code is generated dynamically depending on the optional features requested
+    * You can define multiple times thus features to the drawable factory it's the GPU that will blend the different color layer you configured
+        * Transform position by uniform matrix
+        * Color uniform/attribute
+        * Texture
+        * Gradients
 
 * surface: used to draw meshs, 3 main implementations:
     * window
@@ -100,6 +95,6 @@ libhut: hobby moden-C++ UI toolkit library.
 
 * Matrices are row major
 * Origin is top-left, surface units (position/size) are all int32_t pixels, density is in dpi, angles in degrees
-* All parameters that takes a color are RGBA uint32_t
+* All parameters that takes a color are RGBA vec4
 * Supported pixel formats are RGBA_8888, RGBA_4444, RGB_565, LA_88, L_8
 * Some custom units, with user literal operators: deg, rad, px, dp, sp, rel

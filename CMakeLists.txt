@@ -18,12 +18,12 @@ set(HUT_HEADERS
     inc/libhut/surface.hpp
     inc/libhut/window.hpp
     inc/libhut/buffer.hpp
-    inc/libhut/shader.hpp
+    inc/libhut/drawable.hpp
 )
 
 set(EGL_SOURCES
     src/egl/display.cpp
-    src/egl/shader.cpp
+    src/egl/drawable.cpp
 )
 
 set(WAYLAND_SOURCES

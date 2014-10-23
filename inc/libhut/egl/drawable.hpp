@@ -31,52 +31,72 @@
 #include <string>
 #include "libhut/optional.hpp"
 
-#include "libhut/shader.hpp"
+#include "libhut/drawable.hpp"
 
 namespace hut {
 
-    class shader : public shader_base {
+    class drawable : public drawable_base {
+    public: //FIXME
+        struct attrib {
+            GLuint index;
+            GLint size;
+            GLenum type;
+            GLboolean normalized;
+            GLsizei stride;
+            const GLvoid* pointer;
+        };
+
     public:
-        class factory : public shader_base::factory {
+        class factory : public drawable_base::factory {
         public:
-            virtual factory& transform(const mat3&);
+            virtual factory& pos(const buffer&, size_t offset, size_t stride);
+            virtual factory& transform(const mat4&);
 
             virtual factory& opacity(const float&);
 
-            virtual factory& col(const uint32_t&, blend_mode = BOVER);
-            virtual factory& col(const uint32_t*, blend_mode = BOVER);
-            virtual factory& col(const buffer<uint32_t>&, size_t offset, size_t stride, size_t count, blend_mode = BOVER);
+            virtual factory& col(const vec4&, blend_mode = BOVER);
+            virtual factory& col(const vec4*, blend_mode = BOVER);
+            virtual factory& col(const buffer&, size_t offset, size_t stride, blend_mode = BOVER);
 
-            virtual factory& tex(const texture&, const buffer<float>&, size_t offset, size_t stride, blend_mode = BOVER);
+            virtual factory& tex(const texture&, const buffer&, size_t offset, size_t stride, blend_mode = BOVER);
             virtual factory& tex(const texture&, const float*, blend_mode = BOVER);
 
             virtual factory& gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode = BOVER);
 
-            virtual shader compile();
+            virtual drawable compile();
 
         protected:
-            std::map<std::string, std::tuple<GLint, const GLfloat *>> uniformsMatrix3fv;
-            std::map<std::string, std::tuple<GLint, const GLint &>> uniforms4f;
-            std::map<std::string, std::tuple<GLint, const GLfloat &>> uniforms1f;
-            std::map<std::string, std::tuple<GLint, GLenum, GLboolean, GLsizei, const GLvoid*>> attributes;
-            std::map<std::string, std::tuple<const buffer<uint32_t>&, GLint, GLenum, GLboolean, GLsizei, const GLvoid*>> bound_attributes;
+            std::map<std::string, std::tuple<GLint, const GLfloat*>> uniformsMatrix4fv;
+            std::map<std::string, std::tuple<GLint, const vec4*>> uniforms4f;
+            std::map<std::string, std::tuple<GLint, const GLfloat*>> uniforms1f;
+
+            std::map<std::string, std::tuple<std::string, attrib, GLuint>> attributes;
             std::map<std::string, std::tuple<std::string, std::string>> varryings;
             blend_mode first_mode;
 
-            std::string outPos = "__hut_pos";
-            std::string outColor = "";
+            std::string outPos;
+            std::string outColor;
 
             GLuint compile_vertex_shader();
             GLuint compile_fragment_shader();
         };
 
-    protected:
-        shader() {}
+    public: //FIXME
         GLuint name;
         blend_mode first_mode;
-        std::vector<std::tuple<GLint, const GLfloat *>> uniformsMatrix3fv;
-        std::vector<std::tuple<GLint, const GLint &>> uniforms4i;
-        std::vector<std::tuple<GLint, const GLfloat &>> uniforms1f;
+
+        std::vector<std::tuple<GLint, const GLfloat*>> uniformsMatrix4fv;
+        std::vector<std::tuple<GLint, const vec4*>> uniforms4f;
+        std::vector<std::tuple<GLint, const GLfloat*>> uniforms1f;
+
+        std::vector<std::tuple<attrib, GLuint>> attributes;
+
+        drawable() {
+        }
+
+        void bind();
+
+        void unbind();
     };
 
 } // namespace hut

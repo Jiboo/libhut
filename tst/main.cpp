@@ -10,6 +10,7 @@ public:
 
         main.geometry = {{250, 250}};
         main.title = "Hello world";
+        main.clear_color = {{0, 0, 0, 0.5}};
 
         main.on_ctrl.connect([](hut::keyboard_control_type ctrl, bool down) {
             std::cout << "ctrl ";
@@ -69,29 +70,32 @@ public:
             return true;
         });
 
-        hut::buffer<hut::ivec2> buf_vertices {{
-                {0,  500},
-                {250, 0},
-                {500, 500}
-        }, hut::BSTREAM};
+        float local[] = {
+                0, 0,   1, 1, 1, 1,     0, 0,
+                1, 0,   1, 1, 1, 1,     0, 0,
+                1, 1,   1, 1, 1, 1,     0, 0,
+        };
 
-        buf_vertices.update({{0,  0}}, 1);
+        hut::buffer vbo {(uint8_t*)local, sizeof(local), hut::BSTREAM};
 
-        hut::buffer<std::uint32_t> buf_colors {{
-                {0xff0000ff},
-                {0xff00ff00},
-                {0xffff0000}
-        }, hut::BSTATIC};
-
-        hut::mat3 trans1 = hut::mat3::init();
-        hut::mat3 trans2 = hut::mat3::init();
-        uint32_t tint1 = 0x80ff0000;
-        uint32_t tint2 = 0x8000ff00;
+        hut::mat4 trans1 = hut::mat4::init();
+        hut::mat4 trans2 = hut::mat4::init();
+        hut::vec4 tint1 = {1, 0, 0, 0.5};
+        hut::vec4 tint2 = {0, 1, 0, 0.5};
         float opacity = 0.5f;
-        hut::shader shader_simple = hut::shader::factory()
-                .transform(trans1).transform(trans2)
-                .col(buf_colors, 0, 0, 3).col(tint1).col(tint2).opacity(opacity)
+        hut::drawable shader_simple = hut::drawable::factory()
+                .pos(vbo, 0, 6).transform(trans1).transform(trans2)
+                .col(vbo, 2, 4).col(tint1).col(tint2).opacity(opacity)
                 .compile();
+
+        main.on_draw.connect([&shader_simple]() -> bool {
+            shader_simple.bind();
+
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+
+            shader_simple.unbind();
+            return false;
+        });
 
         ::testing::InitGoogleTest(&argc, argv);
         int result = RUN_ALL_TESTS();
