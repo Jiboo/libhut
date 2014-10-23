@@ -85,8 +85,8 @@ public:
 
         hut::mat3 trans1 = hut::mat3::init();
         hut::mat3 trans2 = hut::mat3::init();
-        uint32_t tint1 = 0xff666666;
-        uint32_t tint2 = 0xff666666;
+        uint32_t tint1 = 0x80ff0000;
+        uint32_t tint2 = 0x8000ff00;
         float opacity = 0.5f;
         hut::shader shader_simple = hut::shader::factory()
                 .transform(trans1).transform(trans2)

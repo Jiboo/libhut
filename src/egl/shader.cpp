@@ -32,30 +32,6 @@
 
 namespace hut {
 
-    static const std::string blend_opacity =
-                "vec4 blend_opacity(in float inputValue, in float opacity)\n"
-                "{\n"
-                "   return vec4(inputValue.xyz, inputValue.w * opacity);\n"
-                "}";
-
-    static const std::string unpack_color =
-            "vec4 unpack_color(in uint col)\n"
-                    "{\n"
-                    "   return vec4("
-                    "       ((col >> 16) & 0xff) / 255.0f,"
-                    "       ((col >> 8)  & 0xff) / 255.0f,"
-                    "       ((col)       & 0xff) / 255.0f,"
-                    "       ((col >> 24) & 0xff) / 255.0f);\n"
-                    "}";
-
-    static const std::string porterduff =
-            "const int BCLEAR = 0;"
-            "vec4 porterduff(in vec4 dest, in vec4 vec4 source, int mode)\n"
-            "{\n"
-            "   //TODO"
-            "  return mix(dest, source, 0.5);\n"
-            "}";
-
     static std::string blending_name(blend_mode mode) {
         switch(mode) {
             case BNONE: return "BNONE";
@@ -72,6 +48,7 @@ namespace hut {
             case BDEST_IN: return "BDEST_IN";
             case BDEST_OUT: return "BDEST_OUT";
         }
+        return "BNONE";
     }
 
     shader::factory& shader::factory::transform(const mat3& ref) {
@@ -99,19 +76,17 @@ namespace hut {
 
     shader::factory& shader::factory::col(const uint32_t& ref, blend_mode mode) {
         std::stringstream buf;
-        buf << "col_uni_" << uniforms1i.size();
+        buf << "col_uni_" << uniforms4f.size();
         std::string name = buf.str();
 
-        uniforms1i.emplace(name, std::make_tuple(-1, ref));
+        uniforms4f.emplace(name, std::make_tuple(-1, ref));
 
         if(outColor.empty()) {
             first_mode = mode;
-            std::stringstream color;
-            color << "unpack_color(" << name << ")";
-            outColor = color.str();
+            outColor = name;
         } else {
             std::stringstream color;
-            color << "porterduff(unpack_color(" << name << "), " << outColor << ", " << blending_name(mode) << ")";
+            color << "porterduff(" << name << ", " << outColor << ", " << blending_name(mode) << ")";
             outColor = color.str();
         }
 
@@ -152,28 +127,37 @@ namespace hut {
     }
 
     GLuint create_shader(const char *source, GLenum shader_type) {
-        GLuint result;
-        result = glCreateShader(shader_type);
+        GLuint result = glCreateShader(shader_type);
         assert(result != 0);
+
         glShaderSource(result, 1, &source, NULL);
         glCompileShader(result);
+
+        GLint status;
+        glGetShaderiv(result, GL_COMPILE_STATUS, &status);
+        if (!status) {
+            char log[1000];
+            GLsizei len;
+            glGetShaderInfoLog(result, 1000, &len, log);
+            std::stringstream error;
+            error << "Error compiling " <<
+                    (shader_type == GL_VERTEX_SHADER ? "vertex" : "fragment")
+                    << " shader: " << log << "\n" << source;
+            throw std::runtime_error(error.str());
+        }
+
         return result;
     }
 
-    shader shader::factory::compile() {
-        shader result;
-
-        runtime_assert(first_mode != BNONE, "Shader don't have any color/texture input");
-        result.first_mode = first_mode;
-
+    GLuint shader::factory::compile_vertex_shader() {
         std::stringstream vertex_source;
 
         for(auto uniform : uniforms1f)
-                vertex_source << "uniform float " << uniform.first << ";\n";
-        for(auto uniform : uniforms1i)
-                vertex_source << "uniform int " << uniform.first << ";\n";
+            vertex_source << "uniform float " << uniform.first << ";\n";
+        for(auto uniform : uniforms4f)
+            vertex_source << "uniform int " << uniform.first << ";\n";
         for(auto uniform : uniformsMatrix3fv)
-                vertex_source << "uniform mat4 " << uniform.first << ";\n";
+            vertex_source << "uniform mat4 " << uniform.first << ";\n";
 
         //for(auto uniform : attributes) vertex_source << "attribute mat4 " << uniform << ";\n";
         //for(auto uniform : bound_attributes) vertex_source << "attribute mat4 " << uniform << ";\n";
@@ -182,32 +166,72 @@ namespace hut {
         for(auto var : varryings) vertex_source << "varying " << std::get<0>(var.second) << " " << var.first << ";\n";
 
         vertex_source << "void main() {\n"
-            "\tgl_Position = " << outPos << ";\n";
+                "\tgl_Position = " << outPos << ";\n";
 
         for(auto var : varryings) vertex_source << "\t" << var.first << " = (" << std::get<0>(var.second) << ")" << std::get<1>(var.second) << ";\n";
 
         vertex_source << "}\n";
 
-        std::cout << vertex_source.str();
+        return create_shader(vertex_source.str().c_str(), GL_VERTEX_SHADER);
+    }
 
+    GLuint shader::factory::compile_fragment_shader() {
         std::stringstream frag_source;
 
+        frag_source << "precision mediump float;\n";
+
         for(auto uniform : uniforms1f)
-                frag_source << "uniform float " << uniform.first << ";\n";
-        for(auto uniform : uniforms1i)
-                frag_source << "uniform int " << uniform.first << ";\n";
+            frag_source << "uniform float " << uniform.first << ";\n";
+        for(auto uniform : uniforms4f)
+            frag_source << "uniform int " << uniform.first << ";\n";
         for(auto uniform : uniformsMatrix3fv)
-                frag_source << "uniform mat4 " << uniform.first << ";\n";
+            frag_source << "uniform mat4 " << uniform.first << ";\n";
 
         for(auto var : varryings) frag_source << "varying " << std::get<0>(var.second) << " " << var.first << ";\n";
 
-        frag_source << "void main() {\n"
-            "\tgl_FragColor = " << outColor << ";\n"
-            "}\n";
+        frag_source <<
+                "vec4 blend_opacity(in vec4 col, in float opacity) {\n"
+                "\treturn vec4(col.xyz, col.w * opacity);\n"
+                "}\n"
+                "const int BOVER = 5;\n"
+                "vec4 porterduff(in vec4 dest, in vec4 source, int mode) {\n"
+                "\treturn mix(dest, source, 0.5);\n"
+                "}\n"
+                "void main() {\n"
+                "\tgl_FragColor = " /*<< outColor <<*/"vec4(0)" ";\n"
+                "}\n";
 
-        std::cout << frag_source.str();
+        return create_shader(frag_source.str().c_str(), GL_FRAGMENT_SHADER);
+    }
 
-        return shader {};
+    shader shader::factory::compile() {
+        shader result;
+
+        runtime_assert(first_mode != BNONE, "Shader don't have any color/texture input");
+        result.first_mode = first_mode;
+
+        GLuint vertex_shader = compile_vertex_shader();
+        GLuint frag_shader = compile_fragment_shader();
+        result.name = glCreateProgram();
+        glAttachShader(result.name, vertex_shader);
+        glAttachShader(result.name, frag_shader);
+
+        glBindAttribLocation(result.name, 0, "__hut_pos");
+
+        glLinkProgram(result.name);
+
+        GLint status;
+        glGetProgramiv(result.name, GL_LINK_STATUS, &status);
+        if (!status) {
+            char log[1000];
+            GLsizei len;
+            glGetProgramInfoLog(result.name, 1000, &len, log);
+            std::stringstream error;
+            error << "Error linking shader: " << log;
+            throw std::runtime_error(error.str());
+        }
+
+        return result;
     }
 
 } // namespace hut

@@ -56,7 +56,7 @@ namespace hut {
 
         protected:
             std::map<std::string, std::tuple<GLint, const GLfloat *>> uniformsMatrix3fv;
-            std::map<std::string, std::tuple<GLint, const GLint &>> uniforms1i;
+            std::map<std::string, std::tuple<GLint, const GLint &>> uniforms4f;
             std::map<std::string, std::tuple<GLint, const GLfloat &>> uniforms1f;
             std::map<std::string, std::tuple<GLint, GLenum, GLboolean, GLsizei, const GLvoid*>> attributes;
             std::map<std::string, std::tuple<const buffer<uint32_t>&, GLint, GLenum, GLboolean, GLsizei, const GLvoid*>> bound_attributes;
@@ -65,6 +65,9 @@ namespace hut {
 
             std::string outPos = "__hut_pos";
             std::string outColor = "";
+
+            GLuint compile_vertex_shader();
+            GLuint compile_fragment_shader();
         };
 
     protected:
@@ -72,7 +75,7 @@ namespace hut {
         GLuint name;
         blend_mode first_mode;
         std::vector<std::tuple<GLint, const GLfloat *>> uniformsMatrix3fv;
-        std::vector<std::tuple<GLint, const GLint &>> uniforms1i;
+        std::vector<std::tuple<GLint, const GLint &>> uniforms4i;
         std::vector<std::tuple<GLint, const GLfloat &>> uniforms1f;
     };
 
