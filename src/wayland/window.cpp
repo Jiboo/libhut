@@ -202,7 +202,7 @@ namespace hut {
 
         xdg_surface_add_listener(xdg_surface, &xdg_surface_listeners, this);
 
-        wl_win = wl_egl_window_create(wl_surf, buffed_size.get()[0], buffed_size.get()[1]);
+        wl_win = wl_egl_window_create(wl_surf, geometry.get()[0], geometry.get()[1]);
         init_egl_window(wl_win);
 
         xdg_surface_set_title(xdg_surface, title.c_str());
@@ -284,7 +284,7 @@ namespace hut {
 
         thiz->fullscreen.cache(false);
         thiz->maximized.cache(false);
-        thiz->buffed_size = {{width, height}};
+        thiz->geometry = {{width, height}};
 
         void *p;
         wl_array_for_each(p, states) {
@@ -317,8 +317,8 @@ namespace hut {
             if (fullscreen) {
                 struct wl_region *region = wl_compositor_create_region(dpy.compositor);
                 wl_region_add(region, 0, 0,
-                        buffed_size.get()[0],
-                        buffed_size.get()[1]);
+                        geometry.get()[0],
+                        geometry.get()[1]);
                 wl_surface_set_opaque_region(wl_surf, region);
                 wl_region_destroy(region);
             } else {

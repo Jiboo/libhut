@@ -86,9 +86,9 @@ namespace hut {
         event<keyboard_control_type, bool /*down*/> on_ctrl;
 
         buffed<bool> fullscreen { [this](auto b) { this->enable_fullscreen(b); }, false };
-        buffed<bool> maximized{ [this](auto b) { this->enable_maximize(b); }, false };
+        buffed<bool> maximized { [this](auto b) { this->enable_maximize(b); }, false };
 
-        buffed<ivec2> buffed_size { [this](auto v) { this->resize(v); }, {{500, 500}} };
+        buffed<ivec2> geometry{ [this](auto v) { this->resize(v); }, {{500, 500}} };
         buffed<std::string> title { [this](auto s) { this->rename(s); }, "" };
 
         display& dpy;

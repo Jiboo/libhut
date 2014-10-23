@@ -58,6 +58,7 @@ namespace hut {
 
     static std::string blending_name(blend_mode mode) {
         switch(mode) {
+            case BNONE: return "BNONE";
             case BCLEAR: return "BCLEAR";
             case BSOURCE: return "BSOURCE";
             case BDEST: return "BDEST";
@@ -156,6 +157,7 @@ namespace hut {
         assert(result != 0);
         glShaderSource(result, 1, &source, NULL);
         glCompileShader(result);
+        return result;
     }
 
     shader shader::factory::compile() {

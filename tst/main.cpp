@@ -8,7 +8,7 @@ class unit_tests : public hut::application {
 public:
     virtual int entry(int argc, char** argv, hut::window& main) override {
 
-        main.buffed_size = {{250, 250}};
+        main.geometry = {{250, 250}};
         main.title = "Hello world";
 
         main.on_ctrl.connect([](hut::keyboard_control_type ctrl, bool down) {
