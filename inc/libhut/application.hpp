@@ -34,17 +34,19 @@
 
 namespace hut {
 
+    /* Your app, define your implementation with the <HUT_MAIN> macro.
+     * Upon app launch, an instance of the class defined by <HUT_MAIN> will be created
+     * and <entry> will get called.
+     */
     class base_application {
     public:
+        /* Gets the default display (as defined by DISPLAY on X) */
         static display &auto_display();
 
-        event<> on_pause, on_resume;
         bool stop = false;
 
-        virtual ~base_application() {
-        }
-
     protected:
+        /* Your application entry point, create widgets and add the root of your hierarchy to the window */
         virtual int entry(int argc, char **argv, window& main) {
             throw std::runtime_error("Entry not overloaded, define HUT_MAIN with your application class.");
             return EXIT_FAILURE;

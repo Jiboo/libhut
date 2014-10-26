@@ -1,10 +1,10 @@
 // generated from weston 1.6.0
 
 /*
- * Copyright © 2008-2013 Kristian Høgsberg
- * Copyright © 2013      Rafael Antognolli
- * Copyright © 2013      Jasper St. Pierre
- * Copyright © 2010-2013 Intel Corporation
+ * Copyright (c) 2008-2013 Kristian Hogsberg
+ * Copyright (c) 2013      Rafael Antognolli
+ * Copyright (c) 2013      Jasper St. Pierre
+ * Copyright (c) 2010-2013 Intel Corporation
  * 
  * Permission to use, copy, modify, distribute, and sell this
  * software and its documentation for any purpose is hereby granted

@@ -318,7 +318,7 @@ namespace hut {
         }
 
         for(auto uniform : uniformsMatrix4fv)
-            glUniformMatrix4fv(std::get<0>(uniform), 1, GL_TRUE, std::get<1>(uniform));
+            glUniformMatrix4fv(std::get<0>(uniform), 1, GL_FALSE, std::get<1>(uniform));
     }
 
     void drawable::unbind() {

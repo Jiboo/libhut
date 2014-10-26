@@ -46,7 +46,7 @@ namespace hut {
         };
 
         if(ch < 0x80) {
-            return std::string {{(char)ch}};
+            return std::string {(char)ch};
         }
         else {
             char result[4];

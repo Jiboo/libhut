@@ -132,6 +132,7 @@ namespace hut {
         thiz->maximized.cache(false);
         thiz->geometry = {{width, height}};
 
+        #ifndef __CLDOC__
         void *p;
         wl_array_for_each(p, states) {
             uint32_t state = *((uint32_t*)p);
@@ -143,6 +144,7 @@ namespace hut {
                     thiz->maximized.cache(true);
             }
         }
+        #endif
 
         if(thiz->wl_win)
             wl_egl_window_resize(thiz->wl_win, width, height, 0, 0);
@@ -160,6 +162,8 @@ namespace hut {
 
             glClearColor(clear_color.r, clear_color.g, clear_color.b, clear_color.a);
             glClear(GL_COLOR_BUFFER_BIT);
+
+            glViewport(0, 0, geometry.get()[0], geometry.get()[1]);
 
             on_draw.fire();
 

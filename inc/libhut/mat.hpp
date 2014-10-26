@@ -62,6 +62,66 @@ namespace hut {
             }
             return result;
         }
+
+        static mat<_Type, _RowCount, _RowSize> trans(const vec<_Type, _RowSize-1>& val) {
+            mat<_Type, _RowCount, _RowSize> result;
+            for(size_t i = 0; i < _RowCount; i++) {
+                for(size_t j = 0; j < _RowSize; j++) {
+                    if(j == (_RowSize - 1) && i != (_RowCount - 1))
+                        result[i][j] = val[i];
+                    else
+                        result[i][j] = i == j ? 1 : 0;
+                }
+            }
+            return result;
+        }
+
+        static mat<_Type, _RowCount, _RowSize> scale(const vec<_Type, _RowSize-1>& val) {
+            mat<_Type, _RowCount, _RowSize> result;
+            for(size_t i = 0; i < _RowCount; i++) {
+                for(size_t j = 0; j < _RowSize; j++) {
+                    if(i == j && i != (_RowCount - 1))
+                        result[i][j] = val[i];
+                    else
+                        result[i][j] = i == j ? 1 : 0;
+                }
+            }
+            return result;
+        }
+
+        static mat<_Type, _RowCount, _RowSize> rotate_x(float degree) {
+            mat<_Type, _RowCount, _RowSize> result = init();
+            result[1][1] = std::cos(degree); result[1][2] = -std::sin(degree);
+            result[2][1] = std::sin(degree); result[2][2] = std::cos(degree);
+            return result;
+        }
+
+        static mat<_Type, _RowCount, _RowSize> rotate_y(float degree) {
+            mat<_Type, _RowCount, _RowSize> result = init();
+            result[0][0] = std::cos(degree); result[0][2] = std::sin(degree);
+            result[2][0] = -std::sin(degree); result[2][2] = std::cos(degree);
+            return result;
+        }
+
+        static mat<_Type, _RowCount, _RowSize> rotate_z(float degree) {
+            mat<_Type, _RowCount, _RowSize> result = init();
+            result[0][0] = std::cos(degree); result[0][1] = -std::sin(degree);
+            result[1][0] = std::sin(degree); result[1][1] = std::cos(degree);
+            return result;
+        }
+
+        static mat<_Type, _RowCount, _RowSize> ortho(
+                const _Type& left, const _Type& right, const _Type& bottom, const _Type& top,
+                const _Type& zNear, const _Type& zFar) {
+            mat<_Type, _RowCount, _RowSize> result = init();
+            result[0][0] = _Type(2) / (right - left);
+            result[1][1] = _Type(2) / (top - bottom);
+            result[2][2] = - _Type(2) / (zFar - zNear);
+            result[0][3] = - (right + left) / (right - left);
+            result[1][3] = - (top + bottom) / (top - bottom);
+            result[2][3] = - (zFar + zNear) / (zFar - zNear);
+            return result;
+        }
     };
 
     using mat2 = mat<float, 2, 2>;

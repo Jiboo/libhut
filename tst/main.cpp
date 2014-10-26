@@ -71,28 +71,42 @@ public:
         });
 
         float local[] = {
-                0, 0,   1, 1, 1, 1,     0, 0,
-                1, 0,   1, 1, 1, 1,     0, 0,
-                1, 1,   1, 1, 1, 1,     0, 0,
+            100, 100,  1, 0, 0, 1,  0, 0,
+            200, 100,  0, 1, 0, 1,  0, 0,
+            100, 200,  0, 0, 1, 1,  0, 0,
+        };
+
+        uint16_t indices[] = {
+                0, 1, 2,
+                2, 3, 0
         };
 
         hut::buffer vbo {(uint8_t*)local, sizeof(local), hut::BSTREAM};
 
-        hut::mat4 trans1 = hut::mat4::init();
-        hut::mat4 trans2 = hut::mat4::init();
-        hut::vec4 tint1 = {1, 0, 0, 0.5};
-        hut::vec4 tint2 = {0, 1, 0, 0.5};
+        float angle = 0;
+
+        hut::mat4 proj = hut::mat4::ortho(0, main.geometry.get()[0], main.geometry.get()[1], 0, 1, -1);
+        hut::mat4 model = hut::mat4::init();
+        hut::vec4 tint1 = {1, 1, 1, 1};
+        hut::vec4 tint2 = {0, 0, 0, 1};
         float opacity = 0.5f;
+
+        std::cout << "proj: " << proj << std::endl;
+        std::cout << "model: " << model << std::endl;
+
         hut::drawable shader_simple = hut::drawable::factory()
-                .pos(vbo, 0, 6).transform(trans1).transform(trans2)
-                .col(vbo, 2, 4).col(tint1).col(tint2).opacity(opacity)
+                .pos(vbo, 0 * sizeof(float), 8 * sizeof(float)).transform(model).transform(proj)
+                .col(vbo, 2 * sizeof(float), 8 * sizeof(float)).col(tint1).col(tint2).opacity(opacity)
                 .compile();
 
-        main.on_draw.connect([&shader_simple]() -> bool {
+        main.on_draw.connect([&]() -> bool {
+            angle += M_PI/256;
+            model = hut::mat4::trans({{-100, -100, 0}}) * hut::mat4::rotate_z(angle) * hut::mat4::trans({{100, 100, 0}});
+
+            opacity = 0.5 + ((std::sin(angle * 4) + 1) / 4);
+
             shader_simple.bind();
-
             glDrawArrays(GL_TRIANGLES, 0, 3);
-
             shader_simple.unbind();
             return false;
         });

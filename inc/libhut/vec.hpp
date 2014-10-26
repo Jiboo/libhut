@@ -46,7 +46,7 @@ namespace hut {
             return std::sqrt(sq); \
         } \
         constexpr static vec<_Type, MSIZE> init(const _Type& val = 0) { \
-            vec<_Type, MSIZE> result; \
+            vec<_Type, MSIZE> result {}; \
             std::fill(result.data, result.data + MSIZE, val); \
             return result; \
         }
