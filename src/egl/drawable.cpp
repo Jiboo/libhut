@@ -36,17 +36,17 @@ namespace hut {
         switch(mode) {
             case BLEND_NONE: return "BLEND_NONE";
             case BLEND_CLEAR: return "BLEND_CLEAR";
-            case BLEND_SOURCE: return "BLEND_SOURCE";
-            case BLEND_DEST: return "BLEND_DEST";
+            case BLEND_SRC: return "BLEND_SRC";
+            case BLEND_DST: return "BLEND_DST";
             case BLEND_XOR: return "BLEND_XOR";
             case BLEND_ATOP: return "BLEND_ATOP";
             case BLEND_OVER: return "BLEND_OVER";
             case BLEND_IN: return "BIN";
             case BLEND_OUT: return "BLEND_OUT";
-            case BLEND_DEST_ATOP: return "BLEND_DEST_ATOP";
-            case BLEND_DEST_OVER: return "BLEND_DEST_OVER";
-            case BLEND_DEST_IN: return "BLEND_DEST_IN";
-            case BLEND_DEST_OUT: return "BLEND_DEST_OUT";
+            case BLEND_DST_ATOP: return "BLEND_DST_ATOP";
+            case BLEND_DST_OVER: return "BLEND_DST_OVER";
+            case BLEND_DST_IN: return "BLEND_DST_IN";
+            case BLEND_DST_OUT: return "BLEND_DST_OUT";
         }
         return "BLEND_NONE";
     }
@@ -233,14 +233,27 @@ namespace hut {
 
         frag_source <<
                 "vec4 blend_opacity(in vec4 col, in float opacity) {\n"
-                "\treturn vec4(col.xyz, col.w * opacity);\n"
+                    "\treturn vec4(col.xyz, col.w * opacity);\n"
                 "}\n"
+                "const int BLEND_NONE = -1;\n"
+                "const int BLEND_CLEAR = 0;\n"
+                "const int BLEND_SRC = 1;\n"
+                "const int BLEND_DST = 2;\n"
+                "const int BLEND_XOR = 3;\n"
+                "const int BLEND_ATOP = 4;\n"
                 "const int BLEND_OVER = 5;\n"
+                "const int BLEND_IN = 6;\n"
+                "const int BLEND_OUT = 7;\n"
+                "const int BLEND_DST_ATOP = 8;\n"
+                "const int BLEND_DST_OVER = 9;\n"
+                "const int BLEND_DST_IN = 10;\n"
+                "const int BLEND_DST_OUT = 11;\n"
                 "vec4 porterduff(in vec4 dest, in vec4 source, int mode) {\n"
-                "\treturn mix(dest, source, 0.5);\n"
+                    "\tif(mode == BLEND_NONE) return source;"
+                    "\treturn mix(dest, source, 0.5);\n"
                 "}\n"
                 "void main() {\n"
-                "\tgl_FragColor = " << outColor << ";\n"
+                    "\tgl_FragColor = " << outColor << ";\n"
                 "}\n";
 
         return create_shader(frag_source.str().c_str(), GL_FRAGMENT_SHADER);
@@ -260,8 +273,47 @@ namespace hut {
 
         runtime_assert(outPos != "", "No position defined for drawable");
 
-        runtime_assert(first_blend_mode != BLEND_NONE, "drawable don't have any color/texture input");
-        result.first_blend_mode = first_blend_mode;
+        result.has_blend = true;
+        switch(first_blend_mode) {
+            // http://www.andersriggelsen.dk/glblendfunc.php
+            case BLEND_NONE:        result.has_blend = false; break;
+
+            case BLEND_CLEAR:       result.blend_src = GL_ZERO;
+                                    result.blend_dst = GL_ZERO; break;
+
+            case BLEND_SRC:         result.blend_src = GL_ONE;
+                                    result.blend_dst = GL_ZERO; break;
+
+            case BLEND_DST:         result.blend_src = GL_ZERO;
+                                    result.blend_dst = GL_ONE; break;
+
+            case BLEND_XOR:         result.blend_src = GL_ONE_MINUS_DST_ALPHA;
+                                    result.blend_dst = GL_ONE_MINUS_SRC_ALPHA; break;
+
+            case BLEND_ATOP:        result.blend_src = GL_DST_ALPHA;
+                                    result.blend_dst = GL_ONE_MINUS_SRC_ALPHA; break;
+
+            case BLEND_OVER:        result.blend_src = GL_ONE;
+                                    result.blend_dst = GL_ONE_MINUS_SRC_ALPHA; break;
+
+            case BLEND_IN:          result.blend_src = GL_DST_ALPHA;
+                                    result.blend_dst = GL_ZERO; break;
+
+            case BLEND_OUT:         result.blend_src = GL_ONE_MINUS_DST_ALPHA;
+                                    result.blend_dst = GL_ONE; break;
+
+            case BLEND_DST_ATOP:    result.blend_src = GL_ONE_MINUS_DST_ALPHA;
+                                    result.blend_dst = GL_DST_ALPHA; break;
+
+            case BLEND_DST_OVER:    result.blend_src = GL_ONE_MINUS_DST_ALPHA;
+                                    result.blend_dst = GL_ONE; break;
+
+            case BLEND_DST_IN:      result.blend_src = GL_ZERO;
+                                    result.blend_dst = GL_SRC_ALPHA; break;
+
+            case BLEND_DST_OUT:     result.blend_src = GL_ZERO;
+                                    result.blend_dst = GL_ONE_MINUS_SRC_ALPHA; break;
+        }
 
         switch(mode) {
             case PRIMITIVE_POINTS: result.primitive_mode = GL_POINTS; break;
@@ -340,12 +392,21 @@ namespace hut {
         for(auto uniform : uniformsMatrix4fv)
             glUniformMatrix4fv(std::get<0>(uniform), 1, GL_FALSE, std::get<1>(uniform));
 
+        if(has_blend) {
+            glEnable(GL_BLEND);
+            glBlendFunc(blend_src, blend_dst);
+        }
+
         if(indices_buffer != 0) {
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices_buffer);
             glDrawElements(primitive_mode, primitive_count, GL_UNSIGNED_SHORT, (void*)indices_offset);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
         } else {
             glDrawArrays(primitive_mode, 0, primitive_count);
+        }
+
+        if(has_blend) {
+            glDisable(GL_BLEND);
         }
 
         for(auto attr : attributes)

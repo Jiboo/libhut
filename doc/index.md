@@ -23,6 +23,7 @@ libhut: hobby moden-C++ UI toolkit library.
 * Text
     * https://github.com/rougier/freetype-gl
     * http://http.developer.nvidia.com/GPUGems3/gpugems3_ch25.html
+    * https://github.com/anoek/ex-sdl-cairo-freetype-harfbuzz/blob/master/ex-sdl-cairo-freetype-harfbuzz.c
 
 * Windows
     * https://code.google.com/p/angleproject/

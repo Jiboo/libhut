@@ -42,9 +42,9 @@ namespace hut {
 
     enum blend_mode {
         BLEND_NONE = -1,
-        BLEND_CLEAR = 0, BLEND_SOURCE = 1, BLEND_DEST = 2, BLEND_XOR = 3,
+        BLEND_CLEAR = 0, BLEND_SRC = 1, BLEND_DST = 2, BLEND_XOR = 3,
         BLEND_ATOP = 4, BLEND_OVER = 5, BLEND_IN = 6, BLEND_OUT = 7,
-        BLEND_DEST_ATOP = 8, BLEND_DEST_OVER = 9, BLEND_DEST_IN = 10, BLEND_DEST_OUT = 11
+        BLEND_DST_ATOP = 8, BLEND_DST_OVER = 9, BLEND_DST_IN = 10, BLEND_DST_OUT = 11
     };
 
 } // namespace hut

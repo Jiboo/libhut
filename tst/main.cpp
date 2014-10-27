@@ -71,10 +71,10 @@ public:
         });
 
         float local[] = {
-            100, 100,  1, 0, 0, 1,  0, 0,
-            200, 200,  0, 1, 0, 1,  0, 0,
-            100, 200,  0, 0, 1, 1,  0, 0,
-            200, 100,  1, 1, 1, 1,  0, 0,
+            100, 100,  0, 0, 0, 0,  0, 0,
+            200, 200,  1, 0, 0, 1,  0, 0,
+            100, 200,  0, 1, 0, 1,  0, 0,
+            200, 100,  0, 0, 1, 1,  0, 0,
         };
 
         uint16_t indices[] = {
@@ -85,31 +85,36 @@ public:
         hut::buffer vbo {(uint8_t*)local, sizeof(local)};
         hut::buffer ebo {(uint8_t*)indices, sizeof(indices), hut::BUFFER_INDICES, hut::BUFFER_USAGE_STATIC};
 
-        float angle = 0;
-
-        hut::mat4 proj = hut::mat4::ortho(0, main.geometry.get()[0], main.geometry.get()[1], 0, 1, -1);
+        hut::mat4 proj = hut::mat4::ortho(0, main.geometry.get()[0], main.geometry.get()[1], 0, 100, -100);
         hut::mat4 model = hut::mat4::init();
+        hut::mat4 model2 = hut::mat4::trans({{50, 50, 0}});
         hut::vec4 tint1 = {1, 1, 1, 1};
         hut::vec4 tint2 = {0, 0, 0, 1};
         float opacity = 0.5f;
-
-        std::cout << "proj: " << proj << std::endl;
-        std::cout << "model: " << model << std::endl;
+        float angle = 0;
 
         hut::drawable shader_simple = hut::drawable::factory()
                 .pos(vbo, 0 * sizeof(float), 8 * sizeof(float)).transform(model).transform(proj)
-                .col(vbo, 2 * sizeof(float), 8 * sizeof(float)).col(tint1).col(tint2).opacity(opacity)
+                .col(vbo, 2 * sizeof(float), 8 * sizeof(float), hut::BLEND_CLEAR)
+                .compile(hut::PRIMITIVE_TRIANGLES, ebo, 0, 6);
+
+        hut::drawable test_blend = hut::drawable::factory()
+                .pos(vbo, 0 * sizeof(float), 8 * sizeof(float)).transform(model2).transform(proj)
+                .col(vbo, 2 * sizeof(float), 8 * sizeof(float), hut::BLEND_IN).opacity(0.5)
                 .compile(hut::PRIMITIVE_TRIANGLES, ebo, 0, 6);
 
         main.on_draw.connect([&]() -> bool {
-            angle += M_PI/128;
+            angle += M_PI/512;
             model = hut::mat4::trans({{-150, -150, 0}})
+                    * hut::mat4::rotate_x(angle)
+                    * hut::mat4::rotate_y(angle)
                     * hut::mat4::rotate_z(angle)
                     * hut::mat4::trans({{150, 150, 0}});
 
-            opacity = 0.5 + ((std::sin(angle * 4) + 1) / 4);
+            opacity = 0.5f + ((std::sin(angle * 4) + 1) / 4.f);
 
             shader_simple.draw();
+            test_blend.draw();
             return false;
         });
 

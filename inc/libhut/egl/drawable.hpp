@@ -84,10 +84,16 @@ namespace hut {
         };
 
     public: //FIXME
-        GLuint name, indices_buffer;
-        blend_mode first_blend_mode;
+        GLuint name;
+
+        bool has_blend;
+        GLenum blend_src, blend_dst;
+
         GLenum primitive_mode;
-        size_t primitive_count, indices_offset;
+        size_t primitive_count;
+
+        GLuint indices_buffer;
+        size_t indices_offset;
 
         std::vector<std::tuple<GLint, const GLfloat*>> uniformsMatrix4fv;
         std::vector<std::tuple<GLint, const vec4*>> uniforms4f;
