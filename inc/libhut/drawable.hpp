@@ -37,6 +37,12 @@ namespace hut {
     class texture;
     class drawable;
 
+    enum vertices_primitive_mode {
+        PRIMITIVE_POINTS,
+        PRIMITIVE_LINE_STRIP, PRIMITIVE_LINE_LOOP, PRIMITIVE_LINES,
+        PRIMITIVE_TRIANGLE_STRIP, PRIMITIVE_TRIANGLE_FAN, PRIMITIVE_TRIANGLES
+    };
+
     class drawable_base {
     public:
         class factory {
@@ -46,16 +52,17 @@ namespace hut {
 
             virtual factory& opacity(const float&) = 0;
 
-            virtual factory& col(const vec4&, blend_mode = BOVER) = 0;
-            virtual factory& col(const vec4*, blend_mode = BOVER) = 0;
-            virtual factory& col(const buffer&, size_t offset, size_t stride, blend_mode = BOVER) = 0;
+            virtual factory& col(const vec4&, blend_mode = BLEND_NONE) = 0;
+            virtual factory& col(const vec4*, blend_mode = BLEND_NONE) = 0;
+            virtual factory& col(const buffer&, size_t offset, size_t stride, blend_mode = BLEND_NONE) = 0;
 
-            virtual factory& tex(const texture&, const buffer&, size_t offset, size_t stride, blend_mode = BOVER) = 0;
-            virtual factory& tex(const texture&, const float*, blend_mode = BOVER) = 0;
+            virtual factory& tex(const texture&, const buffer&, size_t offset, size_t stride, blend_mode = BLEND_NONE) = 0;
+            virtual factory& tex(const texture&, const float*, blend_mode = BLEND_NONE) = 0;
 
-            virtual factory& gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode = BOVER) = 0;
+            virtual factory& gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode = BLEND_NONE) = 0;
 
-            virtual drawable compile() = 0;
+            virtual drawable compile(vertices_primitive_mode mode, size_t count) = 0;
+            virtual drawable compile(vertices_primitive_mode mode, const buffer&, size_t offset, size_t count) = 0;
         };
     };
 

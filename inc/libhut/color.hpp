@@ -41,10 +41,10 @@ namespace hut {
     };
 
     enum blend_mode {
-        BNONE = -1,
-        BCLEAR = 0, BSOURCE = 1, BDEST = 2, BXOR = 3,
-        BATOP = 4, BOVER = 5, BIN = 6, BOUT = 7,
-        BDEST_ATOP = 8, BDEST_OVER = 9, BDEST_IN = 10, BDEST_OUT = 11
+        BLEND_NONE = -1,
+        BLEND_CLEAR = 0, BLEND_SOURCE = 1, BLEND_DEST = 2, BLEND_XOR = 3,
+        BLEND_ATOP = 4, BLEND_OVER = 5, BLEND_IN = 6, BLEND_OUT = 7,
+        BLEND_DEST_ATOP = 8, BLEND_DEST_OVER = 9, BLEND_DEST_IN = 10, BLEND_DEST_OUT = 11
     };
 
 } // namespace hut

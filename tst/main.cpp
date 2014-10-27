@@ -72,16 +72,18 @@ public:
 
         float local[] = {
             100, 100,  1, 0, 0, 1,  0, 0,
-            200, 100,  0, 1, 0, 1,  0, 0,
+            200, 200,  0, 1, 0, 1,  0, 0,
             100, 200,  0, 0, 1, 1,  0, 0,
+            200, 100,  1, 1, 1, 1,  0, 0,
         };
 
         uint16_t indices[] = {
                 0, 1, 2,
-                2, 3, 0
+                0, 1, 3
         };
 
-        hut::buffer vbo {(uint8_t*)local, sizeof(local), hut::BSTREAM};
+        hut::buffer vbo {(uint8_t*)local, sizeof(local)};
+        hut::buffer ebo {(uint8_t*)indices, sizeof(indices), hut::BUFFER_INDICES, hut::BUFFER_USAGE_STATIC};
 
         float angle = 0;
 
@@ -97,17 +99,17 @@ public:
         hut::drawable shader_simple = hut::drawable::factory()
                 .pos(vbo, 0 * sizeof(float), 8 * sizeof(float)).transform(model).transform(proj)
                 .col(vbo, 2 * sizeof(float), 8 * sizeof(float)).col(tint1).col(tint2).opacity(opacity)
-                .compile();
+                .compile(hut::PRIMITIVE_TRIANGLES, ebo, 0, 6);
 
         main.on_draw.connect([&]() -> bool {
-            angle += M_PI/256;
-            model = hut::mat4::trans({{-100, -100, 0}}) * hut::mat4::rotate_z(angle) * hut::mat4::trans({{100, 100, 0}});
+            angle += M_PI/128;
+            model = hut::mat4::trans({{-150, -150, 0}})
+                    * hut::mat4::rotate_z(angle)
+                    * hut::mat4::trans({{150, 150, 0}});
 
             opacity = 0.5 + ((std::sin(angle * 4) + 1) / 4);
 
-            shader_simple.bind();
-            glDrawArrays(GL_TRIANGLES, 0, 3);
-            shader_simple.unbind();
+            shader_simple.draw();
             return false;
         });
 

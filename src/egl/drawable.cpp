@@ -34,21 +34,21 @@ namespace hut {
 
     static std::string blending_name(blend_mode mode) {
         switch(mode) {
-            case BNONE: return "BNONE";
-            case BCLEAR: return "BCLEAR";
-            case BSOURCE: return "BSOURCE";
-            case BDEST: return "BDEST";
-            case BXOR: return "BXOR";
-            case BATOP: return "BATOP";
-            case BOVER: return "BOVER";
-            case BIN: return "BIN";
-            case BOUT: return "BOUT";
-            case BDEST_ATOP: return "BDEST_ATOP";
-            case BDEST_OVER: return "BDEST_OVER";
-            case BDEST_IN: return "BDEST_IN";
-            case BDEST_OUT: return "BDEST_OUT";
+            case BLEND_NONE: return "BLEND_NONE";
+            case BLEND_CLEAR: return "BLEND_CLEAR";
+            case BLEND_SOURCE: return "BLEND_SOURCE";
+            case BLEND_DEST: return "BLEND_DEST";
+            case BLEND_XOR: return "BLEND_XOR";
+            case BLEND_ATOP: return "BLEND_ATOP";
+            case BLEND_OVER: return "BLEND_OVER";
+            case BLEND_IN: return "BIN";
+            case BLEND_OUT: return "BLEND_OUT";
+            case BLEND_DEST_ATOP: return "BLEND_DEST_ATOP";
+            case BLEND_DEST_OVER: return "BLEND_DEST_OVER";
+            case BLEND_DEST_IN: return "BLEND_DEST_IN";
+            case BLEND_DEST_OUT: return "BLEND_DEST_OUT";
         }
-        return "BNONE";
+        return "BLEND_NONE";
     }
 
     drawable::factory& drawable::factory::pos(const buffer& data, size_t offset, size_t stride) {
@@ -107,7 +107,7 @@ namespace hut {
         uniforms4f.emplace(name, std::make_tuple(-1, &ref));
 
         if(outColor.empty()) {
-            first_mode = mode;
+            first_blend_mode = mode;
             outColor = name;
         } else {
             std::stringstream color;
@@ -142,7 +142,7 @@ namespace hut {
         varryings.emplace(var_name, std::make_tuple("vec4", name));
 
         if(outColor.empty()) {
-            first_mode = mode;
+            first_blend_mode = mode;
             outColor = var_name;
         } else {
             std::stringstream color;
@@ -235,7 +235,7 @@ namespace hut {
                 "vec4 blend_opacity(in vec4 col, in float opacity) {\n"
                 "\treturn vec4(col.xyz, col.w * opacity);\n"
                 "}\n"
-                "const int BOVER = 5;\n"
+                "const int BLEND_OVER = 5;\n"
                 "vec4 porterduff(in vec4 dest, in vec4 source, int mode) {\n"
                 "\treturn mix(dest, source, 0.5);\n"
                 "}\n"
@@ -246,13 +246,33 @@ namespace hut {
         return create_shader(frag_source.str().c_str(), GL_FRAGMENT_SHADER);
     }
 
-    drawable drawable::factory::compile() {
+    drawable drawable::factory::compile(vertices_primitive_mode mode, const buffer& buf, size_t offset, size_t count) {
+        drawable result = compile(mode, count);
+
+        result.indices_buffer = buf.name;
+        result.indices_offset = offset;
+
+        return result;
+    }
+
+    drawable drawable::factory::compile(vertices_primitive_mode mode, size_t count) {
         drawable result;
 
         runtime_assert(outPos != "", "No position defined for drawable");
 
-        runtime_assert(first_mode != BNONE, "drawable don't have any color/texture input");
-        result.first_mode = first_mode;
+        runtime_assert(first_blend_mode != BLEND_NONE, "drawable don't have any color/texture input");
+        result.first_blend_mode = first_blend_mode;
+
+        switch(mode) {
+            case PRIMITIVE_POINTS: result.primitive_mode = GL_POINTS; break;
+            case PRIMITIVE_LINE_STRIP: result.primitive_mode = GL_LINE_STRIP; break;
+            case PRIMITIVE_LINE_LOOP: result.primitive_mode = GL_LINE_LOOP; break;
+            case PRIMITIVE_LINES: result.primitive_mode = GL_LINES; break;
+            case PRIMITIVE_TRIANGLE_STRIP: result.primitive_mode = GL_TRIANGLE_STRIP; break;
+            case PRIMITIVE_TRIANGLE_FAN: result.primitive_mode = GL_TRIANGLE_FAN; break;
+            case PRIMITIVE_TRIANGLES: result.primitive_mode = GL_TRIANGLES; break;
+        }
+        result.primitive_count = count;
 
         GLuint vertex_shader = compile_vertex_shader();
         GLuint frag_shader = compile_fragment_shader();
@@ -298,7 +318,7 @@ namespace hut {
         return result;
     }
 
-    void drawable::bind() {
+    void drawable::draw() {
         glUseProgram(name);
 
         for (auto attribute : attributes) {
@@ -319,9 +339,15 @@ namespace hut {
 
         for(auto uniform : uniformsMatrix4fv)
             glUniformMatrix4fv(std::get<0>(uniform), 1, GL_FALSE, std::get<1>(uniform));
-    }
 
-    void drawable::unbind() {
+        if(indices_buffer != 0) {
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices_buffer);
+            glDrawElements(primitive_mode, primitive_count, GL_UNSIGNED_SHORT, (void*)indices_offset);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        } else {
+            glDrawArrays(primitive_mode, 0, primitive_count);
+        }
+
         for(auto attr : attributes)
             glDisableVertexAttribArray(std::get<0>(attr).index);
     }

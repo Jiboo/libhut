@@ -54,16 +54,17 @@ namespace hut {
 
             virtual factory& opacity(const float&);
 
-            virtual factory& col(const vec4&, blend_mode = BOVER);
-            virtual factory& col(const vec4*, blend_mode = BOVER);
-            virtual factory& col(const buffer&, size_t offset, size_t stride, blend_mode = BOVER);
+            virtual factory& col(const vec4&, blend_mode = BLEND_OVER);
+            virtual factory& col(const vec4*, blend_mode = BLEND_OVER);
+            virtual factory& col(const buffer&, size_t offset, size_t stride, blend_mode = BLEND_OVER);
 
-            virtual factory& tex(const texture&, const buffer&, size_t offset, size_t stride, blend_mode = BOVER);
-            virtual factory& tex(const texture&, const float*, blend_mode = BOVER);
+            virtual factory& tex(const texture&, const buffer&, size_t offset, size_t stride, blend_mode = BLEND_OVER);
+            virtual factory& tex(const texture&, const float*, blend_mode = BLEND_OVER);
 
-            virtual factory& gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode = BOVER);
+            virtual factory& gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode = BLEND_OVER);
 
-            virtual drawable compile();
+            virtual drawable compile(vertices_primitive_mode mode, size_t count);
+            virtual drawable compile(vertices_primitive_mode mode, const buffer&, size_t offset, size_t count);
 
         protected:
             std::map<std::string, std::tuple<GLint, const GLfloat*>> uniformsMatrix4fv;
@@ -72,18 +73,21 @@ namespace hut {
 
             std::map<std::string, std::tuple<std::string, attrib, GLuint>> attributes;
             std::map<std::string, std::tuple<std::string, std::string>> varryings;
-            blend_mode first_mode;
 
             std::string outPos;
             std::string outColor;
+
+            blend_mode first_blend_mode;
 
             GLuint compile_vertex_shader();
             GLuint compile_fragment_shader();
         };
 
     public: //FIXME
-        GLuint name;
-        blend_mode first_mode;
+        GLuint name, indices_buffer;
+        blend_mode first_blend_mode;
+        GLenum primitive_mode;
+        size_t primitive_count, indices_offset;
 
         std::vector<std::tuple<GLint, const GLfloat*>> uniformsMatrix4fv;
         std::vector<std::tuple<GLint, const vec4*>> uniforms4f;
@@ -94,9 +98,7 @@ namespace hut {
         drawable() {
         }
 
-        void bind();
-
-        void unbind();
+        void draw();
     };
 
 } // namespace hut

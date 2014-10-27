@@ -40,18 +40,22 @@ namespace hut {
         GLuint name;
         size_t buf_size;
 
+        GLenum gl_type() {
+            return type == BUFFER_DATA ? GL_ARRAY_BUFFER : GL_ELEMENT_ARRAY_BUFFER;
+        }
+
     public:
-        buffer(const uint8_t* data, size_t size, buffer_hint hint = BSTREAM)
-                : base_buffer(size) {
+        buffer(const uint8_t* data, size_t size, buffer_type type = BUFFER_DATA, buffer_usage_hint hint = BUFFER_USAGE_STREAM)
+                : base_buffer(size, type) {
             glGenBuffers(1, &name);
-            glBindBuffer(GL_ARRAY_BUFFER, name);
+            glBindBuffer(gl_type(), name);
             GLenum gl_hint;
             switch(hint) {
-                case BSTATIC: gl_hint = GL_STATIC_DRAW; break;
-                case BDYNAMIC: gl_hint = GL_DYNAMIC_DRAW; break;
-                case BSTREAM: gl_hint = GL_STREAM_DRAW; break;
+                case BUFFER_USAGE_STATIC: gl_hint = GL_STATIC_DRAW; break;
+                case BUFFER_USAGE_DYNAMIC: gl_hint = GL_DYNAMIC_DRAW; break;
+                case BUFFER_USAGE_STREAM: gl_hint = GL_STREAM_DRAW; break;
             }
-            glBufferData(GL_ARRAY_BUFFER, size, data, gl_hint);
+            glBufferData(gl_type(), size, data, gl_hint);
         }
 
         virtual ~buffer() {
@@ -59,8 +63,7 @@ namespace hut {
         }
 
         virtual void update(const uint8_t* data, size_t offset, size_t count) {
-            glBindBuffer(GL_ARRAY_BUFFER, name);
-            glBufferSubData(GL_ARRAY_BUFFER, offset, count, data);
+            glBufferSubData(gl_type(), offset, count, data);
         }
     };
 

@@ -34,17 +34,22 @@
 
 namespace hut {
 
-    enum buffer_hint {
-        BSTATIC, BDYNAMIC, BSTREAM
+    enum buffer_usage_hint {
+        BUFFER_USAGE_STATIC, BUFFER_USAGE_DYNAMIC, BUFFER_USAGE_STREAM
+    };
+
+    enum buffer_type {
+        BUFFER_DATA, BUFFER_INDICES
     };
 
     class base_buffer {
     protected:
         size_t alloc_size;
+        buffer_type type;
 
     public:
-        base_buffer(size_t size)
-            : alloc_size(size) {
+        base_buffer(size_t size, buffer_type type)
+            : alloc_size(size), type(type) {
         }
 
         virtual ~base_buffer() {
