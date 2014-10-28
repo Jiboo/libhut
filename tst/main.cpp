@@ -10,7 +10,7 @@ public:
 
         main.geometry = {{250, 250}};
         main.title = "Hello world";
-        main.clear_color = {{0, 0, 0, 0.5}};
+        main.clear_color = {{0, 0, 0, 0}};
 
         main.on_ctrl.connect([](hut::keyboard_control_type ctrl, bool down) {
             std::cout << "ctrl ";
@@ -71,50 +71,50 @@ public:
         });
 
         float local[] = {
-            100, 100,  0, 0, 0, 0,  0, 0,
-            200, 200,  1, 0, 0, 1,  0, 0,
-            100, 200,  0, 1, 0, 1,  0, 0,
-            200, 100,  0, 0, 1, 1,  0, 0,
+            0, 0,   0, 0, 1, 1,  0, 0,
+            50, 0,  0, 0, 1, 1,  0, 0,
+            50, 50, 0, 0, 1, 1,  0, 0,
+            0, 0,   0, 0, 0, 0,  0, 0,
+            50, 50, 0, 0, 0, 0,  0, 0,
+            0, 50,  0, 0, 0, 0,  0, 0,
+            0, 0,   1, 1, 0, 1,  0, 0,
+            50, 0,  1, 1, 0, 1,  0, 0,
+            0, 50,  1, 1, 0, 1,  0, 0,
+            50, 0,  0, 0, 0, 0,  0, 0,
+            50, 50, 0, 0, 0, 0,  0, 0,
+            0, 50,  0, 0, 0, 0,  0, 0,
         };
-
-        uint16_t indices[] = {
-                0, 1, 2,
-                0, 1, 3
+        hut::blend_mode blend_modes[] = {
+                hut::BLEND_CLEAR, hut::BLEND_SRC, hut::BLEND_DST, hut::BLEND_OVER,
+                hut::BLEND_DST_OVER, hut::BLEND_IN, hut::BLEND_DST_IN, hut::BLEND_OUT,
+                hut::BLEND_DST_OUT, hut::BLEND_ATOP, hut::BLEND_DST_ATOP, hut::BLEND_XOR,
+                hut::BLEND_NONE,
         };
 
         hut::buffer vbo {(uint8_t*)local, sizeof(local)};
-        hut::buffer ebo {(uint8_t*)indices, sizeof(indices), hut::BUFFER_INDICES, hut::BUFFER_USAGE_STATIC};
-
         hut::mat4 proj = hut::mat4::ortho(0, main.geometry.get()[0], main.geometry.get()[1], 0, 100, -100);
         hut::mat4 model = hut::mat4::init();
-        hut::mat4 model2 = hut::mat4::trans({{50, 50, 0}});
-        hut::vec4 tint1 = {1, 1, 1, 1};
-        hut::vec4 tint2 = {0, 0, 0, 1};
-        float opacity = 0.5f;
-        float angle = 0;
+        size_t modes_count = sizeof(blend_modes) / sizeof(blend_modes[0]);
 
-        hut::drawable shader_simple = hut::drawable::factory()
+        hut::drawable left = hut::drawable::factory()
                 .pos(vbo, 0 * sizeof(float), 8 * sizeof(float)).transform(model).transform(proj)
-                .col(vbo, 2 * sizeof(float), 8 * sizeof(float), hut::BLEND_CLEAR)
-                .compile(hut::PRIMITIVE_TRIANGLES, ebo, 0, 6);
+                .col(vbo, 2 * sizeof(float), 8 * sizeof(float))
+                .compile(hut::PRIMITIVE_TRIANGLES, 6);
 
-        hut::drawable test_blend = hut::drawable::factory()
-                .pos(vbo, 0 * sizeof(float), 8 * sizeof(float)).transform(model2).transform(proj)
-                .col(vbo, 2 * sizeof(float), 8 * sizeof(float), hut::BLEND_IN).opacity(0.5)
-                .compile(hut::PRIMITIVE_TRIANGLES, ebo, 0, 6);
+        hut::drawable right[modes_count];
+        for(size_t i = 0; i < modes_count; i++) {
+            right[i] = hut::drawable::factory()
+                    .pos(vbo, 6 * 8 * sizeof(float), 8 * sizeof(float)).transform(model).transform(proj)
+                    .col(vbo, 6 * 8 * sizeof(float) + 2 * sizeof(float), 8 * sizeof(float), blend_modes[i])
+                    .compile(hut::PRIMITIVE_TRIANGLES, 6);
+        }
 
         main.on_draw.connect([&]() -> bool {
-            angle += M_PI/512;
-            model = hut::mat4::trans({{-150, -150, 0}})
-                    * hut::mat4::rotate_x(angle)
-                    * hut::mat4::rotate_y(angle)
-                    * hut::mat4::rotate_z(angle)
-                    * hut::mat4::trans({{150, 150, 0}});
-
-            opacity = 0.5f + ((std::sin(angle * 4) + 1) / 4.f);
-
-            shader_simple.draw();
-            test_blend.draw();
+            for(size_t i = 0; i < modes_count; i++) {
+                model = hut::mat4::trans({{(i % 4) * 50, (i / 4) * 50, 0}});
+                left.draw();
+                right[i].draw();
+            }
             return false;
         });
 

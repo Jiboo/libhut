@@ -169,8 +169,6 @@ namespace hut {
         GLuint result = glCreateShader(shader_type);
         assert(result != 0);
 
-        std::cout << source;
-
         glShaderSource(result, 1, &source, NULL);
         glCompileShader(result);
 
@@ -300,10 +298,10 @@ namespace hut {
                                     result.blend_dst = GL_ZERO; break;
 
             case BLEND_OUT:         result.blend_src = GL_ONE_MINUS_DST_ALPHA;
-                                    result.blend_dst = GL_ONE; break;
+                                    result.blend_dst = GL_ZERO; break;
 
             case BLEND_DST_ATOP:    result.blend_src = GL_ONE_MINUS_DST_ALPHA;
-                                    result.blend_dst = GL_DST_ALPHA; break;
+                                    result.blend_dst = GL_SRC_ALPHA; break;
 
             case BLEND_DST_OVER:    result.blend_src = GL_ONE_MINUS_DST_ALPHA;
                                     result.blend_dst = GL_ONE; break;
@@ -397,7 +395,7 @@ namespace hut {
             glBlendFunc(blend_src, blend_dst);
         }
 
-        if(indices_buffer != 0) {
+        if(indices_buffer != GL_NONE) {
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices_buffer);
             glDrawElements(primitive_mode, primitive_count, GL_UNSIGNED_SHORT, (void*)indices_offset);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);

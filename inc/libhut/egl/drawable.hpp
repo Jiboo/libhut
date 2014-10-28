@@ -92,7 +92,7 @@ namespace hut {
         GLenum primitive_mode;
         size_t primitive_count;
 
-        GLuint indices_buffer;
+        GLuint indices_buffer = GL_NONE;
         size_t indices_offset;
 
         std::vector<std::tuple<GLint, const GLfloat*>> uniformsMatrix4fv;
