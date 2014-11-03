@@ -301,6 +301,13 @@ namespace hut {
                         "\t\treturn vec4(xR, aR);\n"
                     "\t}\n"
 
+                    "\telse if(mode == BLEND_ATOP) {\n"
+                        "\t\tfloat aR = dest.a;\n"
+                        "\t\tvec3 xaA = source.rgb * source.a;\n"
+                        "\t\tvec3 xR = xaA + dest.rgb * (1.f - source.a);\n"
+                        "\t\treturn vec4(xR, aR);\n"
+                    "\t}\n"
+
                     "\telse if(mode == BLEND_OVER || mode == BLEND_NONE) {\n"
                         "\t\tfloat aR = source.a + dest.a * (1.f - source.a);\n"
                         "\t\tvec3 xaA = source.rgb * source.a;\n"
@@ -309,20 +316,35 @@ namespace hut {
                         "\t\treturn vec4(xR, aR);\n"
                     "\t}\n"
 
-                    "\telse if(mode == BLEND_ATOP) {\n"
-                        "\t\tfloat aR = dest.a;\n"
+                    "\telse if(mode == BLEND_IN) {\n"
+                        "\t\treturn vec4(source.rgb, source.a * dest.a);\n"
+                    "\t}\n"
+
+                    "\telse if(mode == BLEND_OUT) {\n"
+                        "\t\treturn vec4(source.rgb, source.a * (1.f - dest.a));\n"
+                    "\t}\n"
+
+                    "\telse if(mode == BLEND_DST_ATOP) {\n"
+                        "\t\tvec3 xaB = dest.rgb * dest.a;\n"
+                        "\t\tvec3 xR = source.rgb * (1.f - dest.a) + xaB;\n"
+                        "\t\treturn vec4(xR, source.a);\n"
+                    "\t}\n"
+
+                    "\telse if(mode == BLEND_DST_OVER) {\n"
+                        "\t\tfloat aR = (1.f - dest.a) * source.a + dest.a;\n"
                         "\t\tvec3 xaA = source.rgb * source.a;\n"
-                        "\t\tvec3 xR = xaA + dest.rgb * (1.f - source.a);\n"
+                        "\t\tvec3 xaB = dest.rgb * dest.a;\n"
+                        "\t\tvec3 xR = (xaA * (1.f - dest.a) + xaB) / aR;\n"
                         "\t\treturn vec4(xR, aR);\n"
                     "\t}\n"
 
-                    "\telse if(mode == BLEND_IN) return source;\n" //TODO
-                    "\telse if(mode == BLEND_OUT) return source;\n"
+                    "\telse if(mode == BLEND_DST_IN) {\n"
+                        "\t\treturn vec4(dest.rgb, source.a * dest.a);\n"
+                    "\t}\n"
 
-                    "\telse if(mode == BLEND_DST_ATOP) return source;\n"
-                    "\telse if(mode == BLEND_DST_OVER) return source;\n"
-                    "\telse if(mode == BLEND_DST_IN) return source;\n"
-                    "\telse if(mode == BLEND_DST_OUT) return source;\n"
+                    "\telse if(mode == BLEND_DST_OUT) {\n"
+                        "\t\treturn vec4(dest.rgb, (1.f - source.a) * dest.a);\n"
+                    "\t}\n"
 
                     "\treturn mix(dest, source, 0.5);\n"
                 "}\n"
