@@ -30,6 +30,7 @@
 
 #include "xdg-shell-client-protocol.h"
 
+#include "libhut/drawable.hpp"
 #include "libhut/egl/window.hpp"
 #include "libhut/wayland/surface.hpp"
 #include "libhut/wayland/display.hpp"
@@ -38,7 +39,6 @@ namespace hut {
 
     class window : public egl_window {
         friend class display;
-        friend void redraw_gl(window *window);
 
     public:
         window(display& dpy, const std::string& title, bool translucent = false,
@@ -51,7 +51,7 @@ namespace hut {
 
         virtual ivec2 size() const;
         virtual short unsigned int density() const;
-        virtual void draw(const hut::mesh&);
+        virtual void draw(const hut::drawable&);
         virtual void draw(const hut::batch&);
 
         virtual void minimize();

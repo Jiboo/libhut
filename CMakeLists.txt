@@ -20,6 +20,7 @@ set(HUT_HEADERS
     inc/libhut/surface.hpp
     inc/libhut/window.hpp
     inc/libhut/buffer.hpp
+    inc/libhut/texture.hpp
     inc/libhut/drawable.hpp
 )
 
@@ -27,11 +28,12 @@ set(EGL_HEADERS
     ${HUT_HEADERS}
 
     inc/libhut/egl/application.hpp
-    inc/libhut/egl/buffer.hpp
     inc/libhut/egl/display.hpp
-    inc/libhut/egl/drawable.hpp
     inc/libhut/egl/surface.hpp
     inc/libhut/egl/window.hpp
+    inc/libhut/egl/drawable.hpp
+    inc/libhut/egl/buffer.hpp
+    inc/libhut/egl/texture.hpp
 )
 
 set(WAYLAND_HEADERS
@@ -43,7 +45,13 @@ set(WAYLAND_HEADERS
     inc/libhut/wayland/window.hpp
 )
 
+set(HUT_SOURCES
+    src/utils.cpp
+)
+
 set(EGL_SOURCES
+    ${HUT_SOURCES}
+
     src/egl/display.cpp
     src/egl/drawable.cpp
 )
@@ -74,7 +82,7 @@ endif(APPLE)
 include_directories(inc)
 
 add_library(hut STATIC ${WAYLAND_SOURCES} ${WAYLAND_HEADERS})
-target_link_libraries(hut PUBLIC wayland-client wayland-egl wayland-cursor xkbcommon EGL GLESv2)
+target_link_libraries(hut PUBLIC wayland-client wayland-egl wayland-cursor xkbcommon EGL GLESv2 png)
 
 add_executable(unit-tests ${TEST_FILES})
 target_link_libraries(unit-tests gtest hut)

@@ -36,7 +36,8 @@
 namespace hut {
 
     class drawable : public drawable_base {
-    public: //FIXME
+        friend class window;
+    protected:
         struct attrib {
             GLuint index;
             GLint size;
@@ -49,19 +50,19 @@ namespace hut {
     public:
         class factory : public drawable_base::factory {
         public:
-            virtual factory& pos(const buffer&, size_t offset, size_t stride);
-            virtual factory& transform(const mat4&);
+            virtual drawable_base::factory& pos(const buffer&, size_t offset, size_t stride);
+            virtual drawable_base::factory& transform(const mat4&);
 
-            virtual factory& opacity(const float&);
+            virtual drawable_base::factory& opacity(const float&);
 
-            virtual factory& col(const vec4&, blend_mode = BLEND_OVER);
-            virtual factory& col(const vec4*, blend_mode = BLEND_OVER);
-            virtual factory& col(const buffer&, size_t offset, size_t stride, blend_mode = BLEND_OVER);
+            virtual drawable_base::factory& col(const vec4&, blend_mode = BLEND_OVER);
+            virtual drawable_base::factory& col(const vec4*, blend_mode = BLEND_OVER);
+            virtual drawable_base::factory& col(const buffer&, size_t offset, size_t stride, blend_mode = BLEND_OVER);
 
-            virtual factory& tex(const texture&, const buffer&, size_t offset, size_t stride, blend_mode = BLEND_OVER);
-            virtual factory& tex(const texture&, const float*, blend_mode = BLEND_OVER);
+            virtual drawable_base::factory& tex(const texture&, const buffer&, size_t offset, size_t stride, blend_mode = BLEND_OVER);
+            virtual drawable_base::factory& tex(const texture&, const float*, blend_mode = BLEND_OVER);
 
-            virtual factory& gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode = BLEND_OVER);
+            virtual drawable_base::factory& gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode = BLEND_OVER);
 
             virtual drawable compile(vertices_primitive_mode mode, size_t count);
             virtual drawable compile(vertices_primitive_mode mode, const buffer&, size_t offset, size_t count);
@@ -70,6 +71,7 @@ namespace hut {
             std::map<std::string, std::tuple<GLint, const GLfloat*>> uniformsMatrix4fv;
             std::map<std::string, std::tuple<GLint, const vec4*>> uniforms4f;
             std::map<std::string, std::tuple<GLint, const GLfloat*>> uniforms1f;
+            std::map<std::string, std::tuple<GLint, GLenum, GLuint>> uniforms_texture;
 
             std::map<std::string, std::tuple<std::string, attrib, GLuint>> attributes;
             std::map<std::string, std::tuple<std::string, std::string>> varryings;
@@ -83,7 +85,7 @@ namespace hut {
             GLuint compile_fragment_shader();
         };
 
-    public: //FIXME
+    protected:
         GLuint name;
 
         bool has_blend;
@@ -98,13 +100,11 @@ namespace hut {
         std::vector<std::tuple<GLint, const GLfloat*>> uniformsMatrix4fv;
         std::vector<std::tuple<GLint, const vec4*>> uniforms4f;
         std::vector<std::tuple<GLint, const GLfloat*>> uniforms1f;
+        std::vector<std::tuple<GLint, GLenum, GLuint>> uniforms_texture;
 
         std::vector<std::tuple<attrib, GLuint>> attributes;
 
-        drawable() {
-        }
-
-        void draw();
+        void draw() const;
     };
 
 } // namespace hut

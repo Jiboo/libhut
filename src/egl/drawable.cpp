@@ -51,7 +51,7 @@ namespace hut {
         return "BLEND_NONE";
     }
 
-    drawable::factory& drawable::factory::pos(const buffer& data, size_t offset, size_t stride) {
+    drawable_base::factory& drawable::factory::pos(const buffer& data, size_t offset, size_t stride) {
         GLuint index = (GLuint)attributes.size();
         std::stringstream buf;
         buf << "pos_" << index;
@@ -74,7 +74,7 @@ namespace hut {
         return *this;
     }
 
-    drawable::factory& drawable::factory::transform(const mat4& ref) {
+    drawable_base::factory& drawable::factory::transform(const mat4& ref) {
         runtime_assert(outPos != "", "Define position before transforms");
 
         std::stringstream name;
@@ -85,7 +85,7 @@ namespace hut {
         return *this;
     }
 
-    drawable::factory& drawable::factory::opacity(const float& ref) {
+    drawable_base::factory& drawable::factory::opacity(const float& ref) {
         std::stringstream buf;
         buf << "opacity_" << uniforms1f.size();
         std::string name = buf.str();
@@ -99,7 +99,7 @@ namespace hut {
         return *this;
     }
 
-    drawable::factory& drawable::factory::col(const vec4& ref, blend_mode mode) {
+    drawable_base::factory& drawable::factory::col(const vec4& ref, blend_mode mode) {
         std::stringstream buf;
         buf << "col_uni_" << uniforms4f.size();
         std::string name = buf.str();
@@ -118,11 +118,11 @@ namespace hut {
         return *this;
     }
 
-    drawable::factory& drawable::factory::col(const vec4* colors, blend_mode mode) {
+    drawable_base::factory& drawable::factory::col(const vec4* colors, blend_mode mode) {
         return *this;
     }
 
-    drawable::factory& drawable::factory::col(const buffer& data, size_t offset, size_t stride, blend_mode mode) {
+    drawable_base::factory& drawable::factory::col(const buffer& data, size_t offset, size_t stride, blend_mode mode) {
         GLuint index = (GLuint)attributes.size();
         std::stringstream buf;
         buf << "col_attrib_bound_" << index;
@@ -153,15 +153,48 @@ namespace hut {
         return *this;
     }
 
-    drawable::factory& drawable::factory::tex(const texture&, const buffer&, size_t offset, size_t stride, blend_mode) {
+    drawable_base::factory& drawable::factory::tex(const texture& t, const buffer& b, size_t offset, size_t stride, blend_mode mode) {
+        GLuint index = (GLuint)uniforms_texture.size();
+        std::stringstream buf;
+        buf << "tex_" << index;
+        std::string name = buf.str();
+        buf << "_coords";
+        std::string coords_name = buf.str();
+        buf << "_var";
+        std::string var_name = buf.str();
+
+        attrib attr;
+        attr.index = attributes.size();
+        attr.normalized = GL_FALSE;
+        attr.pointer = (GLvoid*)offset;
+        attr.size = 2;
+        attr.stride = (GLsizei)stride;
+        attr.type = GL_FLOAT;
+
+        attributes.emplace(coords_name, std::make_tuple("vec2", attr, b.name));
+        varryings.emplace(var_name, std::make_tuple("vec2", coords_name));
+        uniforms_texture.emplace(name, std::make_tuple(-1, index, t.name));
+
+        std::stringstream color;
+        color << "texture2D(" << name << ", " << var_name << ")";
+
+        if(outColor.empty()) {
+            first_blend_mode = mode;
+            outColor = color.str();
+        } else {
+            std::stringstream mixed_color;
+            mixed_color << "porterduff(" << color.str() << ", " << outColor << ", " << blending_name(mode) << ")";
+            outColor = mixed_color.str();
+        }
+
         return *this;
     }
 
-    drawable::factory& drawable::factory::tex(const texture&, const float*, blend_mode) {
+    drawable_base::factory& drawable::factory::tex(const texture&, const float*, blend_mode) {
         return *this;
     }
 
-    drawable::factory& drawable::factory::gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode) {
+    drawable_base::factory& drawable::factory::gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode) {
         return *this;
     }
 
@@ -197,6 +230,8 @@ namespace hut {
             vertex_source << "uniform vec4 " << uniform.first << ";\n";
         for(auto uniform : uniformsMatrix4fv)
             vertex_source << "uniform mat4 " << uniform.first << ";\n";
+        for(auto uniform : uniforms_texture)
+            vertex_source << "uniform sampler2D " << uniform.first << ";\n";
 
         for(auto attr : attributes)
             vertex_source << "attribute " << std::get<0>(attr.second) << " " << attr.first << ";\n";
@@ -212,6 +247,8 @@ namespace hut {
 
         vertex_source << "}\n";
 
+        std::cout << vertex_source.str() << std::endl;
+
         return create_shader(vertex_source.str().c_str(), GL_VERTEX_SHADER);
     }
 
@@ -226,6 +263,8 @@ namespace hut {
             frag_source << "uniform vec4 " << uniform.first << ";\n";
         for(auto uniform : uniformsMatrix4fv)
             frag_source << "uniform mat4 " << uniform.first << ";\n";
+        for(auto uniform : uniforms_texture)
+            frag_source << "uniform sampler2D " << uniform.first << ";\n";
 
         for(auto var : varryings) frag_source << "varying " << std::get<0>(var.second) << " " << var.first << ";\n";
 
@@ -246,13 +285,52 @@ namespace hut {
                 "const int BLEND_DST_OVER = 9;\n"
                 "const int BLEND_DST_IN = 10;\n"
                 "const int BLEND_DST_OUT = 11;\n"
+
                 "vec4 porterduff(in vec4 dest, in vec4 source, int mode) {\n"
-                    "\tif(mode == BLEND_NONE) return source;"
+                    // http://cairographics.org/operators/
+
+                    "\tif(mode == BLEND_CLEAR) return vec4(0);\n"
+                    "\telse if(mode == BLEND_SRC) return source;\n"
+                    "\telse if(mode == BLEND_DST) return dest;\n"
+
+                    "\telse if(mode == BLEND_XOR) {\n"
+                        "\t\tfloat aR = source.a + dest.a - 2.f * (source.a * dest.a);\n"
+                        "\t\tvec3 xaA = source.rgb * source.a;\n"
+                        "\t\tvec3 xaB = dest.rgb * dest.a;\n"
+                        "\t\tvec3 xR = (xaA * (1.f - dest.a) + xaB * (1.f - source.a)) / aR;\n"
+                        "\t\treturn vec4(xR, aR);\n"
+                    "\t}\n"
+
+                    "\telse if(mode == BLEND_OVER || mode == BLEND_NONE) {\n"
+                        "\t\tfloat aR = source.a + dest.a * (1.f - source.a);\n"
+                        "\t\tvec3 xaA = source.rgb * source.a;\n"
+                        "\t\tvec3 xaB = dest.rgb * dest.a;\n"
+                        "\t\tvec3 xR = (xaA + xaB * (1.f - source.a)) / aR;\n"
+                        "\t\treturn vec4(xR, aR);\n"
+                    "\t}\n"
+
+                    "\telse if(mode == BLEND_ATOP) {\n"
+                        "\t\tfloat aR = dest.a;\n"
+                        "\t\tvec3 xaA = source.rgb * source.a;\n"
+                        "\t\tvec3 xR = xaA + dest.rgb * (1.f - source.a);\n"
+                        "\t\treturn vec4(xR, aR);\n"
+                    "\t}\n"
+
+                    "\telse if(mode == BLEND_IN) return source;\n" //TODO
+                    "\telse if(mode == BLEND_OUT) return source;\n"
+
+                    "\telse if(mode == BLEND_DST_ATOP) return source;\n"
+                    "\telse if(mode == BLEND_DST_OVER) return source;\n"
+                    "\telse if(mode == BLEND_DST_IN) return source;\n"
+                    "\telse if(mode == BLEND_DST_OUT) return source;\n"
+
                     "\treturn mix(dest, source, 0.5);\n"
                 "}\n"
                 "void main() {\n"
                     "\tgl_FragColor = " << outColor << ";\n"
                 "}\n";
+
+        std::cout << frag_source.str() << std::endl;
 
         return create_shader(frag_source.str().c_str(), GL_FRAGMENT_SHADER);
     }
@@ -291,7 +369,7 @@ namespace hut {
             case BLEND_ATOP:        result.blend_src = GL_DST_ALPHA;
                                     result.blend_dst = GL_ONE_MINUS_SRC_ALPHA; break;
 
-            case BLEND_OVER:        result.blend_src = GL_ONE;
+            case BLEND_OVER:        result.blend_src = GL_SRC_ALPHA;
                                     result.blend_dst = GL_ONE_MINUS_SRC_ALPHA; break;
 
             case BLEND_IN:          result.blend_src = GL_DST_ALPHA;
@@ -349,18 +427,27 @@ namespace hut {
         }
 
         for (auto uniform : uniforms1f) {
-            std::get<0>(uniform.second) = glGetUniformLocation(result.name, uniform.first.c_str());;
-            result.uniforms1f.emplace_back(uniform.second);
+            std::get<0>(uniform.second) = glGetUniformLocation(result.name, uniform.first.c_str());
+            if(std::get<0>(uniform.second) != -1)
+                result.uniforms1f.emplace_back(uniform.second);
         }
 
         for(auto uniform : uniforms4f) {
             std::get<0>(uniform.second) = glGetUniformLocation(result.name, uniform.first.c_str());
-            result.uniforms4f.emplace_back(uniform.second);
+            if(std::get<0>(uniform.second) != -1)
+                result.uniforms4f.emplace_back(uniform.second);
         }
 
         for(auto uniform : uniformsMatrix4fv) {
             std::get<0>(uniform.second) = glGetUniformLocation(result.name, uniform.first.c_str());
-            result.uniformsMatrix4fv.emplace_back(uniform.second);
+            if(std::get<0>(uniform.second) != -1)
+                result.uniformsMatrix4fv.emplace_back(uniform.second);
+        }
+
+        for(auto uniform : uniforms_texture) {
+            std::get<0>(uniform.second) = glGetUniformLocation(result.name, uniform.first.c_str());
+            if(std::get<0>(uniform.second) != -1)
+                result.uniforms_texture.emplace_back(uniform.second);
         }
 
         assert(glGetError() == GL_NO_ERROR);
@@ -368,7 +455,7 @@ namespace hut {
         return result;
     }
 
-    void drawable::draw() {
+    void drawable::draw() const {
         glUseProgram(name);
 
         for (auto attribute : attributes) {
@@ -387,27 +474,33 @@ namespace hut {
             glUniform4f(std::get<0>(uniform), uni.r, uni.g, uni.b, uni.a);
         }
 
-        for(auto uniform : uniformsMatrix4fv)
+        for (auto uniform : uniformsMatrix4fv)
             glUniformMatrix4fv(std::get<0>(uniform), 1, GL_FALSE, std::get<1>(uniform));
 
-        if(has_blend) {
+        for (auto uniform : uniforms_texture) {
+            glActiveTexture(GL_TEXTURE0 + std::get<1>(uniform));
+            glBindTexture(GL_TEXTURE_2D, std::get<2>(uniform));
+            glUniform1i(std::get<0>(uniform), std::get<1>(uniform));
+        }
+
+        if (has_blend) {
             glEnable(GL_BLEND);
             glBlendFunc(blend_src, blend_dst);
         }
 
-        if(indices_buffer != GL_NONE) {
+        if (indices_buffer != GL_NONE) {
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices_buffer);
-            glDrawElements(primitive_mode, primitive_count, GL_UNSIGNED_SHORT, (void*)indices_offset);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+            glDrawElements(primitive_mode, primitive_count, GL_UNSIGNED_SHORT, (void *) indices_offset);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_NONE);
         } else {
             glDrawArrays(primitive_mode, 0, primitive_count);
         }
 
-        if(has_blend) {
+        if (has_blend) {
             glDisable(GL_BLEND);
         }
 
-        for(auto attr : attributes)
+        for (auto attr : attributes)
             glDisableVertexAttribArray(std::get<0>(attr).index);
     }
 

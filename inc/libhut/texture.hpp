@@ -28,17 +28,33 @@
 
 #pragma once
 
-#include "libhut/event.hpp"
-#include "libhut/property.hpp"
+#include "libhut/color.hpp"
 #include "libhut/vec.hpp"
-#include "libhut/mat.hpp"
-#include "libhut/utils.hpp"
 
-#include "libhut/application.hpp"
-#include "libhut/display.hpp"
-#include "libhut/surface.hpp"
-#include "libhut/window.hpp"
+namespace hut {
 
-#include "libhut/buffer.hpp"
-#include "libhut/texture.hpp"
-#include "libhut/drawable.hpp"
+    class base_texture {
+    protected:
+        uivec2 alloc_size, real_size;
+        pixel_format format;
+
+    public:
+        base_texture(const uivec2 &alloc_size, const uivec2 &real_size, const pixel_format& internal_format)
+                : alloc_size(alloc_size), real_size(real_size), format(internal_format) {
+        }
+
+        virtual ~base_texture() {
+        }
+
+        virtual void filter(bool enable) = 0;
+
+        virtual void update(const uivec2 &offset, const uivec2 &size, const pixel_format& format, void* data) = 0;
+    };
+
+} //namespace hut
+
+#ifdef HUT_WAYLAND
+
+#include "libhut/egl/texture.hpp"
+
+#endif

@@ -33,8 +33,8 @@
 
 namespace hut {
 
-    class mesh;
     class batch;
+    class drawable;
 
     class base_surface {
     public:
@@ -43,7 +43,7 @@ namespace hut {
         virtual ivec2 size() const = 0;
         virtual unsigned short density() const = 0;
 
-        virtual void draw(const mesh &m) = 0;
+        virtual void draw(const drawable &d) = 0;
         virtual void draw(const batch &b) = 0;
     };
 

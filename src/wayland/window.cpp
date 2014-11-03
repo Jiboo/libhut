@@ -76,8 +76,8 @@ namespace hut {
         return 160; //FIXME
     }
 
-    void window::draw(const hut::mesh&) {
-
+    void window::draw(const hut::drawable& d) {
+        d.draw();
     }
 
     void window::draw(const hut::batch&) {

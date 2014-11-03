@@ -1,6 +1,7 @@
 #include <ext/codecvt_specializations.h>
 
 #include <gtest/gtest.h>
+#include <sys/time.h>
 
 #include "hut.hpp"
 
@@ -70,19 +71,21 @@ public:
             return true;
         });
 
+        #define OPACITY 0.5f
+
         float local[] = {
-            0, 0,   0, 0, 1, 1,  0, 0,
-            50, 0,  0, 0, 1, 1,  0, 0,
-            50, 50, 0, 0, 1, 1,  0, 0,
-            0, 0,   0, 0, 0, 0,  0, 0,
-            50, 50, 0, 0, 0, 0,  0, 0,
-            0, 50,  0, 0, 0, 0,  0, 0,
-            0, 0,   1, 1, 0, 1,  0, 0,
-            50, 0,  1, 1, 0, 1,  0, 0,
-            0, 50,  1, 1, 0, 1,  0, 0,
-            50, 0,  0, 0, 0, 0,  0, 0,
-            50, 50, 0, 0, 0, 0,  0, 0,
-            0, 50,  0, 0, 0, 0,  0, 0,
+            0, 0,       0, 0, 1, OPACITY,   0, 0,
+            50, 0,      0, 0, 1, OPACITY,   1, 0,
+            50, 50,     0, 0, 1, OPACITY,   1, 1,
+            0, 0,       0, 0, 0, 0,         0, 0,
+            50, 50,     0, 0, 0, 0,         1, 1,
+            0, 50,      0, 0, 0, 0,         0, 1,
+            0, 0,       1, 1, 0, OPACITY,   0, 0,
+            50, 0,      1, 1, 0, OPACITY,   0, 0,
+            0, 50,      1, 1, 0, OPACITY,   0, 0,
+            50, 0,      0, 0, 0, 0,         0, 0,
+            50, 50,     0, 0, 0, 0,         0, 0,
+            0, 50,      0, 0, 0, 0,         0, 0,
         };
         hut::blend_mode blend_modes[] = {
                 hut::BLEND_CLEAR, hut::BLEND_SRC, hut::BLEND_DST, hut::BLEND_OVER,
@@ -97,24 +100,68 @@ public:
         size_t modes_count = sizeof(blend_modes) / sizeof(blend_modes[0]);
 
         hut::drawable left = hut::drawable::factory()
-                .pos(vbo, 0 * sizeof(float), 8 * sizeof(float)).transform(model).transform(proj)
-                .col(vbo, 2 * sizeof(float), 8 * sizeof(float))
-                .compile(hut::PRIMITIVE_TRIANGLES, 6);
+            .pos(vbo, 0 * sizeof(float), 8 * sizeof(float)).transform(model).transform(proj)
+            .col(vbo, 2 * sizeof(float), 8 * sizeof(float))
+            .compile(hut::PRIMITIVE_TRIANGLES, 6);
 
         hut::drawable right[modes_count];
         for(size_t i = 0; i < modes_count; i++) {
             right[i] = hut::drawable::factory()
-                    .pos(vbo, 6 * 8 * sizeof(float), 8 * sizeof(float)).transform(model).transform(proj)
-                    .col(vbo, 6 * 8 * sizeof(float) + 2 * sizeof(float), 8 * sizeof(float), blend_modes[i])
-                    .compile(hut::PRIMITIVE_TRIANGLES, 6);
+                .pos(vbo, 6 * 8 * sizeof(float), 8 * sizeof(float)).transform(model).transform(proj)
+                .col(vbo, 6 * 8 * sizeof(float) + 2 * sizeof(float), 8 * sizeof(float), blend_modes[i])
+                .compile(hut::PRIMITIVE_TRIANGLES, 6);
         }
 
+        hut::texture tex1 = hut::load_png("tex1.png");
+        hut::texture tex2 = hut::load_png("tex2.png");
+
+        float local2[] = {
+                0, 0,       0, 0, 1, OPACITY,   0, 0,
+                50, 0,      0, 0, 1, OPACITY,   1, 0,
+                50, 50,     0, 0, 1, OPACITY,   1, 1,
+                0, 0,       0, 0, 1, OPACITY,   0, 0,
+                50, 50,     0, 0, 1, OPACITY,   1, 1,
+                0, 50,      0, 0, 1, OPACITY,   0, 1,
+        };
+        hut::buffer vbo2 {(uint8_t*)local2, sizeof(local2)};
+
+        hut::drawable tex1rect = hut::drawable::factory()
+                .pos(vbo2, 0 * sizeof(float), 8 * sizeof(float)).transform(model).transform(proj)
+                .tex(tex1, vbo2, 6 * sizeof(float), 8 * sizeof(float), hut::BLEND_OVER)
+                .tex(tex2, vbo2, 6 * sizeof(float), 8 * sizeof(float), hut::BLEND_ATOP)
+                .compile(hut::PRIMITIVE_TRIANGLES, 6);
+
+        int frames = 0;
+        auto drawing_time = std::chrono::milliseconds(0);
+        auto bench_start = std::chrono::steady_clock::now();
+
         main.on_draw.connect([&]() -> bool {
-            for(size_t i = 0; i < modes_count; i++) {
+
+            std::chrono::steady_clock::time_point frame_start = std::chrono::steady_clock::now();
+
+            for (size_t i = 0; i < modes_count; i++) {
                 model = hut::mat4::trans({{(i % 4) * 50, (i / 4) * 50, 0}});
-                left.draw();
-                right[i].draw();
+                main.draw(left);
+                main.draw(right[i]);
             }
+
+            model = hut::mat4::trans({{(modes_count % 4) * 50, (modes_count / 4) * 50, 0}});
+            main.draw(tex1rect);
+
+            std::chrono::steady_clock::time_point frame_end = std::chrono::steady_clock::now();
+            frames++;
+            drawing_time += std::chrono::duration_cast<std::chrono::milliseconds>(frame_end - frame_start);
+
+            if(std::chrono::duration_cast<std::chrono::milliseconds>(frame_end - bench_start).count() > 1000) {
+                std::cout << "Render stats: "
+                        << frames << " fps, "
+                        << (drawing_time.count() / frames) << "ms average drawing time"
+                        << std::endl;
+                bench_start = frame_end;
+                drawing_time = std::chrono::milliseconds::zero();
+                frames = 0;
+            }
+
             return false;
         });
 
