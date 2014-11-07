@@ -26,6 +26,7 @@
  * SOFTWARE.
  */
 
+#include <cassert>
 #include <sstream>
 
 #include "libhut/egl/drawable.hpp"
@@ -154,7 +155,7 @@ namespace hut {
     }
 
     drawable_base::factory& drawable::factory::tex(const texture& t, const buffer& b, size_t offset, size_t stride, blend_mode mode) {
-        GLuint index = (GLuint)uniforms_texture.size();
+        GLuint index = (GLuint)bound_textures++;
         std::stringstream buf;
         buf << "tex_" << index;
         std::string name = buf.str();
@@ -191,6 +192,67 @@ namespace hut {
     }
 
     drawable_base::factory& drawable::factory::tex(const texture&, const float*, blend_mode) {
+        return *this;
+    }
+
+    drawable_base::factory& drawable::factory::multitex(std::initializer_list<texture*> textures, const buffer& b, size_t texindex_offset, size_t texcoord_offset, size_t stride, blend_mode mode) {
+        GLuint index = (GLuint)uniforms_textures.size();
+        std::stringstream buf;
+        buf << "multitex_" << index;
+        std::string name = buf.str();
+
+        std::vector<std::pair<GLenum, GLuint>> tex_names;
+        for(auto tex : textures)
+            tex_names.emplace_back(bound_textures++, tex->name);
+
+        uniforms_textures.emplace(name, std::make_tuple(-1, tex_names));
+
+        std::stringstream coords_buf;
+        coords_buf << name << "_coords";
+        std::string coords_name = coords_buf.str();
+        coords_buf << "_var";
+        std::string coords_var_name = coords_buf.str();
+
+        attrib attr_texcoord;
+        attr_texcoord.index = attributes.size();
+        attr_texcoord.normalized = GL_FALSE;
+        attr_texcoord.pointer = (GLvoid*)texcoord_offset;
+        attr_texcoord.size = 2;
+        attr_texcoord.stride = (GLsizei)stride;
+        attr_texcoord.type = GL_FLOAT;
+        attributes.emplace(coords_name, std::make_tuple("vec2", attr_texcoord, b.name));
+        varryings.emplace(coords_var_name, std::make_tuple("vec2", coords_name));
+
+        std::stringstream index_buf;
+        index_buf << name << "_index";
+        std::string index_name = index_buf.str();
+        index_buf << "_var";
+        std::string index_var_name = index_buf.str();
+
+        attrib attr_texindex;
+        attr_texindex.index = attributes.size();
+        attr_texindex.normalized = GL_FALSE;
+        attr_texindex.pointer = (GLvoid*)texindex_offset;
+        attr_texindex.size = 1;
+        attr_texindex.stride = (GLsizei)stride;
+        attr_texindex.type = GL_FLOAT;
+        attributes.emplace(index_name, std::make_tuple("float", attr_texindex, b.name));
+        varryings.emplace(index_var_name, std::make_tuple("float", index_name));
+
+        std::stringstream color;
+        //color << "texture2D(" << name << "[" << index_var_name << "]" << ", " << coords_var_name << ")";
+        // http://gamedev.stackexchange.com/questions/34278/can-you-dynamically-set-which-texture-to-use-in-shader
+        color << "get_" << name << "_color(" << index_var_name << ", " << coords_var_name << ")";
+
+        if(outColor.empty()) {
+            first_blend_mode = mode;
+            outColor = color.str();
+        } else {
+            std::stringstream mixed_color;
+            mixed_color << "porterduff(" << color.str() << ", " << outColor << ", " << blending_name(mode) << ")";
+            outColor = mixed_color.str();
+        }
+
         return *this;
     }
 
@@ -232,6 +294,8 @@ namespace hut {
             vertex_source << "uniform mat4 " << uniform.first << ";\n";
         for(auto uniform : uniforms_texture)
             vertex_source << "uniform sampler2D " << uniform.first << ";\n";
+        for(auto uniform : uniforms_textures)
+            vertex_source << "uniform sampler2D " << uniform.first << "[" << std::get<1>(uniform.second).size() << "];\n";
 
         for(auto attr : attributes)
             vertex_source << "attribute " << std::get<0>(attr.second) << " " << attr.first << ";\n";
@@ -265,6 +329,16 @@ namespace hut {
             frag_source << "uniform mat4 " << uniform.first << ";\n";
         for(auto uniform : uniforms_texture)
             frag_source << "uniform sampler2D " << uniform.first << ";\n";
+        for(auto uniform : uniforms_textures) {
+            frag_source << "uniform sampler2D " << uniform.first << "[" << std::get<1>(uniform.second).size() << "];\n";
+
+            frag_source << "vec4 get_" << uniform.first << "_color(float index, vec2 texcoords) {\n";
+            frag_source << "\tint ii = int(index);\n";
+            for (size_t i = 0; i < std::get<1>(uniform.second).size(); i++)
+                frag_source << "\t" << (i == 0 ? "" : "else ") << "if(ii == " << i << ") return texture2D(" << uniform.first << "[" << i << "]" << ", texcoords);\n";
+            frag_source << "\telse return vec4(1, 0, 0, 1);\n";
+            frag_source << "}\n";
+        }
 
         for(auto var : varryings) frag_source << "varying " << std::get<0>(var.second) << " " << var.first << ";\n";
 
@@ -472,6 +546,12 @@ namespace hut {
                 result.uniforms_texture.emplace_back(uniform.second);
         }
 
+        for(auto uniform : uniforms_textures) {
+            std::get<0>(uniform.second) = glGetUniformLocation(result.name, uniform.first.c_str());
+            if(std::get<0>(uniform.second) != -1)
+                result.uniforms_textures.emplace_back(uniform.second);
+        }
+
         assert(glGetError() == GL_NO_ERROR);
 
         return result;
@@ -503,6 +583,16 @@ namespace hut {
             glActiveTexture(GL_TEXTURE0 + std::get<1>(uniform));
             glBindTexture(GL_TEXTURE_2D, std::get<2>(uniform));
             glUniform1i(std::get<0>(uniform), std::get<1>(uniform));
+        }
+
+        for (auto uniform : uniforms_textures) {
+            std::vector<GLint> ids;
+            for(auto tex : std::get<1>(uniform)) {
+                glActiveTexture(GL_TEXTURE0 + tex.first);
+                glBindTexture(GL_TEXTURE_2D, tex.second);
+                ids.emplace_back(tex.first);
+            }
+            glUniform1iv(std::get<0>(uniform), std::get<1>(uniform).size(), ids.data());
         }
 
         if (has_blend) {

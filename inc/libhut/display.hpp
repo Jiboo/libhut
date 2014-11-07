@@ -43,13 +43,13 @@ namespace hut {
         }
 
         inline auto post(std::function<void()> callback);
-        //inline void unpost(auto callback_ref);
+        inline void unpost(auto callback_ref);
 
         inline auto post_delayed(std::function<void()> callback, std::chrono::milliseconds delay);
-        //inline void unpost_delayed(auto callback_ref);
+        inline void unpost_delayed(auto callback_ref);
 
         inline auto schedule(std::function<void()> callback, std::chrono::milliseconds delay);
-        //inline void unschedule(auto callback_ref);
+        inline void unschedule(auto callback_ref);
 
         virtual void flush() = 0;
 
@@ -58,35 +58,60 @@ namespace hut {
     protected:
         using time_point = std::chrono::steady_clock::time_point;
         using duration = std::chrono::steady_clock::duration;
+
         std::list<std::function<void()>> posted_jobs;
         std::map<time_point, std::function<void()>> delayed_jobs;
-        std::map<time_point, std::tuple<bool, duration, std::function<void()>>> scheduled_jobs;
+        std::map<time_point, std::tuple<std::function<void()>, duration>> scheduled_jobs;
 
         virtual void dispatch_draw() {
 
+        }
+
+        void tick_jobs() {
+            for(auto job : posted_jobs)
+                job();
+            posted_jobs.clear();
+
+            time_point now = std::chrono::steady_clock::now();
+
+            for(auto it = delayed_jobs.begin(); it != delayed_jobs.end(); it++) {
+                if(it->first < now) {
+                    it->second();
+                    delayed_jobs.erase(it);
+                }
+            }
+
+            for(auto it = scheduled_jobs.begin(); it != scheduled_jobs.end(); it++) {
+                if(it->first < now) {
+                    std::get<0>(it->second)();
+
+                    scheduled_jobs.emplace(now + std::get<1>(it->second), it->second);
+                    scheduled_jobs.erase(it);
+                }
+            }
         }
     };
 
     auto base_display::post(std::function<void()> callback) {
         return posted_jobs.emplace(posted_jobs.end(), callback);
     }
-    /*void base_display::unpost(auto callback_ref) {
+    void base_display::unpost(auto callback_ref) {
         posted_jobs.erase(callback_ref);
-    }*/
+    }
 
     auto base_display::post_delayed(std::function<void()> callback, std::chrono::milliseconds delay) {
         return delayed_jobs.emplace(std::chrono::steady_clock::now() + delay, callback);
     }
-    /*void base_display::unpost_delayed(auto callback_ref) {
+    void base_display::unpost_delayed(auto callback_ref) {
         delayed_jobs.erase(callback_ref);
-    }*/
+    }
 
     auto base_display::schedule(std::function<void()> callback, std::chrono::milliseconds delay) {
-        return scheduled_jobs.emplace(std::chrono::steady_clock::now() + delay, std::make_tuple(false, delay, callback));
+        return scheduled_jobs.emplace(std::chrono::steady_clock::now() + delay, std::make_tuple(callback, delay));
     }
-    /*void base_display::unschedule(auto callback_ref) {
+    void base_display::unschedule(auto callback_ref) {
         scheduled_jobs.erase(callback_ref);
-    }*/
+    }
 
 } //namespace hut
 
@@ -95,3 +120,4 @@ namespace hut {
 #include "libhut/wayland/display.hpp"
 
 #endif
+

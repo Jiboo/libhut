@@ -59,6 +59,9 @@ namespace hut {
             virtual factory& tex(const texture&, const buffer&, size_t offset, size_t stride, blend_mode = BLEND_NONE) = 0;
             virtual factory& tex(const texture&, const float*, blend_mode = BLEND_NONE) = 0;
 
+            /** Advanced command, mainly used to render text from multiple texture atlases */
+            virtual factory& multitex(std::initializer_list<texture*>, const buffer&, size_t texindex_offset, size_t texcoord_offset, size_t stride, blend_mode = BLEND_NONE) = 0;
+
             virtual factory& gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode = BLEND_NONE) = 0;
 
             virtual drawable compile(vertices_primitive_mode mode, size_t count) = 0;

@@ -185,7 +185,7 @@ namespace hut {
     }
 
     void display::dispatch_draw() {
-        //TODO Call pending posted jobs
+        tick_jobs();
         for(window* win : active_wins) {
             win->dispatch_draw();
         }

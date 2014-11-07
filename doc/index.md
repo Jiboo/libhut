@@ -24,6 +24,9 @@ libhut: hobby moden-C++ UI toolkit library.
     * https://github.com/rougier/freetype-gl
     * http://http.developer.nvidia.com/GPUGems3/gpugems3_ch25.html
     * https://github.com/anoek/ex-sdl-cairo-freetype-harfbuzz/blob/master/ex-sdl-cairo-freetype-harfbuzz.c
+    * http://jcgt.org/published/0002/01/04/paper.pdf
+    * https://github.com/lxnt/ex-sdl-freetype-harfbuzz/
+    * http://www.reddit.com/r/gamedev/comments/2879jd/just_found_out_about_signed_distance_field_text/
 
 * Windows
     * https://code.google.com/p/angleproject/

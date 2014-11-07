@@ -40,6 +40,10 @@ namespace hut {
         bool has_mipmaps;
 
     public:
+        texture(const texture&) = delete;
+        texture& operator=(const texture&) = delete; // would delete the texture if the copied value is destroyed
+        constexpr texture(texture&&) = default;
+
         texture(const uivec2 &size, const pixel_format& data_format, void* data, const pixel_format& internal_format, bool enable_mipmaps = true)
                 : base_texture(size, size, internal_format), has_mipmaps(enable_mipmaps) {
             GLint gl_internal_format;

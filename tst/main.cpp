@@ -9,9 +9,26 @@ class unit_tests : public hut::application {
 public:
     virtual int entry(int argc, char** argv, hut::window& main) override {
 
-        main.geometry = {{250, 250}};
-        main.title = "Hello world";
+        /*main.title = "Hello world";
         main.clear_color = {{0, 0, 0, 0}};
+        main.geometry = {{250, 250}};
+
+        auto_display().post([]{
+            std::cout << "posted job run once!" << std::endl;
+        });
+
+        auto job1 = auto_display().post([]{
+            std::cout << "posted job that will get removed!" << std::endl;
+        });
+        auto_display().unpost(job1);
+
+        auto_display().post_delayed([&main]{
+            std::cout << "posted job with 5s delay!" << std::endl;
+        }, std::chrono::milliseconds {5000});
+
+        auto_display().schedule([]{
+            std::cout << "scheduled job with 5s delay!" << std::endl;
+        }, std::chrono::milliseconds {5000});
 
         main.on_ctrl.connect([](hut::keyboard_control_type ctrl, bool down) {
             std::cout << "ctrl ";
@@ -136,7 +153,6 @@ public:
         auto bench_start = std::chrono::steady_clock::now();
 
         main.on_draw.connect([&]() -> bool {
-
             std::chrono::steady_clock::time_point frame_start = std::chrono::steady_clock::now();
 
             for (size_t i = 0; i < modes_count; i++) {
@@ -145,7 +161,8 @@ public:
                 main.draw(right[i]);
             }
 
-            model = hut::mat4::trans({{(modes_count % 4) * 50, (modes_count / 4) * 50, 0}});
+            const float scale = frames / 60.f * 10;
+            model = hut::mat4::trans({{0, 0, 0}}) * hut::mat4::scale({{scale, scale, 0}});
             main.draw(tex1rect);
 
             std::chrono::steady_clock::time_point frame_end = std::chrono::steady_clock::now();
@@ -162,6 +179,46 @@ public:
                 frames = 0;
             }
 
+            return false;
+        });*/
+
+        struct vertex_info {
+            hut::vec2 pos;
+            hut::vec4 col;
+            float tex;
+            hut::vec2 texcoords;
+        };
+
+        vertex_info vertices[] {
+            {{0, 0},     {0, 0, 1, 1}, 0, {0, 0}},
+            {{50, 0},    {0, 0, 1, 1}, 0, {1, 0}},
+            {{50, 50},   {0, 0, 1, 1}, 0, {1, 1}},
+            {{0, 0},     {0, 0, 1, 1}, 0, {0, 0}},
+            {{50, 50},   {0, 0, 1, 1}, 0, {1, 1}},
+            {{0, 50},    {0, 0, 1, 1}, 0, {0, 1}},
+
+            {{50, 50},   {0, 1, 0, 1}, 1, {0, 0}},
+            {{100, 50},  {0, 1, 0, 1}, 1, {1, 0}},
+            {{100, 100}, {0, 1, 0, 1}, 1, {1, 1}},
+            {{50, 50},   {0, 1, 0, 1}, 1, {0, 0}},
+            {{100, 100}, {0, 1, 0, 1}, 1, {1, 1}},
+            {{50, 100},  {0, 1, 0, 1}, 1, {0, 1}},
+        };
+        hut::buffer vbo {(uint8_t*)vertices, sizeof(vertices)};
+
+        hut::mat4 proj = hut::mat4::ortho(0, main.geometry.get()[0], main.geometry.get()[1], 0, 100, -100);
+        hut::mat4 model = hut::mat4::init();
+
+        hut::texture tex1 = hut::load_png("tex1.png");
+        hut::texture tex2 = hut::load_png("tex2.png");
+
+        hut::drawable rects = hut::drawable::factory()
+            .pos(vbo, offsetof(vertex_info, pos), sizeof(vertex_info)).transform(model).transform(proj)
+            .multitex({&tex1, &tex2}, vbo, offsetof(vertex_info, tex), offsetof(vertex_info, texcoords), sizeof(vertex_info), hut::BLEND_OVER)
+            .compile(hut::PRIMITIVE_TRIANGLES, 12);
+
+        main.on_draw.connect([&]() -> bool {
+            main.draw(rects);
             return false;
         });
 

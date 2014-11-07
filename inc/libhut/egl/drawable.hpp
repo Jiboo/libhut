@@ -29,7 +29,6 @@
 #pragma once
 
 #include <string>
-#include "libhut/optional.hpp"
 
 #include "libhut/drawable.hpp"
 
@@ -61,6 +60,7 @@ namespace hut {
 
             virtual drawable_base::factory& tex(const texture&, const buffer&, size_t offset, size_t stride, blend_mode = BLEND_OVER);
             virtual drawable_base::factory& tex(const texture&, const float*, blend_mode = BLEND_OVER);
+            virtual drawable_base::factory& multitex(std::initializer_list<texture*>, const buffer&, size_t texindex_offset, size_t texcoord_offset, size_t stride, blend_mode = BLEND_NONE);
 
             virtual drawable_base::factory& gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode = BLEND_OVER);
 
@@ -72,6 +72,8 @@ namespace hut {
             std::map<std::string, std::tuple<GLint, const vec4*>> uniforms4f;
             std::map<std::string, std::tuple<GLint, const GLfloat*>> uniforms1f;
             std::map<std::string, std::tuple<GLint, GLenum, GLuint>> uniforms_texture;
+            std::map<std::string, std::tuple<GLint, std::vector<std::pair<GLenum, GLuint>>>> uniforms_textures;
+            size_t bound_textures = 0;
 
             std::map<std::string, std::tuple<std::string, attrib, GLuint>> attributes;
             std::map<std::string, std::tuple<std::string, std::string>> varryings;
@@ -101,6 +103,7 @@ namespace hut {
         std::vector<std::tuple<GLint, const vec4*>> uniforms4f;
         std::vector<std::tuple<GLint, const GLfloat*>> uniforms1f;
         std::vector<std::tuple<GLint, GLenum, GLuint>> uniforms_texture;
+        std::vector<std::tuple<GLint, std::vector<std::pair<GLenum, GLuint>>>> uniforms_textures;
 
         std::vector<std::tuple<attrib, GLuint>> attributes;
 
