@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "xdg-shell-client-protocol.h"
 
 #include "libhut/drawable.hpp"
@@ -51,8 +53,8 @@ namespace hut {
 
         virtual ivec2 size() const;
         virtual short unsigned int density() const;
-        virtual void draw(const hut::drawable&);
-        virtual void draw(const hut::batch&);
+        virtual void draw(std::shared_ptr<hut::drawable>);
+        virtual void draw(std::shared_ptr<hut::batch>);
 
         virtual void minimize();
         virtual void close();

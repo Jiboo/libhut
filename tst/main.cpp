@@ -190,31 +190,32 @@ public:
         };
 
         vertex_info vertices[] {
-            {{0, 0},     {0, 0, 1, 1}, 0, {0, 0}},
-            {{50, 0},    {0, 0, 1, 1}, 0, {1, 0}},
-            {{50, 50},   {0, 0, 1, 1}, 0, {1, 1}},
-            {{0, 0},     {0, 0, 1, 1}, 0, {0, 0}},
-            {{50, 50},   {0, 0, 1, 1}, 0, {1, 1}},
-            {{0, 50},    {0, 0, 1, 1}, 0, {0, 1}},
+            {{0, 0},     {0, 0, 1, 0.5}, 0, {0, 0}},
+            {{100, 0},   {0, 0, 1, 0.5}, 0, {1, 0}},
+            {{100, 100}, {0, 0, 1, 0.5}, 0, {1, 1}},
+            {{0, 0},     {0, 0, 1, 0.5}, 0, {0, 0}},
+            {{100, 100}, {0, 0, 1, 0.5}, 0, {1, 1}},
+            {{0, 100},   {0, 0, 1, 0.5}, 0, {0, 1}},
 
-            {{50, 50},   {0, 1, 0, 1}, 1, {0, 0}},
-            {{100, 50},  {0, 1, 0, 1}, 1, {1, 0}},
-            {{100, 100}, {0, 1, 0, 1}, 1, {1, 1}},
-            {{50, 50},   {0, 1, 0, 1}, 1, {0, 0}},
-            {{100, 100}, {0, 1, 0, 1}, 1, {1, 1}},
-            {{50, 100},  {0, 1, 0, 1}, 1, {0, 1}},
+            {{100, 100}, {0, 1, 0, 0.5}, 1, {0, 0}},
+            {{200, 100}, {0, 1, 0, 0.5}, 1, {1, 0}},
+            {{200, 200}, {0, 1, 0, 0.5}, 1, {1, 1}},
+            {{100, 100}, {0, 1, 0, 0.5}, 1, {0, 0}},
+            {{200, 200}, {0, 1, 0, 0.5}, 1, {1, 1}},
+            {{100, 200}, {0, 1, 0, 0.5}, 1, {0, 1}},
         };
-        hut::buffer vbo {(uint8_t*)vertices, sizeof(vertices)};
+        std::shared_ptr<hut::buffer> vbo = std::make_shared<hut::buffer>((uint8_t*)vertices, sizeof(vertices));
 
         hut::mat4 proj = hut::mat4::ortho(0, main.geometry.get()[0], main.geometry.get()[1], 0, 100, -100);
         hut::mat4 model = hut::mat4::init();
 
-        hut::texture tex1 = hut::load_png("tex1.png");
-        hut::texture tex2 = hut::load_png("tex2.png");
+        auto tex1 = hut::load_png("tex1.png");
+        auto tex2 = hut::load_png("tex2.png");
 
-        hut::drawable rects = hut::drawable::factory()
+        auto rects = hut::drawable::factory()
             .pos(vbo, offsetof(vertex_info, pos), sizeof(vertex_info)).transform(model).transform(proj)
-            .multitex({&tex1, &tex2}, vbo, offsetof(vertex_info, tex), offsetof(vertex_info, texcoords), sizeof(vertex_info), hut::BLEND_OVER)
+            .multitex({tex1, tex2}, vbo, offsetof(vertex_info, tex), offsetof(vertex_info, texcoords), sizeof(vertex_info), hut::BLEND_OVER)
+            .col(vbo, offsetof(vertex_info, col), sizeof(vertex_info), hut::BLEND_ATOP)
             .compile(hut::PRIMITIVE_TRIANGLES, 12);
 
         main.on_draw.connect([&]() -> bool {
@@ -225,8 +226,7 @@ public:
         ::testing::InitGoogleTest(&argc, argv);
         int result = RUN_ALL_TESTS();
 
-        result |= application::entry(argc, argv, main);
-        return result;
+        return result || application::entry(argc, argv, main);
     }
 };
 

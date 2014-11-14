@@ -14,7 +14,6 @@ set(HUT_HEADERS
     inc/libhut/color.hpp
     inc/libhut/event.hpp
     inc/libhut/property.hpp
-    inc/libhut/optional.hpp
     inc/libhut/application.hpp
     inc/libhut/display.hpp
     inc/libhut/surface.hpp

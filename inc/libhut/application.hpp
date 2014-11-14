@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "libhut/event.hpp"
 #include "libhut/display.hpp"
 #include "libhut/window.hpp"
@@ -42,6 +44,8 @@ namespace hut {
     public:
         /* Gets the default display (as defined by DISPLAY on X) */
         static display &auto_display();
+
+        //TODO Some way to list and get shared_ptr to other displays
 
         bool stop = false;
 

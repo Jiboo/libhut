@@ -29,6 +29,7 @@
 #pragma once
 
 #include <string>
+#include <memory>
 
 #include "libhut/drawable.hpp"
 
@@ -49,23 +50,23 @@ namespace hut {
     public:
         class factory : public drawable_base::factory {
         public:
-            virtual drawable_base::factory& pos(const buffer&, size_t offset, size_t stride);
+            virtual drawable_base::factory& pos(std::shared_ptr<buffer>, size_t offset, size_t stride);
             virtual drawable_base::factory& transform(const mat4&);
 
             virtual drawable_base::factory& opacity(const float&);
 
             virtual drawable_base::factory& col(const vec4&, blend_mode = BLEND_OVER);
             virtual drawable_base::factory& col(const vec4*, blend_mode = BLEND_OVER);
-            virtual drawable_base::factory& col(const buffer&, size_t offset, size_t stride, blend_mode = BLEND_OVER);
+            virtual drawable_base::factory& col(std::shared_ptr<buffer>, size_t offset, size_t stride, blend_mode = BLEND_OVER);
 
-            virtual drawable_base::factory& tex(const texture&, const buffer&, size_t offset, size_t stride, blend_mode = BLEND_OVER);
-            virtual drawable_base::factory& tex(const texture&, const float*, blend_mode = BLEND_OVER);
-            virtual drawable_base::factory& multitex(std::initializer_list<texture*>, const buffer&, size_t texindex_offset, size_t texcoord_offset, size_t stride, blend_mode = BLEND_NONE);
+            virtual drawable_base::factory& tex(std::shared_ptr<texture>, std::shared_ptr<buffer>, size_t offset, size_t stride, blend_mode = BLEND_OVER);
+            virtual drawable_base::factory& tex(std::shared_ptr<texture>, const float*, blend_mode = BLEND_OVER);
+            virtual drawable_base::factory& multitex(std::initializer_list<std::shared_ptr<texture>>, std::shared_ptr<buffer>, size_t texindex_offset, size_t texcoord_offset, size_t stride, blend_mode = BLEND_NONE);
 
             virtual drawable_base::factory& gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode = BLEND_OVER);
 
-            virtual drawable compile(vertices_primitive_mode mode, size_t count);
-            virtual drawable compile(vertices_primitive_mode mode, const buffer&, size_t offset, size_t count);
+            virtual std::shared_ptr<drawable> compile(vertices_primitive_mode mode, size_t count);
+            virtual std::shared_ptr<drawable> compile(vertices_primitive_mode mode, std::shared_ptr<buffer>, size_t offset, size_t count);
 
         protected:
             std::map<std::string, std::tuple<GLint, const GLfloat*>> uniformsMatrix4fv;

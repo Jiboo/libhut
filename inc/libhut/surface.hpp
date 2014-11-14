@@ -43,8 +43,8 @@ namespace hut {
         virtual ivec2 size() const = 0;
         virtual unsigned short density() const = 0;
 
-        virtual void draw(const drawable &d) = 0;
-        virtual void draw(const batch &b) = 0;
+        virtual void draw(std::shared_ptr<drawable> d) = 0;
+        virtual void draw(std::shared_ptr<batch> b) = 0;
     };
 
 } // namespace hut

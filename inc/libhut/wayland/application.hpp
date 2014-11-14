@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "libhut/egl/application.hpp"
 #include "libhut/window.hpp"
 

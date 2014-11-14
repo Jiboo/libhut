@@ -63,7 +63,7 @@ namespace hut {
         return std::string {};
     }
 
-    texture load_png(std::string filename) {
+    std::shared_ptr<texture> load_png(std::string filename) {
         // https://github.com/DavidEGrayson/ahrs-visualizer/blob/master/png_texture.cpp
 
         png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
@@ -189,14 +189,14 @@ namespace hut {
 
         png_read_image(png_ptr, row_pointers);
 
-        texture result(size, format, image_data, format, true);
+        texture* result = new texture(size, format, image_data, format, true);
 
         png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
         free(image_data);
         free(row_pointers);
         fclose(fp);
 
-        return result;
+        return std::shared_ptr<texture>(result);
     }
 
 } //namespace hut

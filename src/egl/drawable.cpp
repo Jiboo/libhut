@@ -42,7 +42,7 @@ namespace hut {
             case BLEND_XOR: return "BLEND_XOR";
             case BLEND_ATOP: return "BLEND_ATOP";
             case BLEND_OVER: return "BLEND_OVER";
-            case BLEND_IN: return "BIN";
+            case BLEND_IN: return "BLEND_IN";
             case BLEND_OUT: return "BLEND_OUT";
             case BLEND_DST_ATOP: return "BLEND_DST_ATOP";
             case BLEND_DST_OVER: return "BLEND_DST_OVER";
@@ -52,7 +52,7 @@ namespace hut {
         return "BLEND_NONE";
     }
 
-    drawable_base::factory& drawable::factory::pos(const buffer& data, size_t offset, size_t stride) {
+    drawable_base::factory& drawable::factory::pos(std::shared_ptr<buffer> data, size_t offset, size_t stride) {
         GLuint index = (GLuint)attributes.size();
         std::stringstream buf;
         buf << "pos_" << index;
@@ -65,7 +65,7 @@ namespace hut {
         attr.stride = (GLsizei)stride;
         attr.type = GL_FLOAT;
 
-        attributes.emplace(buf.str(), std::make_tuple("vec3", attr, data.name));
+        attributes.emplace(buf.str(), std::make_tuple("vec3", attr, data->name));
 
         std::stringstream pos;
 
@@ -112,7 +112,7 @@ namespace hut {
             outColor = name;
         } else {
             std::stringstream color;
-            color << "porterduff(" << name << ", " << outColor << ", " << blending_name(mode) << ")";
+            color << "porterduff(" << outColor << ", " << name << ", " << blending_name(mode) << ")";
             outColor = color.str();
         }
 
@@ -123,7 +123,7 @@ namespace hut {
         return *this;
     }
 
-    drawable_base::factory& drawable::factory::col(const buffer& data, size_t offset, size_t stride, blend_mode mode) {
+    drawable_base::factory& drawable::factory::col(std::shared_ptr<buffer> data, size_t offset, size_t stride, blend_mode mode) {
         GLuint index = (GLuint)attributes.size();
         std::stringstream buf;
         buf << "col_attrib_bound_" << index;
@@ -139,7 +139,7 @@ namespace hut {
         attr.stride = (GLsizei)stride;
         attr.type = GL_FLOAT;
 
-        attributes.emplace(name, std::make_tuple("vec4", attr, data.name));
+        attributes.emplace(name, std::make_tuple("vec4", attr, data->name));
         varryings.emplace(var_name, std::make_tuple("vec4", name));
 
         if(outColor.empty()) {
@@ -147,14 +147,14 @@ namespace hut {
             outColor = var_name;
         } else {
             std::stringstream color;
-            color << "porterduff(" << var_name << ", " << outColor << ", " << blending_name(mode) << ")";
+            color << "porterduff(" << outColor << ", " << var_name << ", " << blending_name(mode) << ")";
             outColor = color.str();
         }
 
         return *this;
     }
 
-    drawable_base::factory& drawable::factory::tex(const texture& t, const buffer& b, size_t offset, size_t stride, blend_mode mode) {
+    drawable_base::factory& drawable::factory::tex(std::shared_ptr<texture> t, std::shared_ptr<buffer> b, size_t offset, size_t stride, blend_mode mode) {
         GLuint index = (GLuint)bound_textures++;
         std::stringstream buf;
         buf << "tex_" << index;
@@ -172,9 +172,9 @@ namespace hut {
         attr.stride = (GLsizei)stride;
         attr.type = GL_FLOAT;
 
-        attributes.emplace(coords_name, std::make_tuple("vec2", attr, b.name));
+        attributes.emplace(coords_name, std::make_tuple("vec2", attr, b->name));
         varryings.emplace(var_name, std::make_tuple("vec2", coords_name));
-        uniforms_texture.emplace(name, std::make_tuple(-1, index, t.name));
+        uniforms_texture.emplace(name, std::make_tuple(-1, index, t->name));
 
         std::stringstream color;
         color << "texture2D(" << name << ", " << var_name << ")";
@@ -184,18 +184,18 @@ namespace hut {
             outColor = color.str();
         } else {
             std::stringstream mixed_color;
-            mixed_color << "porterduff(" << color.str() << ", " << outColor << ", " << blending_name(mode) << ")";
+            mixed_color << "porterduff(" << outColor << ", " << color.str() << ", " << blending_name(mode) << ")";
             outColor = mixed_color.str();
         }
 
         return *this;
     }
 
-    drawable_base::factory& drawable::factory::tex(const texture&, const float*, blend_mode) {
+    drawable_base::factory& drawable::factory::tex(std::shared_ptr<texture>, const float*, blend_mode) {
         return *this;
     }
 
-    drawable_base::factory& drawable::factory::multitex(std::initializer_list<texture*> textures, const buffer& b, size_t texindex_offset, size_t texcoord_offset, size_t stride, blend_mode mode) {
+    drawable_base::factory& drawable::factory::multitex(std::initializer_list<std::shared_ptr<texture>> textures, std::shared_ptr<buffer> b, size_t texindex_offset, size_t texcoord_offset, size_t stride, blend_mode mode) {
         GLuint index = (GLuint)uniforms_textures.size();
         std::stringstream buf;
         buf << "multitex_" << index;
@@ -220,7 +220,7 @@ namespace hut {
         attr_texcoord.size = 2;
         attr_texcoord.stride = (GLsizei)stride;
         attr_texcoord.type = GL_FLOAT;
-        attributes.emplace(coords_name, std::make_tuple("vec2", attr_texcoord, b.name));
+        attributes.emplace(coords_name, std::make_tuple("vec2", attr_texcoord, b->name));
         varryings.emplace(coords_var_name, std::make_tuple("vec2", coords_name));
 
         std::stringstream index_buf;
@@ -236,7 +236,7 @@ namespace hut {
         attr_texindex.size = 1;
         attr_texindex.stride = (GLsizei)stride;
         attr_texindex.type = GL_FLOAT;
-        attributes.emplace(index_name, std::make_tuple("float", attr_texindex, b.name));
+        attributes.emplace(index_name, std::make_tuple("float", attr_texindex, b->name));
         varryings.emplace(index_var_name, std::make_tuple("float", index_name));
 
         std::stringstream color;
@@ -249,7 +249,7 @@ namespace hut {
             outColor = color.str();
         } else {
             std::stringstream mixed_color;
-            mixed_color << "porterduff(" << color.str() << ", " << outColor << ", " << blending_name(mode) << ")";
+            mixed_color << "porterduff(" << outColor << ", " << color.str() << ", " << blending_name(mode) << ")";
             outColor = mixed_color.str();
         }
 
@@ -431,130 +431,130 @@ namespace hut {
         return create_shader(frag_source.str().c_str(), GL_FRAGMENT_SHADER);
     }
 
-    drawable drawable::factory::compile(vertices_primitive_mode mode, const buffer& buf, size_t offset, size_t count) {
-        drawable result = compile(mode, count);
+    std::shared_ptr<drawable> drawable::factory::compile(vertices_primitive_mode mode, std::shared_ptr<buffer> buf, size_t offset, size_t count) {
+        auto result = compile(mode, count);
 
-        result.indices_buffer = buf.name;
-        result.indices_offset = offset;
+        result->indices_buffer = buf->name;
+        result->indices_offset = offset;
 
         return result;
     }
 
-    drawable drawable::factory::compile(vertices_primitive_mode mode, size_t count) {
-        drawable result;
+    std::shared_ptr<drawable> drawable::factory::compile(vertices_primitive_mode mode, size_t count) {
+        drawable* result(new drawable);
 
         runtime_assert(outPos != "", "No position defined for drawable");
 
-        result.has_blend = true;
+        result->has_blend = true;
         switch(first_blend_mode) {
             // http://www.andersriggelsen.dk/glblendfunc.php
-            case BLEND_NONE:        result.has_blend = false; break;
+            case BLEND_NONE:        result->has_blend = false; break;
 
-            case BLEND_CLEAR:       result.blend_src = GL_ZERO;
-                                    result.blend_dst = GL_ZERO; break;
+            case BLEND_CLEAR:       result->blend_src = GL_ZERO;
+                                    result->blend_dst = GL_ZERO; break;
 
-            case BLEND_SRC:         result.blend_src = GL_ONE;
-                                    result.blend_dst = GL_ZERO; break;
+            case BLEND_SRC:         result->blend_src = GL_ONE;
+                                    result->blend_dst = GL_ZERO; break;
 
-            case BLEND_DST:         result.blend_src = GL_ZERO;
-                                    result.blend_dst = GL_ONE; break;
+            case BLEND_DST:         result->blend_src = GL_ZERO;
+                                    result->blend_dst = GL_ONE; break;
 
-            case BLEND_XOR:         result.blend_src = GL_ONE_MINUS_DST_ALPHA;
-                                    result.blend_dst = GL_ONE_MINUS_SRC_ALPHA; break;
+            case BLEND_XOR:         result->blend_src = GL_ONE_MINUS_DST_ALPHA;
+                                    result->blend_dst = GL_ONE_MINUS_SRC_ALPHA; break;
 
-            case BLEND_ATOP:        result.blend_src = GL_DST_ALPHA;
-                                    result.blend_dst = GL_ONE_MINUS_SRC_ALPHA; break;
+            case BLEND_ATOP:        result->blend_src = GL_DST_ALPHA;
+                                    result->blend_dst = GL_ONE_MINUS_SRC_ALPHA; break;
 
-            case BLEND_OVER:        result.blend_src = GL_SRC_ALPHA;
-                                    result.blend_dst = GL_ONE_MINUS_SRC_ALPHA; break;
+            case BLEND_OVER:        result->blend_src = GL_SRC_ALPHA;
+                                    result->blend_dst = GL_ONE_MINUS_SRC_ALPHA; break;
 
-            case BLEND_IN:          result.blend_src = GL_DST_ALPHA;
-                                    result.blend_dst = GL_ZERO; break;
+            case BLEND_IN:          result->blend_src = GL_DST_ALPHA;
+                                    result->blend_dst = GL_ZERO; break;
 
-            case BLEND_OUT:         result.blend_src = GL_ONE_MINUS_DST_ALPHA;
-                                    result.blend_dst = GL_ZERO; break;
+            case BLEND_OUT:         result->blend_src = GL_ONE_MINUS_DST_ALPHA;
+                                    result->blend_dst = GL_ZERO; break;
 
-            case BLEND_DST_ATOP:    result.blend_src = GL_ONE_MINUS_DST_ALPHA;
-                                    result.blend_dst = GL_SRC_ALPHA; break;
+            case BLEND_DST_ATOP:    result->blend_src = GL_ONE_MINUS_DST_ALPHA;
+                                    result->blend_dst = GL_SRC_ALPHA; break;
 
-            case BLEND_DST_OVER:    result.blend_src = GL_ONE_MINUS_DST_ALPHA;
-                                    result.blend_dst = GL_ONE; break;
+            case BLEND_DST_OVER:    result->blend_src = GL_ONE_MINUS_DST_ALPHA;
+                                    result->blend_dst = GL_ONE; break;
 
-            case BLEND_DST_IN:      result.blend_src = GL_ZERO;
-                                    result.blend_dst = GL_SRC_ALPHA; break;
+            case BLEND_DST_IN:      result->blend_src = GL_ZERO;
+                                    result->blend_dst = GL_SRC_ALPHA; break;
 
-            case BLEND_DST_OUT:     result.blend_src = GL_ZERO;
-                                    result.blend_dst = GL_ONE_MINUS_SRC_ALPHA; break;
+            case BLEND_DST_OUT:     result->blend_src = GL_ZERO;
+                                    result->blend_dst = GL_ONE_MINUS_SRC_ALPHA; break;
         }
 
         switch(mode) {
-            case PRIMITIVE_POINTS: result.primitive_mode = GL_POINTS; break;
-            case PRIMITIVE_LINE_STRIP: result.primitive_mode = GL_LINE_STRIP; break;
-            case PRIMITIVE_LINE_LOOP: result.primitive_mode = GL_LINE_LOOP; break;
-            case PRIMITIVE_LINES: result.primitive_mode = GL_LINES; break;
-            case PRIMITIVE_TRIANGLE_STRIP: result.primitive_mode = GL_TRIANGLE_STRIP; break;
-            case PRIMITIVE_TRIANGLE_FAN: result.primitive_mode = GL_TRIANGLE_FAN; break;
-            case PRIMITIVE_TRIANGLES: result.primitive_mode = GL_TRIANGLES; break;
+            case PRIMITIVE_POINTS: result->primitive_mode = GL_POINTS; break;
+            case PRIMITIVE_LINE_STRIP: result->primitive_mode = GL_LINE_STRIP; break;
+            case PRIMITIVE_LINE_LOOP: result->primitive_mode = GL_LINE_LOOP; break;
+            case PRIMITIVE_LINES: result->primitive_mode = GL_LINES; break;
+            case PRIMITIVE_TRIANGLE_STRIP: result->primitive_mode = GL_TRIANGLE_STRIP; break;
+            case PRIMITIVE_TRIANGLE_FAN: result->primitive_mode = GL_TRIANGLE_FAN; break;
+            case PRIMITIVE_TRIANGLES: result->primitive_mode = GL_TRIANGLES; break;
         }
-        result.primitive_count = count;
+        result->primitive_count = count;
 
         GLuint vertex_shader = compile_vertex_shader();
         GLuint frag_shader = compile_fragment_shader();
-        result.name = glCreateProgram();
-        glAttachShader(result.name, vertex_shader);
-        glAttachShader(result.name, frag_shader);
+        result->name = glCreateProgram();
+        glAttachShader(result->name, vertex_shader);
+        glAttachShader(result->name, frag_shader);
 
         for (auto attr : attributes) {
-            glBindAttribLocation(result.name, std::get<1>(attr.second).index, attr.first.c_str());
-            result.attributes.emplace_back(std::get<1>(attr.second), std::get<2>(attr.second));
+            glBindAttribLocation(result->name, std::get<1>(attr.second).index, attr.first.c_str());
+            result->attributes.emplace_back(std::get<1>(attr.second), std::get<2>(attr.second));
         }
 
-        glLinkProgram(result.name);
+        glLinkProgram(result->name);
 
         GLint status;
-        glGetProgramiv(result.name, GL_LINK_STATUS, &status);
+        glGetProgramiv(result->name, GL_LINK_STATUS, &status);
         if (!status) {
             char log[1000];
             GLsizei len;
-            glGetProgramInfoLog(result.name, 1000, &len, log);
+            glGetProgramInfoLog(result->name, 1000, &len, log);
             std::stringstream error;
             error << "Error linking drawable: " << log;
             throw std::runtime_error(error.str());
         }
 
         for (auto uniform : uniforms1f) {
-            std::get<0>(uniform.second) = glGetUniformLocation(result.name, uniform.first.c_str());
+            std::get<0>(uniform.second) = glGetUniformLocation(result->name, uniform.first.c_str());
             if(std::get<0>(uniform.second) != -1)
-                result.uniforms1f.emplace_back(uniform.second);
+                result->uniforms1f.emplace_back(uniform.second);
         }
 
         for(auto uniform : uniforms4f) {
-            std::get<0>(uniform.second) = glGetUniformLocation(result.name, uniform.first.c_str());
+            std::get<0>(uniform.second) = glGetUniformLocation(result->name, uniform.first.c_str());
             if(std::get<0>(uniform.second) != -1)
-                result.uniforms4f.emplace_back(uniform.second);
+                result->uniforms4f.emplace_back(uniform.second);
         }
 
         for(auto uniform : uniformsMatrix4fv) {
-            std::get<0>(uniform.second) = glGetUniformLocation(result.name, uniform.first.c_str());
+            std::get<0>(uniform.second) = glGetUniformLocation(result->name, uniform.first.c_str());
             if(std::get<0>(uniform.second) != -1)
-                result.uniformsMatrix4fv.emplace_back(uniform.second);
+                result->uniformsMatrix4fv.emplace_back(uniform.second);
         }
 
         for(auto uniform : uniforms_texture) {
-            std::get<0>(uniform.second) = glGetUniformLocation(result.name, uniform.first.c_str());
+            std::get<0>(uniform.second) = glGetUniformLocation(result->name, uniform.first.c_str());
             if(std::get<0>(uniform.second) != -1)
-                result.uniforms_texture.emplace_back(uniform.second);
+                result->uniforms_texture.emplace_back(uniform.second);
         }
 
         for(auto uniform : uniforms_textures) {
-            std::get<0>(uniform.second) = glGetUniformLocation(result.name, uniform.first.c_str());
+            std::get<0>(uniform.second) = glGetUniformLocation(result->name, uniform.first.c_str());
             if(std::get<0>(uniform.second) != -1)
-                result.uniforms_textures.emplace_back(uniform.second);
+                result->uniforms_textures.emplace_back(uniform.second);
         }
 
         assert(glGetError() == GL_NO_ERROR);
 
-        return result;
+        return std::shared_ptr<drawable>(result);
     }
 
     void drawable::draw() const {

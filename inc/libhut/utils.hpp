@@ -31,6 +31,7 @@
 #include <string>
 #include <stdexcept>
 #include <fstream>
+#include <memory>
 
 #include <png.h>
 
@@ -48,6 +49,6 @@ namespace hut {
 
     std::string to_utf8(char32_t ch);
 
-    texture load_png(std::string filename);
+    std::shared_ptr<texture> load_png(std::string filename);
 
 } //namespace hut
