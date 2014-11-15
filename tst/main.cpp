@@ -206,8 +206,8 @@ public:
         };
         std::shared_ptr<hut::buffer> vbo = std::make_shared<hut::buffer>((uint8_t*)vertices, sizeof(vertices));
 
-        hut::mat4 proj = hut::mat4::ortho(0, main.geometry.get()[0], main.geometry.get()[1], 0, 100, -100);
-        hut::mat4 model = hut::mat4::init();
+        auto proj = std::make_shared<hut::mat4>(hut::mat4::ortho(0, main.geometry.get()[0], main.geometry.get()[1], 0, 100, -100));
+        auto model = std::make_shared<hut::mat4>(hut::mat4::init());
 
         auto tex1 = hut::load_png("tex1.png");
         auto tex2 = hut::load_png("tex2.png");

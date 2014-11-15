@@ -50,21 +50,21 @@ namespace hut {
         class factory {
         public:
             virtual factory& pos(std::shared_ptr<buffer>, size_t offset, size_t stride) = 0;
-            virtual factory& transform(const mat4&) = 0;
+            virtual factory& transform(std::shared_ptr<mat4>) = 0;
 
-            virtual factory& opacity(const float&) = 0;
+            virtual factory& opacity(std::shared_ptr<float>) = 0;
+            virtual factory& ellipsize(std::shared_ptr<vec4> params) = 0;
+            virtual factory& round(std::shared_ptr<vec4> radii) = 0;
 
-            virtual factory& col(const vec4&, blend_mode = BLEND_NONE) = 0;
-            virtual factory& col(const vec4*, blend_mode = BLEND_NONE) = 0;
+            virtual factory& col(std::shared_ptr<vec4>, blend_mode = BLEND_NONE) = 0;
             virtual factory& col(std::shared_ptr<buffer>, size_t offset, size_t stride, blend_mode = BLEND_NONE) = 0;
 
             virtual factory& tex(std::shared_ptr<texture>, std::shared_ptr<buffer>, size_t offset, size_t stride, blend_mode = BLEND_NONE) = 0;
-            virtual factory& tex(std::shared_ptr<texture>, const float*, blend_mode = BLEND_NONE) = 0;
 
             /** Advanced command, mainly used to render text from multiple texture atlases */
             virtual factory& multitex(std::initializer_list<std::shared_ptr<texture>>, std::shared_ptr<buffer>, size_t texindex_offset, size_t texcoord_offset, size_t stride, blend_mode = BLEND_NONE) = 0;
 
-            virtual factory& gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode = BLEND_NONE) = 0;
+            virtual factory& gradient_linear(std::shared_ptr<float> angle, std::shared_ptr<vec4> from, std::shared_ptr<vec4> to, blend_mode = BLEND_NONE) = 0;
 
             virtual std::shared_ptr<drawable> compile(vertices_primitive_mode mode, size_t count) = 0;
             virtual std::shared_ptr<drawable> compile(vertices_primitive_mode mode, std::shared_ptr<buffer>, size_t offset, size_t count) = 0;

@@ -51,27 +51,28 @@ namespace hut {
         class factory : public base_drawable::factory {
         public:
             virtual base_drawable::factory& pos(std::shared_ptr<buffer>, size_t offset, size_t stride);
-            virtual base_drawable::factory& transform(const mat4&);
+            virtual base_drawable::factory& transform(std::shared_ptr<mat4>);
 
-            virtual base_drawable::factory& opacity(const float&);
+            virtual base_drawable::factory& opacity(std::shared_ptr<float>);
+            virtual base_drawable::factory& ellipsize(std::shared_ptr<vec4> params);
+            virtual base_drawable::factory& round(std::shared_ptr<vec4> radii);
 
-            virtual base_drawable::factory& col(const vec4&, blend_mode = BLEND_OVER);
-            virtual base_drawable::factory& col(const vec4*, blend_mode = BLEND_OVER);
+            virtual base_drawable::factory& col(std::shared_ptr<vec4>, blend_mode = BLEND_OVER);
             virtual base_drawable::factory& col(std::shared_ptr<buffer>, size_t offset, size_t stride, blend_mode = BLEND_OVER);
 
             virtual base_drawable::factory& tex(std::shared_ptr<texture>, std::shared_ptr<buffer>, size_t offset, size_t stride, blend_mode = BLEND_OVER);
             virtual base_drawable::factory& tex(std::shared_ptr<texture>, const float*, blend_mode = BLEND_OVER);
             virtual base_drawable::factory& multitex(std::initializer_list<std::shared_ptr<texture>>, std::shared_ptr<buffer>, size_t texindex_offset, size_t texcoord_offset, size_t stride, blend_mode = BLEND_NONE);
 
-            virtual base_drawable::factory& gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode = BLEND_OVER);
+            virtual base_drawable::factory& gradient_linear(std::shared_ptr<float> angle, std::shared_ptr<vec4> from, std::shared_ptr<vec4> to, blend_mode = BLEND_OVER);
 
             virtual std::shared_ptr<drawable> compile(vertices_primitive_mode mode, size_t count);
             virtual std::shared_ptr<drawable> compile(vertices_primitive_mode mode, std::shared_ptr<buffer>, size_t offset, size_t count);
 
         protected:
-            std::map<std::string, std::tuple<GLint, const GLfloat*>> uniformsMatrix4fv;
-            std::map<std::string, std::tuple<GLint, const vec4*>> uniforms4f;
-            std::map<std::string, std::tuple<GLint, const GLfloat*>> uniforms1f;
+            std::map<std::string, std::tuple<GLint, std::shared_ptr<mat4>>> uniformsMatrix4fv;
+            std::map<std::string, std::tuple<GLint, std::shared_ptr<vec4>>> uniforms4f;
+            std::map<std::string, std::tuple<GLint, std::shared_ptr<float>>> uniforms1f;
             std::map<std::string, std::tuple<GLint, GLenum, GLuint>> uniforms_texture;
             std::map<std::string, std::tuple<GLint, std::vector<std::pair<GLenum, GLuint>>>> uniforms_textures;
             size_t bound_textures = 0;
@@ -100,9 +101,9 @@ namespace hut {
         GLuint indices_buffer = GL_NONE;
         size_t indices_offset;
 
-        std::vector<std::tuple<GLint, const GLfloat*>> uniformsMatrix4fv;
-        std::vector<std::tuple<GLint, const vec4*>> uniforms4f;
-        std::vector<std::tuple<GLint, const GLfloat*>> uniforms1f;
+        std::vector<std::tuple<GLint, std::shared_ptr<mat4>>> uniformsMatrix4fv;
+        std::vector<std::tuple<GLint, std::shared_ptr<vec4>>> uniforms4f;
+        std::vector<std::tuple<GLint, std::shared_ptr<float>>> uniforms1f;
         std::vector<std::tuple<GLint, GLenum, GLuint>> uniforms_texture;
         std::vector<std::tuple<GLint, std::vector<std::pair<GLenum, GLuint>>>> uniforms_textures;
 

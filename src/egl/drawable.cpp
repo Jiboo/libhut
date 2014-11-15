@@ -75,23 +75,23 @@ namespace hut {
         return *this;
     }
 
-    base_drawable::factory& drawable::factory::transform(const mat4& ref) {
+    base_drawable::factory& drawable::factory::transform(std::shared_ptr<mat4> ref) {
         runtime_assert(outPos != "", "Define position before transforms");
 
         std::stringstream name;
         name << "transform_" << uniformsMatrix4fv.size();
 
-        uniformsMatrix4fv.emplace(name.str(), std::make_tuple(-1, ref.data->data));
+        uniformsMatrix4fv.emplace(name.str(), std::make_tuple(-1, ref));
         outPos += '*' + name.str();
         return *this;
     }
 
-    base_drawable::factory& drawable::factory::opacity(const float& ref) {
+    base_drawable::factory& drawable::factory::opacity(std::shared_ptr<float> ref) {
         std::stringstream buf;
         buf << "opacity_" << uniforms1f.size();
         std::string name = buf.str();
 
-        uniforms1f.emplace(name, std::make_tuple(-1, &ref));
+        uniforms1f.emplace(name, std::make_tuple(-1, ref));
 
         std::stringstream color;
         color << "blend_opacity(" << outColor << ", " << name << ")";
@@ -100,12 +100,22 @@ namespace hut {
         return *this;
     }
 
-    base_drawable::factory& drawable::factory::col(const vec4& ref, blend_mode mode) {
+    base_drawable::factory& drawable::factory::ellipsize(std::shared_ptr<vec4> params) {
+
+        return *this;
+    }
+
+    base_drawable::factory& drawable::factory::round(std::shared_ptr<vec4> radii) {
+
+        return *this;
+    }
+
+    base_drawable::factory& drawable::factory::col(std::shared_ptr<vec4> ref, blend_mode mode) {
         std::stringstream buf;
         buf << "col_uni_" << uniforms4f.size();
         std::string name = buf.str();
 
-        uniforms4f.emplace(name, std::make_tuple(-1, &ref));
+        uniforms4f.emplace(name, std::make_tuple(-1, ref));
 
         if(outColor.empty()) {
             first_blend_mode = mode;
@@ -116,10 +126,6 @@ namespace hut {
             outColor = color.str();
         }
 
-        return *this;
-    }
-
-    base_drawable::factory& drawable::factory::col(const vec4* colors, blend_mode mode) {
         return *this;
     }
 
@@ -256,7 +262,7 @@ namespace hut {
         return *this;
     }
 
-    base_drawable::factory& drawable::factory::gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode) {
+    base_drawable::factory& drawable::factory::gradient_linear(std::shared_ptr<float> angle, std::shared_ptr<vec4> from, std::shared_ptr<vec4> to, blend_mode) {
         return *this;
     }
 
@@ -577,7 +583,7 @@ namespace hut {
         }
 
         for (auto uniform : uniformsMatrix4fv)
-            glUniformMatrix4fv(std::get<0>(uniform), 1, GL_FALSE, std::get<1>(uniform));
+            glUniformMatrix4fv(std::get<0>(uniform), 1, GL_FALSE, std::get<1>(uniform)->data->data);
 
         for (auto uniform : uniforms_texture) {
             glActiveTexture(GL_TEXTURE0 + std::get<1>(uniform));
