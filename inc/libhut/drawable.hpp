@@ -53,8 +53,10 @@ namespace hut {
             virtual factory& transform(std::shared_ptr<mat4>) = 0;
 
             virtual factory& opacity(std::shared_ptr<float>) = 0;
-            virtual factory& ellipsize(std::shared_ptr<vec4> params) = 0;
-            virtual factory& round(std::shared_ptr<vec4> radii) = 0;
+            virtual factory& circle(std::shared_ptr<vec4> params) = 0;
+            virtual factory& arc(std::shared_ptr<vec4> params, std::shared_ptr<vec2> angles) = 0;
+            virtual factory& ellipse(std::shared_ptr<vec4> params) = 0;
+            virtual factory& round(std::shared_ptr<vec4> rect, std::shared_ptr<vec4> radii) = 0;
 
             virtual factory& col(std::shared_ptr<vec4>, blend_mode = BLEND_NONE) = 0;
             virtual factory& col(std::shared_ptr<buffer>, size_t offset, size_t stride, blend_mode = BLEND_NONE) = 0;

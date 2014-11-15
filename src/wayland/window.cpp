@@ -77,7 +77,7 @@ namespace hut {
     }
 
     void window::draw(std::shared_ptr<drawable> d) {
-        d->draw();
+        d->draw(geometry.get());
     }
 
     void window::draw(std::shared_ptr<batch>) {

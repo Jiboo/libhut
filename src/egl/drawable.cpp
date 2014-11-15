@@ -100,12 +100,70 @@ namespace hut {
         return *this;
     }
 
-    base_drawable::factory& drawable::factory::ellipsize(std::shared_ptr<vec4> params) {
+    base_drawable::factory& drawable::factory::circle(std::shared_ptr<vec4> params) {
+        std::stringstream buf;
+        buf << "circle_params_" << uniforms4f.size();
+        std::string name = buf.str();
+
+        uniforms4f.emplace(name, std::make_tuple(-1, params));
+
+        std::stringstream color;
+        color << "circlify(" << outColor << ", " << name << ")";
+        outColor = color.str();
 
         return *this;
     }
 
-    base_drawable::factory& drawable::factory::round(std::shared_ptr<vec4> radii) {
+    base_drawable::factory& drawable::factory::arc(std::shared_ptr<vec4> params, std::shared_ptr<vec2> angles) {
+        std::stringstream params_buf;
+        params_buf << "arc_params_" << uniforms4f.size();
+        std::string params_name = params_buf.str();
+
+        uniforms4f.emplace(params_name, std::make_tuple(-1, params));
+
+        std::stringstream angles_buf;
+        angles_buf << "arc_angles_" << uniforms2f.size();
+        std::string angles_name = angles_buf.str();
+
+        uniforms2f.emplace(angles_name, std::make_tuple(-1, angles));
+
+        std::stringstream color;
+        color << "arcify(" << outColor << ", " << params_name << ", " << angles_name << ")";
+        outColor = color.str();
+
+        return *this;
+    }
+
+    base_drawable::factory& drawable::factory::ellipse(std::shared_ptr<vec4> params) {
+        std::stringstream buf;
+        buf << "ellipse_" << uniforms4f.size();
+        std::string name = buf.str();
+
+        uniforms4f.emplace(name, std::make_tuple(-1, params));
+
+        std::stringstream color;
+        color << "ellipsify(" << outColor << ", " << name << ")";
+        outColor = color.str();
+
+        return *this;
+    }
+
+    base_drawable::factory& drawable::factory::round(std::shared_ptr<vec4> rect, std::shared_ptr<vec4> radii) {
+        std::stringstream rect_buf;
+        rect_buf << "round_rect_" << uniforms4f.size();
+        std::string rect_name = rect_buf.str();
+
+        uniforms4f.emplace(rect_name, std::make_tuple(-1, rect));
+
+        std::stringstream radii_buf;
+        radii_buf << "round_radii_" << uniforms4f.size();
+        std::string radii_name = radii_buf.str();
+
+        uniforms4f.emplace(radii_name, std::make_tuple(-1, radii));
+
+        std::stringstream color;
+        color << "roundify(" << outColor << ", " << rect_name << ", " << radii_name << ")";
+        outColor = color.str();
 
         return *this;
     }
@@ -296,6 +354,8 @@ namespace hut {
             vertex_source << "uniform float " << uniform.first << ";\n";
         for(auto uniform : uniforms4f)
             vertex_source << "uniform vec4 " << uniform.first << ";\n";
+        for(auto uniform : uniforms2f)
+            vertex_source << "uniform vec2 " << uniform.first << ";\n";
         for(auto uniform : uniformsMatrix4fv)
             vertex_source << "uniform mat4 " << uniform.first << ";\n";
         for(auto uniform : uniforms_texture)
@@ -325,11 +385,16 @@ namespace hut {
     GLuint drawable::factory::compile_fragment_shader() {
         std::stringstream frag_source;
 
-        frag_source << "precision mediump float;\n";
+        frag_source <<
+                "#extension GL_OES_standard_derivatives : enable\n"
+                "precision mediump float;\n"
+                "uniform vec2 hutCanvasSize;\n";
 
         for(auto uniform : uniforms1f)
             frag_source << "uniform float " << uniform.first << ";\n";
         for(auto uniform : uniforms4f)
+            frag_source << "uniform vec4 " << uniform.first << ";\n";
+        for(auto uniform : uniforms2f)
             frag_source << "uniform vec4 " << uniform.first << ";\n";
         for(auto uniform : uniformsMatrix4fv)
             frag_source << "uniform mat4 " << uniform.first << ";\n";
@@ -349,8 +414,45 @@ namespace hut {
         for(auto var : varryings) frag_source << "varying " << std::get<0>(var.second) << " " << var.first << ";\n";
 
         frag_source <<
+                "vec2 hutPos = vec2(gl_FragCoord.x, hutCanvasSize.y - gl_FragCoord.y);\n"
                 "vec4 blend_opacity(in vec4 col, in float opacity) {\n"
                     "\treturn vec4(col.xyz, col.w * opacity);\n"
+                "}\n"
+                "vec4 circlify(in vec4 col, in vec4 params) {\n"
+                    "\tvec2 center = params.xy;\n"
+                    "\tfloat radius = params.z;\n"
+                    "\tfloat sharpness = params.w;\n"
+                    "\tfloat dist = distance(hutPos, center);\n"
+                    "\tfloat t = smoothstep(radius + sharpness, radius - sharpness, dist);"
+                    "\treturn mix(vec4(0), col, t);\n"
+                "}\n"
+                "vec4 roundify(in vec4 col, in vec4 rect, in vec4 radii) {\n"
+                    "\tif(hutPos.x > rect.x && hutPos.x < rect.x + radii.x && hutPos.y > rect.y && hutPos.y < rect.y + radii.x) {" // top left
+                        "\t\tfloat dist = distance(hutPos, vec2(rect.x + radii.x, rect.y + radii.x));\n"
+                        "\t\tfloat t = smoothstep(radii.x + 1.f, radii.x - 1.f, dist);"
+                        "\t\treturn vec4(col.rgb, col.a * t);\n"
+                    "\t} else if(hutPos.x < rect.z && hutPos.x > rect.z - radii.y && hutPos.y > rect.y && hutPos.y < rect.y + radii.y) {" // top right
+                        "\t\tfloat dist = distance(hutPos, vec2(rect.z - radii.y, rect.y + radii.y));\n"
+                        "\t\tfloat t = smoothstep(radii.y + 1.f, radii.y - 1.f, dist);"
+                        "\t\treturn vec4(col.rgb, col.a * t);\n"
+                    "\t} else if(hutPos.x < rect.z && hutPos.x > rect.z - radii.z && hutPos.y < rect.w && hutPos.y > rect.w - radii.z) {" // bottom right
+                        "\t\tfloat dist = distance(hutPos, vec2(rect.z - radii.z, rect.w - radii.z));\n"
+                        "\t\tfloat t = smoothstep(radii.z + 1.f, radii.z - 1.f, dist);"
+                        "\t\treturn vec4(col.rgb, col.a * t);\n"
+                    "\t} else if(hutPos.x > rect.x && hutPos.x < rect.x + radii.w && hutPos.y < rect.w && hutPos.y > rect.w - radii.w) {" // bottom left
+                        "\t\tfloat dist = distance(hutPos, vec2(rect.x + radii.w, rect.w - radii.w));\n"
+                        "\t\tfloat t = smoothstep(radii.w + 1.f, radii.w - 1.f, dist);"
+                        "\t\treturn vec4(col.rgb, col.a * t);\n"
+                    "\t} else if(hutPos.x > rect.x && hutPos.x < rect.z && hutPos.y > rect.y && hutPos.y < rect.w) {" // inside
+                        "\t\treturn col;\n"
+                    "\t}"
+                    "\t\treturn vec4(0);\n" // outside
+                "}\n"
+                "vec4 arcify(in vec4 col, in vec4 params, in vec2 angles) {\n"
+                    "\treturn col;\n" //TODO
+                "}\n"
+                "vec4 ellipsify(in vec4 col, in vec4 params) {\n"
+                    "\treturn col;\n" //TODO
                 "}\n"
                 "const int BLEND_NONE = -1;\n"
                 "const int BLEND_CLEAR = 0;\n"
@@ -528,6 +630,8 @@ namespace hut {
             throw std::runtime_error(error.str());
         }
 
+        result->uniform_hutCanvasSize = glGetUniformLocation(result->name, "hutCanvasSize");
+
         for (auto uniform : uniforms1f) {
             std::get<0>(uniform.second) = glGetUniformLocation(result->name, uniform.first.c_str());
             if(std::get<0>(uniform.second) != -1)
@@ -538,6 +642,12 @@ namespace hut {
             std::get<0>(uniform.second) = glGetUniformLocation(result->name, uniform.first.c_str());
             if(std::get<0>(uniform.second) != -1)
                 result->uniforms4f.emplace_back(uniform.second);
+        }
+
+        for(auto uniform : uniforms2f) {
+            std::get<0>(uniform.second) = glGetUniformLocation(result->name, uniform.first.c_str());
+            if(std::get<0>(uniform.second) != -1)
+                result->uniforms2f.emplace_back(uniform.second);
         }
 
         for(auto uniform : uniformsMatrix4fv) {
@@ -563,7 +673,7 @@ namespace hut {
         return std::shared_ptr<drawable>(result);
     }
 
-    void drawable::draw() const {
+    void drawable::draw(ivec2 canvas_size) const {
         glUseProgram(name);
 
         for (auto attribute : attributes) {
@@ -573,6 +683,8 @@ namespace hut {
             glVertexAttribPointer(attr.index, attr.size, attr.type, attr.normalized, attr.stride, attr.pointer);
         }
 
+        glUniform2f(uniform_hutCanvasSize, canvas_size.x, canvas_size.y);
+
         for (auto uniform : uniforms1f) {
             glUniform1f(std::get<0>(uniform), *std::get<1>(uniform));
         }
@@ -580,6 +692,11 @@ namespace hut {
         for (auto uniform : uniforms4f) {
             const vec4 &uni = *std::get<1>(uniform);
             glUniform4f(std::get<0>(uniform), uni.r, uni.g, uni.b, uni.a);
+        }
+
+        for (auto uniform : uniforms2f) {
+            const vec2 &uni = *std::get<1>(uniform);
+            glUniform2f(std::get<0>(uniform), uni.x, uni.y);
         }
 
         for (auto uniform : uniformsMatrix4fv)

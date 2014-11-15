@@ -208,6 +208,10 @@ public:
 
         auto proj = std::make_shared<hut::mat4>(hut::mat4::ortho(0, main.geometry.get()[0], main.geometry.get()[1], 0, 100, -100));
         auto model = std::make_shared<hut::mat4>(hut::mat4::init());
+        auto circle_params = std::make_shared<hut::vec4>(hut::vec4{100, 100, 100, 1});
+        auto round_rect = std::make_shared<hut::vec4>(hut::vec4{50, 50, 150, 150});
+        //auto round_rect = std::make_shared<hut::vec4>(hut::vec4{0, 0, 100, 100});
+        auto round_radii = std::make_shared<hut::vec4>(hut::vec4{30, 10, 15, 20});
 
         auto tex1 = hut::load_png("tex1.png");
         auto tex2 = hut::load_png("tex2.png");
@@ -216,6 +220,7 @@ public:
             .pos(vbo, offsetof(vertex_info, pos), sizeof(vertex_info)).transform(model).transform(proj)
             .multitex({tex1, tex2}, vbo, offsetof(vertex_info, tex), offsetof(vertex_info, texcoords), sizeof(vertex_info), hut::BLEND_OVER)
             .col(vbo, offsetof(vertex_info, col), sizeof(vertex_info), hut::BLEND_ATOP)
+            .round(round_rect, round_radii)
             .compile(hut::PRIMITIVE_TRIANGLES, 12);
 
         main.on_draw.connect([&]() -> bool {

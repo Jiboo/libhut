@@ -54,8 +54,10 @@ namespace hut {
             virtual base_drawable::factory& transform(std::shared_ptr<mat4>);
 
             virtual base_drawable::factory& opacity(std::shared_ptr<float>);
-            virtual base_drawable::factory& ellipsize(std::shared_ptr<vec4> params);
-            virtual base_drawable::factory& round(std::shared_ptr<vec4> radii);
+            virtual base_drawable::factory& circle(std::shared_ptr<vec4> params);
+            virtual base_drawable::factory& arc(std::shared_ptr<vec4> params, std::shared_ptr<vec2> angles);
+            virtual base_drawable::factory& ellipse(std::shared_ptr<vec4> params);
+            virtual base_drawable::factory& round(std::shared_ptr<vec4> rect, std::shared_ptr<vec4> radii);
 
             virtual base_drawable::factory& col(std::shared_ptr<vec4>, blend_mode = BLEND_OVER);
             virtual base_drawable::factory& col(std::shared_ptr<buffer>, size_t offset, size_t stride, blend_mode = BLEND_OVER);
@@ -72,6 +74,7 @@ namespace hut {
         protected:
             std::map<std::string, std::tuple<GLint, std::shared_ptr<mat4>>> uniformsMatrix4fv;
             std::map<std::string, std::tuple<GLint, std::shared_ptr<vec4>>> uniforms4f;
+            std::map<std::string, std::tuple<GLint, std::shared_ptr<vec2>>> uniforms2f;
             std::map<std::string, std::tuple<GLint, std::shared_ptr<float>>> uniforms1f;
             std::map<std::string, std::tuple<GLint, GLenum, GLuint>> uniforms_texture;
             std::map<std::string, std::tuple<GLint, std::vector<std::pair<GLenum, GLuint>>>> uniforms_textures;
@@ -103,13 +106,16 @@ namespace hut {
 
         std::vector<std::tuple<GLint, std::shared_ptr<mat4>>> uniformsMatrix4fv;
         std::vector<std::tuple<GLint, std::shared_ptr<vec4>>> uniforms4f;
+        std::vector<std::tuple<GLint, std::shared_ptr<vec2>>> uniforms2f;
         std::vector<std::tuple<GLint, std::shared_ptr<float>>> uniforms1f;
         std::vector<std::tuple<GLint, GLenum, GLuint>> uniforms_texture;
         std::vector<std::tuple<GLint, std::vector<std::pair<GLenum, GLuint>>>> uniforms_textures;
 
+        GLint uniform_hutCanvasSize;
+
         std::vector<std::tuple<attrib, GLuint>> attributes;
 
-        void draw() const;
+        void draw(ivec2 size) const;
     };
 
 } // namespace hut
