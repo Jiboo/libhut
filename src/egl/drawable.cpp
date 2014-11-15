@@ -52,7 +52,7 @@ namespace hut {
         return "BLEND_NONE";
     }
 
-    drawable_base::factory& drawable::factory::pos(std::shared_ptr<buffer> data, size_t offset, size_t stride) {
+    base_drawable::factory& drawable::factory::pos(std::shared_ptr<buffer> data, size_t offset, size_t stride) {
         GLuint index = (GLuint)attributes.size();
         std::stringstream buf;
         buf << "pos_" << index;
@@ -75,7 +75,7 @@ namespace hut {
         return *this;
     }
 
-    drawable_base::factory& drawable::factory::transform(const mat4& ref) {
+    base_drawable::factory& drawable::factory::transform(const mat4& ref) {
         runtime_assert(outPos != "", "Define position before transforms");
 
         std::stringstream name;
@@ -86,7 +86,7 @@ namespace hut {
         return *this;
     }
 
-    drawable_base::factory& drawable::factory::opacity(const float& ref) {
+    base_drawable::factory& drawable::factory::opacity(const float& ref) {
         std::stringstream buf;
         buf << "opacity_" << uniforms1f.size();
         std::string name = buf.str();
@@ -100,7 +100,7 @@ namespace hut {
         return *this;
     }
 
-    drawable_base::factory& drawable::factory::col(const vec4& ref, blend_mode mode) {
+    base_drawable::factory& drawable::factory::col(const vec4& ref, blend_mode mode) {
         std::stringstream buf;
         buf << "col_uni_" << uniforms4f.size();
         std::string name = buf.str();
@@ -119,11 +119,11 @@ namespace hut {
         return *this;
     }
 
-    drawable_base::factory& drawable::factory::col(const vec4* colors, blend_mode mode) {
+    base_drawable::factory& drawable::factory::col(const vec4* colors, blend_mode mode) {
         return *this;
     }
 
-    drawable_base::factory& drawable::factory::col(std::shared_ptr<buffer> data, size_t offset, size_t stride, blend_mode mode) {
+    base_drawable::factory& drawable::factory::col(std::shared_ptr<buffer> data, size_t offset, size_t stride, blend_mode mode) {
         GLuint index = (GLuint)attributes.size();
         std::stringstream buf;
         buf << "col_attrib_bound_" << index;
@@ -154,7 +154,7 @@ namespace hut {
         return *this;
     }
 
-    drawable_base::factory& drawable::factory::tex(std::shared_ptr<texture> t, std::shared_ptr<buffer> b, size_t offset, size_t stride, blend_mode mode) {
+    base_drawable::factory& drawable::factory::tex(std::shared_ptr<texture> t, std::shared_ptr<buffer> b, size_t offset, size_t stride, blend_mode mode) {
         GLuint index = (GLuint)bound_textures++;
         std::stringstream buf;
         buf << "tex_" << index;
@@ -191,11 +191,11 @@ namespace hut {
         return *this;
     }
 
-    drawable_base::factory& drawable::factory::tex(std::shared_ptr<texture>, const float*, blend_mode) {
+    base_drawable::factory& drawable::factory::tex(std::shared_ptr<texture>, const float*, blend_mode) {
         return *this;
     }
 
-    drawable_base::factory& drawable::factory::multitex(std::initializer_list<std::shared_ptr<texture>> textures, std::shared_ptr<buffer> b, size_t texindex_offset, size_t texcoord_offset, size_t stride, blend_mode mode) {
+    base_drawable::factory& drawable::factory::multitex(std::initializer_list<std::shared_ptr<texture>> textures, std::shared_ptr<buffer> b, size_t texindex_offset, size_t texcoord_offset, size_t stride, blend_mode mode) {
         GLuint index = (GLuint)uniforms_textures.size();
         std::stringstream buf;
         buf << "multitex_" << index;
@@ -256,7 +256,7 @@ namespace hut {
         return *this;
     }
 
-    drawable_base::factory& drawable::factory::gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode) {
+    base_drawable::factory& drawable::factory::gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode) {
         return *this;
     }
 

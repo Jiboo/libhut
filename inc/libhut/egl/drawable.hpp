@@ -35,7 +35,7 @@
 
 namespace hut {
 
-    class drawable : public drawable_base {
+    class drawable : public base_drawable {
         friend class window;
     protected:
         struct attrib {
@@ -48,22 +48,22 @@ namespace hut {
         };
 
     public:
-        class factory : public drawable_base::factory {
+        class factory : public base_drawable::factory {
         public:
-            virtual drawable_base::factory& pos(std::shared_ptr<buffer>, size_t offset, size_t stride);
-            virtual drawable_base::factory& transform(const mat4&);
+            virtual base_drawable::factory& pos(std::shared_ptr<buffer>, size_t offset, size_t stride);
+            virtual base_drawable::factory& transform(const mat4&);
 
-            virtual drawable_base::factory& opacity(const float&);
+            virtual base_drawable::factory& opacity(const float&);
 
-            virtual drawable_base::factory& col(const vec4&, blend_mode = BLEND_OVER);
-            virtual drawable_base::factory& col(const vec4*, blend_mode = BLEND_OVER);
-            virtual drawable_base::factory& col(std::shared_ptr<buffer>, size_t offset, size_t stride, blend_mode = BLEND_OVER);
+            virtual base_drawable::factory& col(const vec4&, blend_mode = BLEND_OVER);
+            virtual base_drawable::factory& col(const vec4*, blend_mode = BLEND_OVER);
+            virtual base_drawable::factory& col(std::shared_ptr<buffer>, size_t offset, size_t stride, blend_mode = BLEND_OVER);
 
-            virtual drawable_base::factory& tex(std::shared_ptr<texture>, std::shared_ptr<buffer>, size_t offset, size_t stride, blend_mode = BLEND_OVER);
-            virtual drawable_base::factory& tex(std::shared_ptr<texture>, const float*, blend_mode = BLEND_OVER);
-            virtual drawable_base::factory& multitex(std::initializer_list<std::shared_ptr<texture>>, std::shared_ptr<buffer>, size_t texindex_offset, size_t texcoord_offset, size_t stride, blend_mode = BLEND_NONE);
+            virtual base_drawable::factory& tex(std::shared_ptr<texture>, std::shared_ptr<buffer>, size_t offset, size_t stride, blend_mode = BLEND_OVER);
+            virtual base_drawable::factory& tex(std::shared_ptr<texture>, const float*, blend_mode = BLEND_OVER);
+            virtual base_drawable::factory& multitex(std::initializer_list<std::shared_ptr<texture>>, std::shared_ptr<buffer>, size_t texindex_offset, size_t texcoord_offset, size_t stride, blend_mode = BLEND_NONE);
 
-            virtual drawable_base::factory& gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode = BLEND_OVER);
+            virtual base_drawable::factory& gradient_linear(float angle, uint32_t from, uint32_t to, blend_mode = BLEND_OVER);
 
             virtual std::shared_ptr<drawable> compile(vertices_primitive_mode mode, size_t count);
             virtual std::shared_ptr<drawable> compile(vertices_primitive_mode mode, std::shared_ptr<buffer>, size_t offset, size_t count);

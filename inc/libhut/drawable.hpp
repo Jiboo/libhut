@@ -45,7 +45,7 @@ namespace hut {
         PRIMITIVE_TRIANGLE_STRIP, PRIMITIVE_TRIANGLE_FAN, PRIMITIVE_TRIANGLES
     };
 
-    class drawable_base {
+    class base_drawable {
     public:
         class factory {
         public:
