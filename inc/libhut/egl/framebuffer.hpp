@@ -28,29 +28,53 @@
 
 #pragma once
 
-#include "libhut/vec.hpp"
-#include "libhut/event.hpp"
+#include <memory>
+
+#include <GLES2/gl2.h>
+
+#include "libhut/framebuffer.hpp"
 
 namespace hut {
 
-    class batch;
-    class drawable;
-
-    class base_surface {
+    class framebuffer : public base_framebuffer {
     public:
-        event<uivec2 /*new_size*/> on_resize;
+        framebuffer(std::shared_ptr<texture> t) : base_framebuffer(t) {
+            glGenFramebuffers(1, &name);
+            glBindFramebuffer(GL_FRAMEBUFFER, name);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, t->name, 0);
 
-        virtual uivec2 size() const = 0;
-        virtual unsigned short density() const = 0;
+            glClearColor(0, 0, 0, 0);
+            glClear(GL_COLOR_BUFFER_BIT);
 
-        virtual void draw(std::shared_ptr<drawable> d) = 0;
-        virtual void draw(std::shared_ptr<batch> b) = 0;
+            glViewport(0, 0, t->real_size[0], t->real_size[1]);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        }
+
+        virtual ~framebuffer() {
+            glDeleteFramebuffers(1, &name);
+        }
+
+        virtual void draw(std::shared_ptr<drawable> d) {
+            glBindFramebuffer(GL_FRAMEBUFFER, name);
+            d->draw(target->real_size);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        }
+
+        virtual void draw(std::shared_ptr<batch> b) {
+
+        }
+
+        virtual uivec2 size() const {
+            return target->real_size;
+        }
+
+        virtual unsigned short density() const {
+            return target->density;
+        }
+
+    protected:
+        GLuint name;
     };
 
 } // namespace hut
-
-#ifdef HUT_WAYLAND
-
-#include "libhut/wayland/surface.hpp"
-
-#endif

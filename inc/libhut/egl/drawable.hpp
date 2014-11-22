@@ -37,6 +37,7 @@ namespace hut {
 
     class drawable : public base_drawable {
         friend class window;
+        friend class framebuffer;
     protected:
         struct attrib {
             GLuint index;
@@ -50,7 +51,8 @@ namespace hut {
     public:
         class factory : public base_drawable::factory {
         public:
-            virtual base_drawable::factory& pos(std::shared_ptr<buffer>, size_t offset, size_t stride);
+            factory(std::shared_ptr<buffer> b, size_t offset, size_t stride);
+
             virtual base_drawable::factory& transform(std::shared_ptr<mat4>);
 
             virtual base_drawable::factory& opacity(std::shared_ptr<float>);
@@ -83,7 +85,7 @@ namespace hut {
             std::map<std::string, std::tuple<std::string, attrib, GLuint>> attributes;
             std::map<std::string, std::tuple<std::string, std::string>> varryings;
 
-            std::string outPos;
+            std::string outTransforms;
             std::string outColor;
 
             blend_mode first_blend_mode;
@@ -115,7 +117,7 @@ namespace hut {
 
         std::vector<std::tuple<attrib, GLuint>> attributes;
 
-        void draw(ivec2 size) const;
+        void draw(uivec2 size) const;
     };
 
 } // namespace hut

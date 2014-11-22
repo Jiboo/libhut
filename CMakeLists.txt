@@ -21,6 +21,7 @@ set(HUT_HEADERS
     inc/libhut/buffer.hpp
     inc/libhut/texture.hpp
     inc/libhut/drawable.hpp
+    inc/libhut/framebuffer.hpp
 )
 
 set(EGL_HEADERS
@@ -33,6 +34,7 @@ set(EGL_HEADERS
     inc/libhut/egl/drawable.hpp
     inc/libhut/egl/buffer.hpp
     inc/libhut/egl/texture.hpp
+    inc/libhut/egl/framebuffer.hpp
 )
 
 set(WAYLAND_HEADERS

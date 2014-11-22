@@ -28,29 +28,22 @@
 
 #pragma once
 
-#include "libhut/vec.hpp"
-#include "libhut/event.hpp"
+#include <memory>
+
+#include "libhut/surface.hpp"
 
 namespace hut {
 
-    class batch;
-    class drawable;
-
-    class base_surface {
+    class batch_base : public surface_base {
     public:
-        event<uivec2 /*new_size*/> on_resize;
 
-        virtual uivec2 size() const = 0;
-        virtual unsigned short density() const = 0;
-
-        virtual void draw(std::shared_ptr<drawable> d) = 0;
-        virtual void draw(std::shared_ptr<batch> b) = 0;
+        virtual ~batch_base() {}
     };
 
 } // namespace hut
 
 #ifdef HUT_WAYLAND
 
-#include "libhut/wayland/surface.hpp"
+#include "libhut/egl/framebuffer.hpp"
 
 #endif

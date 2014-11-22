@@ -49,7 +49,8 @@ namespace hut {
     public:
         class factory {
         public:
-            virtual factory& pos(std::shared_ptr<buffer>, size_t offset, size_t stride) = 0;
+            //factory(std::shared_ptr<buffer>, size_t offset, size_t stride, std::shared_ptr<mat4> view, std::shared_ptr<mat4> model) { }
+
             virtual factory& transform(std::shared_ptr<mat4>) = 0;
 
             virtual factory& opacity(std::shared_ptr<float>) = 0;

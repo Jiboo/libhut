@@ -35,6 +35,7 @@ namespace hut {
 
     class texture : public base_texture {
         friend class drawable;
+        friend class framebuffer;
     protected:
         GLuint name;
         bool has_mipmaps;
@@ -44,8 +45,8 @@ namespace hut {
         texture& operator=(const texture&) = delete; // would delete the texture if the copied value is destroyed
         constexpr texture(texture&&) = default;
 
-        texture(const uivec2 &size, const pixel_format& data_format, void* data, const pixel_format& internal_format, bool enable_mipmaps = true)
-                : base_texture(size, size, internal_format), has_mipmaps(enable_mipmaps) {
+        texture(const uivec2 &size, const pixel_format& data_format, void* data, const pixel_format& internal_format, unsigned short density, bool enable_mipmaps = true)
+                : base_texture(size, size, internal_format, density), has_mipmaps(enable_mipmaps) {
             GLint gl_internal_format;
             switch(internal_format) {
                 case A8:        gl_internal_format = GL_ALPHA; break;

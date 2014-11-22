@@ -66,9 +66,9 @@ namespace hut {
         dpy.active_wins.emplace_back(this);
     }
 
-    ivec2 window::size() const {
-        ivec2 result;
-        wl_egl_window_get_attached_size(wl_win, result.data, result.data + 1);
+    uivec2 window::size() const {
+        uivec2 result;
+        wl_egl_window_get_attached_size(wl_win, (int32_t*)result.data, (int32_t*)result.data + 1);
         return result;
     }
 
@@ -110,7 +110,7 @@ namespace hut {
             xdg_surface_unset_maximized(xdg_surface);
     }
 
-    void window::resize(hut::ivec2 size) {
+    void window::resize(hut::uivec2 size) {
         if (wl_win)
             wl_egl_window_resize(wl_win, size[0], size[1], 0, 0);
     }
@@ -130,7 +130,7 @@ namespace hut {
 
         thiz->fullscreen.cache(false);
         thiz->maximized.cache(false);
-        thiz->geometry = {{width, height}};
+        thiz->geometry = {{(unsigned int)width, (unsigned int)height}};
 
         #ifndef __CLDOC__
         void *p;

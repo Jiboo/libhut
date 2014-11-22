@@ -51,7 +51,7 @@ namespace hut {
             wl_egl_window_destroy(wl_win);
         }
 
-        virtual ivec2 size() const;
+        virtual uivec2 size() const;
         virtual short unsigned int density() const;
         virtual void draw(std::shared_ptr<hut::drawable>);
         virtual void draw(std::shared_ptr<hut::batch>);
@@ -80,7 +80,7 @@ namespace hut {
 
         virtual void enable_fullscreen(bool);
         virtual void enable_maximize(bool);
-        virtual void resize(hut::ivec2);
+        virtual void resize(hut::uivec2);
         virtual void rename(const std::string&);
     };
 

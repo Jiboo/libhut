@@ -52,41 +52,31 @@ namespace hut {
         return "BLEND_NONE";
     }
 
-    base_drawable::factory& drawable::factory::pos(std::shared_ptr<buffer> data, size_t offset, size_t stride) {
-        GLuint index = (GLuint)attributes.size();
-        std::stringstream buf;
-        buf << "pos_" << index;
-
+    drawable::factory::factory(std::shared_ptr<buffer> data, size_t offset, size_t stride) {
         attrib attr;
-        attr.index = index;
+        attr.index = 0;
         attr.normalized = GL_FALSE;
         attr.pointer = (GLvoid*)offset;
-        attr.size = 3;
+        attr.size = 2;
         attr.stride = (GLsizei)stride;
         attr.type = GL_FLOAT;
 
-        attributes.emplace(buf.str(), std::make_tuple("vec3", attr, data->name));
-
-        std::stringstream pos;
-
-        pos << " + vec4(" << buf.str() << ", 1)";
-        outPos += pos.str();
-
-        return *this;
+        attributes.emplace("hutPos", std::make_tuple("vec3", attr, data->name));
     }
 
     base_drawable::factory& drawable::factory::transform(std::shared_ptr<mat4> ref) {
-        runtime_assert(outPos != "", "Define position before transforms");
-
         std::stringstream name;
         name << "transform_" << uniformsMatrix4fv.size();
 
         uniformsMatrix4fv.emplace(name.str(), std::make_tuple(-1, ref));
-        outPos += '*' + name.str();
+        outTransforms += '*' + name.str();
         return *this;
     }
 
     base_drawable::factory& drawable::factory::opacity(std::shared_ptr<float> ref) {
+        if(outColor.empty())
+            throw std::runtime_error("opacity must be applied to a primer col/tex/multitex");
+
         std::stringstream buf;
         buf << "opacity_" << uniforms1f.size();
         std::string name = buf.str();
@@ -101,6 +91,9 @@ namespace hut {
     }
 
     base_drawable::factory& drawable::factory::circle(std::shared_ptr<vec4> params) {
+        if(outColor.empty())
+            throw std::runtime_error("circle shape must be applied to a primer col/tex/multitex");
+
         std::stringstream buf;
         buf << "circle_params_" << uniforms4f.size();
         std::string name = buf.str();
@@ -115,6 +108,9 @@ namespace hut {
     }
 
     base_drawable::factory& drawable::factory::arc(std::shared_ptr<vec4> params, std::shared_ptr<vec2> angles) {
+        if(outColor.empty())
+            throw std::runtime_error("arc shape must be applied to a primer col/tex/multitex");
+
         std::stringstream params_buf;
         params_buf << "arc_params_" << uniforms4f.size();
         std::string params_name = params_buf.str();
@@ -135,6 +131,9 @@ namespace hut {
     }
 
     base_drawable::factory& drawable::factory::ellipse(std::shared_ptr<vec4> params) {
+        if(outColor.empty())
+            throw std::runtime_error("ellipse shape must be applied to a primer col/tex/multitex");
+
         std::stringstream buf;
         buf << "ellipse_" << uniforms4f.size();
         std::string name = buf.str();
@@ -149,6 +148,9 @@ namespace hut {
     }
 
     base_drawable::factory& drawable::factory::round(std::shared_ptr<vec4> rect, std::shared_ptr<vec4> radii) {
+        if(outColor.empty())
+            throw std::runtime_error("round shape must be applied to a primer col/tex/multitex");
+
         std::stringstream rect_buf;
         rect_buf << "round_rect_" << uniforms4f.size();
         std::string rect_name = rect_buf.str();
@@ -370,7 +372,7 @@ namespace hut {
             vertex_source << "varying " << std::get<0>(var.second) << " " << var.first << ";\n";
 
         vertex_source << "void main() {\n"
-                "\tgl_Position = " << outPos << ";\n";
+                "\tgl_Position = vec4(hutPos, 1)" << outTransforms << ";\n";
 
         for(auto var : varryings)
             vertex_source << "\t" << var.first << " = " << std::get<1>(var.second) << ";\n";
@@ -414,36 +416,39 @@ namespace hut {
         for(auto var : varryings) frag_source << "varying " << std::get<0>(var.second) << " " << var.first << ";\n";
 
         frag_source <<
-                "vec2 hutPos = vec2(gl_FragCoord.x, hutCanvasSize.y - gl_FragCoord.y);\n"
+                "vec4 hutFragPos = vec4(gl_FragCoord.x, hutCanvasSize.y - gl_FragCoord.y, gl_FragCoord.z, 1);\n"
                 "vec4 blend_opacity(in vec4 col, in float opacity) {\n"
                     "\treturn vec4(col.xyz, col.w * opacity);\n"
                 "}\n"
                 "vec4 circlify(in vec4 col, in vec4 params) {\n"
-                    "\tvec2 center = params.xy;\n"
-                    "\tfloat radius = params.z;\n"
-                    "\tfloat sharpness = params.w;\n"
-                    "\tfloat dist = distance(hutPos, center);\n"
-                    "\tfloat t = smoothstep(radius + sharpness, radius - sharpness, dist);"
-                    "\treturn mix(vec4(0), col, t);\n"
+                    "\tvec4 transCenter = vec4(params.xy, gl_FragCoord.z, 1) * transform_0;\n"
+                    "\tfloat dist = distance(hutFragPos, transCenter);\n"
+                    "\tfloat radius = abs((vec4(params.z, 0, 0, 0) * transform_0).x);\n"
+                    "\tfloat sharpness = abs((vec4(params.w, 0, 0, 0) * transform_0).x);\n"
+                    "\tfloat ratiox = abs((transCenter.x - hutFragPos.x)/radius);\n"
+                    "\tfloat ratioy = abs((transCenter.y - hutFragPos.y)/radius);\n"
+                    "\tfloat tx = smoothstep(radius + sharpness, radius - sharpness, dist * ratiox);\n"
+                    "\tfloat ty = smoothstep(radius + sharpness, radius - sharpness, dist * ratioy);\n"
+                    "\treturn mix(vec4(col.rgb, 0), col, tx * ty);\n"
                 "}\n"
                 "vec4 roundify(in vec4 col, in vec4 rect, in vec4 radii) {\n"
-                    "\tif(hutPos.x > rect.x && hutPos.x < rect.x + radii.x && hutPos.y > rect.y && hutPos.y < rect.y + radii.x) {" // top left
-                        "\t\tfloat dist = distance(hutPos, vec2(rect.x + radii.x, rect.y + radii.x));\n"
-                        "\t\tfloat t = smoothstep(radii.x + 1.f, radii.x - 1.f, dist);"
+                    "\tif(hutFragPos.x > rect.x && hutFragPos.x < rect.x + radii.x && hutFragPos.y > rect.y && hutFragPos.y < rect.y + radii.x) {\n" // top left
+                        "\t\tfloat dist = distance(hutFragPos.xy, vec2(rect.x + radii.x, rect.y + radii.x));\n"
+                        "\t\tfloat t = smoothstep(radii.x + 1.f, radii.x - 1.f, dist);\n"
                         "\t\treturn vec4(col.rgb, col.a * t);\n"
-                    "\t} else if(hutPos.x < rect.z && hutPos.x > rect.z - radii.y && hutPos.y > rect.y && hutPos.y < rect.y + radii.y) {" // top right
-                        "\t\tfloat dist = distance(hutPos, vec2(rect.z - radii.y, rect.y + radii.y));\n"
-                        "\t\tfloat t = smoothstep(radii.y + 1.f, radii.y - 1.f, dist);"
+                    "\t} else if(hutFragPos.x < rect.z && hutFragPos.x > rect.z - radii.y && hutFragPos.y > rect.y && hutFragPos.y < rect.y + radii.y) {\n" // top right
+                        "\t\tfloat dist = distance(hutFragPos.xy, vec2(rect.z - radii.y, rect.y + radii.y));\n"
+                        "\t\tfloat t = smoothstep(radii.y + 1.f, radii.y - 1.f, dist);\n"
                         "\t\treturn vec4(col.rgb, col.a * t);\n"
-                    "\t} else if(hutPos.x < rect.z && hutPos.x > rect.z - radii.z && hutPos.y < rect.w && hutPos.y > rect.w - radii.z) {" // bottom right
-                        "\t\tfloat dist = distance(hutPos, vec2(rect.z - radii.z, rect.w - radii.z));\n"
-                        "\t\tfloat t = smoothstep(radii.z + 1.f, radii.z - 1.f, dist);"
+                    "\t} else if(hutFragPos.x < rect.z && hutFragPos.x > rect.z - radii.z && hutFragPos.y < rect.w && hutFragPos.y > rect.w - radii.z) {\n" // bottom right
+                        "\t\tfloat dist = distance(hutFragPos.xy, vec2(rect.z - radii.z, rect.w - radii.z));\n"
+                        "\t\tfloat t = smoothstep(radii.z + 1.f, radii.z - 1.f, dist);\n"
                         "\t\treturn vec4(col.rgb, col.a * t);\n"
-                    "\t} else if(hutPos.x > rect.x && hutPos.x < rect.x + radii.w && hutPos.y < rect.w && hutPos.y > rect.w - radii.w) {" // bottom left
-                        "\t\tfloat dist = distance(hutPos, vec2(rect.x + radii.w, rect.w - radii.w));\n"
-                        "\t\tfloat t = smoothstep(radii.w + 1.f, radii.w - 1.f, dist);"
+                    "\t} else if(hutFragPos.x > rect.x && hutFragPos.x < rect.x + radii.w && hutFragPos.y < rect.w && hutFragPos.y > rect.w - radii.w) {\n" // bottom left
+                        "\t\tfloat dist = distance(hutFragPos.xy, vec2(rect.x + radii.w, rect.w - radii.w));\n"
+                        "\t\tfloat t = smoothstep(radii.w + 1.f, radii.w - 1.f, dist);\n"
                         "\t\treturn vec4(col.rgb, col.a * t);\n"
-                    "\t} else if(hutPos.x > rect.x && hutPos.x < rect.z && hutPos.y > rect.y && hutPos.y < rect.w) {" // inside
+                    "\t} else if(hutFragPos.x > rect.x && hutFragPos.x < rect.z && hutFragPos.y > rect.y && hutFragPos.y < rect.w) {\n" // inside
                         "\t\treturn col;\n"
                     "\t}"
                     "\t\treturn vec4(0);\n" // outside
@@ -551,7 +556,7 @@ namespace hut {
     std::shared_ptr<drawable> drawable::factory::compile(vertices_primitive_mode mode, size_t count) {
         drawable* result(new drawable);
 
-        runtime_assert(outPos != "", "No position defined for drawable");
+        runtime_assert(outTransforms != "", "No position defined for drawable");
 
         result->has_blend = true;
         switch(first_blend_mode) {
@@ -673,7 +678,7 @@ namespace hut {
         return std::shared_ptr<drawable>(result);
     }
 
-    void drawable::draw(ivec2 canvas_size) const {
+    void drawable::draw(uivec2 canvas_size) const {
         glUseProgram(name);
 
         for (auto attribute : attributes) {

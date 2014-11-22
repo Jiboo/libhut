@@ -78,10 +78,10 @@ namespace hut {
 
         event<> on_pause, on_resume;
         event<> on_draw;
-        event<std::string /*path*/, vec2 /*pos*/> on_drop;
+        event<std::string /*path*/, uivec2 /*pos*/> on_drop;
 
-        event<uint8_t /*finger*/, touch_event_type, ivec2 /*pos*/> on_touch;
-        event<uint8_t /*button*/, mouse_event_type, ivec2 /*pos*/> on_mouse;
+        event<uint8_t /*finger*/, touch_event_type, uivec2 /*pos*/> on_touch;
+        event<uint8_t /*button*/, mouse_event_type, uivec2 /*pos*/> on_mouse;
         event<uint8_t /*axis*/, float /*pos*/> on_axis;
         event<char32_t /*utf32_char*/, bool /*down*/> on_char;
         event<keyboard_control_type, bool /*down*/> on_ctrl;
@@ -89,7 +89,7 @@ namespace hut {
         buffed<bool> fullscreen { [this](auto b) { this->enable_fullscreen(b); }, false };
         buffed<bool> maximized { [this](auto b) { this->enable_maximize(b); }, false };
 
-        buffed<ivec2> geometry{ [this](auto v) { this->resize(v); }, {{500, 500}} };
+        buffed<uivec2> geometry{ [this](auto v) { this->resize(v); }, {{500, 500}} };
         buffed<std::string> title { [this](auto s) { this->rename(s); }, "" };
 
         display& dpy;
@@ -117,7 +117,7 @@ namespace hut {
 
         virtual void enable_maximize(bool enable) = 0;
 
-        virtual void resize(ivec2 size) = 0;
+        virtual void resize(uivec2 size) = 0;
 
         virtual void rename(const std::string& name) = 0;
     };

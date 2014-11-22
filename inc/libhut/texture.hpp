@@ -37,10 +37,11 @@ namespace hut {
     protected:
         uivec2 alloc_size, real_size;
         pixel_format format;
+        unsigned short density;
 
     public:
-        base_texture(const uivec2 &alloc_size, const uivec2 &real_size, const pixel_format& internal_format)
-                : alloc_size(alloc_size), real_size(real_size), format(internal_format) {
+        base_texture(const uivec2 &alloc_size, const uivec2 &real_size, const pixel_format& internal_format, unsigned short density)
+                : alloc_size(alloc_size), real_size(real_size), format(internal_format), density(density) {
         }
 
         virtual ~base_texture() {

@@ -59,7 +59,7 @@ namespace hut {
             wl_surface_commit(d->cursor_surface);*/
         }
 
-        d->last_pos = {{wl_fixed_to_int(sx), wl_fixed_to_int(sy)}};
+        d->last_pos = {{(unsigned int)wl_fixed_to_int(sx), (unsigned int)wl_fixed_to_int(sy)}};
 
         for(window* win : d->active_wins) {
             if(win->wl_surf == surface) {
@@ -83,7 +83,7 @@ namespace hut {
             uint32_t time, wl_fixed_t sx, wl_fixed_t sy) {
         display *d = (display*)data;
 
-        ivec2 new_pos = {{wl_fixed_to_int(sx), wl_fixed_to_int(sy)}};
+        uivec2 new_pos = {{(unsigned int)wl_fixed_to_int(sx), (unsigned int)wl_fixed_to_int(sy)}};
         if(new_pos != d->last_pos) {
             d->last_pos = new_pos;
             d->active_win->on_mouse.fire(-1, MMOVE, d->last_pos);

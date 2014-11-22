@@ -31,6 +31,9 @@ libhut: hobby moden-C++ UI toolkit library.
 * Windows
     * https://code.google.com/p/angleproject/
 
+* 2D drawing
+    * http://jcgt.org/published/0003/04/01/
+
 #<cldoc:Architecture>
 
 * vec/mat

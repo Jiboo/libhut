@@ -83,7 +83,7 @@ namespace hut {
         xkb_mod_mask_t xkb_alt_mask;
         xkb_mod_mask_t xkb_shift_mask;
 
-        ivec2 last_pos;
+        uivec2 last_pos;
 
         std::list<window*> active_wins;
         window* active_win;

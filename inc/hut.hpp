@@ -42,3 +42,4 @@
 #include "libhut/buffer.hpp"
 #include "libhut/texture.hpp"
 #include "libhut/drawable.hpp"
+#include "libhut/framebuffer.hpp"
