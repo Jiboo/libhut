@@ -1,2 +1,3 @@
-tmp
-*.trace
+*build*
+.idea
+spv/*.spv

@@ -1,103 +1,91 @@
-cmake_minimum_required(VERSION 2.8)
-project(libhut)
+cmake_minimum_required(VERSION 3.6)
+project(hut)
 
-enable_testing()
-find_package(GTest REQUIRED)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -std=c++1z")
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/deps/")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -Wall -Wextra -Wno-missing-braces -Wno-unused-parameter -DHUT_WAYLAND")
+message("Checking for required dependencies...")
 
-set(HUT_HEADERS
-    inc/hut.hpp
-    inc/libhut/vec.hpp
-    inc/libhut/mat.hpp
-    inc/libhut/utils.hpp
-    inc/libhut/color.hpp
-    inc/libhut/event.hpp
-    inc/libhut/property.hpp
-    inc/libhut/application.hpp
-    inc/libhut/display.hpp
-    inc/libhut/surface.hpp
-    inc/libhut/window.hpp
-    inc/libhut/buffer.hpp
-    inc/libhut/texture.hpp
-    inc/libhut/drawable.hpp
-    inc/libhut/framebuffer.hpp
-)
+find_package(Threads REQUIRED)
+set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
-set(EGL_HEADERS
-    ${HUT_HEADERS}
+find_package(Vulkan REQUIRED)
+include_directories(${Vulkan_INCLUDE_DIRS})
+set(LIBS ${LIBS} ${Vulkan_LIBRARIES})
 
-    inc/libhut/egl/application.hpp
-    inc/libhut/egl/display.hpp
-    inc/libhut/egl/surface.hpp
-    inc/libhut/egl/window.hpp
-    inc/libhut/egl/drawable.hpp
-    inc/libhut/egl/buffer.hpp
-    inc/libhut/egl/texture.hpp
-    inc/libhut/egl/framebuffer.hpp
-)
+find_package(GLM REQUIRED)
+include_directories(${GLM_INCLUDE_DIRS})
+set(LIBS ${LIBS} ${GLM_LIBRARIES})
 
-set(WAYLAND_HEADERS
-    ${EGL_HEADERS}
+find_program(GLSLANG_VALIDATOR NAMES glslangValidator)
+if (GLSLANG_VALIDATOR EQUAL "GLSLANG_VALIDATOR-NOTFOUND")
+  message(FATAL_ERROR "Can't find glslangValidator, needed for shader compilation.")
+endif ()
 
-    inc/libhut/wayland/application.hpp
-    inc/libhut/wayland/display.hpp
-    inc/libhut/wayland/surface.hpp
-    inc/libhut/wayland/window.hpp
-)
+message("Checking for optional dependencies...")
 
-set(HUT_SOURCES
-    src/utils.cpp
-)
+find_package(GTest)
+include_directories(${GTEST_INCLUDE_DIR})
 
-set(EGL_SOURCES
-    ${HUT_SOURCES}
+find_package(XCB COMPONENTS xcb xcb-keysyms)
+if (XCB_FOUND AND xcb-keysyms_FOUND)
+  message("Using XCB as backend")
+  include_directories(${XCB_INCLUDE_DIRS})
+  set(LIBS ${LIBS} ${XCB_LIBRARIES})
 
-    src/egl/display.cpp
-    src/egl/drawable.cpp
-)
+  file(GLOB HUT_XCB_SOURCES src/xcb/*.cpp)
+  set(HUT_SOURCES ${HUT_SOURCES} ${HUT_XCB_SOURCES})
+  set(HUT_PLATFORM XCB)
+endif ()
 
-set(WAYLAND_SOURCES
-    ${EGL_SOURCES}
+if (NOT HUT_PLATFORM)
+  message(FATAL_ERROR "Couldn't find a suitable backend")
+endif ()
 
-    src/wayland/application.cpp
-    src/wayland/display.cpp
-    src/wayland/display_keyboard.cpp
-    src/wayland/display_pointer.cpp
-    src/wayland/display_touch.cpp
-    src/wayland/window.cpp
-    src/wayland/xdg-shell-protocol.c
-)
+message("Generating build targets...")
 
-set(TEST_FILES
-    tst/main.cpp
-    tst/math.cpp
-    tst/utils.cpp
-)
+file(GLOB HUT_SHADER_SOURCES spv/*.frag spv/*.vert)
+STRING(REPLACE ".frag" ".frag.spv" HUT_SHADER_SPV "${HUT_SHADER_SOURCES}")
+STRING(REPLACE ".vert" ".vert.spv" HUT_SHADER_SPV "${HUT_SHADER_SPV}")
 
-if(APPLE)
-elseif(UNIX)
-elseif(WIN32)
-endif(APPLE)
+FOREACH (shader_source ${HUT_SHADER_SOURCES})
+  STRING(REPLACE ".frag" ".frag.spv" shader_spv "${shader_source}")
+  STRING(REPLACE ".vert" ".vert.spv" shader_spv "${shader_spv}")
+  add_custom_command(OUTPUT ${shader_spv}
+      COMMAND ${GLSLANG_VALIDATOR} -V ${shader_source} -o ${shader_spv}
+      DEPENDS ${shader_source}
+      COMMENT "Generating SPIR-V for ${shader_source}")
+ENDFOREACH ()
+
+add_custom_target(shaders_spv DEPENDS ${HUT_SHADER_SPV}
+    COMMENT "Checking if re-compilation of shaders is required")
+
+add_definitions(-Ofast)
+add_definitions(-DVK_USE_PLATFORM_${HUT_PLATFORM}_KHR)
+file(GLOB_RECURSE HUT_HEADERS inc/*.hpp)
+file(GLOB HUT_COMMON_SOURCES src/*.cpp)
+set(HUT_SOURCES ${HUT_SOURCES} ${HUT_COMMON_SOURCES})
 
 include_directories(inc)
 
-add_library(hut STATIC ${WAYLAND_SOURCES} ${WAYLAND_HEADERS})
-target_link_libraries(hut PUBLIC wayland-client wayland-egl wayland-cursor xkbcommon EGL GLESv2 png)
+add_library(hut ${HUT_HEADERS} ${HUT_SOURCES})
+add_dependencies(hut shaders_spv)
+target_link_libraries(hut ${LIBS})
 
-add_executable(unit-tests ${TEST_FILES})
-target_link_libraries(unit-tests gtest hut)
+add_executable(demo tst/demo.cpp)
+target_link_libraries(demo hut)
+#add_custom_command(TARGET demo
+#        POST_BUILD
+#        COMMAND demo
+#        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
-add_custom_target(docs COMMAND
-    cldoc generate -std=c++1y -Iinc -DHUT_WAYLAND -D__CLDOC__ -c --
-    --merge doc
-    --output doc/gen
-    --report
-    --static
-    ${WAYLAND_SOURCES} inc/hut.hpp
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-)
-set_target_properties(docs PROPERTIES
-    EXCLUDE_FROM_ALL 1
-    EXCLUDE_FROM_DEFAULT_BUILD 1
-)
+if (GTEST_FOUND)
+  message("Enabling tests...")
+  enable_testing()
+
+  file(GLOB HUT_UNIT_TESTS tst/unit/*.cpp)
+  add_executable(unittests ${HUT_UNIT_TESTS})
+  add_test(NAME unittests WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND unittests)
+  target_link_libraries(unittests hut ${GTEST_BOTH_LIBRARIES})
+endif ()
