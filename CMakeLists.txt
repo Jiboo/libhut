@@ -75,6 +75,7 @@ add_custom_command(OUTPUT ${HUT_GEN_DIR}/inc/spv.h
     COMMAND gen_shaders ${HUT_GEN_DIR}/inc/spv.h ${HUT_SHADER_SPV}
     DEPENDS gen_shaders ${HUT_SHADER_SPV}
     COMMENT "Generating spv.h")
+include_directories(${HUT_GEN_DIR}/inc)
 
 add_custom_target(gen_shaders_h DEPENDS ${HUT_GEN_DIR}/inc/spv.h
     COMMENT "Checked if spv.h need regeneration")
@@ -85,8 +86,7 @@ file(GLOB_RECURSE HUT_HEADERS inc/hut/*.hpp inc/hut/drawables/*.hpp ${HUT_GEN_DI
 file(GLOB HUT_COMMON_SOURCES src/*.cpp)
 set(HUT_SOURCES ${HUT_SOURCES} ${HUT_COMMON_SOURCES})
 
-include_directories(${HUT_GEN_DIR}/inc inc)
-
+include_directories(inc)
 add_library(hut ${HUT_HEADERS} ${HUT_SOURCES})
 add_dependencies(hut gen_shaders_h)
 target_link_libraries(hut ${LIBS})

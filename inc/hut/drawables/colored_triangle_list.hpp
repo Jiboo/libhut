@@ -253,9 +253,9 @@ class colored_triangle_list {
     if (frag_ != VK_NULL_HANDLE) vkDestroyShaderModule(device, frag_, nullptr);
   }
 
-  template <typename T, uint32_t TCount>
+  template <typename T, uint32_t TVerticesCount>
   void draw(VkCommandBuffer _buffer, const glm::uvec2 &_size,
-            const shared_ref<T, TCount> &_vertices) {
+            const shared_ref<T, TVerticesCount> &_vertices) {
     window_.display_.check_thread();
 
     vkCmdBindPipeline(_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
@@ -278,7 +278,38 @@ class colored_triangle_list {
     viewport.maxDepth = 1.0f;
     vkCmdSetViewport(_buffer, 0, 1, &viewport);
 
-    vkCmdDraw(_buffer, (uint32_t)TCount, 1, 0, 0);
+    vkCmdDraw(_buffer, (uint32_t)TVerticesCount, 1, 0, 0);
+  }
+
+  template <typename TVertices, uint32_t TVerticesCount, uint32_t TIndicesCount>
+  void draw(VkCommandBuffer _buffer, const glm::uvec2 &_size,
+            const shared_ref<TVertices, TVerticesCount> &_vertices,
+            const shared_ref<uint16_t, TIndicesCount> &_indices) {
+    window_.display_.check_thread();
+
+    vkCmdBindPipeline(_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+
+    VkBuffer vertexBuffers[] = {_vertices->buffer_.buffer_};
+    VkDeviceSize offsets[] = {_vertices->offset_};
+    vkCmdBindVertexBuffers(_buffer, 0, 1, vertexBuffers, offsets);
+    vkCmdBindIndexBuffer(_buffer, _indices->buffer_.buffer_, _indices->offset_,
+                         VK_INDEX_TYPE_UINT16);
+
+    VkRect2D scissor = {};
+    scissor.offset = {0, 0};
+    scissor.extent = {_size.x, _size.y};
+    vkCmdSetScissor(_buffer, 0, 1, &scissor);
+
+    VkViewport viewport = {};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = (float)_size.x;
+    viewport.height = (float)_size.y;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(_buffer, 0, 1, &viewport);
+
+    vkCmdDrawIndexed(_buffer, TIndicesCount, 1, 0, 0, 0);
   }
 };
 
