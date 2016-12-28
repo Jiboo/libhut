@@ -39,6 +39,15 @@
 namespace hut {
 
 class colored_triangle_list {
+ private:
+  window &window_;
+  VkShaderModule vert_ = VK_NULL_HANDLE;
+  VkShaderModule frag_ = VK_NULL_HANDLE;
+  VkDescriptorSetLayout descriptor_layout_ = VK_NULL_HANDLE;
+  VkPipelineLayout layout_ = VK_NULL_HANDLE;
+  VkPipeline pipeline_ = VK_NULL_HANDLE;
+  VkDescriptorSet descriptor_ = VK_NULL_HANDLE;
+
  public:
   struct vertex {
     glm::vec2 pos;
@@ -67,17 +76,46 @@ class colored_triangle_list {
     }
   };
 
-  window &window_;
-  VkShaderModule vert_ = VK_NULL_HANDLE;
-  VkShaderModule frag_ = VK_NULL_HANDLE;
-  VkPipelineLayout layout_ = VK_NULL_HANDLE;
-  VkPipeline pipeline_ = VK_NULL_HANDLE;
+  struct ubo {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
+  };
 
   colored_triangle_list(window &_window) : window_(_window) {
     VkDevice device = _window.display_.device_;
     const glm::uvec2 &size = _window.size_;
-    auto vertShaderCode = __spv::noubo_v2_pos_v3_color_vert_spv;
-    auto fragShaderCode = __spv::noubo_v3_color_frag_spv;
+
+    VkDescriptorSetLayoutBinding uboLayoutBinding = {};
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    uboLayoutBinding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &uboLayoutBinding;
+
+    if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr,
+                                    &descriptor_layout_) != VK_SUCCESS)
+      throw std::runtime_error("failed to create descriptor set layout!");
+
+    VkDescriptorSetLayout setLayouts[] = {descriptor_layout_};
+    VkDescriptorSetAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = window_.display_.descriptor_pool_;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = setLayouts;
+
+    if (vkAllocateDescriptorSets(device, &allocInfo, &descriptor_) !=
+        VK_SUCCESS) {
+      throw std::runtime_error("failed to allocate descriptor set!");
+    }
+
+    auto vertShaderCode = __spv::colored_triangle_list_vert_spv;
+    auto fragShaderCode = __spv::colored_triangle_list_frag_spv;
 
     VkShaderModuleCreateInfo module_info = {};
     module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -155,8 +193,12 @@ class colored_triangle_list {
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
+    /*rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;***/
+
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
     rasterizer.depthBiasEnable = VK_FALSE;
     rasterizer.depthBiasConstantFactor = 0.0f;  // Optional
     rasterizer.depthBiasClamp = 0.0f;           // Optional
@@ -209,10 +251,11 @@ class colored_triangle_list {
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 0;          // Optional
-    pipelineLayoutInfo.pSetLayouts = nullptr;       // Optional
     pipelineLayoutInfo.pushConstantRangeCount = 0;  // Optional
     pipelineLayoutInfo.pPushConstantRanges = 0;     // Optional
+
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = setLayouts;
 
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr,
                                &layout_) != VK_SUCCESS)
@@ -245,6 +288,8 @@ class colored_triangle_list {
   ~colored_triangle_list() {
     VkDevice device = window_.display_.device_;
     vkDeviceWaitIdle(device);
+    if (descriptor_layout_ != VK_NULL_HANDLE)
+      vkDestroyDescriptorSetLayout(device, descriptor_layout_, nullptr);
     if (pipeline_ != VK_NULL_HANDLE)
       vkDestroyPipeline(device, pipeline_, nullptr);
     if (layout_ != VK_NULL_HANDLE)
@@ -253,38 +298,10 @@ class colored_triangle_list {
     if (frag_ != VK_NULL_HANDLE) vkDestroyShaderModule(device, frag_, nullptr);
   }
 
-  template <typename T, uint32_t TVerticesCount>
+  template <typename TVertices>
   void draw(VkCommandBuffer _buffer, const glm::uvec2 &_size,
-            const shared_ref<T, TVerticesCount> &_vertices) {
-    window_.display_.check_thread();
-
-    vkCmdBindPipeline(_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
-
-    VkBuffer vertexBuffers[] = {_vertices->buffer_.buffer_};
-    VkDeviceSize offsets[] = {_vertices->offset_};
-    vkCmdBindVertexBuffers(_buffer, 0, 1, vertexBuffers, offsets);
-
-    VkRect2D scissor = {};
-    scissor.offset = {0, 0};
-    scissor.extent = {_size.x, _size.y};
-    vkCmdSetScissor(_buffer, 0, 1, &scissor);
-
-    VkViewport viewport = {};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = (float)_size.x;
-    viewport.height = (float)_size.y;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(_buffer, 0, 1, &viewport);
-
-    vkCmdDraw(_buffer, (uint32_t)TVerticesCount, 1, 0, 0);
-  }
-
-  template <typename TVertices, uint32_t TVerticesCount, uint32_t TIndicesCount>
-  void draw(VkCommandBuffer _buffer, const glm::uvec2 &_size,
-            const shared_ref<TVertices, TVerticesCount> &_vertices,
-            const shared_ref<uint16_t, TIndicesCount> &_indices) {
+            const shared_ref<TVertices> &_vertices,
+            const shared_ref<uint16_t> &_indices) {
     window_.display_.check_thread();
 
     vkCmdBindPipeline(_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
@@ -295,6 +312,9 @@ class colored_triangle_list {
     vkCmdBindIndexBuffer(_buffer, _indices->buffer_.buffer_, _indices->offset_,
                          VK_INDEX_TYPE_UINT16);
 
+    vkCmdBindDescriptorSets(_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout_,
+                            0, 1, &descriptor_, 0, nullptr);
+
     VkRect2D scissor = {};
     scissor.offset = {0, 0};
     scissor.extent = {_size.x, _size.y};
@@ -309,7 +329,28 @@ class colored_triangle_list {
     viewport.maxDepth = 1.0f;
     vkCmdSetViewport(_buffer, 0, 1, &viewport);
 
-    vkCmdDrawIndexed(_buffer, TIndicesCount, 1, 0, 0, 0);
+    vkCmdDrawIndexed(_buffer, _indices->count(), 1, 0, 0, 0);
+  }
+
+  void set_ubo(const shared_ref<ubo> &_ubo) {
+    VkDescriptorBufferInfo bufferInfo = {};
+    bufferInfo.buffer = _ubo->buffer_.buffer_;
+    bufferInfo.offset = _ubo->offset_;
+    bufferInfo.range = _ubo->size_;
+
+    VkWriteDescriptorSet descriptorWrite = {};
+    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrite.dstSet = descriptor_;
+    descriptorWrite.dstBinding = 0;
+    descriptorWrite.dstArrayElement = 0;
+    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrite.descriptorCount = 1;
+    descriptorWrite.pBufferInfo = &bufferInfo;
+    descriptorWrite.pImageInfo = nullptr;        // Optional
+    descriptorWrite.pTexelBufferView = nullptr;  // Optional
+
+    vkUpdateDescriptorSets(window_.display_.device_, 1, &descriptorWrite, 0,
+                           nullptr);
   }
 };
 

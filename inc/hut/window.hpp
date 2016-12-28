@@ -104,6 +104,7 @@ class window {
   event<glm::uvec4> on_expose;
   event<glm::uvec2> on_resize;
   event<VkCommandBuffer, glm::uvec2 /*canvas_size*/> on_draw;
+  event<glm::uvec2, display::duration /*delta*/> on_frame;
   event<std::string /*path*/, glm::uvec2 /*pos*/> on_drop;
 
   event<uint8_t /*finger*/, touch_event_type, glm::uvec2 /*pos*/> on_touch;
@@ -157,14 +158,13 @@ class window {
   uint16_t fps_limit_ = 0;
   glm::uvec2 size_;
   glm::vec4 clear_color_ = {0.0f, 0.0f, 0.0f, 1.0f};
-  std::chrono::steady_clock::time_point last_frame_ =
-      std::chrono::steady_clock::now();
+  display::time_point last_frame_ = display::clock::now();
 
   void init_vulkan_surface();
   void dispatch_resize(const glm::uvec2 &);
   void rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb);
   void destroy_vulkan();
-  void redraw();
+  void redraw(display::time_point);
 
 #if defined(VK_USE_PLATFORM_XCB_KHR)
  protected:

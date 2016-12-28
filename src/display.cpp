@@ -57,7 +57,7 @@ void display::post_delayed(display::callback _callback,
                            std::chrono::milliseconds _delay) {
   {
     std::lock_guard<std::mutex> lock(delayed_mutex_);
-    delayed_jobs_.emplace(std::chrono::steady_clock::now() + _delay, _callback);
+    delayed_jobs_.emplace(display::clock::now() + _delay, _callback);
   }
   cv_.notify_one();
 }
@@ -127,16 +127,16 @@ void display::jobs_loop() {
   } else if (next != time_point::min()) {
     std::unique_lock<std::mutex> lk(cv_mutex_);
     std::chrono::duration<double, std::milli> wait =
-        next - std::chrono::steady_clock::now();
+        next - display::clock::now();
     cv_.wait_until(lk, next);
   }
 
-  const time_point now = std::chrono::steady_clock::now();
+  const time_point now = display::clock::now();
   tick_overridable(now);
   tick_posted(now);
   tick_delayed(now);
   std::chrono::duration<double, std::milli> duration =
-      std::chrono::steady_clock::now() - now;
+      display::clock::now() - now;
   // if (duration > std::chrono::milliseconds(16))
   // std::cout << "Jobs done in " << duration.count() << "ms" << std::endl;
 }
@@ -415,6 +415,20 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
     throw std::runtime_error("failed to create command pool!");
   }
 
+  VkDescriptorPoolSize poolSize = {};
+  poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  poolSize.descriptorCount = 1;
+
+  VkDescriptorPoolCreateInfo descPoolInfo = {};
+  descPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+  descPoolInfo.poolSizeCount = 1;
+  descPoolInfo.pPoolSizes = &poolSize;
+  descPoolInfo.maxSets = 1;
+
+  if (vkCreateDescriptorPool(device_, &descPoolInfo, nullptr,
+                             &descriptor_pool_) != VK_SUCCESS)
+    throw std::runtime_error("failed to create descriptor pool!");
+
   staging_ = std::make_shared<buffer>(*this, 8 * 1024,
                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -440,6 +454,8 @@ void display::destroy_vulkan() {
 
   staging_.reset();
   vkFreeCommandBuffers(device_, commandg_pool_, 1, &staging_cb_);
+
+  vkDestroyDescriptorPool(device_, descriptor_pool_, nullptr);
 
   if (commandg_pool_ != VK_NULL_HANDLE)
     vkDestroyCommandPool(device_, commandg_pool_, nullptr);

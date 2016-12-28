@@ -275,9 +275,9 @@ int display::dispatch() {
               glm::uvec4 r{e->x, e->y, e->x + e->width, e->y + e->height};
               window *w = it->second;
               post_overridable(
-                  [w, r](auto) {
+                  [w, r](auto tp) {
                     w->on_expose.fire(r);  // FIXME JB: Rects should be merged
-                    w->redraw();
+                    w->redraw(tp);
                   },
                   1);
             }

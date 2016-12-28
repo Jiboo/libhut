@@ -76,7 +76,7 @@ void window::destroy_vulkan() {
 void window::init_vulkan_surface() {
   display_.check_thread();
 
-  auto start = std::chrono::steady_clock::now();
+  auto start = display::clock::now();
 
   if (surface_ == VK_NULL_HANDLE) return;
 
@@ -319,10 +319,10 @@ void window::init_vulkan_surface() {
 #endif
 }
 
-void window::redraw() {
+void window::redraw(display::time_point _tp) {
   display_.check_thread();
 
-  auto start = std::chrono::steady_clock::now();
+  auto start = display::clock::now();
 
   if (swapchain_ == VK_NULL_HANDLE) return;
 
@@ -333,16 +333,17 @@ void window::redraw() {
       rebuild_cb(swapchain_fbos_[i], primary_cbs_[i]);
   }
 
+  on_frame.fire(size_, last_frame_ - _tp);
   display_.flush_staged_copies();
 
-  auto draw = std::chrono::steady_clock::now();
+  auto draw = display::clock::now();
 
   uint32_t imageIndex;
   VkResult result = vkAcquireNextImageKHR(
       display_.device_, swapchain_, std::numeric_limits<uint64_t>::max(),
       sem_available_, VK_NULL_HANDLE, &imageIndex);
 
-  auto acquire = std::chrono::steady_clock::now();
+  auto acquire = display::clock::now();
 
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
     init_vulkan_surface();
@@ -374,7 +375,7 @@ void window::redraw() {
       VK_SUCCESS)
     throw std::runtime_error("failed to submit draw command buffer!");
 
-  auto submit = std::chrono::steady_clock::now();
+  auto submit = display::clock::now();
 
   VkPresentInfoKHR presentInfo = {};
   presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -395,7 +396,7 @@ void window::redraw() {
     throw std::runtime_error("failed to present swap chain image!");
   }
 
-  auto present = std::chrono::steady_clock::now();
+  auto present = display::clock::now();
 
   cbs_.clear();
 
@@ -406,7 +407,7 @@ void window::redraw() {
     if (diff < limit) std::this_thread::sleep_for(limit - diff);
   }
 
-  auto done = std::chrono::steady_clock::now();
+  auto done = display::clock::now();
   last_frame_ = done;
 
 #if !defined(NDEBUG) && 0

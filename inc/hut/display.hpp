@@ -60,8 +60,9 @@ class display {
   friend class colored_triangle_list;
 
  public:
-  using time_point = std::chrono::steady_clock::time_point;
-  using duration = std::chrono::steady_clock::duration;
+  using clock = std::chrono::steady_clock;
+  using time_point = clock::time_point;
+  using duration = clock::duration;
   using callback = std::function<void(time_point)>;
   using scheduled_item = std::tuple<callback, duration>;
 
@@ -103,6 +104,7 @@ class display {
   VkQueue queueg_, queuec_, queuet_, queuep_;
   VkCommandPool commandg_pool_ = VK_NULL_HANDLE;
   VkPhysicalDeviceMemoryProperties mem_props_;
+  VkDescriptorPool descriptor_pool_ = VK_NULL_HANDLE;
 
   std::shared_ptr<buffer> staging_;
   VkCommandBuffer staging_cb_;

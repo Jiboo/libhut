@@ -58,7 +58,7 @@ class buffer {
   };
 
   /** Holds a reference to a zone in a buffer. */
-  template <typename T, uint32_t TCount = 1>
+  template <typename T>
   class ref {
     friend class buffer;
     friend class colored_triangle_list;
@@ -82,6 +82,8 @@ class buffer {
       assert(_data.size() == TCount);
       buffer_.update(offset_, size_, (void *)_data.begin().base());
     }
+
+    uint32_t count() const { return size_ / sizeof(T); }
   };
 
   buffer(display &_display, uint32_t _size, VkMemoryPropertyFlags _type,
@@ -92,23 +94,20 @@ class buffer {
   void copy_from(buffer &_other, uint32_t _other_offset, uint32_t _this_offset,
                  uint32_t _size);
 
-  template <typename T, uint32_t TCount>
-  std::shared_ptr<ref<T, TCount>> allocate() {
-    range_t result = do_alloc(sizeof(T) * TCount);
-    return std::make_shared<ref<T, TCount>>(*this, result.offset_,
-                                            result.size_);
+  template <typename T>
+  std::shared_ptr<ref<T>> allocate(uint32_t _count = 1) {
+    range_t result = do_alloc(sizeof(T) * _count);
+    return std::make_shared<ref<T>>(*this, result.offset_, result.size_);
   }
 
-  template <typename T, size_t TCount>
-  void free(const ref<T, TCount> &_ref) {
+  template <typename T>
+  void free(const ref<T> &_ref) {
     do_free(_ref.offset_, _ref.size_);
   };
 
   bool operator==(const buffer &_other) const {
     return buffer_ == _other.buffer_;
   }
-
-  VkBuffer buff() const { return buffer_; }
 
  private:
   display &display_;
@@ -128,7 +127,7 @@ class buffer {
   void clear();
 };
 
-template <typename T, uint32_t TCount>
-using shared_ref = std::shared_ptr<buffer::ref<T, TCount>>;
+template <typename T>
+using shared_ref = std::shared_ptr<buffer::ref<T>>;
 
 }  // namespace hut
