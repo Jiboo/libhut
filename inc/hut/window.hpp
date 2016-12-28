@@ -154,7 +154,7 @@ class window {
   VkSemaphore sem_rendered_ = VK_NULL_HANDLE;
 
   bool dirty_ = true, visible_ = false;
-  uint16_t fps_limit_ = 60;
+  uint16_t fps_limit_ = 0;
   glm::uvec2 size_;
   glm::vec4 clear_color_ = {0.0f, 0.0f, 0.0f, 1.0f};
   std::chrono::steady_clock::time_point last_frame_ =

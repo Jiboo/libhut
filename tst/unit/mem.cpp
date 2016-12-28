@@ -30,3 +30,16 @@ TEST(mem, simple) {
   ASSERT_EQ(ref5->offset_, 4);
   ASSERT_EQ(ref5->size_, 8);
 }
+
+TEST(mem, grow) {
+  hut::display d("testbed");
+
+  hut::buffer b(d, 16,
+                (VkBufferUsageFlagBits)(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                                        VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                                        VK_BUFFER_USAGE_TRANSFER_SRC_BIT));
+
+  auto ref1 = b.allocate<float, 32>();
+  ASSERT_EQ(ref1->offset_, 0);
+  ASSERT_EQ(ref1->size_, 32 * 4);
+}

@@ -36,16 +36,13 @@
 
 namespace hut {
 
-class buffer;
+class display;
 
 class buffer {
+  friend class display;
   friend class colored_triangle_list;
 
-  display &display_;
-  uint32_t size_;
-  VkBuffer buffer_;
-  VkDeviceMemory memory_;
-
+ public:
   struct range_t {
     uint32_t offset_, size_;
     bool allocated_;
@@ -59,12 +56,7 @@ class buffer {
       return offset_ < _other.offset_;
     }
   };
-  std::set<range_t> ranges_;
-  range_t do_alloc(uint32_t _size);
-  void do_free(uint32_t _offset, uint32_t _size);
-  void debug_ranges();
 
- public:
   /** Holds a reference to a zone in a buffer. */
   template <typename T, uint32_t TCount = 1>
   class ref {
@@ -80,6 +72,11 @@ class buffer {
 
     ~ref() { buffer_.do_free(offset_, size_); }
 
+    void set(const std::initializer_list<T> &_data) {
+      assert(_data.size() == TCount);
+      buffer_.update(offset_, size_, (void *)_data.begin());
+    }
+
     template <class TContainer>
     void set(const TContainer &_data) {
       assert(_data.size() == TCount);
@@ -87,11 +84,13 @@ class buffer {
     }
   };
 
-  buffer(display &_display, uint32_t _size, VkBufferUsageFlagBits _usage);
+  buffer(display &_display, uint32_t _size, VkMemoryPropertyFlags _type,
+         VkBufferUsageFlagBits _usage);
   ~buffer();
 
   void update(uint32_t _offset, uint32_t _size, const void *_data);
-  void resize(uint32_t _size);
+  void copy_from(buffer &_other, uint32_t _other_offset, uint32_t _this_offset,
+                 uint32_t _size);
 
   template <typename T, uint32_t TCount>
   std::shared_ptr<ref<T, TCount>> allocate() {
@@ -104,6 +103,29 @@ class buffer {
   void free(const ref<T, TCount> &_ref) {
     do_free(_ref.offset_, _ref.size_);
   };
+
+  bool operator==(const buffer &_other) const {
+    return buffer_ == _other.buffer_;
+  }
+
+  VkBuffer buff() const { return buffer_; }
+
+ private:
+  display &display_;
+  uint32_t size_;
+  VkMemoryPropertyFlags type_;
+  VkBufferUsageFlagBits usage_;
+  VkBuffer buffer_;
+  VkDeviceMemory memory_;
+
+  std::set<range_t> ranges_;
+
+  void grow(uint32_t new_size);
+  range_t do_alloc(uint32_t _size);
+  void do_free(uint32_t _offset, uint32_t _size);
+  void merge();
+  void debug_ranges();
+  void clear();
 };
 
 template <typename T, uint32_t TCount>

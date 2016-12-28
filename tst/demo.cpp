@@ -30,8 +30,8 @@
 #include <glm/ext.hpp>
 
 #include "hut/display.hpp"
-#include "hut/drawables/noinput.hpp"
 #include "hut/drawables/colored_triangle_list.hpp"
+#include "hut/drawables/noinput.hpp"
 #include "hut/window.hpp"
 
 using namespace std;
@@ -42,49 +42,51 @@ int main(int argc, char **argv) {
   hut::display d("testbed");
   hut::window w(d);
   unique_ptr<hut::noinput> noinput = std::make_unique<hut::noinput>(w);
-  unique_ptr<hut::colored_triangle_list> colored_triangle_list = std::make_unique<hut::colored_triangle_list>(w);
+  unique_ptr<hut::colored_triangle_list> colored_triangle_list =
+      std::make_unique<hut::colored_triangle_list>(w);
 
-  const std::vector<hut::colored_triangle_list::vertex> vertices = {
+  auto byte_size = sizeof(hut::colored_triangle_list::vertex) * 100;
+  hut::buffer b(d, byte_size, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                (VkBufferUsageFlagBits)(VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                                        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT));
+
+  auto buf_ref = b.allocate<hut::colored_triangle_list::vertex, 3>();
+  auto buf_ref2 = b.allocate<hut::colored_triangle_list::vertex, 3>();
+  auto buf_ref3 = b.allocate<hut::colored_triangle_list::vertex, 6>();
+
+  buf_ref->set(std::initializer_list<hut::colored_triangle_list::vertex>{
       {{0.0f, -0.5f}, {1.0f, 1.0f, 1.0f}},
       {{0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}},
       {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}},
-  };
-  const std::vector<hut::colored_triangle_list::vertex> vertices2 = {
+  });
+
+  buf_ref2->set(std::initializer_list<hut::colored_triangle_list::vertex>{
       {{0.2f, -0.3f}, {1.0f, 0.0f, 0.0f}},
       {{0.7f, 0.7f}, {1.0f, 0.0f, 0.0f}},
       {{-0.3f, 0.7f}, {1.0f, 0.0f, 0.0f}},
-  };
-  const std::vector<hut::colored_triangle_list::vertex> vertices3 = {
+  });
+
+  buf_ref3->set(std::initializer_list<hut::colored_triangle_list::vertex>{
       {{-0.2f, -0.7f}, {0.0f, 1.0f, 0.0f}},
       {{0.7f, 0.7f}, {0.0f, 1.0f, 0.0f}},
       {{-0.7f, 0.7f}, {00.0f, 1.0f, 0.0f}},
       {{-0.8f, -0.8f}, {0.0f, 1.0f, 0.0f}},
       {{0.7f, 0.7f}, {0.0f, 1.0f, 0.0f}},
       {{-0.7f, 0.7f}, {00.0f, 1.0f, 0.0f}},
-  };
-
-  auto byte_size = sizeof(hut::colored_triangle_list::vertex) * 100;
-  hut::buffer b(d, byte_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-  auto buf_ref = b.allocate<hut::colored_triangle_list::vertex, 3>();
-  auto buf_ref2 = b.allocate<hut::colored_triangle_list::vertex, 3>();
-  auto buf_ref3 = b.allocate<hut::colored_triangle_list::vertex, 6>();
-
-  buf_ref->set(vertices);
-  buf_ref2->set(vertices2);
-  buf_ref3->set(vertices3);
+  });
 
   w.title("testbed");
 
-  w.on_draw.connect([&noinput, &colored_triangle_list, &buf_ref, &buf_ref2, &buf_ref3](
-      VkCommandBuffer _buffer, const glm::uvec2 &_size) {
-    // cout << "drawing" << endl;
-    colored_triangle_list->draw(_buffer, _size, buf_ref);
-    colored_triangle_list->draw(_buffer, _size, buf_ref2);
-    colored_triangle_list->draw(_buffer, _size, buf_ref3);
-    noinput->draw(_buffer, _size);
-    return false;
-  });
+  w.on_draw.connect(
+      [&noinput, &colored_triangle_list, &buf_ref, &buf_ref2, &buf_ref3](
+          VkCommandBuffer _buffer, const glm::uvec2 &_size) {
+        // cout << "drawing" << endl;
+        colored_triangle_list->draw(_buffer, _size, buf_ref);
+        colored_triangle_list->draw(_buffer, _size, buf_ref2);
+        colored_triangle_list->draw(_buffer, _size, buf_ref3);
+        noinput->draw(_buffer, _size);
+        return false;
+      });
 
   w.on_resize.connect([&noinput, &w](const glm::uvec2 &_size) {
     // cout << "resize " << glm::to_string(_size) << endl;
@@ -160,7 +162,7 @@ int main(int argc, char **argv) {
   });
   w.on_resume.connect([&d, &anim_frame, &continue_profiling]() {
     continue_profiling = true;
-    // d.post(anim_frame);
+    d.post(anim_frame);
     return false;
   });
 

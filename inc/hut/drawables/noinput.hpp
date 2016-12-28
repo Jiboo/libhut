@@ -29,6 +29,8 @@
 
 #include <glm/glm.hpp>
 
+#include "spv.h"
+
 #include "hut/color.hpp"
 #include "hut/display.hpp"
 #include "hut/window.hpp"
@@ -46,8 +48,8 @@ class noinput {
   noinput(window &_window) : window_(_window) {
     VkDevice device = _window.display_.device_;
     const glm::uvec2 &size = _window.size_;
-    auto vertShaderCode = read_file("spv/noinput.vert.spv");
-    auto fragShaderCode = read_file("spv/noubo_v3_color.frag.spv");
+    auto vertShaderCode = __spv::noinput_vert_spv;
+    auto fragShaderCode = __spv::noubo_v3_color_frag_spv;
 
     VkShaderModuleCreateInfo module_info = {};
     module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;

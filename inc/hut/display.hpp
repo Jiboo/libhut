@@ -44,12 +44,14 @@
 #include <xcb/xcb_keysyms.h>
 #endif
 
+#include "hut/buffer.hpp"
 #include "hut/utils.hpp"
 
 namespace hut {
 
 class window;
 class display;
+class buffer;
 
 class display {
   friend class buffer;
@@ -102,6 +104,10 @@ class display {
   VkCommandPool commandg_pool_ = VK_NULL_HANDLE;
   VkPhysicalDeviceMemoryProperties mem_props_;
 
+  std::shared_ptr<buffer> staging_;
+  VkCommandBuffer staging_cb_;
+  bool dirty_staging_ = false;
+
   std::list<callback> posted_jobs_;
   std::map<size_t, callback> overridable_jobs_;
   std::multimap<time_point, callback> delayed_jobs_;
@@ -113,8 +119,10 @@ class display {
   void init_vulkan_instance(const char *_app_name, uint32_t _app_version,
                             std::vector<const char *> &extensions);
   void init_vulkan_device(VkSurfaceKHR dummy);
-  uint32_t find_memory_type(uint32_t typeFilter,
-                            VkMemoryPropertyFlags properties);
+  std::pair<uint32_t, VkMemoryPropertyFlags> find_memory_type(
+      uint32_t typeFilter, VkMemoryPropertyFlags properties);
+  void stage_update(VkBuffer _src, VkBufferCopy *_info);
+  void flush_staged_copies();
   void destroy_vulkan();
 
   time_point next_job_time_point();

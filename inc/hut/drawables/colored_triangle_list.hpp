@@ -29,6 +29,8 @@
 
 #include <glm/glm.hpp>
 
+#include "spv.h"
+
 #include "hut/buffer.hpp"
 #include "hut/color.hpp"
 #include "hut/display.hpp"
@@ -74,8 +76,8 @@ class colored_triangle_list {
   colored_triangle_list(window &_window) : window_(_window) {
     VkDevice device = _window.display_.device_;
     const glm::uvec2 &size = _window.size_;
-    auto vertShaderCode = read_file("spv/noubo_v2_pos_v3_color.vert.spv");
-    auto fragShaderCode = read_file("spv/noubo_v3_color.frag.spv");
+    auto vertShaderCode = __spv::noubo_v2_pos_v3_color_vert_spv;
+    auto fragShaderCode = __spv::noubo_v3_color_frag_spv;
 
     VkShaderModuleCreateInfo module_info = {};
     module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;

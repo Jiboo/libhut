@@ -333,6 +333,8 @@ void window::redraw() {
       rebuild_cb(swapchain_fbos_[i], primary_cbs_[i]);
   }
 
+  display_.flush_staged_copies();
+
   auto draw = std::chrono::steady_clock::now();
 
   uint32_t imageIndex;
@@ -397,9 +399,12 @@ void window::redraw() {
 
   cbs_.clear();
 
-  auto diff = present - last_frame_;
-  auto limit = std::chrono::microseconds((uint)(1. / fps_limit_ * 1000 * 1000));
-  if (diff < limit) std::this_thread::sleep_for(limit - diff);
+  if (fps_limit_ != 0) {
+    auto diff = present - last_frame_;
+    auto limit =
+        std::chrono::microseconds((uint)(1. / fps_limit_ * 1000 * 1000));
+    if (diff < limit) std::this_thread::sleep_for(limit - diff);
+  }
 
   auto done = std::chrono::steady_clock::now();
   last_frame_ = done;
@@ -418,8 +423,7 @@ void window::redraw() {
       << std::chrono::duration<double, std::micro>(present - submit).count()
       << "µs, limit " << std::setw(8)
       << std::chrono::duration<double, std::micro>(done - present).count()
-      << "µs) for framebuffer " << imageIndex
-      << std::chrono::duration<double, std::micro>(diff).count() << std::endl;
+      << "µs) for framebuffer " << imageIndex << std::endl;
 #endif
 }
 

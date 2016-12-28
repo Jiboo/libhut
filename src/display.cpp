@@ -414,10 +414,32 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
       VK_SUCCESS) {
     throw std::runtime_error("failed to create command pool!");
   }
+
+  staging_ = std::make_shared<buffer>(*this, 8 * 1024,
+                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                      VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+  VkCommandBufferAllocateInfo allocInfo = {};
+  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocInfo.commandPool = commandg_pool_;
+  allocInfo.commandBufferCount = 1;
+
+  vkAllocateCommandBuffers(device_, &allocInfo, &staging_cb_);
+
+  VkCommandBufferBeginInfo beginInfo = {};
+  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+  vkBeginCommandBuffer(staging_cb_, &beginInfo);
 }
 
 void display::destroy_vulkan() {
   vkDeviceWaitIdle(device_);
+
+  staging_.reset();
+  vkFreeCommandBuffers(device_, commandg_pool_, 1, &staging_cb_);
 
   if (commandg_pool_ != VK_NULL_HANDLE)
     vkDestroyCommandPool(device_, commandg_pool_, nullptr);
@@ -433,14 +455,14 @@ void display::destroy_vulkan() {
   if (instance_ != VK_NULL_HANDLE) vkDestroyInstance(instance_, nullptr);
 }
 
-uint32_t display::find_memory_type(uint32_t typeFilter,
-                                   VkMemoryPropertyFlags properties) {
+std::pair<uint32_t, VkMemoryPropertyFlags> display::find_memory_type(
+    uint32_t typeFilter, VkMemoryPropertyFlags properties) {
   check_thread();
 
   for (uint32_t i = 0; i < mem_props_.memoryTypeCount; i++) {
     if ((typeFilter & (1 << i)) &&
         (mem_props_.memoryTypes[i].propertyFlags & properties) == properties) {
-      return i;
+      return {i, mem_props_.memoryTypes[i].propertyFlags};
     }
   }
 
@@ -450,4 +472,33 @@ uint32_t display::find_memory_type(uint32_t typeFilter,
 void display::check_thread() {
   assert(std::this_thread::get_id() == dispatcher_ ||
          dispatcher_ == std::thread::id());
+}
+
+void display::stage_update(VkBuffer _src, VkBufferCopy *_info) {
+  vkCmdCopyBuffer(staging_cb_, staging_->buffer_, _src, 1, _info);
+  dirty_staging_ = true;
+}
+
+void display::flush_staged_copies() {
+  if (!dirty_staging_) return;
+
+  vkEndCommandBuffer(staging_cb_);
+
+  VkSubmitInfo submitInfo = {};
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &staging_cb_;
+
+  vkQueueSubmit(queueg_, 1, &submitInfo, VK_NULL_HANDLE);
+
+  staging_->clear();
+  dirty_staging_ = false;
+
+  vkQueueWaitIdle(queueg_);
+
+  VkCommandBufferBeginInfo beginInfo = {};
+  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+  vkBeginCommandBuffer(staging_cb_, &beginInfo);
 }
