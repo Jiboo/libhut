@@ -46,15 +46,7 @@ namespace hut {
 
 enum touch_event_type { TDOWN, TUP, TMOVE };
 
-enum mouse_event_type {
-  MDOWN,
-  MUP,
-  MMOVE,
-  MENTER,
-  MLEAVE,
-  MWHEEL_UP,
-  MWHEEL_DOWN
-};
+enum mouse_event_type { MDOWN, MUP, MMOVE, MENTER, MLEAVE, MWHEEL_UP, MWHEEL_DOWN };
 
 enum keysym : char32_t {
   KENUM_START = 0xffffff00,
@@ -98,6 +90,7 @@ class window {
   friend class display;
   friend class noinput;
   friend class colored_triangle_list;
+  friend class coltex_triangle_list;
 
  public:
   event<> on_pause, on_resume, on_focus, on_blur, on_close;
@@ -123,16 +116,21 @@ class window {
 
   void close();
 
-  bool visible() { return visible_; }
+  bool visible() {
+    return visible_;
+  }
   void visible(bool);
   void title(const std::string &);
-  void invalidate(const glm::uvec4 &);
+  void invalidate(const glm::uvec4 &, bool _redraw);
+  void invalidate(bool _redraw);
 
-  glm::uvec2 size() { return size_; }
+  glm::uvec2 size() {
+    return size_;
+  }
 
   void clear_color(const glm::vec4 &_color) {
     clear_color_ = _color;
-    dirty_ = true;
+    invalidate(true);
   }
 
  protected:
@@ -150,11 +148,12 @@ class window {
   std::vector<VkFramebuffer> swapchain_fbos_;
   std::vector<VkCommandBuffer> primary_cbs_;
   std::vector<VkCommandBuffer> cbs_;
+  std::vector<bool> dirty_;
 
   VkSemaphore sem_available_ = VK_NULL_HANDLE;
   VkSemaphore sem_rendered_ = VK_NULL_HANDLE;
 
-  bool dirty_ = true, visible_ = false;
+  bool visible_ = false;
   uint16_t fps_limit_ = 0;
   glm::uvec2 size_;
   glm::vec4 clear_color_ = {0.0f, 0.0f, 0.0f, 1.0f};

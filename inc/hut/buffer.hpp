@@ -41,6 +41,7 @@ class display;
 class buffer {
   friend class display;
   friend class colored_triangle_list;
+  friend class coltex_triangle_list;
 
  public:
   struct range_t {
@@ -48,8 +49,7 @@ class buffer {
     bool allocated_;
 
     bool operator==(const range_t &_other) const {
-      return offset_ == _other.offset_ && size_ == _other.size_ &&
-             allocated_ == _other.allocated_;
+      return offset_ == _other.offset_ && size_ == _other.size_ && allocated_ == _other.allocated_;
     }
 
     bool operator<(const range_t &_other) const {
@@ -61,38 +61,39 @@ class buffer {
   template <typename T>
   class ref {
     friend class buffer;
-    friend class colored_triangle_list;
 
    public:
     buffer &buffer_;
     const uint32_t offset_, size_;
 
-    ref(buffer &_buffer, uint32_t _offset, uint32_t _size)
-        : buffer_(_buffer), offset_(_offset), size_(_size) {}
+    ref(buffer &_buffer, uint32_t _offset, uint32_t _size) : buffer_(_buffer), offset_(_offset), size_(_size) {
+    }
 
-    ~ref() { buffer_.do_free(offset_, size_); }
+    ~ref() {
+      buffer_.do_free(offset_, size_);
+    }
 
     void set(const std::initializer_list<T> &_data) {
-      assert(_data.size() == TCount);
+      assert(_data.size() == size_ / sizeof(T));
       buffer_.update(offset_, size_, (void *)_data.begin());
     }
 
     template <class TContainer>
     void set(const TContainer &_data) {
-      assert(_data.size() == TCount);
+      assert(_data.size() == size_ / sizeof(T));
       buffer_.update(offset_, size_, (void *)_data.begin().base());
     }
 
-    uint32_t count() const { return size_ / sizeof(T); }
+    uint32_t count() const {
+      return size_ / sizeof(T);
+    }
   };
 
-  buffer(display &_display, uint32_t _size, VkMemoryPropertyFlags _type,
-         VkBufferUsageFlagBits _usage);
+  buffer(display &_display, uint32_t _size, VkMemoryPropertyFlags _type, VkBufferUsageFlagBits _usage);
   ~buffer();
 
   void update(uint32_t _offset, uint32_t _size, const void *_data);
-  void copy_from(buffer &_other, uint32_t _other_offset, uint32_t _this_offset,
-                 uint32_t _size);
+  void copy_from(buffer &_other, uint32_t _other_offset, uint32_t _this_offset, uint32_t _size);
 
   template <typename T>
   std::shared_ptr<ref<T>> allocate(uint32_t _count = 1) {
@@ -124,7 +125,7 @@ class buffer {
   void do_free(uint32_t _offset, uint32_t _size);
   void merge();
   void debug_ranges();
-  void clear();
+  void clear_ranges();
 };
 
 template <typename T>

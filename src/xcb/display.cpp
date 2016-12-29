@@ -44,8 +44,7 @@
 
 using namespace hut;
 
-display::display(const char *_app_name, uint32_t _app_version,
-                 const char *_name) {
+display::display(const char *_app_name, uint32_t _app_version, const char *_name) {
   std::vector<const char *> extensions = {VK_KHR_XCB_SURFACE_EXTENSION_NAME};
   init_vulkan_instance(_app_name, _app_version, extensions);
 
@@ -55,20 +54,17 @@ display::display(const char *_app_name, uint32_t _app_version,
   if (result > 0) {
     switch (result) {
       case XCB_CONN_ERROR:
-        throw std::runtime_error(
-            "socket errors, pipe errors or other stream errors");
+        throw std::runtime_error("socket errors, pipe errors or other stream errors");
       case XCB_CONN_CLOSED_EXT_NOTSUPPORTED:
         throw std::runtime_error("extension not supported");
       case XCB_CONN_CLOSED_MEM_INSUFFICIENT:
         throw std::runtime_error("memory not available");
       case XCB_CONN_CLOSED_REQ_LEN_EXCEED:
-        throw std::runtime_error(
-            "exceeding request length that server accepts");
+        throw std::runtime_error("exceeding request length that server accepts");
       case XCB_CONN_CLOSED_PARSE_ERR:
         throw std::runtime_error("error during parsing display string");
       case XCB_CONN_CLOSED_INVALID_SCREEN:
-        throw std::runtime_error(
-            "server does not have a screen matching the display");
+        throw std::runtime_error("server does not have a screen matching the display");
       default:
         throw std::runtime_error("unknown xcb error");
     }
@@ -76,7 +72,8 @@ display::display(const char *_app_name, uint32_t _app_version,
 
   const xcb_setup_t *setup = xcb_get_setup(connection_);
   xcb_screen_iterator_t iter = xcb_setup_roots_iterator(setup);
-  for (int i = 0; i < screenNum; i++) xcb_screen_next(&iter);
+  for (int i = 0; i < screenNum; i++)
+    xcb_screen_next(&iter);
   screen_ = iter.data;
 
   keysyms_ = xcb_key_symbols_alloc(connection_);
@@ -86,7 +83,8 @@ display::display(const char *_app_name, uint32_t _app_version,
     xcb_atom_t &ref_;
     xcb_intern_atom_cookie_t cookie_;
 
-    atom_item_t(xcb_atom_t &_ref) : ref_(_ref) {}
+    atom_item_t(xcb_atom_t &_ref) : ref_(_ref) {
+    }
   };
 
   std::map<std::string, atom_item_t> atoms = {
@@ -94,17 +92,13 @@ display::display(const char *_app_name, uint32_t _app_version,
   };
 
   for (auto &atom : atoms)
-    atom.second.cookie_ =
-        xcb_intern_atom(connection_, 0, atom.first.size(), atom.first.data());
+    atom.second.cookie_ = xcb_intern_atom(connection_, 0, atom.first.size(), atom.first.data());
 
   for (auto &atom : atoms) {
     xcb_generic_error_t *error;
-    auto reply =
-        xcb_intern_atom_reply(connection_, atom.second.cookie_, &error);
+    auto reply = xcb_intern_atom_reply(connection_, atom.second.cookie_, &error);
     if (error) {
-      throw std::runtime_error(sstream("Can't retreive atom ")
-                               << atom.first
-                               << ", code: " << error->error_code);
+      throw std::runtime_error(sstream("Can't retreive atom ") << atom.first << ", code: " << error->error_code);
     }
     atom.second.ref_ = reply->atom;
     free(reply);
@@ -114,9 +108,8 @@ display::display(const char *_app_name, uint32_t _app_version,
   uint32_t values[1] = {screen_->white_pixel};
 
   xcb_window_t dummy = xcb_generate_id(connection_);
-  xcb_create_window(connection_, XCB_COPY_FROM_PARENT, dummy, screen_->root, 0,
-                    0, 800, 600, 10, XCB_WINDOW_CLASS_INPUT_OUTPUT,
-                    screen_->root_visual, mask, values);
+  xcb_create_window(connection_, XCB_COPY_FROM_PARENT, dummy, screen_->root, 0, 0, 800, 600, 10,
+                    XCB_WINDOW_CLASS_INPUT_OUTPUT, screen_->root_visual, mask, values);
 
   VkXcbSurfaceCreateInfoKHR info = {};
   info.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
@@ -127,8 +120,7 @@ display::display(const char *_app_name, uint32_t _app_version,
   VkSurfaceKHR dummy_surface;
   VkResult vkr;
   if ((vkr = func(instance_, &info, nullptr, &dummy_surface)) != VK_SUCCESS)
-    throw std::runtime_error(sstream("couldn't create dummy surface, code: ")
-                             << vkr);
+    throw std::runtime_error(sstream("couldn't create dummy surface, code: ") << vkr);
 
   init_vulkan_device(dummy_surface);
 
@@ -142,10 +134,11 @@ display::~display() {
   xcb_disconnect(connection_);
 }
 
-void display::flush() { xcb_flush(connection_); }
+void display::flush() {
+  xcb_flush(connection_);
+}
 
-void dispatch_keysym(display *thiz, window *w, xcb_keysym_t keysym,
-                     bool press) {
+void dispatch_keysym(display *thiz, window *w, xcb_keysym_t keysym, bool press) {
   switch (keysym) {
     case XK_KP_0:
       keysym = XK_0;
@@ -267,8 +260,7 @@ int display::dispatch() {
       if (event != nullptr) {
         switch (event->response_type & ~0x80) {
           case XCB_EXPOSE: {
-            xcb_expose_event_t *e =
-                reinterpret_cast<xcb_expose_event_t *>(event);
+            xcb_expose_event_t *e = reinterpret_cast<xcb_expose_event_t *>(event);
 
             auto it = windows_.find(e->window);
             if (it != windows_.end()) {
@@ -284,8 +276,7 @@ int display::dispatch() {
           } break;
 
           case XCB_CONFIGURE_NOTIFY: {
-            xcb_configure_notify_event_t *e =
-                reinterpret_cast<xcb_configure_notify_event_t *>(event);
+            xcb_configure_notify_event_t *e = reinterpret_cast<xcb_configure_notify_event_t *>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
@@ -298,8 +289,7 @@ int display::dispatch() {
           } break;
 
           case XCB_KEY_PRESS: {
-            xcb_key_press_event_t *e =
-                reinterpret_cast<xcb_key_press_event_t *>(event);
+            xcb_key_press_event_t *e = reinterpret_cast<xcb_key_press_event_t *>(event);
 
             int col;
             if (e->state & 0x3)
@@ -321,8 +311,7 @@ int display::dispatch() {
           } break;
 
           case XCB_KEY_RELEASE: {
-            xcb_key_press_event_t *e =
-                reinterpret_cast<xcb_key_release_event_t *>(event);
+            xcb_key_press_event_t *e = reinterpret_cast<xcb_key_release_event_t *>(event);
 
             int col;
             if (e->state & 0x80)
@@ -344,8 +333,7 @@ int display::dispatch() {
           } break;
 
           case XCB_BUTTON_PRESS: {
-            xcb_button_press_event_t *e =
-                reinterpret_cast<xcb_button_press_event_t *>(event);
+            xcb_button_press_event_t *e = reinterpret_cast<xcb_button_press_event_t *>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
@@ -369,8 +357,7 @@ int display::dispatch() {
           } break;
 
           case XCB_BUTTON_RELEASE: {
-            xcb_button_release_event_t *e =
-                reinterpret_cast<xcb_button_release_event_t *>(event);
+            xcb_button_release_event_t *e = reinterpret_cast<xcb_button_release_event_t *>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
@@ -378,76 +365,64 @@ int display::dispatch() {
               uint8_t b = e->detail;
               if (b < 4 || b > 5) {  // ignore wheel events
                 auto c = glm::vec2{e->event_x, e->event_y};
-                post([w, b, c](auto) {
-                  w->on_mouse.fire(b, mouse_event_type::MUP, c);
-                });
+                post([w, b, c](auto) { w->on_mouse.fire(b, mouse_event_type::MUP, c); });
               }
             }
           } break;
 
           case XCB_ENTER_NOTIFY: {
-            xcb_enter_notify_event_t *e =
-                reinterpret_cast<xcb_enter_notify_event_t *>(event);
+            xcb_enter_notify_event_t *e = reinterpret_cast<xcb_enter_notify_event_t *>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
               window *w = it->second;
               auto c = glm::vec2{e->event_x, e->event_y};
               uint8_t b = e->detail;
-              post([w, b, c](auto) {
-                w->on_mouse.fire(b, mouse_event_type::MENTER, c);
-              });
+              post([w, b, c](auto) { w->on_mouse.fire(b, mouse_event_type::MENTER, c); });
             }
           } break;
 
           case XCB_LEAVE_NOTIFY: {
-            xcb_leave_notify_event_t *e =
-                reinterpret_cast<xcb_leave_notify_event_t *>(event);
+            xcb_leave_notify_event_t *e = reinterpret_cast<xcb_leave_notify_event_t *>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
               window *w = it->second;
               auto c = glm::vec2{e->event_x, e->event_y};
               uint8_t b = e->detail;
-              post([w, b, c](auto) {
-                w->on_mouse.fire(b, mouse_event_type::MLEAVE, c);
-              });
+              post([w, b, c](auto) { w->on_mouse.fire(b, mouse_event_type::MLEAVE, c); });
             }
           } break;
 
           case XCB_MOTION_NOTIFY: {
-            xcb_motion_notify_event_t *e =
-                reinterpret_cast<xcb_motion_notify_event_t *>(event);
+            xcb_motion_notify_event_t *e = reinterpret_cast<xcb_motion_notify_event_t *>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
               window *w = it->second;
               auto c = glm::vec2{e->event_x, e->event_y};
               uint8_t b = e->detail;
-              post([w, b, c](auto) {
-                w->on_mouse.fire(b, mouse_event_type::MMOVE, c);
-              });
+              post([w, b, c](auto) { w->on_mouse.fire(b, mouse_event_type::MMOVE, c); });
             }
           } break;
 
           case XCB_CLIENT_MESSAGE: {
-            xcb_client_message_event_t *e =
-                reinterpret_cast<xcb_client_message_event_t *>(event);
+            xcb_client_message_event_t *e = reinterpret_cast<xcb_client_message_event_t *>(event);
 
             auto it = windows_.find(e->window);
             if (it != windows_.end()) {
               if (e->data.data32[0] == atom_close_) {
                 window *w = it->second;
                 post([w](auto) {
-                  if (!w->on_close.fire()) w->close();
+                  if (!w->on_close.fire())
+                    w->close();
                 });
               }
             }
           } break;
 
           case XCB_FOCUS_IN: {
-            xcb_focus_in_event_t *e =
-                reinterpret_cast<xcb_focus_in_event_t *>(event);
+            xcb_focus_in_event_t *e = reinterpret_cast<xcb_focus_in_event_t *>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
@@ -457,8 +432,7 @@ int display::dispatch() {
           } break;
 
           case XCB_FOCUS_OUT: {
-            xcb_focus_out_event_t *e =
-                reinterpret_cast<xcb_focus_out_event_t *>(event);
+            xcb_focus_out_event_t *e = reinterpret_cast<xcb_focus_out_event_t *>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
@@ -468,8 +442,7 @@ int display::dispatch() {
           } break;
 
           case XCB_MAP_NOTIFY: {
-            xcb_map_notify_event_t *e =
-                reinterpret_cast<xcb_map_notify_event_t *>(event);
+            xcb_map_notify_event_t *e = reinterpret_cast<xcb_map_notify_event_t *>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
@@ -479,8 +452,7 @@ int display::dispatch() {
           } break;
 
           case XCB_UNMAP_NOTIFY: {
-            xcb_unmap_notify_event_t *e =
-                reinterpret_cast<xcb_unmap_notify_event_t *>(event);
+            xcb_unmap_notify_event_t *e = reinterpret_cast<xcb_unmap_notify_event_t *>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {

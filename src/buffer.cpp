@@ -33,8 +33,7 @@
 
 using namespace hut;
 
-buffer::buffer(display &_display, uint32_t _size, VkMemoryPropertyFlags _type,
-               VkBufferUsageFlagBits _usage)
+buffer::buffer(display &_display, uint32_t _size, VkMemoryPropertyFlags _type, VkBufferUsageFlagBits _usage)
     : display_(_display), size_(_size), usage_(_usage) {
   ranges_.insert(range_t{0, _size, false});
 
@@ -44,8 +43,7 @@ buffer::buffer(display &_display, uint32_t _size, VkMemoryPropertyFlags _type,
   bufferInfo.usage = _usage;
   bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-  if (vkCreateBuffer(_display.device_, &bufferInfo, nullptr, &buffer_) !=
-      VK_SUCCESS) {
+  if (vkCreateBuffer(_display.device_, &bufferInfo, nullptr, &buffer_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create vertex buffer!");
   }
 
@@ -60,8 +58,7 @@ buffer::buffer(display &_display, uint32_t _size, VkMemoryPropertyFlags _type,
   allocInfo.memoryTypeIndex = type.first;
   type_ = type.second;
 
-  if (vkAllocateMemory(_display.device_, &allocInfo, nullptr, &memory_) !=
-      VK_SUCCESS) {
+  if (vkAllocateMemory(_display.device_, &allocInfo, nullptr, &memory_) != VK_SUCCESS) {
     vkDestroyBuffer(_display.device_, buffer_, nullptr);
     throw std::runtime_error("failed to allocate vertex buffer memory!");
   }
@@ -85,51 +82,23 @@ void buffer::update(uint32_t _offset, uint32_t _size, const void *_data) {
     copy.size = _size;
     copy.srcOffset = staging.offset_;
     copy.dstOffset = _offset;
-    display_.stage_update(buffer_, &copy);
+
+    display_.post([copy, this](auto) { display_.stage_copy(buffer_, &copy); });
 
     void *target;
-    vkMapMemory(display_.device_, display_.staging_->memory_, staging.offset_,
-                _size, 0, &target);
+    vkMapMemory(display_.device_, display_.staging_->memory_, staging.offset_, _size, 0, &target);
     memcpy(target, _data, _size);
     vkUnmapMemory(display_.device_, display_.staging_->memory_);
   }
 }
 
-void buffer::copy_from(buffer &_other, uint32_t _other_offset,
-                       uint32_t _this_offset, uint32_t _size) {
-  VkCommandBufferAllocateInfo allocInfo = {};
-  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  allocInfo.commandPool = display_.commandg_pool_;
-  allocInfo.commandBufferCount = 1;
-
-  VkCommandBuffer commandBuffer;
-  vkAllocateCommandBuffers(display_.device_, &allocInfo, &commandBuffer);
-
-  VkCommandBufferBeginInfo beginInfo = {};
-  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-  vkBeginCommandBuffer(commandBuffer, &beginInfo);
-
+void buffer::copy_from(buffer &_other, uint32_t _other_offset, uint32_t _this_offset, uint32_t _size) {
   VkBufferCopy copyRegion = {};
   copyRegion.srcOffset = _other_offset;
   copyRegion.dstOffset = _this_offset;
   copyRegion.size = _size;
-  vkCmdCopyBuffer(commandBuffer, _other.buffer_, buffer_, 1, &copyRegion);
 
-  vkEndCommandBuffer(commandBuffer);
-
-  VkSubmitInfo submitInfo = {};
-  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &commandBuffer;
-
-  vkQueueSubmit(display_.queueg_, 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(display_.queueg_);
-
-  vkFreeCommandBuffers(display_.device_, display_.commandg_pool_, 1,
-                       &commandBuffer);
+  display_.stage_copy(_other.buffer_, buffer_, &copyRegion);
 }
 
 void buffer::grow(uint32_t new_size) {
@@ -158,7 +127,8 @@ void buffer::grow(uint32_t new_size) {
 buffer::range_t buffer::do_alloc(uint32_t _size) {
   auto it = ranges_.cbegin();
   for (; it != ranges_.cend(); it++) {
-    if (!it->allocated_ && it->size_ >= _size) break;
+    if (!it->allocated_ && it->size_ >= _size)
+      break;
   }
 
   if (it == ranges_.cend()) {
@@ -197,13 +167,13 @@ void buffer::do_free(uint32_t _offset, uint32_t _size) {
 
 void buffer::debug_ranges() {
   for (auto &range : ranges_)
-    std::cout << "\trange " << range.offset_ << " to "
-              << (range.offset_ + range.size_) << " " << range.allocated_
+    std::cout << "\trange " << range.offset_ << " to " << (range.offset_ + range.size_) << " " << range.allocated_
               << std::endl;
 }
 
 void buffer::merge() {
-  if (ranges_.size() < 2) return;
+  if (ranges_.size() < 2)
+    return;
 
   auto prev = ranges_.begin();
   auto it = ranges_.begin();
@@ -224,7 +194,7 @@ void buffer::merge() {
   }
 }
 
-void buffer::clear() {
+void buffer::clear_ranges() {
   ranges_.clear();
   ranges_.insert(range_t{0, size_, false});
 }

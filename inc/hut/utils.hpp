@@ -48,7 +48,9 @@ class event {
  public:
   using callback = std::function<bool(TArgTypes...)>;
 
-  void connect(const callback &_callback) { cbs_.emplace_back(_callback); }
+  void connect(const callback &_callback) {
+    cbs_.emplace_back(_callback);
+  }
 
   bool fire(const TArgTypes &... _args) {
     bool handled = false;
@@ -60,6 +62,10 @@ class event {
     return handled;
   }
 
+  void clear() {
+    cbs_.clear();
+  }
+
  protected:
   std::vector<callback> cbs_;
 };
@@ -69,7 +75,9 @@ class sstream {
   std::ostringstream stream_;
 
  public:
-  sstream(const char *_base) { stream_ << _base; }
+  sstream(const char *_base) {
+    stream_ << _base;
+  }
 
   template <typename T>
   sstream &operator<<(const T &_rhs) {
@@ -77,7 +85,9 @@ class sstream {
     return *this;
   }
 
-  operator std::string() { return stream_.str(); }
+  operator std::string() {
+    return stream_.str();
+  }
 };
 
 static std::vector<char> read_file(const std::string &filename) {

@@ -5,7 +5,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -std=c++1z")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/deps/")
 
+###########################################################
 message("Checking for required dependencies...")
+###########################################################
 
 find_package(Threads REQUIRED)
 set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
@@ -18,12 +20,18 @@ find_package(GLM REQUIRED)
 include_directories(${GLM_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${GLM_LIBRARIES})
 
+find_package(PNG REQUIRED)
+include_directories(${PNG_INCLUDE_DIRS})
+set(LIBS ${LIBS} ${PNG_LIBRARIES})
+
 find_program(GLSLANG_VALIDATOR NAMES glslangValidator)
 if (GLSLANG_VALIDATOR EQUAL "GLSLANG_VALIDATOR-NOTFOUND")
   message(FATAL_ERROR "Can't find glslangValidator, needed for shader compilation.")
 endif ()
 
+###########################################################
 message("Checking for optional dependencies...")
+###########################################################
 
 find_package(GTest)
 include_directories(${GTEST_INCLUDE_DIR})
@@ -43,7 +51,9 @@ if (NOT HUT_PLATFORM)
   message(FATAL_ERROR "Couldn't find a suitable backend")
 endif ()
 
-message("Configuring build targets...")
+###########################################################
+message("Configuring library build targets...")
+###########################################################
 
 file(GLOB HUT_SHADER_SOURCES spv/*.frag spv/*.vert)
 set(HUT_SHADER_SPV "")
@@ -68,11 +78,11 @@ ENDFOREACH ()
 add_custom_target(shaders_spv DEPENDS ${HUT_SHADER_SPV}
     COMMENT "Checked if shaders need recompilation")
 
-add_executable(gen_shaders src/gen_shaders/main.cpp)
+add_executable(gen_shaders src/gen_res/main.cpp)
 target_link_libraries(gen_shaders -lstdc++fs)
 
 add_custom_command(OUTPUT ${HUT_GEN_DIR}/inc/spv.h
-    COMMAND gen_shaders ${HUT_GEN_DIR}/inc/spv.h ${HUT_SHADER_SPV}
+    COMMAND gen_shaders __spv ${HUT_GEN_DIR}/inc/spv.h ${HUT_SHADER_SPV}
     DEPENDS gen_shaders ${HUT_SHADER_SPV}
     COMMENT "Generating spv.h")
 include_directories(${HUT_GEN_DIR}/inc)
@@ -91,11 +101,28 @@ add_library(hut ${HUT_HEADERS} ${HUT_SOURCES})
 add_dependencies(hut gen_shaders_h)
 target_link_libraries(hut ${LIBS})
 
+###########################################################
+message("Configuring demo build targets...")
+###########################################################
+
+file(GLOB HUT_DEMO_PNG tst/*.png)
+add_custom_command(OUTPUT ${HUT_GEN_DIR}/inc/demo_png.h
+    COMMAND gen_shaders demo ${HUT_GEN_DIR}/inc/demo_png.h ${HUT_DEMO_PNG}
+    DEPENDS gen_shaders ${HUT_DEMO_PNG}
+    COMMENT "Generating demo_png.h")
+
+add_custom_target(gen_demo_h DEPENDS ${HUT_GEN_DIR}/inc/demo_png.h
+    COMMENT "Checked if demo_png.h need regeneration")
+
 add_executable(demo tst/demo.cpp)
 target_link_libraries(demo hut)
+add_dependencies(demo gen_demo_h)
 
 if (GTEST_FOUND)
+  ###########################################################
   message("Enabling tests...")
+  ###########################################################
+
   enable_testing()
 
   file(GLOB HUT_UNIT_TESTS tst/unit/*.cpp)

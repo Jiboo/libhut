@@ -46,6 +46,7 @@
 
 #include "hut/buffer.hpp"
 #include "hut/utils.hpp"
+#include "image.hpp"
 
 namespace hut {
 
@@ -54,10 +55,13 @@ class display;
 class buffer;
 
 class display {
-  friend class buffer;
   friend class window;
+  friend class buffer;
+  friend class image;
+  friend class sampler;
   friend class noinput;
   friend class colored_triangle_list;
+  friend class coltex_triangle_list;
 
  public:
   using clock = std::chrono::steady_clock;
@@ -66,9 +70,7 @@ class display {
   using callback = std::function<void(time_point)>;
   using scheduled_item = std::tuple<callback, duration>;
 
-  display(const char *_app_name,
-          uint32_t _app_version = VK_MAKE_VERSION(1, 0, 0),
-          const char *_display_name = nullptr);
+  display(const char *_app_name, uint32_t _app_version = VK_MAKE_VERSION(1, 0, 0), const char *_display_name = nullptr);
   ~display();
 
   void flush();
@@ -104,12 +106,12 @@ class display {
   VkQueue queueg_, queuec_, queuet_, queuep_;
   VkCommandPool commandg_pool_ = VK_NULL_HANDLE;
   VkPhysicalDeviceMemoryProperties mem_props_;
-  VkDescriptorPool descriptor_pool_ = VK_NULL_HANDLE;
 
   std::shared_ptr<buffer> staging_;
   VkCommandBuffer staging_cb_;
   bool dirty_staging_ = false;
 
+  event<> on_staged;
   std::list<callback> posted_jobs_;
   std::map<size_t, callback> overridable_jobs_;
   std::multimap<time_point, callback> delayed_jobs_;
@@ -118,13 +120,14 @@ class display {
   std::condition_variable cv_;
   std::thread::id dispatcher_;
 
-  void init_vulkan_instance(const char *_app_name, uint32_t _app_version,
-                            std::vector<const char *> &extensions);
-  void init_vulkan_device(VkSurfaceKHR dummy);
-  std::pair<uint32_t, VkMemoryPropertyFlags> find_memory_type(
-      uint32_t typeFilter, VkMemoryPropertyFlags properties);
-  void stage_update(VkBuffer _src, VkBufferCopy *_info);
-  void flush_staged_copies();
+  void init_vulkan_instance(const char *_app_name, uint32_t _app_version, std::vector<const char *> &_extensions);
+  void init_vulkan_device(VkSurfaceKHR _dummy);
+  std::pair<uint32_t, VkMemoryPropertyFlags> find_memory_type(uint32_t _type_filter, VkMemoryPropertyFlags _properties);
+  void stage_copy(VkBuffer _src, VkBuffer _dst, const VkBufferCopy *_info);
+  void stage_copy(VkBuffer _dst, const VkBufferCopy *_info);
+  void stage_transition(VkImage _image, VkFormat _format, VkImageLayout _old_layout, VkImageLayout _new_layout);
+  void stage_copy(VkImage _src, VkImage _dst, uint32_t _width, uint32_t _height);
+  void flush_staged();
   void destroy_vulkan();
 
   time_point next_job_time_point();

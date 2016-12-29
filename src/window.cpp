@@ -34,12 +34,19 @@
 
 using namespace hut;
 
-window::~window() { close(); }
+window::~window() {
+  close();
+}
+
+void window::invalidate(bool _redraw) {
+  invalidate(glm::uvec4{glm::uvec2{0, 0}, size_}, _redraw);
+}
 
 void window::destroy_vulkan() {
   display_.check_thread();
 
-  if (surface_ == VK_NULL_HANDLE) return;
+  if (surface_ == VK_NULL_HANDLE)
+    return;
 
   vkDeviceWaitIdle(display_.device_);
 
@@ -78,45 +85,38 @@ void window::init_vulkan_surface() {
 
   auto start = display::clock::now();
 
-  if (surface_ == VK_NULL_HANDLE) return;
+  if (surface_ == VK_NULL_HANDLE)
+    return;
 
   const VkPhysicalDevice &pdevice = display_.pdevice_;
 
   VkBool32 present;
-  vkGetPhysicalDeviceSurfaceSupportKHR(pdevice, display_.iqueuep_, surface_,
-                                       &present);
+  vkGetPhysicalDeviceSurfaceSupportKHR(pdevice, display_.iqueuep_, surface_, &present);
   if (!present)
-    throw std::runtime_error(
-        "can't create a swapchain for the provided surface");
+    throw std::runtime_error("can't create a swapchain for the provided surface");
 
   VkSurfaceCapabilitiesKHR capabilities = {};
   vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pdevice, surface_, &capabilities);
 
   uint32_t formats_count;
-  vkGetPhysicalDeviceSurfaceFormatsKHR(pdevice, surface_, &formats_count,
-                                       nullptr);
+  vkGetPhysicalDeviceSurfaceFormatsKHR(pdevice, surface_, &formats_count, nullptr);
   std::vector<VkSurfaceFormatKHR> formats(formats_count);
-  vkGetPhysicalDeviceSurfaceFormatsKHR(pdevice, surface_, &formats_count,
-                                       formats.data());
+  vkGetPhysicalDeviceSurfaceFormatsKHR(pdevice, surface_, &formats_count, formats.data());
   surface_format_ = formats[0];
   if (formats.size() == 1 && formats[0].format == VK_FORMAT_UNDEFINED) {
-    surface_format_ = {VK_FORMAT_B8G8R8A8_UNORM,
-                       VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+    surface_format_ = {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
   } else {
     for (const auto &it : formats) {
-      if (it.format == VK_FORMAT_B8G8R8A8_UNORM &&
-          it.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+      if (it.format == VK_FORMAT_B8G8R8A8_UNORM && it.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
         surface_format_ = it;
       }
     }
   }
 
   uint32_t modes_count;
-  vkGetPhysicalDeviceSurfacePresentModesKHR(pdevice, surface_, &modes_count,
-                                            nullptr);
+  vkGetPhysicalDeviceSurfacePresentModesKHR(pdevice, surface_, &modes_count, nullptr);
   std::vector<VkPresentModeKHR> modes(modes_count);
-  vkGetPhysicalDeviceSurfacePresentModesKHR(pdevice, surface_, &modes_count,
-                                            modes.data());
+  vkGetPhysicalDeviceSurfacePresentModesKHR(pdevice, surface_, &modes_count, modes.data());
   present_mode_ = VK_PRESENT_MODE_FIFO_KHR;
   for (const auto &it : modes) {
     if (it == VK_PRESENT_MODE_MAILBOX_KHR) {
@@ -124,25 +124,19 @@ void window::init_vulkan_surface() {
     }
   }
 
-  if (capabilities.currentExtent.width !=
-      std::numeric_limits<uint32_t>::max()) {
+  if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
     swapchain_extents_ = capabilities.currentExtent;
   } else {
     VkExtent2D tmp = {size_.x, size_.y};
 
-    tmp.width =
-        std::max(capabilities.minImageExtent.width,
-                 std::min(capabilities.maxImageExtent.width, tmp.width));
-    tmp.height =
-        std::max(capabilities.minImageExtent.height,
-                 std::min(capabilities.maxImageExtent.height, tmp.height));
+    tmp.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, tmp.width));
+    tmp.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, tmp.height));
 
     swapchain_extents_ = tmp;
   }
 
   uint32_t images_count = capabilities.minImageCount + 1;
-  if (capabilities.maxImageCount > 0 &&
-      images_count > capabilities.maxImageCount) {
+  if (capabilities.maxImageCount > 0 && images_count > capabilities.maxImageCount) {
     images_count = capabilities.maxImageCount;
   }
 
@@ -174,8 +168,7 @@ void window::init_vulkan_surface() {
   swapchain_infos.oldSwapchain = old_swapchain;
 
   VkSwapchainKHR new_swapchain;
-  if (vkCreateSwapchainKHR(display_.device_, &swapchain_infos, nullptr,
-                           &new_swapchain) != VK_SUCCESS) {
+  if (vkCreateSwapchainKHR(display_.device_, &swapchain_infos, nullptr, &new_swapchain) != VK_SUCCESS) {
     throw std::runtime_error("failed to create swap chain!");
   }
 
@@ -187,8 +180,7 @@ void window::init_vulkan_surface() {
 
   vkGetSwapchainImagesKHR(display_.device_, swapchain_, &images_count, nullptr);
   swapchain_images_.resize(images_count);
-  vkGetSwapchainImagesKHR(display_.device_, swapchain_, &images_count,
-                          swapchain_images_.data());
+  vkGetSwapchainImagesKHR(display_.device_, swapchain_, &images_count, swapchain_images_.data());
 
   for (auto &imageview : swapchain_imageviews_) {
     if (imageview != VK_NULL_HANDLE)
@@ -210,8 +202,7 @@ void window::init_vulkan_surface() {
     imagev_infos.subresourceRange.levelCount = 1;
     imagev_infos.subresourceRange.baseArrayLayer = 0;
     imagev_infos.subresourceRange.layerCount = 1;
-    if (vkCreateImageView(display_.device_, &imagev_infos, nullptr,
-                          &swapchain_imageviews_[i]) != VK_SUCCESS)
+    if (vkCreateImageView(display_.device_, &imagev_infos, nullptr, &swapchain_imageviews_[i]) != VK_SUCCESS)
       throw std::runtime_error("failed to create image views!");
   }
 
@@ -241,8 +232,7 @@ void window::init_vulkan_surface() {
   dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   dependency.srcAccessMask = 0;
   dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
   VkRenderPassCreateInfo renderPassInfo = {};
   renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -255,8 +245,7 @@ void window::init_vulkan_surface() {
 
   if (renderpass_ != VK_NULL_HANDLE)
     vkDestroyRenderPass(display_.device_, renderpass_, nullptr);
-  if (vkCreateRenderPass(display_.device_, &renderPassInfo, nullptr,
-                         &renderpass_) != VK_SUCCESS)
+  if (vkCreateRenderPass(display_.device_, &renderPassInfo, nullptr, &renderpass_) != VK_SUCCESS)
     throw std::runtime_error("failed to create render pass!");
 
   for (auto &fbo : swapchain_fbos_) {
@@ -276,14 +265,12 @@ void window::init_vulkan_surface() {
     framebufferInfo.height = swapchain_extents_.height;
     framebufferInfo.layers = 1;
 
-    if (vkCreateFramebuffer(display_.device_, &framebufferInfo, nullptr,
-                            &swapchain_fbos_[i]) != VK_SUCCESS)
+    if (vkCreateFramebuffer(display_.device_, &framebufferInfo, nullptr, &swapchain_fbos_[i]) != VK_SUCCESS)
       throw std::runtime_error("failed to create framebuffer!");
   }
 
   if (!primary_cbs_.empty())
-    vkFreeCommandBuffers(display_.device_, display_.commandg_pool_,
-                         primary_cbs_.size(), primary_cbs_.data());
+    vkFreeCommandBuffers(display_.device_, display_.commandg_pool_, primary_cbs_.size(), primary_cbs_.data());
 
   primary_cbs_.resize(images_count);
   VkCommandBufferAllocateInfo allocInfo = {};
@@ -292,8 +279,7 @@ void window::init_vulkan_surface() {
   allocInfo.commandBufferCount = images_count;
   allocInfo.commandPool = display_.commandg_pool_;
 
-  if (vkAllocateCommandBuffers(display_.device_, &allocInfo,
-                               primary_cbs_.data()) != VK_SUCCESS)
+  if (vkAllocateCommandBuffers(display_.device_, &allocInfo, primary_cbs_.data()) != VK_SUCCESS)
     throw std::runtime_error("failed to allocate command buffers!");
 
   if (sem_available_ != VK_NULL_HANDLE)
@@ -303,47 +289,33 @@ void window::init_vulkan_surface() {
 
   VkSemaphoreCreateInfo semaphoreInfo = {};
   semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  if (vkCreateSemaphore(display_.device_, &semaphoreInfo, nullptr,
-                        &sem_available_) != VK_SUCCESS ||
-      vkCreateSemaphore(display_.device_, &semaphoreInfo, nullptr,
-                        &sem_rendered_) != VK_SUCCESS) {
+  if (vkCreateSemaphore(display_.device_, &semaphoreInfo, nullptr, &sem_available_) != VK_SUCCESS ||
+      vkCreateSemaphore(display_.device_, &semaphoreInfo, nullptr, &sem_rendered_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create semaphores!");
   }
 
+  for (size_t i = 0; i < dirty_.size(); i++)
+    dirty_[i] = true;
+  dirty_.resize(images_count, true);
+
 #if !defined(NDEBUG) && 1
   std::cout << "Surface creation took "
-            << std::chrono::duration<double, std::milli>(
-                   std::chrono::steady_clock::now() - start)
-                   .count()
-            << "ms" << std::endl;
+            << std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() << "ms"
+            << std::endl;
 #endif
 }
 
 void window::redraw(display::time_point _tp) {
   display_.check_thread();
 
+  if (swapchain_ == VK_NULL_HANDLE)
+    return;
+
   auto start = display::clock::now();
 
-  if (swapchain_ == VK_NULL_HANDLE) return;
-
-  if (dirty_) {
-    vkDeviceWaitIdle(display_.device_);
-    dirty_ = false;
-    for (size_t i = 0; i < primary_cbs_.size(); i++)
-      rebuild_cb(swapchain_fbos_[i], primary_cbs_[i]);
-  }
-
-  on_frame.fire(size_, last_frame_ - _tp);
-  display_.flush_staged_copies();
-
-  auto draw = display::clock::now();
-
   uint32_t imageIndex;
-  VkResult result = vkAcquireNextImageKHR(
-      display_.device_, swapchain_, std::numeric_limits<uint64_t>::max(),
-      sem_available_, VK_NULL_HANDLE, &imageIndex);
-
-  auto acquire = display::clock::now();
+  VkResult result = vkAcquireNextImageKHR(display_.device_, swapchain_, std::numeric_limits<uint64_t>::max(),
+                                          sem_available_, VK_NULL_HANDLE, &imageIndex);
 
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
     init_vulkan_surface();
@@ -352,14 +324,26 @@ void window::redraw(display::time_point _tp) {
     throw std::runtime_error("failed to acquire swap chain image!");
   }
 
+  auto acquire = display::clock::now();
+
+  on_frame.fire(size_, last_frame_ - _tp);
+  display_.flush_staged();
+
+  if (dirty_[imageIndex]) {
+    vkDeviceWaitIdle(display_.device_);
+    dirty_[imageIndex] = false;
+    rebuild_cb(swapchain_fbos_[imageIndex], primary_cbs_[imageIndex]);
+  }
+
+  auto draw = display::clock::now();
+
   cbs_.emplace_back(primary_cbs_[imageIndex]);
 
   VkSubmitInfo submitInfo = {};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
   VkSemaphore waitSemaphores[] = {sem_available_};
-  VkPipelineStageFlags waitStages[] = {
-      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+  VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
   submitInfo.waitSemaphoreCount = 1;
   submitInfo.pWaitSemaphores = waitSemaphores;
   submitInfo.pWaitDstStageMask = waitStages;
@@ -371,8 +355,7 @@ void window::redraw(display::time_point _tp) {
   submitInfo.signalSemaphoreCount = 1;
   submitInfo.pSignalSemaphores = signalSemaphores;
 
-  if (vkQueueSubmit(display_.queueg_, 1, &submitInfo, VK_NULL_HANDLE) !=
-      VK_SUCCESS)
+  if (vkQueueSubmit(display_.queueg_, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
     throw std::runtime_error("failed to submit draw command buffer!");
 
   auto submit = display::clock::now();
@@ -402,35 +385,28 @@ void window::redraw(display::time_point _tp) {
 
   if (fps_limit_ != 0) {
     auto diff = present - last_frame_;
-    auto limit =
-        std::chrono::microseconds((uint)(1. / fps_limit_ * 1000 * 1000));
-    if (diff < limit) std::this_thread::sleep_for(limit - diff);
+    auto limit = std::chrono::microseconds((uint)(1. / fps_limit_ * 1000 * 1000));
+    if (diff < limit)
+      std::this_thread::sleep_for(limit - diff);
   }
 
   auto done = display::clock::now();
   last_frame_ = done;
 
 #if !defined(NDEBUG) && 0
-  std::cout
-      << std::setprecision(2) << std::fixed << "Redraw took " << std::setw(8)
-      << std::chrono::duration<double, std::milli>(done - start).count()
-      << "ms (draw " << std::setw(8)
-      << std::chrono::duration<double, std::micro>(draw - start).count()
-      << "µs, acquire " << std::setw(8)
-      << std::chrono::duration<double, std::micro>(acquire - draw).count()
-      << "µs, submit " << std::setw(8)
-      << std::chrono::duration<double, std::micro>(submit - acquire).count()
-      << "µs, present " << std::setw(8)
-      << std::chrono::duration<double, std::micro>(present - submit).count()
-      << "µs, limit " << std::setw(8)
-      << std::chrono::duration<double, std::micro>(done - present).count()
-      << "µs) for framebuffer " << imageIndex << std::endl;
+  std::cout << std::setprecision(2) << std::fixed << "Redraw took " << std::setw(8)
+            << std::chrono::duration<double, std::milli>(done - start).count() << "ms (acquire " << std::setw(8)
+            << std::chrono::duration<double, std::micro>(acquire - start).count() << "µs, draw " << std::setw(8)
+            << std::chrono::duration<double, std::micro>(draw - acquire).count() << "µs, submit " << std::setw(8)
+            << std::chrono::duration<double, std::micro>(submit - draw).count() << "µs, present " << std::setw(8)
+            << std::chrono::duration<double, std::micro>(present - submit).count() << "µs, limit " << std::setw(8)
+            << std::chrono::duration<double, std::micro>(done - present).count() << "µs) for framebuffer " << imageIndex
+            << std::endl;
 #endif
 }
 
 void window::dispatch_resize(const glm::uvec2 &_size) {
   size_ = _size;
-  dirty_ = true;
   init_vulkan_surface();
   on_resize.fire(_size);
 }
@@ -452,13 +428,11 @@ void window::rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
   renderPassInfo.renderArea.offset = {0, 0};
   renderPassInfo.renderArea.extent = swapchain_extents_;
 
-  VkClearValue clearColor = {clear_color_.r, clear_color_.r, clear_color_.b,
-                             clear_color_.a};
+  VkClearValue clearColor = {clear_color_.r, clear_color_.r, clear_color_.b, clear_color_.a};
   renderPassInfo.clearValueCount = 1;
   renderPassInfo.pClearValues = &clearColor;
 
-  vkCmdBeginRenderPass(_cb, &renderPassInfo,
-                       VK_SUBPASS_CONTENTS_INLINE);  // FIXME
+  vkCmdBeginRenderPass(_cb, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);  // FIXME
   // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS
   // to enable secondary command buffers
 

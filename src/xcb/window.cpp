@@ -35,44 +35,44 @@
 
 using namespace hut;
 
-bool window::is_keypad_key(char32_t c) { return xcb_is_keypad_key(c) != 0; }
-bool window::is_cursor_key(char32_t c) { return xcb_is_cursor_key(c) != 0; }
-bool window::is_function_key(char32_t c) { return xcb_is_function_key(c) != 0; }
-bool window::is_modifier_key(char32_t c) { return xcb_is_modifier_key(c) != 0; }
+bool window::is_keypad_key(char32_t c) {
+  return xcb_is_keypad_key(c) != 0;
+}
+bool window::is_cursor_key(char32_t c) {
+  return xcb_is_cursor_key(c) != 0;
+}
+bool window::is_function_key(char32_t c) {
+  return xcb_is_function_key(c) != 0;
+}
+bool window::is_modifier_key(char32_t c) {
+  return xcb_is_modifier_key(c) != 0;
+}
 
-window::window(display &_display)
-    : display_(_display), parent_(_display.screen_->root), size_(800, 600) {
+window::window(display &_display) : display_(_display), parent_(_display.screen_->root), size_(800, 600) {
   window_ = xcb_generate_id(_display.connection_);
 
   uint32_t mask = XCB_CW_EVENT_MASK;
-  uint32_t values[1] = {
-      XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE |
-      XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE |
-      XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW |
-      XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_KEYMAP_STATE |
-      XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_VISIBILITY_CHANGE |
-      XCB_EVENT_MASK_FOCUS_CHANGE | XCB_EVENT_MASK_PROPERTY_CHANGE |
-      XCB_EVENT_MASK_STRUCTURE_NOTIFY};
+  uint32_t values[1] = {XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE | XCB_EVENT_MASK_BUTTON_PRESS |
+                        XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW |
+                        XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_KEYMAP_STATE | XCB_EVENT_MASK_EXPOSURE |
+                        XCB_EVENT_MASK_VISIBILITY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE |
+                        XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_STRUCTURE_NOTIFY};
 
-  xcb_create_window(_display.connection_, XCB_COPY_FROM_PARENT, window_,
-                    parent_, 0, 0, 800, 600, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT,
-                    _display.screen_->root_visual, mask, values);
+  xcb_create_window(_display.connection_, XCB_COPY_FROM_PARENT, window_, parent_, 0, 0, 800, 600, 0,
+                    XCB_WINDOW_CLASS_INPUT_OUTPUT, _display.screen_->root_visual, mask, values);
 
-  xcb_change_property(_display.connection_, XCB_PROP_MODE_REPLACE, window_,
-                      _display.atom_wm_, 4, 32, 1, &_display.atom_close_);
+  xcb_change_property(_display.connection_, XCB_PROP_MODE_REPLACE, window_, _display.atom_wm_, 4, 32, 1,
+                      &_display.atom_close_);
 
   VkXcbSurfaceCreateInfoKHR info = {};
   info.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
   info.connection = _display.connection_;
   info.window = window_;
 
-  auto func =
-      display_.get_proc<PFN_vkCreateXcbSurfaceKHR>("vkCreateXcbSurfaceKHR");
+  auto func = display_.get_proc<PFN_vkCreateXcbSurfaceKHR>("vkCreateXcbSurfaceKHR");
   VkResult result;
-  if ((result = func(_display.instance_, &info, nullptr, &surface_)) !=
-      VK_SUCCESS)
-    throw std::runtime_error(sstream("failed to create window surface, code: ")
-                             << result);
+  if ((result = func(_display.instance_, &info, nullptr, &surface_)) != VK_SUCCESS)
+    throw std::runtime_error(sstream("failed to create window surface, code: ") << result);
 
   _display.windows_.emplace(window_, this);
   xcb_flush(_display.connection_);
@@ -214,16 +214,17 @@ std::string window::name_key(char32_t c) {
 }
 
 void window::title(const std::string &_title) {
-  xcb_change_property(display_.connection_, XCB_PROP_MODE_REPLACE, window_,
-                      XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8,
+  xcb_change_property(display_.connection_, XCB_PROP_MODE_REPLACE, window_, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8,
                       (uint32_t)_title.size(), _title.data());
-  xcb_change_property(display_.connection_, XCB_PROP_MODE_REPLACE, window_,
-                      XCB_ATOM_WM_ICON_NAME, XCB_ATOM_STRING, 8,
+  xcb_change_property(display_.connection_, XCB_PROP_MODE_REPLACE, window_, XCB_ATOM_WM_ICON_NAME, XCB_ATOM_STRING, 8,
                       (uint32_t)_title.size(), _title.data());
 }
 
-void window::invalidate(const glm::uvec4 &_coords) {
-  dirty_ = true;
+void window::invalidate(const glm::uvec4 &_coords, bool _redraw) {
+  if (_redraw) {
+    for (size_t i = 0; i < dirty_.size(); i++)
+      dirty_[i] = true;
+  }
   xcb_expose_event_t event = {};
   event.window = window_;
   event.x = (uint16_t)_coords.x;

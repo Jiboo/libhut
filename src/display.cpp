@@ -53,8 +53,7 @@ void display::post_overridable(callback _callback, size_t _id) {
   cv_.notify_one();
 }
 
-void display::post_delayed(display::callback _callback,
-                           std::chrono::milliseconds _delay) {
+void display::post_delayed(display::callback _callback, std::chrono::milliseconds _delay) {
   {
     std::lock_guard<std::mutex> lock(delayed_mutex_);
     delayed_jobs_.emplace(display::clock::now() + _delay, _callback);
@@ -66,11 +65,13 @@ display::time_point display::next_job_time_point() {
   time_point result = time_point::max();
   {
     std::lock_guard<std::mutex> lock(overridable_mutex_);
-    if (!overridable_jobs_.empty()) return time_point::min();
+    if (!overridable_jobs_.empty())
+      return time_point::min();
   }
   {
     std::lock_guard<std::mutex> lock(posted_mutex_);
-    if (!posted_jobs_.empty()) return time_point::min();
+    if (!posted_jobs_.empty())
+      return time_point::min();
   }
   {
     std::lock_guard<std::mutex> lock(delayed_mutex_);
@@ -80,27 +81,29 @@ display::time_point display::next_job_time_point() {
   return result;
 }
 
-void display::tick_posted(display::time_point _now) {
+void display::tick_posted(time_point _now) {
   decltype(posted_jobs_) tmp;
   {
     std::lock_guard<std::mutex> lock(posted_mutex_);
     tmp.swap(posted_jobs_);
   }
 
-  for (const auto &job : tmp) job(_now);
+  for (const auto &job : tmp)
+    job(_now);
 }
 
-void display::tick_overridable(display::time_point _now) {
+void display::tick_overridable(time_point _now) {
   decltype(overridable_jobs_) tmp;
   {
     std::lock_guard<std::mutex> lock(overridable_mutex_);
     tmp.swap(overridable_jobs_);
   }
 
-  for (const auto &job : tmp) job.second(_now);
+  for (const auto &job : tmp)
+    job.second(_now);
 }
 
-void display::tick_delayed(display::time_point _now) {
+void display::tick_delayed(time_point _now) {
   decltype(delayed_jobs_) tmp;
   {
     std::lock_guard<std::mutex> lock(delayed_mutex_);
@@ -108,14 +111,16 @@ void display::tick_delayed(display::time_point _now) {
   }
 
   for (auto it = tmp.begin(); it != tmp.end();) {
-    if (it->first > _now) break;
+    if (it->first > _now)
+      break;
     it->second(_now);
     it = tmp.erase(it);
   }
 
   {
     std::lock_guard<std::mutex> lock(delayed_mutex_);
-    for (const auto &due : tmp) delayed_jobs_.insert(due);
+    for (const auto &due : tmp)
+      delayed_jobs_.insert(due);
   }
 }
 
@@ -126,8 +131,7 @@ void display::jobs_loop() {
     cv_.wait(lk);
   } else if (next != time_point::min()) {
     std::unique_lock<std::mutex> lk(cv_mutex_);
-    std::chrono::duration<double, std::milli> wait =
-        next - display::clock::now();
+    std::chrono::duration<double, std::milli> wait = next - display::clock::now();
     cv_.wait_until(lk, next);
   }
 
@@ -135,16 +139,14 @@ void display::jobs_loop() {
   tick_overridable(now);
   tick_posted(now);
   tick_delayed(now);
-  std::chrono::duration<double, std::milli> duration =
-      display::clock::now() - now;
+  std::chrono::duration<double, std::milli> duration = display::clock::now() - now;
   // if (duration > std::chrono::milliseconds(16))
   // std::cout << "Jobs done in " << duration.count() << "ms" << std::endl;
 }
 
 struct score_t {
   constexpr static uint32_t bad_id = std::numeric_limits<uint32_t>::max();
-  uint32_t iqueueg_ = bad_id, iqueuec_ = bad_id, iqueuet_ = bad_id,
-           iqueuep_ = bad_id;
+  uint32_t iqueueg_ = bad_id, iqueuec_ = bad_id, iqueuet_ = bad_id, iqueuep_ = bad_id;
   uint score_ = 0;
 };
 
@@ -156,17 +158,13 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
   vkGetPhysicalDeviceProperties(_device, &properties);
   vkGetPhysicalDeviceFeatures(_device, &features);
 
-  result.score_ = properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
-                      ? 1000
-                      : 100;
+  result.score_ = properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? 1000 : 100;
   result.score_ += properties.limits.maxImageDimension2D;
 
   uint32_t extension_count;
-  vkEnumerateDeviceExtensionProperties(_device, nullptr, &extension_count,
-                                       nullptr);
+  vkEnumerateDeviceExtensionProperties(_device, nullptr, &extension_count, nullptr);
   std::vector<VkExtensionProperties> available_extensions(extension_count);
-  vkEnumerateDeviceExtensionProperties(_device, nullptr, &extension_count,
-                                       available_extensions.data());
+  vkEnumerateDeviceExtensionProperties(_device, nullptr, &extension_count, available_extensions.data());
   std::cout << "\tAvailable device extension:" << std::endl;
   bool has_swapchhain_ext = false;
   for (const auto &extension : available_extensions) {
@@ -177,11 +175,9 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
 
   if (has_swapchhain_ext) {
     uint32_t famillies_count;
-    vkGetPhysicalDeviceQueueFamilyProperties(_device, &famillies_count,
-                                             nullptr);
+    vkGetPhysicalDeviceQueueFamilyProperties(_device, &famillies_count, nullptr);
     std::vector<VkQueueFamilyProperties> famillies(famillies_count);
-    vkGetPhysicalDeviceQueueFamilyProperties(_device, &famillies_count,
-                                             famillies.data());
+    vkGetPhysicalDeviceQueueFamilyProperties(_device, &famillies_count, famillies.data());
 
     std::cout << "\tAvailable queue famillies:" << std::endl;
     for (uint32_t i = 0; i < famillies_count; i++) {
@@ -189,32 +185,26 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
       VkBool32 present;
       vkGetPhysicalDeviceSurfaceSupportKHR(_device, i, _dummy, &present);
 
-      std::cout << "\t\tcount:" << props.queueCount
-                << ", flags: " << props.queueFlags << ", present: " << present
+      std::cout << "\t\tcount:" << props.queueCount << ", flags: " << props.queueFlags << ", present: " << present
                 << std::endl;
 
       if (props.queueCount > 0) {
         // prioritise dedicated queues
-        if (props.queueFlags & VK_QUEUE_GRAPHICS_BIT &&
-            (props.queueFlags & (uint)~VK_QUEUE_GRAPHICS_BIT) == 0)
+        if (props.queueFlags & VK_QUEUE_GRAPHICS_BIT && (props.queueFlags & (uint)~VK_QUEUE_GRAPHICS_BIT) == 0)
           result.iqueueg_ = i;
-        else if (props.queueFlags & VK_QUEUE_COMPUTE_BIT &&
-                 (props.queueFlags & (uint)~VK_QUEUE_COMPUTE_BIT) == 0)
+        else if (props.queueFlags & VK_QUEUE_COMPUTE_BIT && (props.queueFlags & (uint)~VK_QUEUE_COMPUTE_BIT) == 0)
           result.iqueuec_ = i;
-        else if (props.queueFlags & VK_QUEUE_TRANSFER_BIT &&
-                 (props.queueFlags & (uint)~VK_QUEUE_TRANSFER_BIT) == 0)
+        else if (props.queueFlags & VK_QUEUE_TRANSFER_BIT && (props.queueFlags & (uint)~VK_QUEUE_TRANSFER_BIT) == 0)
           result.iqueuet_ = i;
 
-        if (result.iqueueg_ == score_t::bad_id &&
-            props.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+        if (result.iqueueg_ == score_t::bad_id && props.queueFlags & VK_QUEUE_GRAPHICS_BIT)
           result.iqueueg_ = i;
-        if (result.iqueuec_ == score_t::bad_id &&
-            props.queueFlags & VK_QUEUE_COMPUTE_BIT)
+        if (result.iqueuec_ == score_t::bad_id && props.queueFlags & VK_QUEUE_COMPUTE_BIT)
           result.iqueuec_ = i;
-        if (result.iqueuet_ == score_t::bad_id &&
-            props.queueFlags & VK_QUEUE_TRANSFER_BIT)
+        if (result.iqueuet_ == score_t::bad_id && props.queueFlags & VK_QUEUE_TRANSFER_BIT)
           result.iqueuet_ = i;
-        if (result.iqueuep_ == score_t::bad_id && present) result.iqueuep_ = i;
+        if (result.iqueuep_ == score_t::bad_id && present)
+          result.iqueuep_ = i;
       }
     }
 
@@ -222,10 +212,8 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_device, _dummy, &capabilities);
 
     uint32_t formats_count, modes_count;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(_device, _dummy, &formats_count,
-                                         nullptr);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(_device, _dummy, &modes_count,
-                                              nullptr);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(_device, _dummy, &formats_count, nullptr);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(_device, _dummy, &modes_count, nullptr);
 
     if (formats_count == 0) {
       std::cout << "\teliminated, no formats" << std::endl;
@@ -260,10 +248,10 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
   return result;
 }
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
-    VkDebugReportFlagsEXT /*flags*/, VkDebugReportObjectTypeEXT /*objType*/,
-    uint64_t /*obj*/, size_t /*location*/, int32_t /*code*/,
-    const char *layerPrefix, const char *msg, void * /*userData*/) {
+static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT /*flags*/,
+                                                     VkDebugReportObjectTypeEXT /*objType*/, uint64_t /*obj*/,
+                                                     size_t /*location*/, int32_t /*code*/, const char *layerPrefix,
+                                                     const char *msg, void * /*userData*/) {
   std::cout << '[' << layerPrefix << "] " << msg << std::endl;
 
   return VK_FALSE;
@@ -282,15 +270,13 @@ void display::init_vulkan_instance(const char *_app_name, uint32_t _app_version,
   uint32_t extension_count;
   vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr);
   std::vector<VkExtensionProperties> available_extensions(extension_count);
-  vkEnumerateInstanceExtensionProperties(nullptr, &extension_count,
-                                         available_extensions.data());
+  vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, available_extensions.data());
   std::cout << "Available vulkan extension:" << std::endl;
   bool has_debug_ext = false;
   for (const auto &extension : available_extensions) {
     std::cout << '\t' << extension.extensionName << std::endl;
 #ifndef NDEBUG
-    if (strcmp(extension.extensionName, VK_EXT_DEBUG_REPORT_EXTENSION_NAME) ==
-        0)
+    if (strcmp(extension.extensionName, VK_EXT_DEBUG_REPORT_EXTENSION_NAME) == 0)
       has_debug_ext = true;
 #endif
   }
@@ -316,22 +302,20 @@ void display::init_vulkan_instance(const char *_app_name, uint32_t _app_version,
 
   VkResult result = vkCreateInstance(&info, nullptr, &instance_);
   if (result != VK_SUCCESS)
-    throw std::runtime_error(
-        sstream("Couldn't create a vulkan instance, code: ") << result);
+    throw std::runtime_error(sstream("Couldn't create a vulkan instance, code: ") << result);
 
   if (has_debug_ext) {
     VkDebugReportCallbackCreateInfoEXT dinfo = {};
     dinfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
-    dinfo.flags =
-        VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
+    dinfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
 #ifndef NDEBUG
     dinfo.flags |= VK_DEBUG_REPORT_DEBUG_BIT_EXT;
 #endif
     dinfo.pfnCallback = debug_callback;
 
-    auto func = get_proc<PFN_vkCreateDebugReportCallbackEXT>(
-        "vkCreateDebugReportCallbackEXT");
-    if (func != nullptr) func(instance_, &dinfo, nullptr, &debug_cb_);
+    auto func = get_proc<PFN_vkCreateDebugReportCallbackEXT>("vkCreateDebugReportCallbackEXT");
+    if (func != nullptr)
+      func(instance_, &dinfo, nullptr, &debug_cb_);
   }
 }
 
@@ -397,8 +381,7 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
 
   VkResult result = vkCreateDevice(pdevice_, &device_info, nullptr, &device_);
   if (result != VK_SUCCESS)
-    throw std::runtime_error(sstream("Couldn't create a vulkan device, code: ")
-                             << result);
+    throw std::runtime_error(sstream("Couldn't create a vulkan device, code: ") << result);
 
   vkGetDeviceQueue(device_, prefered_rate.iqueueg_, 0, &queueg_);
   vkGetDeviceQueue(device_, prefered_rate.iqueuec_, 0, &queuec_);
@@ -410,28 +393,12 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   poolInfo.queueFamilyIndex = prefered_rate.iqueueg_;
   poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-  if (vkCreateCommandPool(device_, &poolInfo, nullptr, &commandg_pool_) !=
-      VK_SUCCESS) {
+  if (vkCreateCommandPool(device_, &poolInfo, nullptr, &commandg_pool_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create command pool!");
   }
 
-  VkDescriptorPoolSize poolSize = {};
-  poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  poolSize.descriptorCount = 1;
-
-  VkDescriptorPoolCreateInfo descPoolInfo = {};
-  descPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-  descPoolInfo.poolSizeCount = 1;
-  descPoolInfo.pPoolSizes = &poolSize;
-  descPoolInfo.maxSets = 1;
-
-  if (vkCreateDescriptorPool(device_, &descPoolInfo, nullptr,
-                             &descriptor_pool_) != VK_SUCCESS)
-    throw std::runtime_error("failed to create descriptor pool!");
-
   staging_ = std::make_shared<buffer>(*this, 8 * 1024,
-                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                       VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
   VkCommandBufferAllocateInfo allocInfo = {};
@@ -455,29 +422,28 @@ void display::destroy_vulkan() {
   staging_.reset();
   vkFreeCommandBuffers(device_, commandg_pool_, 1, &staging_cb_);
 
-  vkDestroyDescriptorPool(device_, descriptor_pool_, nullptr);
-
   if (commandg_pool_ != VK_NULL_HANDLE)
     vkDestroyCommandPool(device_, commandg_pool_, nullptr);
 
-  if (device_ != VK_NULL_HANDLE) vkDestroyDevice(device_, nullptr);
+  if (device_ != VK_NULL_HANDLE)
+    vkDestroyDevice(device_, nullptr);
 
   if (debug_cb_ != VK_NULL_HANDLE) {
-    auto func = get_proc<PFN_vkDestroyDebugReportCallbackEXT>(
-        "vkDestroyDebugReportCallbackEXT");
-    if (func != nullptr) func(instance_, debug_cb_, nullptr);
+    auto func = get_proc<PFN_vkDestroyDebugReportCallbackEXT>("vkDestroyDebugReportCallbackEXT");
+    if (func != nullptr)
+      func(instance_, debug_cb_, nullptr);
   }
 
-  if (instance_ != VK_NULL_HANDLE) vkDestroyInstance(instance_, nullptr);
+  if (instance_ != VK_NULL_HANDLE)
+    vkDestroyInstance(instance_, nullptr);
 }
 
-std::pair<uint32_t, VkMemoryPropertyFlags> display::find_memory_type(
-    uint32_t typeFilter, VkMemoryPropertyFlags properties) {
-  check_thread();
+std::pair<uint32_t, VkMemoryPropertyFlags> display::find_memory_type(uint32_t typeFilter,
+                                                                     VkMemoryPropertyFlags properties) {
+  // check_thread();
 
   for (uint32_t i = 0; i < mem_props_.memoryTypeCount; i++) {
-    if ((typeFilter & (1 << i)) &&
-        (mem_props_.memoryTypes[i].propertyFlags & properties) == properties) {
+    if ((typeFilter & (1 << i)) && (mem_props_.memoryTypes[i].propertyFlags & properties) == properties) {
       return {i, mem_props_.memoryTypes[i].propertyFlags};
     }
   }
@@ -486,17 +452,78 @@ std::pair<uint32_t, VkMemoryPropertyFlags> display::find_memory_type(
 }
 
 void display::check_thread() {
-  assert(std::this_thread::get_id() == dispatcher_ ||
-         dispatcher_ == std::thread::id());
+  assert(std::this_thread::get_id() == dispatcher_ || dispatcher_ == std::thread::id());
 }
 
-void display::stage_update(VkBuffer _src, VkBufferCopy *_info) {
-  vkCmdCopyBuffer(staging_cb_, staging_->buffer_, _src, 1, _info);
+void display::stage_copy(VkBuffer _dst, const VkBufferCopy *_info) {
   dirty_staging_ = true;
+  vkCmdCopyBuffer(staging_cb_, staging_->buffer_, _dst, 1, _info);
 }
 
-void display::flush_staged_copies() {
-  if (!dirty_staging_) return;
+void display::stage_copy(VkBuffer _src, VkBuffer _dst, const VkBufferCopy *_info) {
+  dirty_staging_ = true;
+  vkCmdCopyBuffer(staging_cb_, _src, _dst, 1, _info);
+}
+
+void display::stage_transition(VkImage _image, VkFormat _format, VkImageLayout _old_layout, VkImageLayout _new_layout) {
+  dirty_staging_ = true;
+
+  VkImageMemoryBarrier barrier = {};
+  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  barrier.oldLayout = _old_layout;
+  barrier.newLayout = _new_layout;
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.image = _image;
+  barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  barrier.subresourceRange.baseMipLevel = 0;
+  barrier.subresourceRange.levelCount = 1;
+  barrier.subresourceRange.baseArrayLayer = 0;
+  barrier.subresourceRange.layerCount = 1;
+
+  if (_old_layout == VK_IMAGE_LAYOUT_PREINITIALIZED && _new_layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+    barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+  } else if (_old_layout == VK_IMAGE_LAYOUT_PREINITIALIZED && _new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+    barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+  } else if (_old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+             _new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+  } else {
+    throw std::invalid_argument("unsupported layout transition!");
+  }
+
+  vkCmdPipelineBarrier(staging_cb_, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
+                       0, nullptr, 1, &barrier);
+}
+
+void display::stage_copy(VkImage srcImage, VkImage dstImage, uint32_t width, uint32_t height) {
+  dirty_staging_ = true;
+
+  VkImageSubresourceLayers subResource = {};
+  subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  subResource.baseArrayLayer = 0;
+  subResource.mipLevel = 0;
+  subResource.layerCount = 1;
+
+  VkImageCopy region = {};
+  region.srcSubresource = subResource;
+  region.dstSubresource = subResource;
+  region.srcOffset = {0, 0, 0};
+  region.dstOffset = {0, 0, 0};
+  region.extent.width = width;
+  region.extent.height = height;
+  region.extent.depth = 1;
+
+  vkCmdCopyImage(staging_cb_, srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImage,
+                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+}
+
+void display::flush_staged() {
+  if (!dirty_staging_)
+    return;
 
   vkEndCommandBuffer(staging_cb_);
 
@@ -507,10 +534,13 @@ void display::flush_staged_copies() {
 
   vkQueueSubmit(queueg_, 1, &submitInfo, VK_NULL_HANDLE);
 
-  staging_->clear();
+  staging_->clear_ranges();
   dirty_staging_ = false;
 
   vkQueueWaitIdle(queueg_);
+
+  on_staged.fire();
+  on_staged.clear();
 
   VkCommandBufferBeginInfo beginInfo = {};
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
