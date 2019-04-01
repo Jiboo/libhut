@@ -60,8 +60,11 @@ class display {
   friend class image;
   friend class sampler;
   friend class noinput;
-  friend class colored_triangle_list;
-  friend class coltex_triangle_list;
+  friend class rgb;
+  friend class rgba;
+  friend class tex;
+  friend class rgb_tex;
+  friend class rgba_tex;
 
  public:
   using clock = std::chrono::steady_clock;
@@ -74,6 +77,7 @@ class display {
   ~display();
 
   void flush();
+  void flush_staged();
   int dispatch();
 
   void post(callback _callback);
@@ -103,6 +107,8 @@ class display {
   VkPhysicalDevice pdevice_;
   uint32_t iqueueg_, iqueuec_, iqueuet_, iqueuep_;
   VkDevice device_ = VK_NULL_HANDLE;
+  VkPhysicalDeviceFeatures device_features_;
+  VkPhysicalDeviceProperties device_props_;
   VkQueue queueg_, queuec_, queuet_, queuep_;
   VkCommandPool commandg_pool_ = VK_NULL_HANDLE;
   VkPhysicalDeviceMemoryProperties mem_props_;
@@ -127,7 +133,6 @@ class display {
   void stage_copy(VkBuffer _dst, const VkBufferCopy *_info);
   void stage_transition(VkImage _image, VkFormat _format, VkImageLayout _old_layout, VkImageLayout _new_layout);
   void stage_copy(VkImage _src, VkImage _dst, uint32_t _width, uint32_t _height);
-  void flush_staged();
   void destroy_vulkan();
 
   time_point next_job_time_point();

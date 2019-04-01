@@ -40,8 +40,11 @@ class display;
 
 class image {
   friend class display;
-  friend class colored_triangle_list;
-  friend class coltex_triangle_list;
+  friend class rgb;
+  friend class rgba;
+  friend class tex;
+  friend class rgb_tex;
+  friend class rgba_tex;
 
  public:
   static std::shared_ptr<image> load_png(display &, const uint8_t *_data, size_t _size);

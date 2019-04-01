@@ -36,21 +36,32 @@ using namespace hut;
 buffer::buffer(display &_display, uint32_t _size, VkMemoryPropertyFlags _type, VkBufferUsageFlagBits _usage)
     : display_(_display), size_(_size), usage_(_usage) {
   ranges_.insert(range_t{0, _size, false});
+  init(_size, _type, _usage);
+}
 
+buffer::~buffer() {
+  if (memory_ != 0)
+    vkFreeMemory(display_.device_, memory_, nullptr);
+  if (buffer_ != 0)
+    vkDestroyBuffer(display_.device_, buffer_, nullptr);
+}
+
+
+void buffer::init(uint32_t _size, VkMemoryPropertyFlags _type, VkBufferUsageFlagBits _usage) {
   VkBufferCreateInfo bufferInfo = {};
   bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   bufferInfo.size = _size;
   bufferInfo.usage = _usage;
   bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-  if (vkCreateBuffer(_display.device_, &bufferInfo, nullptr, &buffer_) != VK_SUCCESS) {
+  if (vkCreateBuffer(display_.device_, &bufferInfo, nullptr, &buffer_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create vertex buffer!");
   }
 
   VkMemoryRequirements memRequirements;
-  vkGetBufferMemoryRequirements(_display.device_, buffer_, &memRequirements);
+  vkGetBufferMemoryRequirements(display_.device_, buffer_, &memRequirements);
 
-  auto type = _display.find_memory_type(memRequirements.memoryTypeBits, _type);
+  auto type = display_.find_memory_type(memRequirements.memoryTypeBits, _type);
 
   VkMemoryAllocateInfo allocInfo = {};
   allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -58,16 +69,11 @@ buffer::buffer(display &_display, uint32_t _size, VkMemoryPropertyFlags _type, V
   allocInfo.memoryTypeIndex = type.first;
   type_ = type.second;
 
-  if (vkAllocateMemory(_display.device_, &allocInfo, nullptr, &memory_) != VK_SUCCESS) {
-    vkDestroyBuffer(_display.device_, buffer_, nullptr);
+  if (vkAllocateMemory(display_.device_, &allocInfo, nullptr, &memory_) != VK_SUCCESS) {
+    vkDestroyBuffer(display_.device_, buffer_, nullptr);
     throw std::runtime_error("failed to allocate vertex buffer memory!");
   }
   vkBindBufferMemory(display_.device_, buffer_, memory_, 0);
-}
-
-buffer::~buffer() {
-  vkFreeMemory(display_.device_, memory_, nullptr);
-  vkDestroyBuffer(display_.device_, buffer_, nullptr);
 }
 
 void buffer::update(uint32_t _offset, uint32_t _size, const void *_data) {
@@ -92,22 +98,35 @@ void buffer::update(uint32_t _offset, uint32_t _size, const void *_data) {
   }
 }
 
-void buffer::copy_from(buffer &_other, uint32_t _other_offset, uint32_t _this_offset, uint32_t _size) {
+void buffer::copy_from(VkBuffer _other, uint32_t _other_offset, uint32_t _this_offset, uint32_t _size) {
   VkBufferCopy copyRegion = {};
   copyRegion.srcOffset = _other_offset;
   copyRegion.dstOffset = _this_offset;
   copyRegion.size = _size;
 
-  display_.stage_copy(_other.buffer_, buffer_, &copyRegion);
+  display_.stage_copy(_other, buffer_, &copyRegion);
+}
+
+void buffer::copy_from(buffer &_other, uint32_t _other_offset, uint32_t _this_offset, uint32_t _size) {
+  copy_from(_other.buffer_, _other_offset, _this_offset, _size);
 }
 
 void buffer::grow(uint32_t new_size) {
   assert(new_size > size_);
 
-  buffer newbuf(display_, new_size, type_, usage_);
-  newbuf.copy_from(*this, 0, 0, size_);
-  std::swap(buffer_, newbuf.buffer_);
-  std::swap(memory_, newbuf.memory_);
+  VkBuffer old_buff = buffer_;
+  VkDeviceMemory old_mem = memory_;
+  uint32_t old_size = size_;
+
+  init(new_size, type_, usage_);
+  copy_from(old_buff, 0, 0, size_);
+
+  VkDevice dev = display_.device_;
+  display_.on_staged.once([dev, old_buff, old_mem] {
+    vkFreeMemory(dev, old_mem, nullptr);
+    vkDestroyBuffer(dev, old_buff, nullptr);
+    return true;
+  });
 
   auto last = ranges_.rbegin();
   if (last->allocated_) {

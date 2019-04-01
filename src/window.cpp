@@ -118,11 +118,12 @@ void window::init_vulkan_surface() {
   std::vector<VkPresentModeKHR> modes(modes_count);
   vkGetPhysicalDeviceSurfacePresentModesKHR(pdevice, surface_, &modes_count, modes.data());
   present_mode_ = VK_PRESENT_MODE_FIFO_KHR;
-  for (const auto &it : modes) {
+  // NOTE JB: We don't really need 10k fps, force fifo for now
+  /*for (const auto &it : modes) {
     if (it == VK_PRESENT_MODE_MAILBOX_KHR) {
       present_mode_ = it;
     }
-  }
+  }*/
 
   if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
     swapchain_extents_ = capabilities.currentExtent;
@@ -297,12 +298,6 @@ void window::init_vulkan_surface() {
   for (size_t i = 0; i < dirty_.size(); i++)
     dirty_[i] = true;
   dirty_.resize(images_count, true);
-
-#if !defined(NDEBUG) && 1
-  std::cout << "Surface creation took "
-            << std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() << "ms"
-            << std::endl;
-#endif
 }
 
 void window::redraw(display::time_point _tp) {
@@ -428,7 +423,7 @@ void window::rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
   renderPassInfo.renderArea.offset = {0, 0};
   renderPassInfo.renderArea.extent = swapchain_extents_;
 
-  VkClearValue clearColor = {clear_color_.r, clear_color_.r, clear_color_.b, clear_color_.a};
+  VkClearValue clearColor = {clear_color_.r, clear_color_.g, clear_color_.b, clear_color_.a};
   renderPassInfo.clearValueCount = 1;
   renderPassInfo.pClearValues = &clearColor;
 

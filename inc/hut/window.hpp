@@ -50,6 +50,7 @@ enum mouse_event_type { MDOWN, MUP, MMOVE, MENTER, MLEAVE, MWHEEL_UP, MWHEEL_DOW
 
 enum keysym : char32_t {
   KENUM_START = 0xffffff00,
+  KTAB,
   KALT_LEFT,
   KALT_RIGHT,
   KCTRL_LEFT,
@@ -89,8 +90,11 @@ class display;
 class window {
   friend class display;
   friend class noinput;
-  friend class colored_triangle_list;
-  friend class coltex_triangle_list;
+  friend class rgb;
+  friend class rgba;
+  friend class tex;
+  friend class rgb_tex;
+  friend class rgba_tex;
 
  public:
   event<> on_pause, on_resume, on_focus, on_blur, on_close;

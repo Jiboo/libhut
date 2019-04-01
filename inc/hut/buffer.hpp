@@ -40,8 +40,11 @@ class display;
 
 class buffer {
   friend class display;
-  friend class colored_triangle_list;
-  friend class coltex_triangle_list;
+  friend class rgb;
+  friend class rgba;
+  friend class tex;
+  friend class rgb_tex;
+  friend class rgba_tex;
 
  public:
   struct range_t {
@@ -120,6 +123,8 @@ class buffer {
 
   std::set<range_t> ranges_;
 
+  void init(uint32_t _size, VkMemoryPropertyFlags _type, VkBufferUsageFlagBits _usage);
+  void copy_from(VkBuffer _other, uint32_t _other_offset, uint32_t _this_offset, uint32_t _size);
   void grow(uint32_t new_size);
   range_t do_alloc(uint32_t _size);
   void do_free(uint32_t _offset, uint32_t _size);

@@ -165,10 +165,10 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
   vkEnumerateDeviceExtensionProperties(_device, nullptr, &extension_count, nullptr);
   std::vector<VkExtensionProperties> available_extensions(extension_count);
   vkEnumerateDeviceExtensionProperties(_device, nullptr, &extension_count, available_extensions.data());
-  std::cout << "\tAvailable device extension:" << std::endl;
+  //std::cout << "\tAvailable device extension:" << std::endl;
   bool has_swapchhain_ext = false;
   for (const auto &extension : available_extensions) {
-    std::cout << "\t\t" << extension.extensionName << std::endl;
+    //std::cout << "\t\t" << extension.extensionName << std::endl;
     if (strcmp(extension.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0)
       has_swapchhain_ext = true;
   }
@@ -179,14 +179,14 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
     std::vector<VkQueueFamilyProperties> famillies(famillies_count);
     vkGetPhysicalDeviceQueueFamilyProperties(_device, &famillies_count, famillies.data());
 
-    std::cout << "\tAvailable queue famillies:" << std::endl;
+    //std::cout << "\tAvailable queue famillies:" << std::endl;
     for (uint32_t i = 0; i < famillies_count; i++) {
       const VkQueueFamilyProperties &props = famillies[i];
       VkBool32 present;
       vkGetPhysicalDeviceSurfaceSupportKHR(_device, i, _dummy, &present);
 
-      std::cout << "\t\tcount:" << props.queueCount << ", flags: " << props.queueFlags << ", present: " << present
-                << std::endl;
+      /*std::cout << "\t\tcount:" << props.queueCount << ", flags: " << props.queueFlags << ", present: " << present
+                << std::endl;*/
 
       if (props.queueCount > 0) {
         // prioritise dedicated queues
@@ -271,10 +271,10 @@ void display::init_vulkan_instance(const char *_app_name, uint32_t _app_version,
   vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr);
   std::vector<VkExtensionProperties> available_extensions(extension_count);
   vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, available_extensions.data());
-  std::cout << "Available vulkan extension:" << std::endl;
+  //std::cout << "Available vulkan extension:" << std::endl;
   bool has_debug_ext = false;
   for (const auto &extension : available_extensions) {
-    std::cout << '\t' << extension.extensionName << std::endl;
+    //std::cout << '\t' << extension.extensionName << std::endl;
 #ifndef NDEBUG
     if (strcmp(extension.extensionName, VK_EXT_DEBUG_REPORT_EXTENSION_NAME) == 0)
       has_debug_ext = true;
@@ -327,10 +327,10 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
 
   VkPhysicalDevice prefered_device = VK_NULL_HANDLE;
   score_t prefered_rate;
-  std::cout << "Available vulkan devices:" << std::endl;
+  //std::cout << "Available vulkan devices:" << std::endl;
   for (VkPhysicalDevice &device : physical_devices) {
     score_t rate = rate_p_device(device, _dummy);
-    std::cout << '\t' << device << ", scored: " << rate.score_ << std::endl;
+    //std::cout << '\t' << device << ", scored: " << rate.score_ << std::endl;
     if (rate.score_ > prefered_rate.score_) {
       prefered_rate = rate;
       prefered_device = device;
@@ -338,6 +338,9 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   }
   if (prefered_device == VK_NULL_HANDLE)
     throw std::runtime_error("No suitable vulkan devices");
+
+  vkGetPhysicalDeviceProperties(prefered_device, &device_props_);
+  vkGetPhysicalDeviceFeatures(prefered_device, &device_features_);
 
   pdevice_ = prefered_device;
   iqueueg_ = prefered_rate.iqueueg_;
@@ -481,22 +484,29 @@ void display::stage_transition(VkImage _image, VkFormat _format, VkImageLayout _
   barrier.subresourceRange.baseArrayLayer = 0;
   barrier.subresourceRange.layerCount = 1;
 
+  VkPipelineStageFlagBits srcStage, dstStage;
+
   if (_old_layout == VK_IMAGE_LAYOUT_PREINITIALIZED && _new_layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    srcStage = VK_PIPELINE_STAGE_HOST_BIT;
+    dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
   } else if (_old_layout == VK_IMAGE_LAYOUT_PREINITIALIZED && _new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    srcStage = VK_PIPELINE_STAGE_HOST_BIT;
+    dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
   } else if (_old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
              _new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
   } else {
     throw std::invalid_argument("unsupported layout transition!");
   }
 
-  vkCmdPipelineBarrier(staging_cb_, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
-                       0, nullptr, 1, &barrier);
+  vkCmdPipelineBarrier(staging_cb_, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
 void display::stage_copy(VkImage srcImage, VkImage dstImage, uint32_t width, uint32_t height) {

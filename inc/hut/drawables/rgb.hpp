@@ -38,7 +38,7 @@
 
 namespace hut {
 
-class coltex_triangle_list {
+class rgb {
  private:
   window &window_;
   VkShaderModule vert_ = VK_NULL_HANDLE;
@@ -53,35 +53,26 @@ class coltex_triangle_list {
   struct vertex {
     glm::vec2 pos;
     glm::vec3 color;
-    glm::vec2 texcoords;
 
     static VkVertexInputBindingDescription binding_desc() {
-      VkVertexInputBindingDescription bindingDescription = {};
-      bindingDescription.binding = 0;
-      bindingDescription.stride = sizeof(vertex);
-      bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+      VkVertexInputBindingDescription desc = {};
+      desc.binding = 0;
+      desc.stride = sizeof(vertex);
+      desc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-      return bindingDescription;
+      return desc;
     }
-    static std::array<VkVertexInputAttributeDescription, 3> attributes_desc() {
-      std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions = {};
-
-      attributeDescriptions[0].binding = 0;
-      attributeDescriptions[0].location = 0;
-      attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
-      attributeDescriptions[0].offset = offsetof(vertex, pos);
-
-      attributeDescriptions[1].binding = 0;
-      attributeDescriptions[1].location = 1;
-      attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-      attributeDescriptions[1].offset = offsetof(vertex, color);
-
-      attributeDescriptions[2].binding = 0;
-      attributeDescriptions[2].location = 2;
-      attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-      attributeDescriptions[2].offset = offsetof(vertex, texcoords);
-
-      return attributeDescriptions;
+    static std::array<VkVertexInputAttributeDescription, 2> attributes_desc() {
+      std::array<VkVertexInputAttributeDescription, 2> descs = {};
+      descs[0].binding = 0;
+      descs[0].location = 0;
+      descs[0].format = VK_FORMAT_R32G32_SFLOAT;
+      descs[0].offset = offsetof(vertex, pos);
+      descs[1].binding = 0;
+      descs[1].location = 1;
+      descs[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+      descs[1].offset = offsetof(vertex, color);
+      return descs;
     }
   };
 
@@ -91,73 +82,62 @@ class coltex_triangle_list {
     glm::mat4 proj;
   };
 
-  coltex_triangle_list(window &_window) : window_(_window) {
+  rgb(window &_window) : window_(_window) {
     VkDevice device = _window.display_.device_;
     const glm::uvec2 &size = _window.size_;
 
-    std::array<VkDescriptorPoolSize, 2> poolSizes = {};
-    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = 1;
-    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = 1;
+    VkDescriptorPoolSize pool_sizes = {};
+    pool_sizes.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    pool_sizes.descriptorCount = 1;
 
-    VkDescriptorPoolCreateInfo descPoolInfo = {};
-    descPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    descPoolInfo.poolSizeCount = (uint32_t)poolSizes.size();
-    descPoolInfo.pPoolSizes = poolSizes.data();
-    descPoolInfo.maxSets = 1;
+    VkDescriptorPoolCreateInfo pool_info = {};
+    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.poolSizeCount = 1;
+    pool_info.pPoolSizes = &pool_sizes;
+    pool_info.maxSets = 1;
 
-    if (vkCreateDescriptorPool(device, &descPoolInfo, nullptr, &descriptor_pool_) != VK_SUCCESS)
+    if (vkCreateDescriptorPool(device, &pool_info, nullptr, &descriptor_pool_) != VK_SUCCESS)
       throw std::runtime_error("failed to create descriptor pool!");
 
-    VkDescriptorSetLayoutBinding uboLayoutBinding = {};
-    uboLayoutBinding.binding = 0;
-    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uboLayoutBinding.descriptorCount = 1;
-    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    uboLayoutBinding.pImmutableSamplers = nullptr;
+    VkDescriptorSetLayoutBinding ubo_binding = {};
+    ubo_binding.binding = 0;
+    ubo_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    ubo_binding.descriptorCount = 1;
+    ubo_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    ubo_binding.pImmutableSamplers = nullptr;
 
-    VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
-    samplerLayoutBinding.binding = 1;
-    samplerLayoutBinding.descriptorCount = 1;
-    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    samplerLayoutBinding.pImmutableSamplers = nullptr;
-    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    VkDescriptorSetLayoutCreateInfo layout_info = {};
+    layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layout_info.bindingCount = 1;
+    layout_info.pBindings = &ubo_binding;
 
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings = {uboLayoutBinding, samplerLayoutBinding};
-
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = (uint32_t)bindings.size();
-    layoutInfo.pBindings = bindings.data();
-
-    if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptor_layout_) != VK_SUCCESS)
+    if (vkCreateDescriptorSetLayout(device, &layout_info, nullptr, &descriptor_layout_) != VK_SUCCESS)
       throw std::runtime_error("failed to create descriptor set layout!");
 
-    VkDescriptorSetLayout setLayouts[] = {descriptor_layout_};
-    VkDescriptorSetAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = descriptor_pool_;
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = setLayouts;
+    VkDescriptorSetLayout layouts[] = {descriptor_layout_};
+    VkDescriptorSetAllocateInfo alloc_info = {};
+    alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    alloc_info.descriptorPool = descriptor_pool_;
+    alloc_info.descriptorSetCount = 1;
+    alloc_info.pSetLayouts = layouts;
 
-    if (vkAllocateDescriptorSets(device, &allocInfo, &descriptor_) != VK_SUCCESS) {
+    if (vkAllocateDescriptorSets(device, &alloc_info, &descriptor_) != VK_SUCCESS) {
       throw std::runtime_error("failed to allocate descriptor set!");
     }
 
-    auto vertShaderCode = __spv::coltex_triangle_list_vert_spv;
-    auto fragShaderCode = __spv::coltex_triangle_list_frag_spv;
+    auto vshader_code = __spv::rgb_vert_spv;
+    auto fshader_code = __spv::rgb_frag_spv;
 
     VkShaderModuleCreateInfo module_info = {};
     module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    module_info.codeSize = vertShaderCode.size();
-    module_info.pCode = (uint32_t *)vertShaderCode.data();
+    module_info.codeSize = vshader_code.size();
+    module_info.pCode = (uint32_t *)vshader_code.data();
 
     if (vkCreateShaderModule(device, &module_info, nullptr, &vert_) != VK_SUCCESS)
       throw std::runtime_error("[sample] failed to create vertex module!");
 
-    module_info.codeSize = fragShaderCode.size();
-    module_info.pCode = (uint32_t *)fragShaderCode.data();
+    module_info.codeSize = fshader_code.size();
+    module_info.pCode = (uint32_t *)fshader_code.data();
 
     if (vkCreateShaderModule(device, &module_info, nullptr, &frag_) != VK_SUCCESS)
       throw std::runtime_error("[sample] failed to create fragment module!");
@@ -174,18 +154,18 @@ class coltex_triangle_list {
     frag_stage_info.module = frag_;
     frag_stage_info.pName = "main";
 
-    VkPipelineShaderStageCreateInfo shaderStages[] = {vert_stage_info, frag_stage_info};
+    VkPipelineShaderStageCreateInfo stages[] = {vert_stage_info, frag_stage_info};
 
-    auto bindingDescription = vertex::binding_desc();
-    auto attributeDescriptions = vertex::attributes_desc();
+    auto bindings = vertex::binding_desc();
+    auto attributes = vertex::attributes_desc();
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
     vertexInputInfo.vertexBindingDescriptionCount = 1;
-    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-    vertexInputInfo.vertexAttributeDescriptionCount = (uint32_t)attributeDescriptions.size();
-    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+    vertexInputInfo.pVertexBindingDescriptions = &bindings;
+    vertexInputInfo.vertexAttributeDescriptionCount = (uint32_t)attributes.size();
+    vertexInputInfo.pVertexAttributeDescriptions = attributes.data();
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -217,7 +197,7 @@ class coltex_triangle_list {
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
     rasterizer.depthBiasEnable = VK_FALSE;
@@ -271,7 +251,7 @@ class coltex_triangle_list {
     pipelineLayoutInfo.pPushConstantRanges = 0;     // Optional
 
     pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = setLayouts;
+    pipelineLayoutInfo.pSetLayouts = layouts;
 
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &layout_) != VK_SUCCESS)
       throw std::runtime_error("[sample] failed to create pipeline layout!");
@@ -279,7 +259,7 @@ class coltex_triangle_list {
     VkGraphicsPipelineCreateInfo pipelineInfo = {};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = shaderStages;
+    pipelineInfo.pStages = stages;
     pipelineInfo.pVertexInputState = &vertexInputInfo;
     pipelineInfo.pInputAssemblyState = &inputAssembly;
     pipelineInfo.pViewportState = &viewportState;
@@ -287,7 +267,7 @@ class coltex_triangle_list {
     pipelineInfo.pMultisampleState = &multisampling;
     pipelineInfo.pDepthStencilState = nullptr;  // Optional
     pipelineInfo.pColorBlendState = &colorBlending;
-    pipelineInfo.pDynamicState = nullptr;  // Optional
+    pipelineInfo.pDynamicState = &dynamicState;  // Optional
     pipelineInfo.layout = layout_;
     pipelineInfo.renderPass = window_.renderpass_;
     pipelineInfo.subpass = 0;
@@ -299,7 +279,7 @@ class coltex_triangle_list {
     }
   }
 
-  ~coltex_triangle_list() {
+  ~rgb() {
     VkDevice device = window_.display_.device_;
     vkDeviceWaitIdle(device);
     if (descriptor_layout_ != VK_NULL_HANDLE)
@@ -347,36 +327,24 @@ class coltex_triangle_list {
     vkCmdDrawIndexed(_buffer, _indices->count(), 1, 0, 0, 0);
   }
 
-  void bind(const shared_ref<ubo> &_ubo, const shared_image &_tex, const sampler &_sampler) {
+  void bind(const shared_ref<ubo> &_ubo) {
     VkDescriptorBufferInfo bufferInfo = {};
     bufferInfo.buffer = _ubo->buffer_.buffer_;
     bufferInfo.offset = _ubo->offset_;
     bufferInfo.range = _ubo->size_;
 
-    VkDescriptorImageInfo imageInfo = {};
-    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo.imageView = _tex->view_;
-    imageInfo.sampler = _sampler.sampler_;
+    VkWriteDescriptorSet descriptorWrite = {};
+    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrite.dstSet = descriptor_;
+    descriptorWrite.dstBinding = 0;
+    descriptorWrite.dstArrayElement = 0;
+    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrite.descriptorCount = 1;
+    descriptorWrite.pBufferInfo = &bufferInfo;
+    descriptorWrite.pImageInfo = nullptr;        // Optional
+    descriptorWrite.pTexelBufferView = nullptr;  // Optional
 
-    std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
-
-    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[0].dstSet = descriptor_;
-    descriptorWrites[0].dstBinding = 0;
-    descriptorWrites[0].dstArrayElement = 0;
-    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorWrites[0].descriptorCount = 1;
-    descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[1].dstSet = descriptor_;
-    descriptorWrites[1].dstBinding = 1;
-    descriptorWrites[1].dstArrayElement = 0;
-    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    descriptorWrites[1].descriptorCount = 1;
-    descriptorWrites[1].pImageInfo = &imageInfo;
-
-    vkUpdateDescriptorSets(window_.display_.device_, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+    vkUpdateDescriptorSets(window_.display_.device_, 1, &descriptorWrite, 0, nullptr);
   }
 };
 

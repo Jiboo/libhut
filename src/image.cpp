@@ -179,6 +179,8 @@ image::image(display &_display, glm::uvec2 _size, VkFormat _format, VkImage _ima
       vkDestroyImage(_display.device_, _image, nullptr);
       return false;
     });
+
+    return false;
   });
 
   VkImageViewCreateInfo viewInfo = {};
@@ -251,8 +253,9 @@ sampler::sampler(display &_display, bool _hiquality) : device_(_display.device_)
   samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
   samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
   samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  samplerInfo.anisotropyEnable = _hiquality ? VK_TRUE : VK_FALSE;
-  samplerInfo.maxAnisotropy = 16;
+  bool enable_filtering = _hiquality && _display.device_features_.samplerAnisotropy;
+  samplerInfo.anisotropyEnable = enable_filtering ? VK_TRUE : VK_FALSE;
+  samplerInfo.maxAnisotropy = enable_filtering ? _display.device_props_.limits.maxSamplerAnisotropy : 0;
   samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
   samplerInfo.unnormalizedCoordinates = VK_FALSE;
   samplerInfo.compareEnable = VK_FALSE;

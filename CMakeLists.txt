@@ -18,6 +18,7 @@ set(LIBS ${LIBS} ${Vulkan_LIBRARIES})
 
 find_package(GLM REQUIRED)
 include_directories(${GLM_INCLUDE_DIRS})
+add_definitions("-DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_LEFT_HANDED")
 set(LIBS ${LIBS} ${GLM_LIBRARIES})
 
 find_package(PNG REQUIRED)
@@ -25,7 +26,7 @@ include_directories(${PNG_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${PNG_LIBRARIES})
 
 find_program(GLSLANG_VALIDATOR NAMES glslangValidator)
-if (GLSLANG_VALIDATOR EQUAL "GLSLANG_VALIDATOR-NOTFOUND")
+if (NOT GLSLANG_VALIDATOR)
   message(FATAL_ERROR "Can't find glslangValidator, needed for shader compilation.")
 endif ()
 

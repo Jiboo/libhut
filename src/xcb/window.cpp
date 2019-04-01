@@ -98,6 +98,8 @@ void window::visible(bool _visible) {
 
 keysym window::map_key(char32_t c) {
   switch (c) {
+    case XK_Tab:
+      return KTAB;
     case XK_Alt_L:
       return KALT_LEFT;
     case XK_Alt_R:
@@ -171,7 +173,8 @@ std::string window::name_key(char32_t c) {
     switch (mapped) {
 #define HUT_NAME_KEY(CASE) \
   case CASE:               \
-    return #CASE + 1;
+    return #CASE;
+      HUT_NAME_KEY(KTAB)
       HUT_NAME_KEY(KALT_LEFT)
       HUT_NAME_KEY(KALT_RIGHT)
       HUT_NAME_KEY(KCTRL_LEFT)
