@@ -89,12 +89,12 @@ class display;
 
 class window {
   friend class display;
-  friend class noinput;
   friend class rgb;
   friend class rgba;
   friend class tex;
   friend class rgb_tex;
   friend class rgba_tex;
+  friend class rgba_mask;
 
  public:
   event<> on_pause, on_resume, on_focus, on_blur, on_close;

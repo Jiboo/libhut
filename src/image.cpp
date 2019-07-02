@@ -34,6 +34,7 @@
 
 #include "hut/display.hpp"
 #include "hut/image.hpp"
+#include "hut/color.hpp"
 
 using namespace hut;
 
@@ -85,6 +86,10 @@ std::shared_ptr<image> image::load_png(display &_display, const uint8_t *_data, 
     png_set_expand_gray_1_2_4_to_8(png_ptr);
     bitdepth = 8;
   }
+  else if (bitdepth > 8) {
+    png_set_strip_16(png_ptr);
+    bitdepth = 8;
+  }
 
   if (color_type == PNG_COLOR_TYPE_PALETTE) {
     png_set_palette_to_rgb(png_ptr);
@@ -97,24 +102,26 @@ std::shared_ptr<image> image::load_png(display &_display, const uint8_t *_data, 
   }
 
   if (channels == 3) {
-    png_set_filler(png_ptr, 0xff, PNG_FILLER_BEFORE);
+    png_set_filler(png_ptr, 0xff, PNG_FILLER_AFTER);
     channels += 1;
   }
 
-  assert(bitdepth == 8 || bitdepth == 16);
+  assert(bitdepth == 8);
   assert(channels == 4 || channels == 2 || channels == 1);  // RGBA/LA/L
 
   VkFormat format;
   switch (channels) {
     case 1:
-      format = bitdepth == 8 ? VK_FORMAT_R8_UNORM : VK_FORMAT_R16_UNORM;
+      format = VK_FORMAT_R8_UNORM;
       break;
     case 2:
-      format = bitdepth == 8 ? VK_FORMAT_R8G8_UNORM : VK_FORMAT_R16G16_UNORM;
+      format = VK_FORMAT_R8G8_UNORM;
       break;
     case 4:
-      format = bitdepth == 8 ? VK_FORMAT_R8G8B8A8_UNORM : VK_FORMAT_R16G16B16A16_UNORM;
+      format = VK_FORMAT_R8G8B8A8_UNORM;
       break;
+    default:
+      throw std::runtime_error("unexpected png channel count");
   }
 
   auto width = png_get_image_width(png_ptr, info_ptr);
@@ -122,37 +129,52 @@ std::shared_ptr<image> image::load_png(display &_display, const uint8_t *_data, 
 
   png_read_update_info(png_ptr, info_ptr);
 
-  // TODO: Don't use staging if HOST_VISIBLE&DEVICE_LOCAL is available
-  VkImage stagingImage;
-  VkDeviceMemory stagingImageMemory;
-  auto byte_size = create(_display, width, height, format, VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingImage,
-                          &stagingImageMemory);
+  int byte_size = width * height * channels;
+  _display.stage_pending_++;
+  buffer::range_t staging = _display.staging_->do_alloc(byte_size);
 
-  VkImageSubresource subresource = {};
-  subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  subresource.mipLevel = 0;
-  subresource.arrayLayer = 0;
+  // FIXME: Continue to do it in place, or should I use CPU mem and call update?
+  {
+    std::lock_guard lk(_display.staging_mutex_);
+    void *data;
+    vkMapMemory(_display.device_, _display.staging_->memory_, staging.offset_, byte_size, 0, &data);
 
-  VkSubresourceLayout stagingImageLayout;
-  vkGetImageSubresourceLayout(_display.device_, stagingImage, &subresource, &stagingImageLayout);
+    uint8_t *dataBytes = reinterpret_cast<uint8_t *>(data);
+    std::vector<png_bytep> rows;
+    rows.reserve(height);
+    for (uint y = 0; y < height; y++) {
+      rows.emplace_back(dataBytes + y * width * channels);
+    }
 
-  void *data;
-  vkMapMemory(_display.device_, stagingImageMemory, 0, byte_size, 0, &data);
-  uint8_t *dataBytes = reinterpret_cast<uint8_t *>(data);
-
-  std::vector<png_bytep> rows;
-  rows.reserve(height);
-  for (uint y = 0; y < height; y++) {
-    rows.emplace_back(dataBytes + y * stagingImageLayout.rowPitch);
+    png_read_image(png_ptr, rows.data());
+    vkUnmapMemory(_display.device_, _display.staging_->memory_);
   }
-
-  png_read_image(png_ptr, rows.data());
   png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
 
-  vkUnmapMemory(_display.device_, stagingImageMemory);
+  VkImageSubresourceLayers subResource = {};
+  subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  subResource.baseArrayLayer = 0;
+  subResource.mipLevel = 0;
+  subResource.layerCount = 1;
 
-  return std::make_shared<image>(_display, glm::uvec2{width, height}, format, stagingImage, stagingImageMemory);
+  VkBufferImageCopy info = {};
+  info.imageExtent = {(uint)width, (uint)height, 1};
+  info.imageOffset = {0, 0, 0};
+  info.bufferRowLength = width;
+  info.bufferImageHeight = height;
+  info.bufferOffset = staging.offset_;
+  info.imageSubresource = subResource;
+
+  auto dst = std::make_shared<image>(_display, glm::uvec2{width, height}, format);
+
+  _display.preflush([info, &_display, dst]() {
+    _display.stage_transition(dst->image_, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    _display.stage_copy(_display.staging_->buffer_, dst->image_, &info);
+    _display.stage_transition(dst->image_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    _display.stage_pending_--;
+  });
+
+  return dst;
 }
 
 image::~image() {
@@ -161,26 +183,18 @@ image::~image() {
   vkDestroyImage(display_.device_, image_, nullptr);
 }
 
-image::image(display &_display, glm::uvec2 _size, VkFormat _format, VkImage _image, VkDeviceMemory _memory)
-    : display_(_display), size_(_size), format_(_format), image_(_image), memory_(_memory) {
+image::image(display &_display, glm::uvec2 _size, VkFormat _format)
+    : display_(_display), size_(_size), format_(_format) {
+  pixel_size_ = format_size(_format);
   create(_display, _size.x, _size.y, _format, VK_IMAGE_TILING_LINEAR,
          VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &image_,
          &memory_);
 
-  _display.post([&_display, _image, _memory, this](auto) {
-    _display.stage_transition(_image, format_, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    _display.stage_transition(image_, format_, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    _display.stage_copy(_image, image_, size_.x, size_.y);
-    _display.stage_transition(image_, format_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-    _display.on_staged.connect([&_display, _image, _memory]() {
-      vkFreeMemory(_display.device_, _memory, nullptr);
-      vkDestroyImage(_display.device_, _image, nullptr);
-      return false;
-    });
-
-    return false;
+  _display.preflush([&_display, this]() {
+    _display.stage_transition(image_, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VkClearColorValue clear = {};
+    _display.stage_clear(image_, &clear);
+    _display.stage_transition(image_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   });
 
   VkImageViewCreateInfo viewInfo = {};
@@ -239,6 +253,44 @@ VkDeviceSize image::create(display &_display, uint32_t _width, uint32_t _height,
   return memReq.size;
 }
 
+void image::update(glm::ivec4 _coords, uint8_t *_data, uint _srcRowPitch) {
+  int width = _coords[2] - _coords[0];
+  int height = _coords[3] - _coords[1];
+  assert (width > 0 && height > 0);
+  int byte_size = height * _srcRowPitch;
+  display_.stage_pending_++;
+  buffer::range_t staging = display_.staging_->do_alloc(byte_size);
+
+  {
+    std::lock_guard lk(display_.staging_mutex_);
+    void *target;
+    vkMapMemory(display_.device_, display_.staging_->memory_, staging.offset_, byte_size, 0, &target);
+    memcpy(target, _data, byte_size);
+    vkUnmapMemory(display_.device_, display_.staging_->memory_);
+  }
+
+  VkImageSubresourceLayers subResource = {};
+  subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  subResource.baseArrayLayer = 0;
+  subResource.mipLevel = 0;
+  subResource.layerCount = 1;
+
+  VkBufferImageCopy info = {};
+  info.imageExtent = {(uint)width, (uint)height, 1};
+  info.imageOffset = {_coords[0], _coords[1], 0};
+  info.bufferRowLength = _srcRowPitch / pixel_size_;
+  info.bufferImageHeight = height;
+  info.bufferOffset = staging.offset_;
+  info.imageSubresource = subResource;
+
+  display_.preflush([info, this]() {
+    display_.stage_transition(image_, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    display_.stage_copy(display_.staging_->buffer_, image_, &info);
+    display_.stage_transition(image_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    display_.stage_pending_--;
+  });
+}
+
 sampler::sampler(display &_display, VkSamplerCreateInfo *_info) : device_(_display.device_) {
   if (vkCreateSampler(device_, _info, nullptr, &sampler_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create texture sampler!");
@@ -256,7 +308,7 @@ sampler::sampler(display &_display, bool _hiquality) : device_(_display.device_)
   bool enable_filtering = _hiquality && _display.device_features_.samplerAnisotropy;
   samplerInfo.anisotropyEnable = enable_filtering ? VK_TRUE : VK_FALSE;
   samplerInfo.maxAnisotropy = enable_filtering ? _display.device_props_.limits.maxSamplerAnisotropy : 0;
-  samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+  samplerInfo.borderColor = VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
   samplerInfo.unnormalizedCoordinates = VK_FALSE;
   samplerInfo.compareEnable = VK_FALSE;
   samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;

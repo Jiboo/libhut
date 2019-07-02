@@ -83,8 +83,6 @@ void window::destroy_vulkan() {
 void window::init_vulkan_surface() {
   display_.check_thread();
 
-  auto start = display::clock::now();
-
   if (surface_ == VK_NULL_HANDLE)
     return;
 
@@ -194,10 +192,6 @@ void window::init_vulkan_surface() {
     imagev_infos.image = swapchain_images_[i];
     imagev_infos.viewType = VK_IMAGE_VIEW_TYPE_2D;
     imagev_infos.format = surface_format_.format;
-    imagev_infos.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    imagev_infos.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    imagev_infos.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    imagev_infos.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
     imagev_infos.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     imagev_infos.subresourceRange.baseMipLevel = 0;
     imagev_infos.subresourceRange.levelCount = 1;
@@ -306,8 +300,6 @@ void window::redraw(display::time_point _tp) {
   if (swapchain_ == VK_NULL_HANDLE)
     return;
 
-  auto start = display::clock::now();
-
   uint32_t imageIndex;
   VkResult result = vkAcquireNextImageKHR(display_.device_, swapchain_, std::numeric_limits<uint64_t>::max(),
                                           sem_available_, VK_NULL_HANDLE, &imageIndex);
@@ -319,8 +311,6 @@ void window::redraw(display::time_point _tp) {
     throw std::runtime_error("failed to acquire swap chain image!");
   }
 
-  auto acquire = display::clock::now();
-
   on_frame.fire(size_, last_frame_ - _tp);
   display_.flush_staged();
 
@@ -329,8 +319,6 @@ void window::redraw(display::time_point _tp) {
     dirty_[imageIndex] = false;
     rebuild_cb(swapchain_fbos_[imageIndex], primary_cbs_[imageIndex]);
   }
-
-  auto draw = display::clock::now();
 
   cbs_.emplace_back(primary_cbs_[imageIndex]);
 
@@ -352,8 +340,6 @@ void window::redraw(display::time_point _tp) {
 
   if (vkQueueSubmit(display_.queueg_, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
     throw std::runtime_error("failed to submit draw command buffer!");
-
-  auto submit = display::clock::now();
 
   VkPresentInfoKHR presentInfo = {};
   presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -423,7 +409,7 @@ void window::rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
   renderPassInfo.renderArea.offset = {0, 0};
   renderPassInfo.renderArea.extent = swapchain_extents_;
 
-  VkClearValue clearColor = {clear_color_.r, clear_color_.g, clear_color_.b, clear_color_.a};
+  VkClearValue clearColor = {{{clear_color_.r, clear_color_.g, clear_color_.b, clear_color_.a}}};
   renderPassInfo.clearValueCount = 1;
   renderPassInfo.pClearValues = &clearColor;
 

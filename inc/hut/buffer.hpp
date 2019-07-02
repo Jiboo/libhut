@@ -45,11 +45,18 @@ class buffer {
   friend class tex;
   friend class rgb_tex;
   friend class rgba_tex;
+  friend class rgba_mask;
+  friend class shaper;
+  friend class image;
 
  public:
   struct range_t {
-    uint32_t offset_, size_;
+    uint32_t offset_, size_, aligned_size_;
     bool allocated_;
+
+    range_t() {}
+    range_t(uint32_t _offset, uint32_t _size, bool _allocated)
+      : offset_(_offset), size_(_size), aligned_size_(_size + _size % 4), allocated_(_allocated) {}
 
     bool operator==(const range_t &_other) const {
       return offset_ == _other.offset_ && size_ == _other.size_ && allocated_ == _other.allocated_;
@@ -76,15 +83,18 @@ class buffer {
       buffer_.do_free(offset_, size_);
     }
 
+    void set(const T *_data, size_t _count) {
+      assert(_count == size_ / sizeof(T));
+      buffer_.update(offset_, size_, (void *)_data);
+    }
+
     void set(const std::initializer_list<T> &_data) {
-      assert(_data.size() == size_ / sizeof(T));
-      buffer_.update(offset_, size_, (void *)_data.begin());
+      set(_data.begin(), _data.size());
     }
 
     template <class TContainer>
     void set(const TContainer &_data) {
-      assert(_data.size() == size_ / sizeof(T));
-      buffer_.update(offset_, size_, (void *)_data.begin().base());
+      set(_data.begin().base(), _data.size());
     }
 
     uint32_t count() const {
@@ -92,7 +102,7 @@ class buffer {
     }
   };
 
-  buffer(display &_display, uint32_t _size, VkMemoryPropertyFlags _type, VkBufferUsageFlagBits _usage);
+  buffer(display &_display, uint32_t _size, VkMemoryPropertyFlags _type, uint _usage);
   ~buffer();
 
   void update(uint32_t _offset, uint32_t _size, const void *_data);
@@ -117,13 +127,14 @@ class buffer {
   display &display_;
   uint32_t size_;
   VkMemoryPropertyFlags type_;
-  VkBufferUsageFlagBits usage_;
+  uint usage_; // see VkBufferUsageFlagBits
   VkBuffer buffer_;
   VkDeviceMemory memory_;
 
   std::set<range_t> ranges_;
+  std::mutex ranges_mutex_;
 
-  void init(uint32_t _size, VkMemoryPropertyFlags _type, VkBufferUsageFlagBits _usage);
+  void init(uint32_t _size, VkMemoryPropertyFlags _type, uint _usage);
   void copy_from(VkBuffer _other, uint32_t _other_offset, uint32_t _this_offset, uint32_t _size);
   void grow(uint32_t new_size);
   range_t do_alloc(uint32_t _size);

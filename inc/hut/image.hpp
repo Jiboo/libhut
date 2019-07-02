@@ -45,12 +45,19 @@ class image {
   friend class tex;
   friend class rgb_tex;
   friend class rgba_tex;
+  friend class rgba_mask;
+  friend class font;
 
  public:
   static std::shared_ptr<image> load_png(display &, const uint8_t *_data, size_t _size);
 
-  image(display &_display, glm::uvec2 _size, VkFormat _format, VkImage _staging_image, VkDeviceMemory _staging_memory);
+  image(display &_display, glm::uvec2 _size, VkFormat _format);
   ~image();
+
+  void update(glm::ivec4 _coords, uint8_t *_data, uint _srcRowPitch);
+
+  uint pixel_size() const { return pixel_size_; }
+  glm::uvec2 size() const { return size_; }
 
  private:
   static VkDeviceSize create(display &_display, uint32_t _width, uint32_t _height, VkFormat _format,
@@ -60,6 +67,7 @@ class image {
   display &display_;
   glm::uvec2 size_;
   VkFormat format_;
+  uint pixel_size_;
 
   VkImage image_;
   VkDeviceMemory memory_;
@@ -68,10 +76,16 @@ class image {
 
 using shared_image = std::shared_ptr<image>;
 
-struct sampler {
+class sampler {
+  friend class tex;
+  friend class rgb_tex;
+  friend class rgba_tex;
+  friend class rgba_mask;
+
   VkSampler sampler_;
   VkDevice device_;
 
+public:
   sampler(display &_display, bool _hiquality = true);
   sampler(display &_display, VkSamplerCreateInfo *_info);
   ~sampler();

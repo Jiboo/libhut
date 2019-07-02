@@ -38,7 +38,7 @@
 
 namespace hut {
 
-class tex {
+class rgba_mask {
  private:
   window &window_;
   VkShaderModule vert_ = VK_NULL_HANDLE;
@@ -83,9 +83,10 @@ class tex {
     glm::mat4 model_;
     glm::mat4 view_;
     glm::mat4 proj_;
+    glm::vec4 color_;
   };
 
-  tex(window &_window, bool _enable_blend = true) : window_(_window) {
+  rgba_mask(window &_window, bool _enable_blend = true) : window_(_window) {
     VkDevice device = _window.display_.device_;
     const glm::uvec2 &size = _window.size_;
 
@@ -139,8 +140,8 @@ class tex {
       throw std::runtime_error("failed to allocate descriptor set!");
     }
 
-    auto vertShaderCode = hutgen_spv::tex_vert_spv;
-    auto fragShaderCode = hutgen_spv::tex_frag_spv;
+    auto vertShaderCode = hutgen_spv::rgba_mask_vert_spv;
+    auto fragShaderCode = hutgen_spv::rgba_mask_frag_spv;
 
     VkShaderModuleCreateInfo module_info = {};
     module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -293,7 +294,7 @@ class tex {
     }
   }
 
-  ~tex() {
+  ~rgba_mask() {
     VkDevice device = window_.display_.device_;
     vkDeviceWaitIdle(device);
     if (descriptor_layout_ != VK_NULL_HANDLE)

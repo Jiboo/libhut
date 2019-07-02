@@ -33,7 +33,7 @@
 
 using namespace hut;
 
-buffer::buffer(display &_display, uint32_t _size, VkMemoryPropertyFlags _type, VkBufferUsageFlagBits _usage)
+buffer::buffer(display &_display, uint32_t _size, VkMemoryPropertyFlags _type, uint _usage)
     : display_(_display), size_(_size), usage_(_usage) {
   ranges_.insert(range_t{0, _size, false});
   init(_size, _type, _usage);
@@ -47,7 +47,7 @@ buffer::~buffer() {
 }
 
 
-void buffer::init(uint32_t _size, VkMemoryPropertyFlags _type, VkBufferUsageFlagBits _usage) {
+void buffer::init(uint32_t _size, VkMemoryPropertyFlags _type, uint _usage) {
   VkBufferCreateInfo bufferInfo = {};
   bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   bufferInfo.size = _size;
@@ -83,18 +83,25 @@ void buffer::update(uint32_t _offset, uint32_t _size, const void *_data) {
     memcpy(target, _data, _size);
     vkUnmapMemory(display_.device_, memory_);
   } else {
+    display_.stage_pending_++;
     buffer::range_t staging = display_.staging_->do_alloc(_size);
+
+    {
+      std::lock_guard lk(display_.staging_mutex_);
+      void *target;
+      vkMapMemory(display_.device_, display_.staging_->memory_, staging.offset_, _size, 0, &target);
+      memcpy(target, _data, _size);
+      vkUnmapMemory(display_.device_, display_.staging_->memory_);
+    }
+
     VkBufferCopy copy;
     copy.size = _size;
     copy.srcOffset = staging.offset_;
     copy.dstOffset = _offset;
-
-    display_.post([copy, this](auto) { display_.stage_copy(buffer_, &copy); });
-
-    void *target;
-    vkMapMemory(display_.device_, display_.staging_->memory_, staging.offset_, _size, 0, &target);
-    memcpy(target, _data, _size);
-    vkUnmapMemory(display_.device_, display_.staging_->memory_);
+    display_.preflush([this, copy](){
+      display_.stage_copy(buffer_, &copy);
+      display_.stage_pending_--;
+    });
   }
 }
 
@@ -112,11 +119,11 @@ void buffer::copy_from(buffer &_other, uint32_t _other_offset, uint32_t _this_of
 }
 
 void buffer::grow(uint32_t new_size) {
+  std::lock_guard lk(ranges_mutex_);
   assert(new_size > size_);
 
   VkBuffer old_buff = buffer_;
   VkDeviceMemory old_mem = memory_;
-  uint32_t old_size = size_;
 
   init(new_size, type_, usage_);
   copy_from(old_buff, 0, 0, size_);
@@ -144,43 +151,57 @@ void buffer::grow(uint32_t new_size) {
 }
 
 buffer::range_t buffer::do_alloc(uint32_t _size) {
+  ranges_mutex_.lock();
+  uint rest = _size % 4;
+  uint aligned_size = _size + (rest ? (4 - rest) : 0);
+
   auto it = ranges_.cbegin();
   for (; it != ranges_.cend(); it++) {
-    if (!it->allocated_ && it->size_ >= _size)
+    if (!it->allocated_ && it->size_ >= aligned_size)
       break;
   }
 
   if (it == ranges_.cend()) {
-    grow(_size < size_ ? size_ * 2 : _size * 2);
-    return do_alloc(_size);
+    ranges_mutex_.unlock();
+    grow(aligned_size < size_ ? size_ * 2 : aligned_size * 2);
+    return do_alloc(aligned_size);
   }
 
   range_t result;
   result.offset_ = it->offset_;
   result.size_ = _size;
+  result.aligned_size_ = aligned_size;
   result.allocated_ = true;
 
   range_t free_block = *it;
+
+  assert(result.offset_ % 4 == 0);
+  assert(free_block.offset_ % 4 == 0);
+
   ranges_.erase(it);
 
-  free_block.offset_ += _size;
-  free_block.size_ -= _size;
+  free_block.offset_ += aligned_size;
+  free_block.size_ -= aligned_size;
 
   ranges_.insert(result);
   ranges_.insert(free_block);
+  ranges_mutex_.unlock();
 
   return result;
 }
 
 void buffer::do_free(uint32_t _offset, uint32_t _size) {
-  std::set<range_t>::iterator it = ranges_.find(range_t{_offset, _size, true});
-  if (it == ranges_.end())
-    throw std::out_of_range("couldn't find range, probably already deleted");
+  {
+    std::lock_guard lk(ranges_mutex_);
+    auto it = ranges_.find(range_t{_offset, _size, true});
+    if (it == ranges_.end())
+      throw std::out_of_range("couldn't find range, probably already deleted");
 
-  range_t result = *it;
-  result.allocated_ = false;
-  it = ranges_.erase(it);
-  ranges_.insert(it, result);
+    range_t result = *it;
+    result.allocated_ = false;
+    it = ranges_.erase(it);
+    ranges_.insert(it, result);
+  }
   merge();
 }
 
@@ -191,6 +212,7 @@ void buffer::debug_ranges() {
 }
 
 void buffer::merge() {
+  std::lock_guard lk(ranges_mutex_);
   if (ranges_.size() < 2)
     return;
 
@@ -214,6 +236,7 @@ void buffer::merge() {
 }
 
 void buffer::clear_ranges() {
+  std::lock_guard lk(ranges_mutex_);
   ranges_.clear();
   ranges_.insert(range_t{0, size_, false});
 }

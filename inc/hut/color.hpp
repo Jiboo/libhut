@@ -45,4 +45,14 @@ enum blend_mode {
   BLEND_DST_OUT = 11
 };
 
+inline uint format_size(VkFormat _format) {
+  switch (_format) {
+    case VK_FORMAT_R8_UNORM: return 1;
+    case VK_FORMAT_R8G8_UNORM: return 2;
+    case VK_FORMAT_R8G8B8A8_UNORM: return 4;
+    default:
+      throw std::runtime_error("can't determine size of VkFormat");
+  }
+}
+
 }  // namespace hut

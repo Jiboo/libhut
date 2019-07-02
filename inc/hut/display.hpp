@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <functional>
@@ -44,6 +45,9 @@
 #include <xcb/xcb_keysyms.h>
 #endif
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
 #include "hut/buffer.hpp"
 #include "hut/utils.hpp"
 #include "image.hpp"
@@ -59,12 +63,13 @@ class display {
   friend class buffer;
   friend class image;
   friend class sampler;
-  friend class noinput;
+  friend class font;
   friend class rgb;
   friend class rgba;
   friend class tex;
   friend class rgb_tex;
   friend class rgba_tex;
+  friend class rgba_mask;
 
  public:
   using clock = std::chrono::steady_clock;
@@ -77,7 +82,6 @@ class display {
   ~display();
 
   void flush();
-  void flush_staged();
   int dispatch();
 
   void post(callback _callback);
@@ -116,6 +120,17 @@ class display {
   std::shared_ptr<buffer> staging_;
   VkCommandBuffer staging_cb_;
   bool dirty_staging_ = false;
+  std::atomic<uint> stage_pending_{0};
+  std::mutex staging_mutex_;
+  using preflush_callback = std::function<void()>;
+  std::list<preflush_callback> preflush_jobs_;
+  std::mutex preflush_mutex_;
+
+  void flush_staged();
+  void preflush(preflush_callback _callback) {
+    std::lock_guard lk(preflush_mutex_);
+    preflush_jobs_.emplace_back(_callback);
+  }
 
   event<> on_staged;
   std::list<callback> posted_jobs_;
@@ -126,13 +141,18 @@ class display {
   std::condition_variable cv_;
   std::thread::id dispatcher_;
 
+  FT_Library ft_library_;
+
   void init_vulkan_instance(const char *_app_name, uint32_t _app_version, std::vector<const char *> &_extensions);
   void init_vulkan_device(VkSurfaceKHR _dummy);
   std::pair<uint32_t, VkMemoryPropertyFlags> find_memory_type(uint32_t _type_filter, VkMemoryPropertyFlags _properties);
   void stage_copy(VkBuffer _src, VkBuffer _dst, const VkBufferCopy *_info);
   void stage_copy(VkBuffer _dst, const VkBufferCopy *_info);
-  void stage_transition(VkImage _image, VkFormat _format, VkImageLayout _old_layout, VkImageLayout _new_layout);
+  void stage_transition(VkImage _image, VkImageLayout _old_layout, VkImageLayout _new_layout);
   void stage_copy(VkImage _src, VkImage _dst, uint32_t _width, uint32_t _height);
+  void stage_copy(VkImage _src, VkImage _dst, const VkImageCopy *_info);
+  void stage_copy(VkBuffer _src, VkImage _dst, const VkBufferImageCopy *_info);
+  void stage_clear(VkImage _dst, VkClearColorValue *_clearColor);
   void destroy_vulkan();
 
   time_point next_job_time_point();
@@ -141,7 +161,9 @@ class display {
   void tick_overridable(time_point _now);
   void tick_delayed(time_point _now);
   void jobs_loop();
-  void check_thread();
+  inline void check_thread() {
+    assert(std::this_thread::get_id() == dispatcher_ || dispatcher_ == std::thread::id());
+  }
 
 #if defined(VK_USE_PLATFORM_XCB_KHR)
   xcb_connection_t *connection_;

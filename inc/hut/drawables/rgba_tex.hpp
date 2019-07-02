@@ -29,7 +29,7 @@
 
 #include <glm/glm.hpp>
 
-#include "spv.h"
+#include "hutgen_spv.hpp"
 
 #include "hut/buffer.hpp"
 #include "hut/color.hpp"
@@ -51,9 +51,9 @@ class rgba_tex {
 
  public:
   struct vertex {
-    glm::vec2 pos;
-    glm::vec4 color;
-    glm::vec2 texcoords;
+    glm::vec2 pos_;
+    glm::vec4 color_;
+    glm::vec2 texcoords_;
 
     static VkVertexInputBindingDescription binding_desc() {
       VkVertexInputBindingDescription bindingDescription = {};
@@ -69,26 +69,26 @@ class rgba_tex {
       attributeDescriptions[0].binding = 0;
       attributeDescriptions[0].location = 0;
       attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
-      attributeDescriptions[0].offset = offsetof(vertex, pos);
+      attributeDescriptions[0].offset = offsetof(vertex, pos_);
 
       attributeDescriptions[1].binding = 0;
       attributeDescriptions[1].location = 1;
       attributeDescriptions[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-      attributeDescriptions[1].offset = offsetof(vertex, color);
+      attributeDescriptions[1].offset = offsetof(vertex, color_);
 
       attributeDescriptions[2].binding = 0;
       attributeDescriptions[2].location = 2;
       attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-      attributeDescriptions[2].offset = offsetof(vertex, texcoords);
+      attributeDescriptions[2].offset = offsetof(vertex, texcoords_);
 
       return attributeDescriptions;
     }
   };
 
   struct ubo {
-    glm::mat4 model;
-    glm::mat4 view;
-    glm::mat4 proj;
+    glm::mat4 model_;
+    glm::mat4 view_;
+    glm::mat4 proj_;
   };
 
   rgba_tex(window &_window, bool _enable_blend = true) : window_(_window) {
@@ -145,8 +145,8 @@ class rgba_tex {
       throw std::runtime_error("failed to allocate descriptor set!");
     }
 
-      auto vertShaderCode = __spv::rgba_tex_vert_spv;
-      auto fragShaderCode = __spv::rgba_tex_frag_spv;
+    auto vertShaderCode = hutgen_spv::rgba_tex_vert_spv;
+    auto fragShaderCode = hutgen_spv::rgba_tex_frag_spv;
 
     VkShaderModuleCreateInfo module_info = {};
     module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;

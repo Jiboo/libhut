@@ -126,9 +126,12 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
 
   vkDestroySurfaceKHR(instance_, dummy_surface, nullptr);
   xcb_destroy_window(connection_, dummy);
+
+  FT_Init_FreeType(&ft_library_);
 }
 
 display::~display() {
+  FT_Done_FreeType(ft_library_);
   destroy_vulkan();
   xcb_key_symbols_free(keysyms_);
   xcb_disconnect(connection_);

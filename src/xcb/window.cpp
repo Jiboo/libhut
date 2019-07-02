@@ -48,7 +48,7 @@ bool window::is_modifier_key(char32_t c) {
   return xcb_is_modifier_key(c) != 0;
 }
 
-window::window(display &_display) : display_(_display), parent_(_display.screen_->root), size_(800, 600) {
+window::window(display &_display) : display_(_display), size_(800, 600), parent_(_display.screen_->root) {
   window_ = xcb_generate_id(_display.connection_);
 
   uint32_t mask = XCB_CW_EVENT_MASK;

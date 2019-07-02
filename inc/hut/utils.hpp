@@ -34,7 +34,11 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_set>
+#include <unordered_map>
 #include <vector>
+
+#include <glm/glm.hpp>
 
 namespace hut {
 
@@ -94,12 +98,20 @@ class sstream {
     return *this;
   }
 
-  operator std::string() {
+  std::string str() {
     return stream_.str();
+  }
+
+  const char* c_str() {
+    return stream_.str().c_str();
+  }
+
+  operator std::string() {
+    return str();
   }
 };
 
-static std::vector<char> read_file(const std::string &filename) {
+/*static std::vector<char> read_file(const std::string &filename) {
   std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
   if (!file.is_open())
@@ -111,6 +123,6 @@ static std::vector<char> read_file(const std::string &filename) {
   file.read(buffer.data(), size);
 
   return buffer;
-}
+}*/
 
 }  // namespace hut

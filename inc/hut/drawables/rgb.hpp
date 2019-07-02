@@ -29,7 +29,7 @@
 
 #include <glm/glm.hpp>
 
-#include "spv.h"
+#include "hutgen_spv.hpp"
 
 #include "hut/buffer.hpp"
 #include "hut/color.hpp"
@@ -51,8 +51,8 @@ class rgb {
 
  public:
   struct vertex {
-    glm::vec2 pos;
-    glm::vec3 color;
+    glm::vec2 pos_;
+    glm::vec3 color_;
 
     static VkVertexInputBindingDescription binding_desc() {
       VkVertexInputBindingDescription desc = {};
@@ -67,19 +67,19 @@ class rgb {
       descs[0].binding = 0;
       descs[0].location = 0;
       descs[0].format = VK_FORMAT_R32G32_SFLOAT;
-      descs[0].offset = offsetof(vertex, pos);
+      descs[0].offset = offsetof(vertex, pos_);
       descs[1].binding = 0;
       descs[1].location = 1;
       descs[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-      descs[1].offset = offsetof(vertex, color);
+      descs[1].offset = offsetof(vertex, color_);
       return descs;
     }
   };
 
   struct ubo {
-    glm::mat4 model;
-    glm::mat4 view;
-    glm::mat4 proj;
+    glm::mat4 model_;
+    glm::mat4 view_;
+    glm::mat4 proj_;
   };
 
   rgb(window &_window) : window_(_window) {
@@ -125,8 +125,8 @@ class rgb {
       throw std::runtime_error("failed to allocate descriptor set!");
     }
 
-    auto vshader_code = __spv::rgb_vert_spv;
-    auto fshader_code = __spv::rgb_frag_spv;
+    auto vshader_code = hutgen_spv::rgb_vert_spv;
+    auto fshader_code = hutgen_spv::rgb_frag_spv;
 
     VkShaderModuleCreateInfo module_info = {};
     module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
