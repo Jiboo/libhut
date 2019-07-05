@@ -37,6 +37,8 @@
 
 using namespace hut;
 
+//#define HUT_PREFERE_NONDESCRETE_DEVICES
+
 static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT /*flags*/,
                                                      VkDebugReportObjectTypeEXT /*objType*/, uint64_t /*obj*/,
                                                      size_t /*location*/, int32_t /*code*/, const char *layerPrefix,
@@ -167,6 +169,10 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
   vkGetPhysicalDeviceFeatures(_device, &features);
 
   result.score_ = properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? 1000 : 100;
+#ifdef HUT_PREFERE_NONDESCRETE_DEVICES
+  if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+    result.score_ = 0;
+#endif
   result.score_ += properties.limits.maxImageDimension2D;
 
   uint32_t extension_count;
@@ -545,12 +551,10 @@ void display::stage_clear(VkImage _dst, VkClearColorValue *_clearColor) {
 }
 
 void display::flush_staged() {
-  {
-    std::lock_guard lk(preflush_mutex_);
-    for (auto &preflush : preflush_jobs_)
-      preflush();
-    preflush_jobs_.clear();
-  }
+  std::lock_guard lk(staging_mutex_);
+  for (auto &preflush : preflush_jobs_)
+    preflush();
+  preflush_jobs_.clear();
 
   if (!dirty_staging_)
     return;
@@ -571,8 +575,9 @@ void display::flush_staged() {
 
   vkQueueWaitIdle(queueg_);
 
-  on_staged.fire();
-  on_staged.clear();
+  for (auto &postflush : postflush_jobs_)
+    postflush();
+  postflush_jobs_.clear();
 
   VkCommandBufferBeginInfo beginInfo = {};
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;

@@ -11,3 +11,9 @@ TEST(utils, event) {
   EXPECT_EQ(e1.fire(42), true);
   EXPECT_EQ(e1.fire(1337), true);
 }
+
+TEST(utils, align) {
+  EXPECT_EQ(4, hut::align(2, 4));
+  EXPECT_EQ(80, hut::align(2, 80));
+  EXPECT_EQ(160, hut::align(82, 80));
+}

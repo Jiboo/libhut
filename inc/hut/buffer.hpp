@@ -33,6 +33,7 @@
 #include <glm/glm.hpp>
 
 #include "hut/display.hpp"
+#include "display.hpp"
 
 namespace hut {
 
@@ -45,18 +46,18 @@ class buffer {
   friend class tex;
   friend class rgb_tex;
   friend class rgba_tex;
-  friend class rgba_mask;
+  friend class tex_mask;
   friend class shaper;
   friend class image;
 
  public:
   struct range_t {
-    uint32_t offset_, size_, aligned_size_;
+    uint offset_, size_;
     bool allocated_;
 
     range_t() {}
-    range_t(uint32_t _offset, uint32_t _size, bool _allocated)
-      : offset_(_offset), size_(_size), aligned_size_(_size + _size % 4), allocated_(_allocated) {}
+    range_t(uint _offset, uint _size, bool _allocated)
+      : offset_(_offset), size_(_size), allocated_(_allocated) {}
 
     bool operator==(const range_t &_other) const {
       return offset_ == _other.offset_ && size_ == _other.size_ && allocated_ == _other.allocated_;
@@ -74,13 +75,13 @@ class buffer {
 
    public:
     buffer &buffer_;
-    const uint32_t offset_, size_;
+    const uint offset_, size_;
 
-    ref(buffer &_buffer, uint32_t _offset, uint32_t _size) : buffer_(_buffer), offset_(_offset), size_(_size) {
+    ref(buffer &_buffer, uint _offset, uint _size) : buffer_(_buffer), offset_(_offset), size_(_size) {
     }
 
     ~ref() {
-      buffer_.do_free(offset_, size_);
+      buffer_.do_free(offset_);
     }
 
     void set(const T *_data, size_t _count) {
@@ -97,26 +98,28 @@ class buffer {
       set(_data.begin().base(), _data.size());
     }
 
-    uint32_t count() const {
+    uint count() const {
       return size_ / sizeof(T);
     }
   };
 
-  buffer(display &_display, uint32_t _size, VkMemoryPropertyFlags _type, uint _usage);
+  buffer(display &_display, uint _size, VkMemoryPropertyFlags _type, uint _usage);
   ~buffer();
 
-  void update(uint32_t _offset, uint32_t _size, const void *_data);
-  void copy_from(buffer &_other, uint32_t _other_offset, uint32_t _this_offset, uint32_t _size);
+  void update(uint _offset, uint _size, const void *_data);
+  void copy_from(buffer &_other, uint _other_offset, uint _this_offset, uint _size);
+  void debug_ranges();
 
   template <typename T>
-  std::shared_ptr<ref<T>> allocate(uint32_t _count = 1) {
-    range_t result = do_alloc(sizeof(T) * _count);
-    return std::make_shared<ref<T>>(*this, result.offset_, result.size_);
+  std::shared_ptr<ref<T>> allocate(uint _count, uint _align = 4) {
+    uint size = sizeof(T) * _count;
+    uint offset = do_alloc(size, _align);
+    return std::make_shared<ref<T>>(*this, offset, size);
   }
 
   template <typename T>
   void free(const ref<T> &_ref) {
-    do_free(_ref.offset_, _ref.size_);
+    do_free(_ref.offset_);
   };
 
   bool operator==(const buffer &_other) const {
@@ -125,22 +128,21 @@ class buffer {
 
  private:
   display &display_;
-  uint32_t size_;
+  uint size_;
   VkMemoryPropertyFlags type_;
   uint usage_; // see VkBufferUsageFlagBits
   VkBuffer buffer_;
   VkDeviceMemory memory_;
 
-  std::set<range_t> ranges_;
+  std::list<range_t> ranges_;
   std::mutex ranges_mutex_;
 
-  void init(uint32_t _size, VkMemoryPropertyFlags _type, uint _usage);
-  void copy_from(VkBuffer _other, uint32_t _other_offset, uint32_t _this_offset, uint32_t _size);
-  void grow(uint32_t new_size);
-  range_t do_alloc(uint32_t _size);
-  void do_free(uint32_t _offset, uint32_t _size);
+  void init(uint _size, VkMemoryPropertyFlags _type, uint _usage);
+  void copy_from(VkBuffer _other, uint _other_offset, uint _this_offset, uint _size);
+  void grow(uint new_size);
+  uint do_alloc(uint _size, uint8_t _align = 4);
+  void do_free(uint _offset);
   void merge();
-  void debug_ranges();
   void clear_ranges();
 };
 

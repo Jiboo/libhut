@@ -45,7 +45,7 @@ class image {
   friend class tex;
   friend class rgb_tex;
   friend class rgba_tex;
-  friend class rgba_mask;
+  friend class tex_mask;
   friend class font;
 
  public:
@@ -80,7 +80,7 @@ class sampler {
   friend class tex;
   friend class rgb_tex;
   friend class rgba_tex;
-  friend class rgba_mask;
+  friend class tex_mask;
 
   VkSampler sampler_;
   VkDevice device_;

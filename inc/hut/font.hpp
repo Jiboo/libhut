@@ -197,7 +197,7 @@ namespace hut {
 
   public:
     struct result {
-      shared_ref<rgba_mask::vertex> vertices_;
+      shared_ref<tex_mask::vertex> vertices_;
       shared_ref<uint16_t> indices_;
       glm::vec4 bbox_;
 
@@ -212,11 +212,6 @@ namespace hut {
 
     ~shaper() {
       hb_buffer_destroy(buffer_);
-    }
-
-    glm::vec4 measure(const shared_font &_font, uint8_t _size, const std::string &_text) {
-      FT_Set_Char_Size(_font->face_, _size * 64, _size * 64, 96, 96);
-
     }
 
     void bake(buffer &_buff, result &_dst, const shared_font &_font, uint8_t _size,
@@ -237,9 +232,9 @@ namespace hut {
       size_t max_indices = 6 * codepoints;
       size_t max_vertices = 4 * codepoints;
       auto *indices = new uint16_t[max_indices];
-      auto *vertices = new rgba_mask::vertex[max_vertices];
+      auto *vertices = new tex_mask::vertex[max_vertices];
       float x = 0., y = 0;
-      glm::vec4 bbox;
+      glm::vec4 bbox = {0, 0, 0, 0};
 
       // https://github.com/tangrams/harfbuzz-example/blob/master/src/hbshaper.h
       for (uint i = 0; i < codepoints; i++) {
@@ -266,7 +261,7 @@ namespace hut {
           float t1 = glyph.texcoords_[3];
 
           size_t vertices_offset = 4 * drawn_codepoints;
-          rgba_mask::vertex *vertice = vertices + vertices_offset;
+          tex_mask::vertex *vertice = vertices + vertices_offset;
           vertice[0] = {{x0, y0}, {s0, t0}};
           vertice[1] = {{x1, y0}, {s1, t0}};
           vertice[2] = {{x1, y1}, {s1, t1}};
@@ -288,11 +283,12 @@ namespace hut {
       }
       bbox[0] = 0;
       bbox[2] = x;
+      _dst.bbox_ = bbox;
 
       _buff.display_.post([_post_cb, &_dst, &_buff, indices, vertices, drawn_codepoints](auto) {
         _dst.indices_ = _buff.allocate<uint16_t>(6 * drawn_codepoints);
         _dst.indices_->set(indices, 6 * drawn_codepoints);
-        _dst.vertices_ = _buff.allocate<rgba_mask::vertex>(4 * drawn_codepoints);
+        _dst.vertices_ = _buff.allocate<tex_mask::vertex>(4 * drawn_codepoints);
         _dst.vertices_->set(vertices, 4 * drawn_codepoints);
 
         delete [] indices;

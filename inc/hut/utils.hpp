@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <codecvt>
 #include <fstream>
 #include <functional>
@@ -42,9 +43,17 @@
 
 namespace hut {
 
+  using namespace std::chrono_literals;
+
 inline std::string to_utf8(char32_t ch) {
   std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> convert;
   return convert.to_bytes(ch);
+}
+
+template<typename T>
+inline T align(T _input, T _align) {
+  T rest = _input % _align;
+  return _input + (rest ? (_align - rest) : 0);
 }
 
 template <typename... TArgTypes>

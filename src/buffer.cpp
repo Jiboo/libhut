@@ -35,7 +35,7 @@ using namespace hut;
 
 buffer::buffer(display &_display, uint32_t _size, VkMemoryPropertyFlags _type, uint _usage)
     : display_(_display), size_(_size), usage_(_usage) {
-  ranges_.insert(range_t{0, _size, false});
+  ranges_.emplace_back(0, _size, false);
   init(_size, _type, _usage);
 }
 
@@ -77,32 +77,22 @@ void buffer::init(uint32_t _size, VkMemoryPropertyFlags _type, uint _usage) {
 }
 
 void buffer::update(uint32_t _offset, uint32_t _size, const void *_data) {
-  if (type_ & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
-    void *target;
-    vkMapMemory(display_.device_, memory_, _offset, _size, 0, &target);
-    memcpy(target, _data, _size);
-    vkUnmapMemory(display_.device_, memory_);
-  } else {
-    display_.stage_pending_++;
-    buffer::range_t staging = display_.staging_->do_alloc(_size);
+  uint offset = display_.staging_->do_alloc(_size, 4);
+  VkBufferCopy copy;
+  copy.size = _size;
+  copy.srcOffset = offset;
+  copy.dstOffset = _offset;
 
-    {
-      std::lock_guard lk(display_.staging_mutex_);
-      void *target;
-      vkMapMemory(display_.device_, display_.staging_->memory_, staging.offset_, _size, 0, &target);
-      memcpy(target, _data, _size);
-      vkUnmapMemory(display_.device_, display_.staging_->memory_);
-    }
-
-    VkBufferCopy copy;
-    copy.size = _size;
-    copy.srcOffset = staging.offset_;
-    copy.dstOffset = _offset;
-    display_.preflush([this, copy](){
-      display_.stage_copy(buffer_, &copy);
-      display_.stage_pending_--;
-    });
-  }
+  std::lock_guard lk(display_.staging_mutex_);
+  display_.stage_pending_++;
+  void *target;
+  vkMapMemory(display_.device_, display_.staging_->memory_, offset, _size, 0, &target);
+  memcpy(target, _data, _size);
+  vkUnmapMemory(display_.device_, display_.staging_->memory_);
+  display_.preflush([this, copy](){
+    display_.stage_copy(buffer_, &copy);
+    display_.stage_pending_--;
+  });
 }
 
 void buffer::copy_from(VkBuffer _other, uint32_t _other_offset, uint32_t _this_offset, uint32_t _size) {
@@ -111,7 +101,11 @@ void buffer::copy_from(VkBuffer _other, uint32_t _other_offset, uint32_t _this_o
   copyRegion.dstOffset = _this_offset;
   copyRegion.size = _size;
 
-  display_.stage_copy(_other, buffer_, &copyRegion);
+  display_.stage_pending_++;
+  display_.preflush([this, _other, copyRegion](){
+    display_.stage_copy(_other, buffer_, &copyRegion);
+    display_.stage_pending_--;
+  });
 }
 
 void buffer::copy_from(buffer &_other, uint32_t _other_offset, uint32_t _this_offset, uint32_t _size) {
@@ -128,79 +122,77 @@ void buffer::grow(uint32_t new_size) {
   init(new_size, type_, usage_);
   copy_from(old_buff, 0, 0, size_);
 
-  VkDevice dev = display_.device_;
-  display_.on_staged.once([dev, old_buff, old_mem] {
-    vkFreeMemory(dev, old_mem, nullptr);
-    vkDestroyBuffer(dev, old_buff, nullptr);
-    return true;
-  });
+  {
+    std::lock_guard lk(display_.staging_mutex_);
+    display_.postflush([this, old_buff, old_mem] {
+      vkFreeMemory(display_.device_, old_mem, nullptr);
+      vkDestroyBuffer(display_.device_, old_buff, nullptr);
+    });
+  }
 
   auto last = ranges_.rbegin();
   if (last->allocated_) {
-    range_t nrange;
-    nrange.allocated_ = false;
-    nrange.size_ = (new_size - size_);
-    nrange.offset_ = last->offset_ + last->size_;
-    ranges_.insert(nrange);
+    range_t new_range;
+    new_range.allocated_ = false;
+    new_range.size_ = (new_size - size_);
+    new_range.offset_ = last->offset_ + last->size_;
+    ranges_.push_back(new_range);
   } else {
-    range_t nrange = *last;
-    nrange.size_ += (new_size - size_);
-    ranges_.erase(std::next(last).base());
-    ranges_.insert(nrange);
+    range_t &tail = *last;
+    tail.size_ += (new_size - size_);
   }
 }
 
-buffer::range_t buffer::do_alloc(uint32_t _size) {
+uint buffer::do_alloc(uint32_t _size, uint8_t _align) {
   ranges_mutex_.lock();
-  uint rest = _size % 4;
-  uint aligned_size = _size + (rest ? (4 - rest) : 0);
 
-  auto it = ranges_.cbegin();
-  for (; it != ranges_.cend(); it++) {
-    if (!it->allocated_ && it->size_ >= aligned_size)
-      break;
+  assert(!ranges_.empty());
+
+  uint aligned, aligned_size, align_bytes;
+  auto it = ranges_.begin();
+  for (; it != ranges_.end(); it++) {
+    if (it->allocated_)
+      continue;
+    aligned = align<uint32_t>(it->offset_, _align);
+    align_bytes = aligned - it->offset_;
+    aligned_size = align_bytes + _size;
+    if (aligned_size > it->size_)
+      continue;
+    break;
   }
 
   if (it == ranges_.cend()) {
     ranges_mutex_.unlock();
-    grow(aligned_size < size_ ? size_ * 2 : aligned_size * 2);
-    return do_alloc(aligned_size);
+    grow(size_ * 2);
+    return do_alloc(_size, _align);
   }
 
-  range_t result;
-  result.offset_ = it->offset_;
-  result.size_ = _size;
-  result.aligned_size_ = aligned_size;
-  result.allocated_ = true;
+  range_t &free_block = *it;
 
-  range_t free_block = *it;
+  if (free_block.size_ - aligned_size == 0) {
+    it->allocated_ = true;
+  }
+  else {
+    ranges_.emplace(it, it->offset_, aligned_size, true);
+    free_block.size_ -= aligned_size;
+    free_block.offset_ += aligned_size;
+  }
 
-  assert(result.offset_ % 4 == 0);
-  assert(free_block.offset_ % 4 == 0);
-
-  ranges_.erase(it);
-
-  free_block.offset_ += aligned_size;
-  free_block.size_ -= aligned_size;
-
-  ranges_.insert(result);
-  ranges_.insert(free_block);
   ranges_mutex_.unlock();
 
-  return result;
+  assert(aligned % _align == 0);
+  return aligned;
 }
 
-void buffer::do_free(uint32_t _offset, uint32_t _size) {
+void buffer::do_free(uint32_t _offset) {
   {
     std::lock_guard lk(ranges_mutex_);
-    auto it = ranges_.find(range_t{_offset, _size, true});
-    if (it == ranges_.end())
-      throw std::out_of_range("couldn't find range, probably already deleted");
-
-    range_t result = *it;
-    result.allocated_ = false;
-    it = ranges_.erase(it);
-    ranges_.insert(it, result);
+    for (auto &block : ranges_) {
+      if (block.offset_ == _offset) {
+        block.allocated_ = false;
+        break;
+      }
+    }
   }
   merge();
 }
@@ -217,8 +209,7 @@ void buffer::merge() {
     return;
 
   auto prev = ranges_.begin();
-  auto it = ranges_.begin();
-  it++;
+  auto it = std::next(prev);
   while (it != ranges_.end()) {
     if (!it->allocated_ && !prev->allocated_) {
       range_t m = *prev;
@@ -238,5 +229,5 @@ void buffer::merge() {
 void buffer::clear_ranges() {
   std::lock_guard lk(ranges_mutex_);
   ranges_.clear();
-  ranges_.insert(range_t{0, size_, false});
+  ranges_.emplace_back(0, size_, false);
 }

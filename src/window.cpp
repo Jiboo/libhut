@@ -116,7 +116,6 @@ void window::init_vulkan_surface() {
   std::vector<VkPresentModeKHR> modes(modes_count);
   vkGetPhysicalDeviceSurfacePresentModesKHR(pdevice, surface_, &modes_count, modes.data());
   present_mode_ = VK_PRESENT_MODE_FIFO_KHR;
-  // NOTE JB: We don't really need 10k fps, force fifo for now
   /*for (const auto &it : modes) {
     if (it == VK_PRESENT_MODE_MAILBOX_KHR) {
       present_mode_ = it;
@@ -364,11 +363,14 @@ void window::redraw(display::time_point _tp) {
 
   cbs_.clear();
 
+  auto diff = present - last_frame_;
   if (fps_limit_ != 0) {
-    auto diff = present - last_frame_;
     auto limit = std::chrono::microseconds((uint)(1. / fps_limit_ * 1000 * 1000));
     if (diff < limit)
       std::this_thread::sleep_for(limit - diff);
+  }
+  else if (diff > 20ms) {
+    std::cout << "[hut] frame took " << std::chrono::duration<double, std::milli>(diff).count() << "ms..." << std::endl;
   }
 
   auto done = display::clock::now();

@@ -38,7 +38,7 @@
 
 namespace hut {
 
-class rgba_mask {
+class tex_mask {
  private:
   window &window_;
   VkShaderModule vert_ = VK_NULL_HANDLE;
@@ -50,43 +50,78 @@ class rgba_mask {
   VkDescriptorSet descriptor_ = VK_NULL_HANDLE;
 
  public:
+  struct ubo {
+    glm::mat4 proj_;
+  };
+
+  struct instance {
+    glm::vec4 col0_;
+    glm::vec4 col1_;
+    glm::vec4 col2_;
+    glm::vec4 col3_;
+    glm::vec4 color_;
+
+    instance(const glm::mat4 &_i, const glm::vec4 &_c)
+        : col0_(_i[0]), col1_(_i[1]), col2_(_i[2]), col3_(_i[3]), color_(_c) {}
+  };
+
   struct vertex {
     glm::vec2 pos_;
     glm::vec2 texcoords_;
-
-    static VkVertexInputBindingDescription binding_desc() {
-      VkVertexInputBindingDescription bindingDescription = {};
-      bindingDescription.binding = 0;
-      bindingDescription.stride = sizeof(vertex);
-      bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-      return bindingDescription;
-    }
-    static std::array<VkVertexInputAttributeDescription, 2> attributes_desc() {
-      std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = {};
-
-      attributeDescriptions[0].binding = 0;
-      attributeDescriptions[0].location = 0;
-      attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
-      attributeDescriptions[0].offset = offsetof(vertex, pos_);
-
-      attributeDescriptions[1].binding = 0;
-      attributeDescriptions[1].location = 1;
-      attributeDescriptions[1].format = VK_FORMAT_R32G32_SFLOAT;
-      attributeDescriptions[1].offset = offsetof(vertex, texcoords_);
-
-      return attributeDescriptions;
-    }
   };
 
-  struct ubo {
-    glm::mat4 model_;
-    glm::mat4 view_;
-    glm::mat4 proj_;
-    glm::vec4 color_;
-  };
+  static std::array<VkVertexInputBindingDescription, 2> binding_desc() {
+    std::array<VkVertexInputBindingDescription, 2> descs = {};
+    descs[0].binding = 0;
+    descs[0].stride = sizeof(vertex);
+    descs[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    descs[1].binding = 1;
+    descs[1].stride = sizeof(instance);
+    descs[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+    return descs;
+  }
 
-  rgba_mask(window &_window, bool _enable_blend = true) : window_(_window) {
+  static std::array<VkVertexInputAttributeDescription, 7> attributes_desc() {
+    std::array<VkVertexInputAttributeDescription, 7> descs = {};
+    descs[0].binding = 0;
+    descs[0].location = 0;
+    descs[0].format = VK_FORMAT_R32G32_SFLOAT;
+    descs[0].offset = offsetof(vertex, pos_);
+
+    descs[1].binding = 0;
+    descs[1].location = 1;
+    descs[1].format = VK_FORMAT_R32G32_SFLOAT;
+    descs[1].offset = offsetof(vertex, texcoords_);
+
+    descs[2].binding = 1;
+    descs[2].location = 2;
+    descs[2].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    descs[2].offset = offsetof(instance, col0_);
+
+    descs[3].binding = 1;
+    descs[3].location = 3;
+    descs[3].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    descs[3].offset = offsetof(instance, col1_);
+
+    descs[4].binding = 1;
+    descs[4].location = 4;
+    descs[4].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    descs[4].offset = offsetof(instance, col2_);
+
+    descs[5].binding = 1;
+    descs[5].location = 5;
+    descs[5].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    descs[5].offset = offsetof(instance, col3_);
+
+    descs[6].binding = 1;
+    descs[6].location = 6;
+    descs[6].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    descs[6].offset = offsetof(instance, color_);
+
+    return descs;
+  }
+
+  tex_mask(window &_window, bool _enable_blend = true) : window_(_window) {
     VkDevice device = _window.display_.device_;
     const glm::uvec2 &size = _window.size_;
 
@@ -119,12 +154,12 @@ class rgba_mask {
     samplerLayoutBinding.pImmutableSamplers = nullptr;
     samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings = {uboLayoutBinding, samplerLayoutBinding};
+    std::array<VkDescriptorSetLayoutBinding, 2> setBindings = {uboLayoutBinding, samplerLayoutBinding};
 
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = (uint32_t)bindings.size();
-    layoutInfo.pBindings = bindings.data();
+    layoutInfo.bindingCount = (uint32_t)setBindings.size();
+    layoutInfo.pBindings = setBindings.data();
 
     if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptor_layout_) != VK_SUCCESS)
       throw std::runtime_error("failed to create descriptor set layout!");
@@ -140,8 +175,8 @@ class rgba_mask {
       throw std::runtime_error("failed to allocate descriptor set!");
     }
 
-    auto vertShaderCode = hutgen_spv::rgba_mask_vert_spv;
-    auto fragShaderCode = hutgen_spv::rgba_mask_frag_spv;
+    auto vertShaderCode = hutgen_spv::tex_mask_vert_spv;
+    auto fragShaderCode = hutgen_spv::tex_mask_frag_spv;
 
     VkShaderModuleCreateInfo module_info = {};
     module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -171,16 +206,16 @@ class rgba_mask {
 
     VkPipelineShaderStageCreateInfo shaderStages[] = {vert_stage_info, frag_stage_info};
 
-    auto bindingDescription = vertex::binding_desc();
-    auto attributeDescriptions = vertex::attributes_desc();
+    auto bindings = binding_desc();
+    auto attributes = attributes_desc();
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
-    vertexInputInfo.vertexBindingDescriptionCount = 1;
-    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-    vertexInputInfo.vertexAttributeDescriptionCount = (uint32_t)attributeDescriptions.size();
-    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+    vertexInputInfo.vertexBindingDescriptionCount = (uint32_t)bindings.size();
+    vertexInputInfo.pVertexBindingDescriptions = bindings.data();
+    vertexInputInfo.vertexAttributeDescriptionCount = (uint32_t)attributes.size();
+    vertexInputInfo.pVertexAttributeDescriptions = attributes.data();
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -262,8 +297,8 @@ class rgba_mask {
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.pushConstantRangeCount = 0;  // Optional
-    pipelineLayoutInfo.pPushConstantRanges = 0;     // Optional
+    pipelineLayoutInfo.pushConstantRangeCount = 0;
+    pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = setLayouts;
@@ -280,9 +315,9 @@ class rgba_mask {
     pipelineInfo.pViewportState = &viewportState;
     pipelineInfo.pRasterizationState = &rasterizer;
     pipelineInfo.pMultisampleState = &multisampling;
-    pipelineInfo.pDepthStencilState = nullptr;  // Optional
+    pipelineInfo.pDepthStencilState = nullptr;
     pipelineInfo.pColorBlendState = &colorBlending;
-    pipelineInfo.pDynamicState = &dynamicState;  // Optional
+    pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = layout_;
     pipelineInfo.renderPass = window_.renderpass_;
     pipelineInfo.subpass = 0;
@@ -294,7 +329,7 @@ class rgba_mask {
     }
   }
 
-  ~rgba_mask() {
+  ~tex_mask() {
     VkDevice device = window_.display_.device_;
     vkDeviceWaitIdle(device);
     if (descriptor_layout_ != VK_NULL_HANDLE)
@@ -311,19 +346,22 @@ class rgba_mask {
       vkDestroyShaderModule(device, frag_, nullptr);
   }
 
-  template <typename TVertices>
-  void draw(VkCommandBuffer _buffer, const glm::uvec2 &_size, const shared_ref<TVertices> &_vertices,
-            const shared_ref<uint16_t> &_indices) {
+  void draw(VkCommandBuffer _buffer, const glm::uvec2 &_size, const shared_ref<vertex> &_vertices,
+            const shared_ref<uint16_t> &_indices, const shared_ref<instance> &_instances, uint _instances_count) {
     window_.display_.check_thread();
 
     vkCmdBindPipeline(_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
-
-    VkBuffer vertexBuffers[] = {_vertices->buffer_.buffer_};
-    VkDeviceSize offsets[] = {_vertices->offset_};
-    vkCmdBindVertexBuffers(_buffer, 0, 1, vertexBuffers, offsets);
-    vkCmdBindIndexBuffer(_buffer, _indices->buffer_.buffer_, _indices->offset_, VK_INDEX_TYPE_UINT16);
-
     vkCmdBindDescriptorSets(_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout_, 0, 1, &descriptor_, 0, nullptr);
+
+    VkBuffer verticesBuffers[] = {_vertices->buffer_.buffer_};
+    VkDeviceSize verticesOffsets[] = {_vertices->offset_};
+    vkCmdBindVertexBuffers(_buffer, 0, 1, verticesBuffers, verticesOffsets);
+
+    VkBuffer instancesBuffers[] = {_instances->buffer_.buffer_};
+    VkDeviceSize instancesOffsets[] = {_instances->offset_};
+    vkCmdBindVertexBuffers(_buffer, 1, 1, instancesBuffers, instancesOffsets);
+
+    vkCmdBindIndexBuffer(_buffer, _indices->buffer_.buffer_, _indices->offset_, VK_INDEX_TYPE_UINT16);
 
     VkRect2D scissor = {};
     scissor.offset = {0, 0};
@@ -339,7 +377,7 @@ class rgba_mask {
     viewport.maxDepth = 1.0f;
     vkCmdSetViewport(_buffer, 0, 1, &viewport);
 
-    vkCmdDrawIndexed(_buffer, _indices->count(), 1, 0, 0, 0);
+    vkCmdDrawIndexed(_buffer, _indices->count(), _instances_count, 0, 0, 0);
   }
 
   void bind(const shared_ref<ubo> &_ubo, const shared_image &_tex, const sampler &_sampler) {

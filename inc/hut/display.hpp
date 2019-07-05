@@ -69,7 +69,7 @@ class display {
   friend class tex;
   friend class rgb_tex;
   friend class rgba_tex;
-  friend class rgba_mask;
+  friend class tex_mask;
 
  public:
   using clock = std::chrono::steady_clock;
@@ -82,6 +82,7 @@ class display {
   ~display();
 
   void flush();
+  void flush_staged();
   int dispatch();
 
   void post(callback _callback);
@@ -104,6 +105,10 @@ class display {
     }
   }
 
+  VkPhysicalDeviceLimits limits() {
+    return device_props_.limits;
+  }
+
  protected:
   VkInstance instance_ = VK_NULL_HANDLE;
   VkDebugReportCallbackEXT debug_cb_ = VK_NULL_HANDLE;
@@ -120,19 +125,19 @@ class display {
   std::shared_ptr<buffer> staging_;
   VkCommandBuffer staging_cb_;
   bool dirty_staging_ = false;
-  std::atomic<uint> stage_pending_{0};
+  uint stage_pending_{0};
   std::mutex staging_mutex_;
-  using preflush_callback = std::function<void()>;
-  std::list<preflush_callback> preflush_jobs_;
-  std::mutex preflush_mutex_;
+  using flush_callback = std::function<void()>;
+  std::vector<flush_callback> preflush_jobs_, postflush_jobs_;
 
-  void flush_staged();
-  void preflush(preflush_callback _callback) {
-    std::lock_guard lk(preflush_mutex_);
+  void preflush(flush_callback _callback) {
     preflush_jobs_.emplace_back(_callback);
   }
 
-  event<> on_staged;
+  void postflush(flush_callback _callback) {
+    postflush_jobs_.emplace_back(_callback);
+  }
+
   std::list<callback> posted_jobs_;
   std::map<size_t, callback> overridable_jobs_;
   std::multimap<time_point, callback> delayed_jobs_;

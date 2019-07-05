@@ -94,7 +94,7 @@ class window {
   friend class tex;
   friend class rgb_tex;
   friend class rgba_tex;
-  friend class rgba_mask;
+  friend class tex_mask;
 
  public:
   event<> on_pause, on_resume, on_focus, on_blur, on_close;

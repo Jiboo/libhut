@@ -129,27 +129,12 @@ std::shared_ptr<image> image::load_png(display &_display, const uint8_t *_data, 
 
   png_read_update_info(png_ptr, info_ptr);
 
-  int byte_size = width * height * channels;
-  _display.stage_pending_++;
-  buffer::range_t staging = _display.staging_->do_alloc(byte_size);
-
-  // FIXME: Continue to do it in place, or should I use CPU mem and call update?
-  {
-    std::lock_guard lk(_display.staging_mutex_);
-    void *data;
-    vkMapMemory(_display.device_, _display.staging_->memory_, staging.offset_, byte_size, 0, &data);
-
-    uint8_t *dataBytes = reinterpret_cast<uint8_t *>(data);
-    std::vector<png_bytep> rows;
-    rows.reserve(height);
-    for (uint y = 0; y < height; y++) {
-      rows.emplace_back(dataBytes + y * width * channels);
-    }
-
-    png_read_image(png_ptr, rows.data());
-    vkUnmapMemory(_display.device_, _display.staging_->memory_);
-  }
-  png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
+  uint offsetAlignment = _display.device_props_.limits.optimalBufferCopyOffsetAlignment;
+  uint rowAlignment = _display.device_props_.limits.optimalBufferCopyRowPitchAlignment;
+  uint stride = align(width, rowAlignment);
+  uint row_byte_size = stride * channels;
+  uint byte_size = row_byte_size * height;
+  uint offset = _display.staging_->do_alloc(byte_size, offsetAlignment);
 
   VkImageSubresourceLayers subResource = {};
   subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -158,21 +143,36 @@ std::shared_ptr<image> image::load_png(display &_display, const uint8_t *_data, 
   subResource.layerCount = 1;
 
   VkBufferImageCopy info = {};
-  info.imageExtent = {(uint)width, (uint)height, 1};
+  info.imageExtent = {width, height, 1};
   info.imageOffset = {0, 0, 0};
-  info.bufferRowLength = width;
+  info.bufferRowLength = stride;
   info.bufferImageHeight = height;
-  info.bufferOffset = staging.offset_;
+  info.bufferOffset = offset;
   info.imageSubresource = subResource;
 
   auto dst = std::make_shared<image>(_display, glm::uvec2{width, height}, format);
+  {
+    std::lock_guard lk(_display.staging_mutex_);
+    _display.stage_pending_++;
+    void *data;
+    vkMapMemory(_display.device_, _display.staging_->memory_, offset, byte_size, 0, &data);
 
-  _display.preflush([info, &_display, dst]() {
-    _display.stage_transition(dst->image_, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    _display.stage_copy(_display.staging_->buffer_, dst->image_, &info);
-    _display.stage_transition(dst->image_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    _display.stage_pending_--;
-  });
+    auto dataBytes = reinterpret_cast<uint8_t *>(data);
+    png_bytep rows[height];
+    for (uint y = 0; y < height; y++) {
+      rows[y] = dataBytes + y * row_byte_size;
+    }
+
+    png_read_image(png_ptr, rows);
+    vkUnmapMemory(_display.device_, _display.staging_->memory_);
+    _display.preflush([info, &_display, dst]() {
+      _display.stage_transition(dst->image_, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+      _display.stage_copy(_display.staging_->buffer_, dst->image_, &info);
+      _display.stage_transition(dst->image_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+      _display.stage_pending_--;
+    });
+  }
+  png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
 
   return dst;
 }
@@ -190,12 +190,17 @@ image::image(display &_display, glm::uvec2 _size, VkFormat _format)
          VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &image_,
          &memory_);
 
-  _display.preflush([&_display, this]() {
-    _display.stage_transition(image_, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    VkClearColorValue clear = {};
-    _display.stage_clear(image_, &clear);
-    _display.stage_transition(image_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  });
+  {
+    std::lock_guard lk(display_.staging_mutex_);
+    display_.stage_pending_++,
+    _display.preflush([&_display, this]() {
+      _display.stage_transition(image_, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+      VkClearColorValue clear = {};
+      _display.stage_clear(image_, &clear);
+      _display.stage_transition(image_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+      display_.stage_pending_--;
+    });
+  }
 
   VkImageViewCreateInfo viewInfo = {};
   viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -258,31 +263,28 @@ void image::update(glm::ivec4 _coords, uint8_t *_data, uint _srcRowPitch) {
   int height = _coords[3] - _coords[1];
   assert (width > 0 && height > 0);
   int byte_size = height * _srcRowPitch;
-  display_.stage_pending_++;
-  buffer::range_t staging = display_.staging_->do_alloc(byte_size);
+  uint alignment = display_.device_props_.limits.optimalBufferCopyOffsetAlignment;
 
-  {
-    std::lock_guard lk(display_.staging_mutex_);
-    void *target;
-    vkMapMemory(display_.device_, display_.staging_->memory_, staging.offset_, byte_size, 0, &target);
-    memcpy(target, _data, byte_size);
-    vkUnmapMemory(display_.device_, display_.staging_->memory_);
-  }
-
+  uint offset = display_.staging_->do_alloc(byte_size, alignment);
   VkImageSubresourceLayers subResource = {};
   subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   subResource.baseArrayLayer = 0;
   subResource.mipLevel = 0;
   subResource.layerCount = 1;
-
   VkBufferImageCopy info = {};
   info.imageExtent = {(uint)width, (uint)height, 1};
   info.imageOffset = {_coords[0], _coords[1], 0};
   info.bufferRowLength = _srcRowPitch / pixel_size_;
   info.bufferImageHeight = height;
-  info.bufferOffset = staging.offset_;
+  info.bufferOffset = offset;
   info.imageSubresource = subResource;
 
+  std::lock_guard lk(display_.staging_mutex_);
+  display_.stage_pending_++;
+  void *target;
+  vkMapMemory(display_.device_, display_.staging_->memory_, offset, byte_size, 0, &target);
+  memcpy(target, _data, byte_size);
+  vkUnmapMemory(display_.device_, display_.staging_->memory_);
   display_.preflush([info, this]() {
     display_.stage_transition(image_, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     display_.stage_copy(display_.staging_->buffer_, image_, &info);
