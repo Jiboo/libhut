@@ -32,21 +32,14 @@
 
 #include <glm/glm.hpp>
 
-#include "hut/display.hpp"
-
 namespace hut {
 
 class display;
 
 class image {
   friend class display;
-  friend class rgb;
-  friend class rgba;
-  friend class tex;
-  friend class rgb_tex;
-  friend class rgba_tex;
-  friend class tex_mask;
   friend class font;
+  template<typename TDetails, typename... TExtraBindings> friend class drawable;
 
  public:
   static std::shared_ptr<image> load_png(display &, const uint8_t *_data, size_t _size);
@@ -77,10 +70,7 @@ class image {
 using shared_image = std::shared_ptr<image>;
 
 class sampler {
-  friend class tex;
-  friend class rgb_tex;
-  friend class rgba_tex;
-  friend class tex_mask;
+  template<typename TDetails, typename... TExtraBindings> friend class drawable;
 
   VkSampler sampler_;
   VkDevice device_;
@@ -90,5 +80,7 @@ public:
   sampler(display &_display, VkSamplerCreateInfo *_info);
   ~sampler();
 };
+
+using shared_sampler = std::shared_ptr<sampler>;
 
 }  // namespace hut

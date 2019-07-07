@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include <vulkan/vulkan.h>
+
 namespace hut {
 
 enum blend_mode {

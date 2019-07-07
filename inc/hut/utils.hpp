@@ -27,27 +27,46 @@
 
 #pragma once
 
-#include <chrono>
 #include <codecvt>
-#include <fstream>
 #include <functional>
 #include <locale>
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <unordered_set>
-#include <unordered_map>
 #include <vector>
 
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
+#include <glm/ext.hpp>
 
 namespace hut {
 
+  class buffer;
+  class display;
+  template<typename TDetails, typename... TExtraBindings> class drawable;
+  class font;
+  class shaper;
+  class image;
+  class sampler;
+  class window;
+
+  using shared_buffer = std::shared_ptr<buffer>;
+  using shared_font = std::shared_ptr<font>;
+  using shared_image = std::shared_ptr<image>;
+  using shared_sampler = std::shared_ptr<sampler>;
+
   using namespace std::chrono_literals;
+  using namespace glm;
 
 inline std::string to_utf8(char32_t ch) {
-  std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> convert;
+  static std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> convert;
   return convert.to_bytes(ch);
+}
+
+inline vec2 bbox_center(const vec4 &_input) {
+  const float width = _input[2] - _input[0];
+  const float height = _input[3] - _input[1];
+  return vec2{_input[0] + width / 2, _input[1] + height / 2};
 }
 
 template<typename T>
@@ -119,19 +138,5 @@ class sstream {
     return str();
   }
 };
-
-/*static std::vector<char> read_file(const std::string &filename) {
-  std::ifstream file(filename, std::ios::ate | std::ios::binary);
-
-  if (!file.is_open())
-    throw std::runtime_error(sstream("failed to open file: ") << filename);
-
-  size_t size = (size_t)file.tellg();
-  std::vector<char> buffer(size);
-  file.seekg(0);
-  file.read(buffer.data(), size);
-
-  return buffer;
-}*/
 
 }  // namespace hut

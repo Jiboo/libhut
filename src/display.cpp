@@ -34,10 +34,11 @@
 #include <unordered_set>
 
 #include "hut/display.hpp"
+#include "hut/buffer.hpp"
 
 using namespace hut;
 
-//#define HUT_PREFERE_NONDESCRETE_DEVICES
+#define HUT_PREFER_NONDESCRETE_DEVICES
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT /*flags*/,
                                                      VkDebugReportObjectTypeEXT /*objType*/, uint64_t /*obj*/,
@@ -50,7 +51,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT /*fla
 
 void display::post(display::callback _callback) {
   {
-    std::lock_guard<std::mutex> lock(posted_mutex_);
+    std::lock_guard lock(posted_mutex_);
     posted_jobs_.emplace(posted_jobs_.end(), _callback);
   }
   cv_.notify_one();
@@ -58,7 +59,7 @@ void display::post(display::callback _callback) {
 
 void display::post_overridable(callback _callback, size_t _id) {
   {
-    std::lock_guard<std::mutex> lock(overridable_mutex_);
+    std::lock_guard lock(overridable_mutex_);
     overridable_jobs_.emplace(_id, _callback);
   }
   cv_.notify_one();
@@ -66,7 +67,7 @@ void display::post_overridable(callback _callback, size_t _id) {
 
 void display::post_delayed(display::callback _callback, std::chrono::milliseconds _delay) {
   {
-    std::lock_guard<std::mutex> lock(delayed_mutex_);
+    std::lock_guard lock(delayed_mutex_);
     delayed_jobs_.emplace(display::clock::now() + _delay, _callback);
   }
   cv_.notify_one();
@@ -75,17 +76,17 @@ void display::post_delayed(display::callback _callback, std::chrono::millisecond
 display::time_point display::next_job_time_point() {
   time_point result = time_point::max();
   {
-    std::lock_guard<std::mutex> lock(overridable_mutex_);
+    std::lock_guard lock(overridable_mutex_);
     if (!overridable_jobs_.empty())
       return time_point::min();
   }
   {
-    std::lock_guard<std::mutex> lock(posted_mutex_);
+    std::lock_guard lock(posted_mutex_);
     if (!posted_jobs_.empty())
       return time_point::min();
   }
   {
-    std::lock_guard<std::mutex> lock(delayed_mutex_);
+    std::lock_guard lock(delayed_mutex_);
     if (!delayed_jobs_.empty())
       result = std::min(result, delayed_jobs_.begin()->first);
   }
@@ -95,7 +96,7 @@ display::time_point display::next_job_time_point() {
 void display::tick_posted(time_point _now) {
   decltype(posted_jobs_) tmp;
   {
-    std::lock_guard<std::mutex> lock(posted_mutex_);
+    std::lock_guard lock(posted_mutex_);
     tmp.swap(posted_jobs_);
   }
 
@@ -106,7 +107,7 @@ void display::tick_posted(time_point _now) {
 void display::tick_overridable(time_point _now) {
   decltype(overridable_jobs_) tmp;
   {
-    std::lock_guard<std::mutex> lock(overridable_mutex_);
+    std::lock_guard lock(overridable_mutex_);
     tmp.swap(overridable_jobs_);
   }
 
@@ -117,7 +118,7 @@ void display::tick_overridable(time_point _now) {
 void display::tick_delayed(time_point _now) {
   decltype(delayed_jobs_) tmp;
   {
-    std::lock_guard<std::mutex> lock(delayed_mutex_);
+    std::lock_guard lock(delayed_mutex_);
     tmp.swap(delayed_jobs_);
   }
 
@@ -129,7 +130,7 @@ void display::tick_delayed(time_point _now) {
   }
 
   {
-    std::lock_guard<std::mutex> lock(delayed_mutex_);
+    std::lock_guard lock(delayed_mutex_);
     for (const auto &due : tmp)
       delayed_jobs_.insert(due);
   }
@@ -138,10 +139,10 @@ void display::tick_delayed(time_point _now) {
 void display::jobs_loop() {
   time_point next = next_job_time_point();
   if (next == time_point::max()) {
-    std::unique_lock<std::mutex> lk(cv_mutex_);
+    std::unique_lock lk(cv_mutex_);
     cv_.wait(lk);
   } else if (next != time_point::min()) {
-    std::unique_lock<std::mutex> lk(cv_mutex_);
+    std::unique_lock lk(cv_mutex_);
     cv_.wait_until(lk, next);
   }
 
@@ -152,6 +153,10 @@ void display::jobs_loop() {
   // std::chrono::duration<double, std::milli> duration = display::clock::now() - now;
   // if (duration > std::chrono::milliseconds(16))
   // std::cout << "Jobs done in " << duration.count() << "ms" << std::endl;
+}
+
+shared_buffer display::alloc_buffer(uint _byte_size, VkMemoryPropertyFlags _type, VkBufferUsageFlagBits _flags) {
+  return std::make_shared<buffer>(*this, _byte_size, _type, _flags);
 }
 
 struct score_t {
@@ -169,7 +174,7 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
   vkGetPhysicalDeviceFeatures(_device, &features);
 
   result.score_ = properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? 1000 : 100;
-#ifdef HUT_PREFERE_NONDESCRETE_DEVICES
+#ifdef HUT_PREFER_NONDESCRETE_DEVICES
   if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
     result.score_ = 0;
 #endif
@@ -357,12 +362,14 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
   };
 
-  VkPhysicalDeviceFeatures device_features = {};
+  VkPhysicalDeviceFeatures enabled_features = {};
+  enabled_features.samplerAnisotropy = device_features_.samplerAnisotropy;
+
   VkDeviceCreateInfo device_info = {};
   device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
   device_info.pQueueCreateInfos = queue_create_infos.data();
   device_info.queueCreateInfoCount = (uint32_t)queue_create_infos.size();
-  device_info.pEnabledFeatures = &device_features;
+  device_info.pEnabledFeatures = &enabled_features;
   device_info.enabledExtensionCount = (uint32_t)device_extensions.size();
   device_info.ppEnabledExtensionNames = device_extensions.data();
   device_info.enabledLayerCount = (uint32_t)layers.size();
@@ -440,26 +447,19 @@ std::pair<uint32_t, VkMemoryPropertyFlags> display::find_memory_type(uint32_t ty
   throw std::runtime_error("failed to find suitable memory type!");
 }
 
-void display::stage_copy(VkBuffer _dst, const VkBufferCopy *_info) {
-  dirty_staging_ = true;
-  vkCmdCopyBuffer(staging_cb_, staging_->buffer_, _dst, 1, _info);
-}
-
-void display::stage_copy(VkBuffer _src, VkBuffer _dst, const VkBufferCopy *_info) {
-  dirty_staging_ = true;
-  vkCmdCopyBuffer(staging_cb_, _src, _dst, 1, _info);
-}
-
-void display::stage_transition(VkImage _image, VkImageLayout _old_layout, VkImageLayout _new_layout) {
-  dirty_staging_ = true;
+void display::stage_transition(const image_transition &_info) {
+#ifdef HUT_DEBUG_STAGING
+  /*std::cout << "[staging] transition " << _info.destination << " from " << _info.oldLayout << " to "
+            <<  _info.new_layout << std::endl;*/
+#endif
 
   VkImageMemoryBarrier barrier = {};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  barrier.oldLayout = _old_layout;
-  barrier.newLayout = _new_layout;
+  barrier.oldLayout = _info.oldLayout;
+  barrier.newLayout = _info.newLayout;
   barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = _image;
+  barrier.image = _info.destination;
   barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   barrier.subresourceRange.baseMipLevel = 0;
   barrier.subresourceRange.levelCount = 1;
@@ -468,30 +468,30 @@ void display::stage_transition(VkImage _image, VkImageLayout _old_layout, VkImag
 
   VkPipelineStageFlagBits srcStage, dstStage;
 
-  if (_old_layout == VK_IMAGE_LAYOUT_PREINITIALIZED && _new_layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+  if (_info.oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED && _info.newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
     srcStage = VK_PIPELINE_STAGE_HOST_BIT;
     dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-  } else if (_old_layout == VK_IMAGE_LAYOUT_PREINITIALIZED && _new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+  } else if (_info.oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED && _info.newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     srcStage = VK_PIPELINE_STAGE_HOST_BIT;
     dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-  } else if (_old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
-             _new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+  } else if (_info.oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+             _info.newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
     dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-  } else if (_old_layout == VK_IMAGE_LAYOUT_PREINITIALIZED &&
-             _new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+  } else if (_info.oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED &&
+             _info.newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     srcStage = VK_PIPELINE_STAGE_HOST_BIT;
     dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-  } else if (_old_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
-             _new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+  } else if (_info.oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
+             _info.newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
     barrier.dstAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     srcStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
@@ -503,42 +503,35 @@ void display::stage_transition(VkImage _image, VkImageLayout _old_layout, VkImag
   vkCmdPipelineBarrier(staging_cb_, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
-void display::stage_copy(VkImage _src, VkImage _dst, uint32_t _width, uint32_t _height) {
-  dirty_staging_ = true;
+void display::stage_copy(const buffer_copy &_info) {
+#ifdef HUT_DEBUG_STAGING
+  std::cout << "[staging] buffer " << _info.source << '[' << _info.srcOffset << "-" << (_info.srcOffset+_info.size)
+            << "] to " << _info.destination << '[' << _info.dstOffset << "-" << (_info.dstOffset+_info.size)
+            << ']' << std::endl;
+#endif
 
-  VkImageSubresourceLayers subResource = {};
-  subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  subResource.baseArrayLayer = 0;
-  subResource.mipLevel = 0;
-  subResource.layerCount = 1;
-
-  VkImageCopy copy = {};
-  copy.srcSubresource = subResource;
-  copy.dstSubresource = subResource;
-  copy.srcOffset = {0, 0, 0};
-  copy.dstOffset = {0, 0, 0};
-  copy.extent.width = _width;
-  copy.extent.height = _height;
-  copy.extent.depth = 1;
-
-  stage_copy(_src, _dst, &copy);
+  vkCmdCopyBuffer(staging_cb_, _info.source, _info.destination, 1, &_info);
 }
 
-void display::stage_copy(VkImage _src, VkImage _dst, const VkImageCopy *_info) {
-  dirty_staging_ = true;
-
-  vkCmdCopyImage(staging_cb_, _src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, _dst,
-                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, _info);
+void display::stage_copy(const image_copy &_info) {
+  vkCmdCopyImage(staging_cb_, _info.source, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                 _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &_info);
 }
 
-void display::stage_copy(VkBuffer _src, VkImage _dst, const VkBufferImageCopy *_info) {
-  dirty_staging_ = true;
+void display::stage_copy(const buffer2image_copy &_info) {
+#ifdef HUT_DEBUG_STAGING
+  uint size = _info.bufferRowLength * _info.bufferImageHeight * _info.pixelSize;
+  std::cout << "[staging] buffer " << _info.source << '[' << _info.bufferOffset << "-" << (_info.bufferOffset+size)
+            << "] to image " << _info.destination << std::endl;
+#endif
 
-  vkCmdCopyBufferToImage(staging_cb_, _src, _dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, _info);
+  vkCmdCopyBufferToImage(staging_cb_, _info.source, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &_info);
 }
 
-void display::stage_clear(VkImage _dst, VkClearColorValue *_clearColor) {
-  dirty_staging_ = true;
+void display::stage_clear(const image_clear &_info) {
+#ifdef HUT_DEBUG_STAGING
+  std::cout << "[staging] clear image " << _info.destination << std::endl;
+#endif
 
   VkImageSubresourceRange range = {};
   range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -547,18 +540,22 @@ void display::stage_clear(VkImage _dst, VkClearColorValue *_clearColor) {
   range.baseMipLevel = 0;
   range.levelCount = 1;
 
-  vkCmdClearColorImage(staging_cb_, _dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, _clearColor, 1, &range);
+  vkCmdClearColorImage(staging_cb_, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &_info.color, 1, &range);
 }
 
 void display::flush_staged() {
   std::lock_guard lk(staging_mutex_);
+  if (staging_jobs_ == 0)
+    return;
+
+#ifdef HUT_DEBUG_STAGING
+  std::cout << "[staging] doing preflush with staging " << staging_->buffer_ << std::endl;
+#endif
   for (auto &preflush : preflush_jobs_)
     preflush();
   preflush_jobs_.clear();
 
-  if (!dirty_staging_)
-    return;
-  if (stage_pending_ > 0)
+  if (staging_jobs_ > 0)
     return;
 
   vkEndCommandBuffer(staging_cb_);
@@ -568,13 +565,13 @@ void display::flush_staged() {
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &staging_cb_;
 
+#ifdef HUT_DEBUG_STAGING
+  std::cout << "[staging] submitting!" << std::endl;
+#endif
   vkQueueSubmit(queueg_, 1, &submitInfo, VK_NULL_HANDLE);
-
-  staging_->clear_ranges();
-  dirty_staging_ = false;
-
   vkQueueWaitIdle(queueg_);
 
+  staging_->clear_ranges();
   for (auto &postflush : postflush_jobs_)
     postflush();
   postflush_jobs_.clear();

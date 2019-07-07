@@ -35,6 +35,7 @@
 #include "hut/display.hpp"
 #include "hut/image.hpp"
 #include "hut/color.hpp"
+#include "hut/buffer.hpp"
 
 using namespace hut;
 
@@ -134,7 +135,6 @@ std::shared_ptr<image> image::load_png(display &_display, const uint8_t *_data, 
   uint stride = align(width, rowAlignment);
   uint row_byte_size = stride * channels;
   uint byte_size = row_byte_size * height;
-  uint offset = _display.staging_->do_alloc(byte_size, offsetAlignment);
 
   VkImageSubresourceLayers subResource = {};
   subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -142,34 +142,51 @@ std::shared_ptr<image> image::load_png(display &_display, const uint8_t *_data, 
   subResource.mipLevel = 0;
   subResource.layerCount = 1;
 
-  VkBufferImageCopy info = {};
-  info.imageExtent = {width, height, 1};
-  info.imageOffset = {0, 0, 0};
-  info.bufferRowLength = stride;
-  info.bufferImageHeight = height;
-  info.bufferOffset = offset;
-  info.imageSubresource = subResource;
-
   auto dst = std::make_shared<image>(_display, glm::uvec2{width, height}, format);
   {
     std::lock_guard lk(_display.staging_mutex_);
-    _display.stage_pending_++;
+    uint offset = _display.staging_->do_alloc(byte_size, offsetAlignment);
+
     void *data;
     vkMapMemory(_display.device_, _display.staging_->memory_, offset, byte_size, 0, &data);
-
     auto dataBytes = reinterpret_cast<uint8_t *>(data);
     png_bytep rows[height];
     for (uint y = 0; y < height; y++) {
       rows[y] = dataBytes + y * row_byte_size;
     }
-
     png_read_image(png_ptr, rows);
     vkUnmapMemory(_display.device_, _display.staging_->memory_);
-    _display.preflush([info, &_display, dst]() {
-      _display.stage_transition(dst->image_, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-      _display.stage_copy(_display.staging_->buffer_, dst->image_, &info);
-      _display.stage_transition(dst->image_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-      _display.stage_pending_--;
+#ifdef HUT_DEBUG_STAGING
+    std::cout << "[staging] png at " << _display.staging_->buffer_ << '['
+              << offset << '-' << (offset + byte_size) << ']' << std::endl;
+#endif
+
+    display::buffer2image_copy copy = {};
+    copy.imageExtent = {width, height, 1};
+    copy.imageOffset = {0, 0, 0};
+    copy.bufferRowLength = stride;
+    copy.bufferImageHeight = height;
+    copy.bufferOffset = offset;
+    copy.imageSubresource = subResource;
+    copy.source = _display.staging_->buffer_;
+    copy.destination = dst->image_;
+    copy.pixelSize = channels;
+
+    display::image_transition pre = {};
+    pre.destination = dst->image_;
+    pre.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    pre.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    display::image_transition post = {};
+    post.destination = dst->image_;
+    post.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    post.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    _display.staging_jobs_++;
+    _display.preflush([&_display, pre, post, copy] {
+      _display.stage_transition(pre);
+      _display.stage_copy(copy);
+      _display.stage_transition(post);
+      _display.staging_jobs_--;
     });
   }
   png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
@@ -192,13 +209,25 @@ image::image(display &_display, glm::uvec2 _size, VkFormat _format)
 
   {
     std::lock_guard lk(display_.staging_mutex_);
-    display_.stage_pending_++,
-    _display.preflush([&_display, this]() {
-      _display.stage_transition(image_, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-      VkClearColorValue clear = {};
-      _display.stage_clear(image_, &clear);
-      _display.stage_transition(image_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-      display_.stage_pending_--;
+
+    display::image_transition pre = {};
+    pre.destination = image_;
+    pre.oldLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+    pre.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    display::image_transition post = {};
+    post.destination = image_;
+    post.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    post.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    display::image_clear clear = {};
+    clear.destination = image_;
+    clear.color = VkClearColorValue{};
+
+    display_.staging_jobs_++;
+    display_.preflush([this, pre, post, clear]() {
+      display_.stage_transition(pre);
+      display_.stage_clear(clear);
+      display_.stage_transition(post);
+      display_.staging_jobs_--;
     });
   }
 
@@ -265,31 +294,48 @@ void image::update(glm::ivec4 _coords, uint8_t *_data, uint _srcRowPitch) {
   int byte_size = height * _srcRowPitch;
   uint alignment = display_.device_props_.limits.optimalBufferCopyOffsetAlignment;
 
+  std::lock_guard lk(display_.staging_mutex_);
   uint offset = display_.staging_->do_alloc(byte_size, alignment);
+  void *target;
+  vkMapMemory(display_.device_, display_.staging_->memory_, offset, byte_size, 0, &target);
+  memcpy(target, _data, byte_size);
+  vkUnmapMemory(display_.device_, display_.staging_->memory_);
+#ifdef HUT_DEBUG_STAGING
+  std::cout << "[staging] image update at " << display_.staging_->buffer_ << '['
+            << offset << '-' << (offset + byte_size) << ']' << std::endl;
+#endif
+
   VkImageSubresourceLayers subResource = {};
   subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   subResource.baseArrayLayer = 0;
   subResource.mipLevel = 0;
   subResource.layerCount = 1;
-  VkBufferImageCopy info = {};
-  info.imageExtent = {(uint)width, (uint)height, 1};
-  info.imageOffset = {_coords[0], _coords[1], 0};
-  info.bufferRowLength = _srcRowPitch / pixel_size_;
-  info.bufferImageHeight = height;
-  info.bufferOffset = offset;
-  info.imageSubresource = subResource;
 
-  std::lock_guard lk(display_.staging_mutex_);
-  display_.stage_pending_++;
-  void *target;
-  vkMapMemory(display_.device_, display_.staging_->memory_, offset, byte_size, 0, &target);
-  memcpy(target, _data, byte_size);
-  vkUnmapMemory(display_.device_, display_.staging_->memory_);
-  display_.preflush([info, this]() {
-    display_.stage_transition(image_, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    display_.stage_copy(display_.staging_->buffer_, image_, &info);
-    display_.stage_transition(image_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    display_.stage_pending_--;
+  display::image_transition pre = {};
+  pre.destination = image_;
+  pre.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  pre.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  display::image_transition post = {};
+  post.destination = image_;
+  post.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  post.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  display::buffer2image_copy copy = {};
+  copy.imageExtent = {(uint)width, (uint)height, 1};
+  copy.imageOffset = {_coords[0], _coords[1], 0};
+  copy.bufferRowLength = _srcRowPitch / pixel_size_;
+  copy.bufferImageHeight = height;
+  copy.bufferOffset = offset;
+  copy.imageSubresource = subResource;
+  copy.source = display_.staging_->buffer_;
+  copy.destination = image_;
+  copy.pixelSize = pixel_size_;
+
+  display_.staging_jobs_++;
+  display_.preflush([this, pre, post, copy]() {
+    display_.stage_transition(pre);
+    display_.stage_copy(copy);
+    display_.stage_transition(post);
+    display_.staging_jobs_--;
   });
 }
 

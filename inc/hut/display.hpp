@@ -48,15 +48,9 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
-#include "hut/buffer.hpp"
 #include "hut/utils.hpp"
-#include "image.hpp"
 
 namespace hut {
-
-class window;
-class display;
-class buffer;
 
 class display {
   friend class window;
@@ -64,12 +58,7 @@ class display {
   friend class image;
   friend class sampler;
   friend class font;
-  friend class rgb;
-  friend class rgba;
-  friend class tex;
-  friend class rgb_tex;
-  friend class rgba_tex;
-  friend class tex_mask;
+  template<typename TDetails, typename... TExtraBindings> friend class drawable;
 
  public:
   using clock = std::chrono::steady_clock;
@@ -109,7 +98,16 @@ class display {
     return device_props_.limits;
   }
 
+  constexpr static VkBufferUsageFlagBits GENERAL_FLAGS = VkBufferUsageFlagBits(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+                                                          | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+                                                          | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+
+  shared_buffer alloc_buffer(uint _byte_size,
+      VkMemoryPropertyFlags _type = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+      VkBufferUsageFlagBits _flags = GENERAL_FLAGS);
+
  protected:
+  FT_Library ft_library_;
   VkInstance instance_ = VK_NULL_HANDLE;
   VkDebugReportCallbackEXT debug_cb_ = VK_NULL_HANDLE;
 
@@ -122,21 +120,58 @@ class display {
   VkCommandPool commandg_pool_ = VK_NULL_HANDLE;
   VkPhysicalDeviceMemoryProperties mem_props_;
 
+  void init_vulkan_instance(const char *_app_name, uint32_t _app_version, std::vector<const char *> &_extensions);
+  void init_vulkan_device(VkSurfaceKHR _dummy);
+  void destroy_vulkan();
+
+  std::pair<uint32_t, VkMemoryPropertyFlags> find_memory_type(uint32_t _type_filter, VkMemoryPropertyFlags _properties);
+
   std::shared_ptr<buffer> staging_;
   VkCommandBuffer staging_cb_;
-  bool dirty_staging_ = false;
-  uint stage_pending_{0};
+  uint staging_jobs_ = 0;
   std::mutex staging_mutex_;
   using flush_callback = std::function<void()>;
   std::vector<flush_callback> preflush_jobs_, postflush_jobs_;
 
-  void preflush(flush_callback _callback) {
+  inline void preflush(flush_callback _callback) {
     preflush_jobs_.emplace_back(_callback);
   }
 
-  void postflush(flush_callback _callback) {
+  inline void postflush(flush_callback _callback) {
     postflush_jobs_.emplace_back(_callback);
   }
+
+  struct buffer_copy : public VkBufferCopy {
+    VkBuffer source;
+    VkBuffer destination;
+  };
+
+  struct buffer2image_copy : public VkBufferImageCopy {
+    VkBuffer source;
+    VkImage destination;
+    uint pixelSize;
+  };
+
+  struct image_copy : public VkImageCopy {
+    VkImage source;
+    VkImage destination;
+  };
+
+  struct image_clear {
+    VkImage destination;
+    VkClearColorValue color;
+  };
+
+  struct image_transition {
+    VkImage destination;
+    VkImageLayout oldLayout, newLayout;
+  };
+
+  void stage_transition(const image_transition &_info);
+  void stage_copy(const buffer_copy &_info);
+  void stage_copy(const image_copy &_info);
+  void stage_copy(const buffer2image_copy &_info);
+  void stage_clear(const image_clear &_info);
 
   std::list<callback> posted_jobs_;
   std::map<size_t, callback> overridable_jobs_;
@@ -146,26 +181,12 @@ class display {
   std::condition_variable cv_;
   std::thread::id dispatcher_;
 
-  FT_Library ft_library_;
-
-  void init_vulkan_instance(const char *_app_name, uint32_t _app_version, std::vector<const char *> &_extensions);
-  void init_vulkan_device(VkSurfaceKHR _dummy);
-  std::pair<uint32_t, VkMemoryPropertyFlags> find_memory_type(uint32_t _type_filter, VkMemoryPropertyFlags _properties);
-  void stage_copy(VkBuffer _src, VkBuffer _dst, const VkBufferCopy *_info);
-  void stage_copy(VkBuffer _dst, const VkBufferCopy *_info);
-  void stage_transition(VkImage _image, VkImageLayout _old_layout, VkImageLayout _new_layout);
-  void stage_copy(VkImage _src, VkImage _dst, uint32_t _width, uint32_t _height);
-  void stage_copy(VkImage _src, VkImage _dst, const VkImageCopy *_info);
-  void stage_copy(VkBuffer _src, VkImage _dst, const VkBufferImageCopy *_info);
-  void stage_clear(VkImage _dst, VkClearColorValue *_clearColor);
-  void destroy_vulkan();
-
   time_point next_job_time_point();
-
   void tick_posted(time_point _now);
   void tick_overridable(time_point _now);
   void tick_delayed(time_point _now);
   void jobs_loop();
+
   inline void check_thread() {
     assert(std::this_thread::get_id() == dispatcher_ || dispatcher_ == std::thread::id());
   }

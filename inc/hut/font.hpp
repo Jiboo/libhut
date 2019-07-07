@@ -36,7 +36,8 @@
 #include <harfbuzz/hb.h>
 #include <harfbuzz/hb-ft.h>
 
-#include "image.hpp"
+#include "hut/image.hpp"
+#include "hut/drawable.hpp"
 
 namespace hut {
 
@@ -46,10 +47,11 @@ namespace hut {
     FT_Face face_;
     hb_font_t *font_;
     shared_image atlas_;
-    uint load_flags_ = FT_LOAD_NO_BITMAP | FT_LOAD_FORCE_AUTOHINT;
+    uint load_flags_;
 
   public:
-    font(display &_display, const uint8_t *_addr, size_t _size, glm::uvec2 _atlas_size = {512, 512}) {
+    font(display &_display, const uint8_t *_addr, size_t _size, uvec2 _atlas_size = {512, 512}, bool _hinting = true) {
+      load_flags_ = FT_LOAD_NO_BITMAP | (_hinting ? FT_LOAD_FORCE_AUTOHINT : FT_LOAD_NO_HINTING);
       FT_New_Memory_Face(_display.ft_library_, _addr, _size, 0, &face_);
       font_ = hb_ft_font_create(face_, nullptr);
       hb_ft_font_set_load_flags(font_, load_flags_);
@@ -197,8 +199,8 @@ namespace hut {
 
   public:
     struct result {
-      shared_ref<tex_mask::vertex> vertices_;
-      shared_ref<uint16_t> indices_;
+      tex_mask::shared_vertices vertices_;
+      tex_mask::shared_indices indices_;
       glm::vec4 bbox_;
 
       operator bool() {
@@ -214,8 +216,7 @@ namespace hut {
       hb_buffer_destroy(buffer_);
     }
 
-    void bake(buffer &_buff, result &_dst, const shared_font &_font, uint8_t _size,
-        const std::string &_text, const std::function<void()> _post_cb) {
+    void bake(shared_buffer &_buff, result &_dst, const shared_font &_font, uint8_t _size, const std::string &_text) {
       FT_Set_Char_Size(_font->face_, _size * 64, _size * 64, 96, 96);
 
       hb_buffer_reset(buffer_);
@@ -231,8 +232,8 @@ namespace hut {
       size_t drawn_codepoints = 0;
       size_t max_indices = 6 * codepoints;
       size_t max_vertices = 4 * codepoints;
-      auto *indices = new uint16_t[max_indices];
-      auto *vertices = new tex_mask::vertex[max_vertices];
+      uint16_t indices[max_indices];
+      tex_mask::vertex vertices[max_vertices];
       float x = 0., y = 0;
       glm::vec4 bbox = {0, 0, 0, 0};
 
@@ -242,8 +243,8 @@ namespace hut {
         font::glyph &glyph = _font->load_glyph(cindex, _size);
 
         if (glyph) {
-          float xo = ceilf(float(pos[i].x_offset) / 64);
-          float yo = ceilf(float(pos[i].y_offset) / 64);
+          float xo = float(pos[i].x_offset) / 64;
+          float yo = float(pos[i].y_offset) / 64;
 
           float x0 = x + xo + glyph.bearing_.x;
           float y0 = y + yo + glyph.bearing_.y;
@@ -278,23 +279,17 @@ namespace hut {
           drawn_codepoints++;
         }
 
-        x += floorf(float(pos[i].x_advance) / 64);
-        y += floorf(float(pos[i].y_advance) / 64);
+        x += float(pos[i].x_advance) / 64;
+        y += float(pos[i].y_advance) / 64;
       }
       bbox[0] = 0;
       bbox[2] = x;
       _dst.bbox_ = bbox;
 
-      _buff.display_.post([_post_cb, &_dst, &_buff, indices, vertices, drawn_codepoints](auto) {
-        _dst.indices_ = _buff.allocate<uint16_t>(6 * drawn_codepoints);
-        _dst.indices_->set(indices, 6 * drawn_codepoints);
-        _dst.vertices_ = _buff.allocate<tex_mask::vertex>(4 * drawn_codepoints);
-        _dst.vertices_->set(vertices, 4 * drawn_codepoints);
-
-        delete [] indices;
-        delete [] vertices;
-        _post_cb();
-      });
+      _dst.indices_ = _buff->allocate<uint16_t>(6 * drawn_codepoints);
+      _dst.indices_->set(indices);
+      _dst.vertices_ = _buff->allocate<tex_mask::vertex>(4 * drawn_codepoints);
+      _dst.vertices_->set(vertices);
     }
   };
 

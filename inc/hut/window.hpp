@@ -37,9 +37,6 @@
 #include <xcb/xcb_keysyms.h>
 #endif
 
-#include <glm/vec2.hpp>
-#include <glm/vec4.hpp>
-
 #include "hut/utils.hpp"
 
 namespace hut {
@@ -89,12 +86,7 @@ class display;
 
 class window {
   friend class display;
-  friend class rgb;
-  friend class rgba;
-  friend class tex;
-  friend class rgb_tex;
-  friend class rgba_tex;
-  friend class tex_mask;
+  template<typename TDetails, typename... TExtraBindings> friend class drawable;
 
  public:
   event<> on_pause, on_resume, on_focus, on_blur, on_close;

@@ -30,6 +30,7 @@
 #include <iostream>
 
 #include "hut/buffer.hpp"
+#include "hut/display.hpp"
 
 using namespace hut;
 
@@ -77,58 +78,88 @@ void buffer::init(uint32_t _size, VkMemoryPropertyFlags _type, uint _usage) {
 }
 
 void buffer::update(uint32_t _offset, uint32_t _size, const void *_data) {
-  uint offset = display_.staging_->do_alloc(_size, 4);
-  VkBufferCopy copy;
-  copy.size = _size;
-  copy.srcOffset = offset;
-  copy.dstOffset = _offset;
-
   std::lock_guard lk(display_.staging_mutex_);
-  display_.stage_pending_++;
+  uint offset = display_.staging_->do_alloc(_size, 4);
+
   void *target;
   vkMapMemory(display_.device_, display_.staging_->memory_, offset, _size, 0, &target);
   memcpy(target, _data, _size);
   vkUnmapMemory(display_.device_, display_.staging_->memory_);
-  display_.preflush([this, copy](){
-    display_.stage_copy(buffer_, &copy);
-    display_.stage_pending_--;
+#ifdef HUT_DEBUG_STAGING
+  std::cout << "[staging] buffer " << buffer_ << " update at " << display_.staging_->buffer_
+            << '[' << _offset << '-' << (_offset + _size) << ']' << std::endl;
+#endif
+
+  display::buffer_copy copy = {};
+  copy.size = _size;
+  copy.srcOffset = offset;
+  copy.dstOffset = _offset;
+  copy.source = display_.staging_->buffer_;
+  copy.destination = buffer_;
+
+  display_.staging_jobs_++;
+  display_.preflush([this, copy]() {
+    display_.stage_copy(copy);
+    display_.staging_jobs_--;
   });
-}
-
-void buffer::copy_from(VkBuffer _other, uint32_t _other_offset, uint32_t _this_offset, uint32_t _size) {
-  VkBufferCopy copyRegion = {};
-  copyRegion.srcOffset = _other_offset;
-  copyRegion.dstOffset = _this_offset;
-  copyRegion.size = _size;
-
-  display_.stage_pending_++;
-  display_.preflush([this, _other, copyRegion](){
-    display_.stage_copy(_other, buffer_, &copyRegion);
-    display_.stage_pending_--;
-  });
-}
-
-void buffer::copy_from(buffer &_other, uint32_t _other_offset, uint32_t _this_offset, uint32_t _size) {
-  copy_from(_other.buffer_, _other_offset, _this_offset, _size);
 }
 
 void buffer::grow(uint32_t new_size) {
+  merge();
+
   std::lock_guard lk(ranges_mutex_);
   assert(new_size > size_);
 
+  // keep thus ref to delete them once we staged the copy from the old buf to the new
   VkBuffer old_buff = buffer_;
   VkDeviceMemory old_mem = memory_;
 
   init(new_size, type_, usage_);
-  copy_from(old_buff, 0, 0, size_);
+#ifdef HUT_DEBUG_STAGING
+  std::cout << "[staging] buffer grow " << old_buff << " changes its ID to " << buffer_ << std::endl;
+#endif
 
-  {
-    std::lock_guard lk(display_.staging_mutex_);
-    display_.postflush([this, old_buff, old_mem] {
-      vkFreeMemory(display_.device_, old_mem, nullptr);
-      vkDestroyBuffer(display_.device_, old_buff, nullptr);
-    });
+  // Find the minimal copy size, otherwise ("full range") we could erase stuff already staged in the new buff!
+  uint lower_bound = std::numeric_limits<uint>::max();
+  uint upper_bound = 0;
+  for (const auto &range : ranges_) {
+    if (!range.allocated_)
+      continue;
+    if (range.offset_ < lower_bound)
+      lower_bound = range.offset_;
+    uint end = range.offset_ + range.size_;
+    if (end > upper_bound)
+      upper_bound = end;
   }
+
+  display::buffer_copy copy = {};
+  copy.srcOffset = lower_bound;
+  copy.dstOffset = lower_bound;
+  copy.size = upper_bound - lower_bound;
+  copy.source = old_buff;
+  copy.destination = buffer_;
+
+  // NOTE: We asked for a growth, while locking the staging, like the alloc for loading a png
+  // In this case we can't lock the mutex, as it's already done
+  // FIXME: Should we check if this thread is really the one locking mutex?
+  if (display_.staging_.get() != this && display_.staging_mutex_.try_lock())
+    std::lock_guard lk_staging(display_.staging_mutex_);
+
+  display_.staging_jobs_++;
+  display_.preflush([this, copy]() {
+#ifdef HUT_DEBUG_STAGING
+    std::cout << "[staging] preflush copying old buff " << copy.source << " to " << copy.destination << std::endl;
+#endif
+    display_.stage_copy(copy);
+    display_.staging_jobs_--;
+  });
+  display_.postflush([this, old_buff, old_mem] {
+#ifdef HUT_DEBUG_STAGING
+    std::cout << "[staging] destroying old buff " << old_buff << std::endl;
+#endif
+    vkFreeMemory(display_.device_, old_mem, nullptr);
+    vkDestroyBuffer(display_.device_, old_buff, nullptr);
+  });
 
   auto last = ranges_.rbegin();
   if (last->allocated_) {
@@ -141,6 +172,8 @@ void buffer::grow(uint32_t new_size) {
     range_t &tail = *last;
     tail.size_ += (new_size - size_);
   }
+
+  size_ = new_size;
 }
 
 uint buffer::do_alloc(uint32_t _size, uint8_t _align) {
@@ -163,7 +196,7 @@ uint buffer::do_alloc(uint32_t _size, uint8_t _align) {
 
   if (it == ranges_.cend()) {
     ranges_mutex_.unlock();
-    grow(size_ * 2);
+    grow(align(size_ + _size, size_));
     return do_alloc(_size, _align);
   }
 

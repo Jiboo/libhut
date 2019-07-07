@@ -27,13 +27,14 @@
 
 #pragma once
 
+#include <list>
 #include <memory>
+#include <mutex>
 #include <set>
 
 #include <glm/glm.hpp>
 
-#include "hut/display.hpp"
-#include "display.hpp"
+#include <vulkan/vulkan.h>
 
 namespace hut {
 
@@ -41,14 +42,10 @@ class display;
 
 class buffer {
   friend class display;
-  friend class rgb;
-  friend class rgba;
-  friend class tex;
-  friend class rgb_tex;
-  friend class rgba_tex;
-  friend class tex_mask;
   friend class shaper;
   friend class image;
+  friend struct buffer_ubo;
+  template<typename TDetails, typename... TExtraBindings> friend class drawable;
 
  public:
   struct range_t {
@@ -84,21 +81,29 @@ class buffer {
       buffer_.do_free(offset_);
     }
 
-    void set(const T *_data, size_t _count) {
-      assert(_count == size_ / sizeof(T));
+    void set(const T *_data) {
       buffer_.update(offset_, size_, (void *)_data);
     }
 
     void set(const std::initializer_list<T> &_data) {
-      set(_data.begin(), _data.size());
+      const uint byte_size = _data.size() * sizeof(T);
+      assert(byte_size == size_);
+      set(_data.begin());
     }
 
-    template <class TContainer>
-    void set(const TContainer &_data) {
-      set(_data.begin().base(), _data.size());
+    void update(uint _offset, const T &_src) {
+      const uint byte_offset = _offset * sizeof(T);
+      assert(byte_offset <= size_);
+      buffer_.update(offset_ + byte_offset, sizeof(T), (void *)&_src);
     }
 
-    uint count() const {
+    void update(uint _offset, uint _byte_offset, uint _byte_size, void *_data) {
+      const uint byte_offset = _offset * sizeof(T) + _byte_offset;
+      assert(byte_offset + _byte_size <= size_);
+      buffer_.update(offset_ + byte_offset, _byte_size, (void *)_data);
+    }
+
+    uint size() const {
       return size_ / sizeof(T);
     }
   };
@@ -107,7 +112,6 @@ class buffer {
   ~buffer();
 
   void update(uint _offset, uint _size, const void *_data);
-  void copy_from(buffer &_other, uint _other_offset, uint _this_offset, uint _size);
   void debug_ranges();
 
   template <typename T>
@@ -138,13 +142,14 @@ class buffer {
   std::mutex ranges_mutex_;
 
   void init(uint _size, VkMemoryPropertyFlags _type, uint _usage);
-  void copy_from(VkBuffer _other, uint _other_offset, uint _this_offset, uint _size);
   void grow(uint new_size);
   uint do_alloc(uint _size, uint8_t _align = 4);
   void do_free(uint _offset);
   void merge();
   void clear_ranges();
 };
+
+using shared_buffer = std::shared_ptr<buffer>;
 
 template <typename T>
 using shared_ref = std::shared_ptr<buffer::ref<T>>;

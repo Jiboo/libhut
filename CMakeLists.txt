@@ -115,7 +115,7 @@ add_dependencies(hut hutgen_spv_cpp)
 message("Configuring demo build targets...")
 ###########################################################
 
-file(GLOB HUT_DEMO_PNG tst/*.png)
+file(GLOB HUT_DEMO_PNG tst/png/*.png)
 add_custom_command(OUTPUT ${HUT_GEN_DIR}/demo_png.cpp
     COMMAND gen_res demo_png ${HUT_GEN_DIR} ${HUT_DEMO_PNG}
     DEPENDS gen_res ${HUT_DEMO_PNG}
