@@ -38,20 +38,20 @@
 
 using namespace hut;
 
-glm::mat4 make_mat(glm::vec2 _translate, glm::vec3 _scale) {
-  glm::mat4 m(1);
-  m = glm::translate(m, glm::vec3(_translate, 0));
-  m = glm::scale(m, _scale);
+mat4 make_mat(vec2 _translate, vec3 _scale) {
+  mat4 m(1);
+  m = translate(m, vec3(_translate, 0));
+  m = scale(m, _scale);
   return m;
 }
 
-glm::mat4 make_mat(glm::vec2 _translate, float _rot_angle, glm::vec2 _rot_center, glm::vec3 _scale) {
-  glm::mat4 m(1);
-  m = glm::translate(m, glm::vec3(_translate, 0));
-  m = glm::translate(m, glm::vec3(_rot_center, 0));
-  m = glm::rotate(m, _rot_angle, {0, 0, 1});
-  m = glm::translate(m, glm::vec3(-_rot_center, 0));
-  m = glm::scale(m, _scale);
+mat4 make_mat(vec2 _translate, float _rot_angle, vec2 _rot_center, vec3 _scale) {
+  mat4 m(1);
+  m = translate(m, vec3(_translate, 0));
+  m = translate(m, vec3(_rot_center, 0));
+  m = rotate(m, _rot_angle, {0, 0, 1});
+  m = translate(m, vec3(-_rot_center, 0));
+  m = scale(m, _scale);
   return m;
 }
 
@@ -64,16 +64,16 @@ int main(int, char **) {
   d.post_delayed([](auto) { std::cout << "single job, delayed" << std::endl; }, 5s);
 
   window w(d);
-  w.clear_color({1, 0, 1, 1});
+  w.clear_color({1, 1, 1, 1});
   w.title("testbed");
 
-  auto b = d.alloc_buffer(1024 * 1024); // FIXME: If "grown", all refs (particulary, descriptor sets, stagings should be fine) to this are invalid...
+  auto b = d.alloc_buffer(32);
 
   auto indices = b->allocate<uint16_t>(6);
   indices->set({0, 1, 2, 2, 3, 0});
 
   buffer_ubo default_ubo;
-  default_ubo.proj_ = glm::ortho<float>(0, w.size().x, 0, w.size().y);
+  default_ubo.proj_ = ortho<float>(0, w.size().x, 0, w.size().y);
   shared_ubo ubo = buffer_ubo::alloc(b, default_ubo);
 
   auto rgb_pipeline = std::make_unique<rgb>(w);
@@ -95,10 +95,10 @@ int main(int, char **) {
   auto rgba_instances = b->allocate<rgba::instance>(2);
   auto rgba_vertices = b->allocate<rgba::vertex>(4);
   rgba_vertices->set({
-    rgba::vertex{{0,     0}, {1, 0, 0, 0.5}},
-    rgba::vertex{{100,   0}, {0, 1, 0, 0.5}},
-    rgba::vertex{{100, 100}, {1, 1, 1, 0.5}},
-    rgba::vertex{{0,   100}, {0, 0, 1, 0.5}}
+    rgba::vertex{{0,     0}, {1, 0, 0, 0.25}},
+    rgba::vertex{{100,   0}, {0, 1, 0, 0.25}},
+    rgba::vertex{{100, 100}, {1, 1, 1, 0.25}},
+    rgba::vertex{{0,   100}, {0, 0, 1, 0.25}}
   });
   rgba_instances->set({
     rgba::instance{make_mat({  0,   0}, {1,1,1})},
@@ -144,10 +144,10 @@ int main(int, char **) {
   auto tex2_rgba_instances = b->allocate<tex_rgba::instance>(2);
   auto tex_rgba_vertices = b->allocate<tex_rgba::vertex>(4);
   tex_rgba_vertices->set({
-    tex_rgba::vertex{{0, 0}, {0, 0}, {1, 0, 0, 0.5}},
-    tex_rgba::vertex{{1, 0}, {1, 0}, {0, 1, 0, 0.5}},
-    tex_rgba::vertex{{1, 1}, {1, 1}, {1, 1, 1, 0.5}},
-    tex_rgba::vertex{{0, 1}, {0, 1}, {0, 0, 1, 0.5}}
+    tex_rgba::vertex{{0, 0}, {0, 0}, {1, 0, 0, 0.25}},
+    tex_rgba::vertex{{1, 0}, {1, 0}, {0, 1, 0, 0.25}},
+    tex_rgba::vertex{{1, 1}, {1, 1}, {1, 1, 1, 0.25}},
+    tex_rgba::vertex{{0, 1}, {0, 1}, {0, 0, 1, 0.25}}
   });
   tex1_rgba_instances->set({
     tex_rgba::instance{make_mat({  0, 400}, {100,100,1})},
@@ -208,8 +208,8 @@ int main(int, char **) {
     tex2_ready = true;
     w.invalidate(true);  // will force to call on_draw on the next frame
 
-    roboto = std::make_shared<font>(d, demo_ttf::Roboto_Regular_ttf.data(), demo_ttf::Roboto_Regular_ttf.size(), glm::uvec2{256, 256}, true);
-    material_icons = std::make_shared<font>(d, demo_ttf::MaterialIcons_Regular_ttf.data(), demo_ttf::MaterialIcons_Regular_ttf.size(), glm::uvec2{256, 256}, false);
+    roboto = std::make_shared<font>(d, demo_ttf::Roboto_Regular_ttf.data(), demo_ttf::Roboto_Regular_ttf.size(), uvec2{256, 256}, true);
+    material_icons = std::make_shared<font>(d, demo_ttf::MaterialIcons_Regular_ttf.data(), demo_ttf::MaterialIcons_Regular_ttf.size(), uvec2{256, 256}, false);
     tmask_pipeline->bind(0, ubo, roboto->atlas(), samp);
     tmask_pipeline->bind(1, ubo, material_icons->atlas(), samp);
 
@@ -218,9 +218,11 @@ int main(int, char **) {
     s.bake(b, icons_test, material_icons, 16, u8"\uE834\uE835\uE836\uE837");
 
     w.invalidate(true);
+
+    auto deref = b->allocate<glm::mat4>(1024 * 1024); // This is just to force a "grow" on the buffer, and check that previous references are still valid
   });
 
-  w.on_draw.connect([&](VkCommandBuffer _buffer, const glm::uvec2 &_size) {
+  w.on_draw.connect([&](VkCommandBuffer _buffer, const uvec2 &_size) {
     rgb_pipeline->draw(_buffer, _size, 0, indices, rgb_instances, rgb_vertices);
     rgba_pipeline->draw(_buffer, _size, 0, indices, rgba_instances, rgba_vertices);
     if (tex1_ready) {
@@ -243,7 +245,7 @@ int main(int, char **) {
   size_t fps = 0;
   display::time_point last_infos = display::clock::now();
 
-  w.on_frame.connect([&](glm::uvec2 _size, display::duration _delta) {
+  w.on_frame.connect([&](uvec2 _size, display::duration _delta) {
     w.invalidate(false);  // asks for a redraw, without recalling on_draw (shader animation, for example)
 
     static auto startTime = display::clock::now();
@@ -273,17 +275,17 @@ int main(int, char **) {
     return false;
   });
 
-  w.on_resize.connect([&](const glm::uvec2 &_size) {
-    //cout << "resize " << glm::to_string(_size) << endl;
+  w.on_resize.connect([&](const uvec2 &_size) {
+    //cout << "resize " << to_string(_size) << endl;
     buffer_ubo new_ubo;
-    new_ubo.proj_ = glm::ortho<float>(0, _size.x, 0, _size.y);
+    new_ubo.proj_ = ortho<float>(0, _size.x, 0, _size.y);
 
     ubo->set(&new_ubo);
     return false;
   });
 
-  w.on_expose.connect([](const glm::uvec4 &_bounds) {
-    // cout << "expose " << glm::to_string(_bounds) << endl;
+  w.on_expose.connect([](const uvec4 &_bounds) {
+    // cout << "expose " << to_string(_bounds) << endl;
     return false;
   });
 
@@ -293,9 +295,9 @@ int main(int, char **) {
     return true;
   });
 
-  w.on_mouse.connect([](uint8_t _button, mouse_event_type _type, glm::uvec2 _pos) {
+  w.on_mouse.connect([](uint8_t _button, mouse_event_type _type, uvec2 _pos) {
     if (_type != MMOVE)
-      std::cout << "mouse " << std::to_string(_button) << ", type: " << _type << ", pos: " << glm::to_string(_pos) << std::endl;
+      std::cout << "mouse " << std::to_string(_button) << ", type: " << _type << ", pos: " << to_string(_pos) << std::endl;
     return true;
   });
 

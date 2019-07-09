@@ -1,9 +1,10 @@
 fix:
-- can't grow a device local buffer referenced in some descriptor (buffer id changed)
 
 refactor:
 - texture atlas (decouple from font code)
 - isolate xcb code in shared library
+- buffer allocation strategies
+    the staging buffer strategy could be much simpler, as it is cleared at once, and not fragment per fragment
 
 features:
 - 9patch
@@ -13,6 +14,7 @@ features:
 - automatic animation of ref (like blending from one tex_rgba::instance to another)
 - scene/render tree, for ui hierarchy
 - support more WSI
+- perf stats
 
 build:
 - compile against a statically compiled harfbuzz?

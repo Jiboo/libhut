@@ -27,9 +27,11 @@
 
 #pragma once
 
+#include <chrono>
 #include <codecvt>
 #include <functional>
 #include <locale>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -41,7 +43,7 @@
 
 namespace hut {
 
-  class buffer;
+  class buffer_pool;
   class display;
   template<typename TDetails, typename... TExtraBindings> class drawable;
   class font;
@@ -50,7 +52,7 @@ namespace hut {
   class sampler;
   class window;
 
-  using shared_buffer = std::shared_ptr<buffer>;
+  using shared_buffer = std::shared_ptr<buffer_pool>;
   using shared_font = std::shared_ptr<font>;
   using shared_image = std::shared_ptr<image>;
   using shared_sampler = std::shared_ptr<sampler>;

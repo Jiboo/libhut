@@ -29,7 +29,7 @@
 
 #include "hutgen_spv.hpp"
 
-#include "hut/buffer.hpp"
+#include "hut/buffer_pool.hpp"
 #include "hut/color.hpp"
 #include "hut/display.hpp"
 #include "hut/image.hpp"
@@ -133,7 +133,7 @@ namespace hut {
         throw std::runtime_error("[sample] failed to create pipeline layout!");
     }
 
-    void init_pipeline(glm::uvec2 _default_size) {
+    void init_pipeline(uvec2 _default_size) {
       VkPipelineShaderStageCreateInfo vert_stage_info = {};
       vert_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
       vert_stage_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -307,9 +307,9 @@ namespace hut {
 
       void buffer(uint _binding, const shared_ubo &_ubo) {
         VkDescriptorBufferInfo info = {};
-        info.buffer = _ubo->buffer_.buffer_;
+        info.buffer = _ubo->buffer_;
         info.offset = _ubo->offset_;
-        info.range = _ubo->size_;
+        info.range = _ubo->byte_size_;
         buffers_.emplace_back(info);
 
         VkWriteDescriptorSet write = {};
@@ -372,15 +372,15 @@ namespace hut {
       vkCmdBindPipeline(_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
       vkCmdBindDescriptorSets(_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout_, 0, 1, descriptors_.data() + _descriptor_index, 0, nullptr);
 
-      VkBuffer verticesBuffers[] = {_vertices->buffer_.buffer_};
+      VkBuffer verticesBuffers[] = {_vertices->buffer_};
       VkDeviceSize verticesOffsets[] = {_vertices->offset_};
       vkCmdBindVertexBuffers(_buffer, 0, 1, verticesBuffers, verticesOffsets);
 
-      VkBuffer instancesBuffers[] = {_instances->buffer_.buffer_};
+      VkBuffer instancesBuffers[] = {_instances->buffer_};
       VkDeviceSize instancesOffsets[] = {_instances->offset_};
       vkCmdBindVertexBuffers(_buffer, 1, 1, instancesBuffers, instancesOffsets);
 
-      vkCmdBindIndexBuffer(_buffer, _indices->buffer_.buffer_, _indices->offset_, VK_INDEX_TYPE_UINT16);
+      vkCmdBindIndexBuffer(_buffer, _indices->buffer_, _indices->offset_, VK_INDEX_TYPE_UINT16);
 
       VkRect2D scissor = {};
       scissor.offset = {0, 0};

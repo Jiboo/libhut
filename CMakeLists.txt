@@ -1,11 +1,17 @@
 cmake_minimum_required(VERSION 3.6)
 project(hut)
 
+###########################################################
+# Configuration
+###########################################################
+
+#add_definitions(-DHUT_PREFER_NONDESCRETE_DEVICES)
+add_definitions(-DHUT_ENABLE_VALIDATION)
+#add_definitions(-DHUT_DEBUG_STAGING)
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -std=c++1z")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/deps/")
-
-message("${CMAKE_MODULE_PATH}")
 
 ###########################################################
 message("Checking for required dependencies...")
@@ -75,7 +81,12 @@ file(GLOB HUT_SHADER_SOURCES res/spv/*.frag res/spv/*.vert)
 set(HUT_SHADER_SPV "")
 file(MAKE_DIRECTORY ${HUT_GEN_DIR}/res/spv)
 
-FOREACH (shader_source ${HUT_SHADER_SOURCES})
+set(GLSLANG_VALIDATOR_FLAGS "")
+if(CMAKE_BUILD_TYPE MATCHES DEBUG)
+  set(GLSLANG_VALIDATOR_FLAGS "${GLSLANG_VALIDATOR_FLAGS} -g")
+endif()
+
+foreach(shader_source ${HUT_SHADER_SOURCES})
   get_filename_component(shader_target ${shader_source} NAME)
   string(REPLACE ".frag" ".frag.spv" shader_target "${shader_target}")
   string(REPLACE ".vert" ".vert.spv" shader_target "${shader_target}")
@@ -83,10 +94,10 @@ FOREACH (shader_source ${HUT_SHADER_SOURCES})
   set(HUT_SHADER_SPV ${HUT_SHADER_SPV};${shader_target})
 
   add_custom_command(OUTPUT ${shader_target}
-      COMMAND ${GLSLANG_VALIDATOR} -V ${shader_source} -o ${shader_target}
+      COMMAND ${GLSLANG_VALIDATOR} ${GLSLANG_VALIDATOR_FLAGS} -V ${shader_source} -o ${shader_target}
       DEPENDS ${shader_source} ${HUT_GEN_DIR}/res/spv
       COMMENT "Generating SPIR-V for ${shader_source}")
-ENDFOREACH ()
+endforeach()
 
 add_custom_target(shaders_spv DEPENDS ${HUT_SHADER_SPV}
     COMMENT "Checked if shaders need recompilation")
@@ -136,7 +147,7 @@ add_executable(demo tst/demo.cpp ${HUT_GEN_DIR}/demo_png.cpp ${HUT_GEN_DIR}/demo
 target_link_libraries(demo hut)
 add_dependencies(demo gen_demo_cpp)
 
-if (GTEST_FOUND)
+if(GTEST_FOUND)
   ###########################################################
   message("Enabling tests...")
   ###########################################################
@@ -147,4 +158,4 @@ if (GTEST_FOUND)
   add_executable(unittests ${HUT_UNIT_TESTS})
   add_test(NAME unittests WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND unittests)
   target_link_libraries(unittests hut ${GTEST_BOTH_LIBRARIES})
-endif ()
+endif()

@@ -38,6 +38,8 @@
 
 #include "hut/image.hpp"
 #include "hut/drawable.hpp"
+#include "buffer_pool.hpp"
+
 
 namespace hut {
 
@@ -72,7 +74,7 @@ namespace hut {
     // http://blackpawn.com/texts/lightmaps/default.html
     struct node {
       node* children_[2] = {nullptr, nullptr};
-      glm::uvec4 coords_;
+      uvec4 coords_;
 
       ~node() {
         for (int i = 0; i < 2; i++) {
@@ -86,9 +88,9 @@ namespace hut {
 
     struct glyph {
       node *store_ = nullptr;
-      glm::vec4 texcoords_ = {0, 0, 0, 0};
-      glm::vec2 bearing_ = {0, 0};
-      glm::uvec2 bounds_ = {0, 0};
+      vec4 texcoords_ = {0, 0, 0, 0};
+      vec2 bearing_ = {0, 0};
+      uvec2 bounds_ = {0, 0};
 
       operator bool() {
         return bounds_.x > 0 && bounds_.y > 0;
@@ -103,7 +105,7 @@ namespace hut {
       root_.coords_ = {0, 0, atlas_->size().x, atlas_->size().y};
     }
 
-    node *binpack(node *_cur_node, const glm::uvec2 &_bounds) {
+    node *binpack(node *_cur_node, const uvec2 &_bounds) {
       if (!_cur_node->leaf()) {
         for (int i = 0; i < 2; i++) {
           node *new_node = binpack(_cur_node->children_[i], _bounds);
@@ -201,7 +203,7 @@ namespace hut {
     struct result {
       tex_mask::shared_vertices vertices_;
       tex_mask::shared_indices indices_;
-      glm::vec4 bbox_;
+      vec4 bbox_;
 
       operator bool() {
         return vertices_ && indices_;
@@ -235,7 +237,7 @@ namespace hut {
       uint16_t indices[max_indices];
       tex_mask::vertex vertices[max_vertices];
       float x = 0., y = 0;
-      glm::vec4 bbox = {0, 0, 0, 0};
+      vec4 bbox = {0, 0, 0, 0};
 
       // https://github.com/tangrams/harfbuzz-example/blob/master/src/hbshaper.h
       for (uint i = 0; i < codepoints; i++) {

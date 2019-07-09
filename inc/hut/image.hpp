@@ -44,13 +44,13 @@ class image {
  public:
   static std::shared_ptr<image> load_png(display &, const uint8_t *_data, size_t _size);
 
-  image(display &_display, glm::uvec2 _size, VkFormat _format);
+  image(display &_display, uvec2 _size, VkFormat _format);
   ~image();
 
-  void update(glm::ivec4 _coords, uint8_t *_data, uint _srcRowPitch);
+  void update(ivec4 _coords, uint8_t *_data, uint _srcRowPitch);
 
   uint pixel_size() const { return pixel_size_; }
-  glm::uvec2 size() const { return size_; }
+  uvec2 size() const { return size_; }
 
  private:
   static VkDeviceSize create(display &_display, uint32_t _width, uint32_t _height, VkFormat _format,
@@ -58,7 +58,7 @@ class image {
                              VkImage *_image, VkDeviceMemory *_imageMemory);
 
   display &display_;
-  glm::uvec2 size_;
+  uvec2 size_;
   VkFormat format_;
   uint pixel_size_;
 

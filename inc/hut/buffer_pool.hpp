@@ -40,118 +40,118 @@ namespace hut {
 
 class display;
 
-class buffer {
+class buffer_pool {
   friend class display;
   friend class shaper;
   friend class image;
   friend struct buffer_ubo;
   template<typename TDetails, typename... TExtraBindings> friend class drawable;
 
+  struct range;
+
  public:
-  struct range_t {
-    uint offset_, size_;
-    bool allocated_;
-
-    range_t() {}
-    range_t(uint _offset, uint _size, bool _allocated)
-      : offset_(_offset), size_(_size), allocated_(_allocated) {}
-
-    bool operator==(const range_t &_other) const {
-      return offset_ == _other.offset_ && size_ == _other.size_ && allocated_ == _other.allocated_;
-    }
-
-    bool operator<(const range_t &_other) const {
-      return offset_ < _other.offset_;
-    }
-  };
-
   /** Holds a reference to a zone in a buffer. */
   template <typename T>
   class ref {
-    friend class buffer;
+    friend class buffer_pool;
+    range *range_;
 
    public:
-    buffer &buffer_;
-    const uint offset_, size_;
+    buffer_pool &pool_;
+    VkBuffer buffer_;
+    const uint offset_, byte_size_;
 
-    ref(buffer &_buffer, uint _offset, uint _size) : buffer_(_buffer), offset_(_offset), size_(_size) {
+    ref(range *_range, buffer_pool &_pool, VkBuffer _buffer, uint _offset, uint _size)
+        : range_(_range), pool_(_pool), buffer_(_buffer), offset_(_offset), byte_size_(_size) {
     }
 
     ~ref() {
-      buffer_.do_free(offset_);
+      pool_.do_free(range_);
     }
 
     void set(const T *_data) {
-      buffer_.update(offset_, size_, (void *)_data);
+      pool_.do_update(buffer_, offset_, byte_size_, (void *)_data);
     }
 
     void set(const std::initializer_list<T> &_data) {
-      const uint byte_size = _data.size() * sizeof(T);
-      assert(byte_size == size_);
+      assert(_data.size() * sizeof(T) == byte_size_);
       set(_data.begin());
     }
 
     void update(uint _offset, const T &_src) {
       const uint byte_offset = _offset * sizeof(T);
-      assert(byte_offset <= size_);
-      buffer_.update(offset_ + byte_offset, sizeof(T), (void *)&_src);
+      assert(byte_offset <= byte_size_);
+      pool_.do_update(buffer_, offset_ + byte_offset, sizeof(T), (void *)&_src);
     }
 
     void update(uint _offset, uint _byte_offset, uint _byte_size, void *_data) {
       const uint byte_offset = _offset * sizeof(T) + _byte_offset;
-      assert(byte_offset + _byte_size <= size_);
-      buffer_.update(offset_ + byte_offset, _byte_size, (void *)_data);
+      assert(byte_offset + _byte_size <= byte_size_);
+      pool_.do_update(buffer_, offset_ + byte_offset, _byte_size, (void *)_data);
     }
 
     uint size() const {
-      return size_ / sizeof(T);
+      return byte_size_ / sizeof(T);
     }
   };
 
-  buffer(display &_display, uint _size, VkMemoryPropertyFlags _type, uint _usage);
-  ~buffer();
-
-  void update(uint _offset, uint _size, const void *_data);
-  void debug_ranges();
+  buffer_pool(display &_display, uint _size, VkMemoryPropertyFlags _type, uint _usage);
+  ~buffer_pool();
 
   template <typename T>
   std::shared_ptr<ref<T>> allocate(uint _count, uint _align = 4) {
     uint size = sizeof(T) * _count;
-    uint offset = do_alloc(size, _align);
-    return std::make_shared<ref<T>>(*this, offset, size);
+    auto alloc = do_alloc(size, _align);
+    return std::make_shared<ref<T>>(alloc.node_, *this, alloc.buffer_, alloc.offset_, size);
   }
 
   template <typename T>
   void free(const ref<T> &_ref) {
-    do_free(_ref.offset_);
+    do_free(_ref.buffer_, _ref.offset_);
   };
 
-  bool operator==(const buffer &_other) const {
-    return buffer_ == _other.buffer_;
-  }
+  void debug();
 
  private:
   display &display_;
-  uint size_;
+  uint total_size_ = 0;
   VkMemoryPropertyFlags type_;
   uint usage_; // see VkBufferUsageFlagBits
-  VkBuffer buffer_;
-  VkDeviceMemory memory_;
 
-  std::list<range_t> ranges_;
-  std::mutex ranges_mutex_;
+  struct range {
+    range *prev_, *next_;
+    bool allocated_;
+    uint offset_, size_;
+  };
 
-  void init(uint _size, VkMemoryPropertyFlags _type, uint _usage);
-  void grow(uint new_size);
-  uint do_alloc(uint _size, uint8_t _align = 4);
-  void do_free(uint _offset);
-  void merge();
+  struct alloc {
+    VkBuffer buffer_;
+    VkDeviceMemory memory_;
+    uint offset_;
+    range *node_;
+  };
+
+  struct buffer {
+    uint size_;
+    VkBuffer buffer_;
+    VkDeviceMemory memory_;
+    range *root_;
+  };
+
+  std::mutex mutex_;
+  std::vector<buffer> buffers_;
+
+  buffer *grow(uint new_size);
+  void free_buffer(buffer &_buff);
+  alloc do_alloc(uint _size, uint _align = 4);
+  void do_free(range *_ref);
+  void do_update(VkBuffer _buf, uint _offset, uint _size, const void *_data);
   void clear_ranges();
 };
 
-using shared_buffer = std::shared_ptr<buffer>;
+using shared_buffer = std::shared_ptr<buffer_pool>;
 
 template <typename T>
-using shared_ref = std::shared_ptr<buffer::ref<T>>;
+using shared_ref = std::shared_ptr<buffer_pool::ref<T>>;
 
 }  // namespace hut

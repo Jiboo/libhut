@@ -267,7 +267,7 @@ int display::dispatch() {
 
             auto it = windows_.find(e->window);
             if (it != windows_.end()) {
-              glm::uvec4 r{e->x, e->y, e->x + e->width, e->y + e->height};
+              uvec4 r{e->x, e->y, e->x + e->width, e->y + e->height};
               window *w = it->second;
               post_overridable(
                   [w, r](auto tp) {
@@ -284,7 +284,7 @@ int display::dispatch() {
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
               window *w = it->second;
-              glm::uvec2 s{e->width, e->height};
+              uvec2 s{e->width, e->height};
               if (s != w->size_) {
                 post_overridable([w, s](auto) { w->dispatch_resize(s); }, 0);
               }
@@ -342,7 +342,7 @@ int display::dispatch() {
             if (it != windows_.end()) {
               window *w = it->second;
               uint8_t b = e->detail;
-              auto c = glm::vec2{e->event_x, e->event_y};
+              auto c = vec2{e->event_x, e->event_y};
               mouse_event_type t;
               switch (e->detail) {
                 case 4:
@@ -367,7 +367,7 @@ int display::dispatch() {
               window *w = it->second;
               uint8_t b = e->detail;
               if (b < 4 || b > 5) {  // ignore wheel events
-                auto c = glm::vec2{e->event_x, e->event_y};
+                auto c = vec2{e->event_x, e->event_y};
                 post([w, b, c](auto) { w->on_mouse.fire(b, mouse_event_type::MUP, c); });
               }
             }
@@ -379,7 +379,7 @@ int display::dispatch() {
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
               window *w = it->second;
-              auto c = glm::vec2{e->event_x, e->event_y};
+              auto c = vec2{e->event_x, e->event_y};
               uint8_t b = e->detail;
               post([w, b, c](auto) { w->on_mouse.fire(b, mouse_event_type::MENTER, c); });
             }
@@ -391,7 +391,7 @@ int display::dispatch() {
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
               window *w = it->second;
-              auto c = glm::vec2{e->event_x, e->event_y};
+              auto c = vec2{e->event_x, e->event_y};
               uint8_t b = e->detail;
               post([w, b, c](auto) { w->on_mouse.fire(b, mouse_event_type::MLEAVE, c); });
             }
@@ -403,7 +403,7 @@ int display::dispatch() {
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
               window *w = it->second;
-              auto c = glm::vec2{e->event_x, e->event_y};
+              auto c = vec2{e->event_x, e->event_y};
               uint8_t b = e->detail;
               post([w, b, c](auto) { w->on_mouse.fire(b, mouse_event_type::MMOVE, c); });
             }

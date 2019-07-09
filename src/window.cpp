@@ -39,7 +39,7 @@ window::~window() {
 }
 
 void window::invalidate(bool _redraw) {
-  invalidate(glm::uvec4{glm::uvec2{0, 0}, size_}, _redraw);
+  invalidate(uvec4{uvec2{0, 0}, size_}, _redraw);
 }
 
 void window::destroy_vulkan() {
@@ -373,22 +373,10 @@ void window::redraw(display::time_point _tp) {
     std::cout << "[hut] frame took " << std::chrono::duration<double, std::milli>(diff).count() << "ms..." << std::endl;
   }
 
-  auto done = display::clock::now();
-  last_frame_ = done;
-
-#if !defined(NDEBUG) && 0
-  std::cout << std::setprecision(2) << std::fixed << "Redraw took " << std::setw(8)
-            << std::chrono::duration<double, std::milli>(done - start).count() << "ms (acquire " << std::setw(8)
-            << std::chrono::duration<double, std::micro>(acquire - start).count() << "µs, draw " << std::setw(8)
-            << std::chrono::duration<double, std::micro>(draw - acquire).count() << "µs, submit " << std::setw(8)
-            << std::chrono::duration<double, std::micro>(submit - draw).count() << "µs, present " << std::setw(8)
-            << std::chrono::duration<double, std::micro>(present - submit).count() << "µs, limit " << std::setw(8)
-            << std::chrono::duration<double, std::micro>(done - present).count() << "µs) for framebuffer " << imageIndex
-            << std::endl;
-#endif
+  last_frame_ = present;
 }
 
-void window::dispatch_resize(const glm::uvec2 &_size) {
+void window::dispatch_resize(const uvec2 &_size) {
   size_ = _size;
   init_vulkan_surface();
   on_resize.fire(_size);

@@ -90,14 +90,14 @@ class window {
 
  public:
   event<> on_pause, on_resume, on_focus, on_blur, on_close;
-  event<glm::uvec4> on_expose;
-  event<glm::uvec2> on_resize;
-  event<VkCommandBuffer, glm::uvec2 /*canvas_size*/> on_draw;
-  event<glm::uvec2, display::duration /*delta*/> on_frame;
-  event<std::string /*path*/, glm::uvec2 /*pos*/> on_drop;
+  event<uvec4> on_expose;
+  event<uvec2> on_resize;
+  event<VkCommandBuffer, uvec2 /*canvas_size*/> on_draw;
+  event<uvec2, display::duration /*delta*/> on_frame;
+  event<std::string /*path*/, uvec2 /*pos*/> on_drop;
 
-  event<uint8_t /*finger*/, touch_event_type, glm::uvec2 /*pos*/> on_touch;
-  event<uint8_t /*button*/, mouse_event_type, glm::uvec2 /*pos*/> on_mouse;
+  event<uint8_t /*finger*/, touch_event_type, uvec2 /*pos*/> on_touch;
+  event<uint8_t /*button*/, mouse_event_type, uvec2 /*pos*/> on_mouse;
 
   event<char32_t /*utf32_char*/, bool /*down*/> on_keysym;
   static bool is_keypad_key(char32_t c);
@@ -117,14 +117,14 @@ class window {
   }
   void visible(bool);
   void title(const std::string &);
-  void invalidate(const glm::uvec4 &, bool _redraw);
+  void invalidate(const uvec4 &, bool _redraw);
   void invalidate(bool _redraw);
 
-  glm::uvec2 size() {
+  uvec2 size() {
     return size_;
   }
 
-  void clear_color(const glm::vec4 &_color) {
+  void clear_color(const vec4 &_color) {
     clear_color_ = _color;
     invalidate(true);
   }
@@ -151,12 +151,12 @@ class window {
 
   bool visible_ = false;
   uint16_t fps_limit_ = 0;
-  glm::uvec2 size_;
-  glm::vec4 clear_color_ = {0.0f, 0.0f, 0.0f, 1.0f};
+  uvec2 size_;
+  vec4 clear_color_ = {0.0f, 0.0f, 0.0f, 1.0f};
   display::time_point last_frame_ = display::clock::now();
 
   void init_vulkan_surface();
-  void dispatch_resize(const glm::uvec2 &);
+  void dispatch_resize(const uvec2 &);
   void rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb);
   void destroy_vulkan();
   void redraw(display::time_point);

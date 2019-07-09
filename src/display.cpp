@@ -34,12 +34,11 @@
 #include <unordered_set>
 
 #include "hut/display.hpp"
-#include "hut/buffer.hpp"
+#include "hut/buffer_pool.hpp"
 
 using namespace hut;
 
-#define HUT_PREFER_NONDESCRETE_DEVICES
-
+#ifdef HUT_ENABLE_VALIDATION
 static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT /*flags*/,
                                                      VkDebugReportObjectTypeEXT /*objType*/, uint64_t /*obj*/,
                                                      size_t /*location*/, int32_t /*code*/, const char *layerPrefix,
@@ -48,6 +47,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT /*fla
 
   return VK_FALSE;
 }
+#endif
 
 void display::post(display::callback _callback) {
   {
@@ -156,7 +156,7 @@ void display::jobs_loop() {
 }
 
 shared_buffer display::alloc_buffer(uint _byte_size, VkMemoryPropertyFlags _type, VkBufferUsageFlagBits _flags) {
-  return std::make_shared<buffer>(*this, _byte_size, _type, _flags);
+  return std::make_shared<buffer_pool>(*this, _byte_size, _type, _flags);
 }
 
 struct score_t {
@@ -249,7 +249,7 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
 }
 
 const std::vector<const char *> layers = {
-#ifndef NDEBUG
+#ifdef HUT_ENABLE_VALIDATION
     "VK_LAYER_LUNARG_standard_validation",
 #endif
 };
@@ -262,16 +262,16 @@ void display::init_vulkan_instance(const char *_app_name, uint32_t _app_version,
   vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr);
   std::vector<VkExtensionProperties> available_extensions(extension_count);
   vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, available_extensions.data());
+#ifdef HUT_ENABLE_VALIDATION
   bool has_debug_ext = false;
   for (const auto &extension : available_extensions) {
-#ifndef NDEBUG
     if (strcmp(extension.extensionName, VK_EXT_DEBUG_REPORT_EXTENSION_NAME) == 0)
       has_debug_ext = true;
-#endif
   }
 
   if (has_debug_ext)
     extensions.emplace_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+#endif
 
   VkApplicationInfo appInfo = {};
   appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -293,19 +293,19 @@ void display::init_vulkan_instance(const char *_app_name, uint32_t _app_version,
   if (result != VK_SUCCESS)
     throw std::runtime_error(sstream("Couldn't create a vulkan instance, code: ") << result);
 
+#ifdef HUT_ENABLE_VALIDATION
   if (has_debug_ext) {
     VkDebugReportCallbackCreateInfoEXT dinfo = {};
     dinfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
-    dinfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
-#ifndef NDEBUG
-    dinfo.flags |= VK_DEBUG_REPORT_DEBUG_BIT_EXT;
-#endif
+    dinfo.flags = VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT
+        | VK_DEBUG_REPORT_ERROR_BIT_EXT /*| VK_DEBUG_REPORT_INFORMATION_BIT_EXT*/;
     dinfo.pfnCallback = debug_callback;
 
     auto func = get_proc<PFN_vkCreateDebugReportCallbackEXT>("vkCreateDebugReportCallbackEXT");
     if (func != nullptr)
       func(instance_, &dinfo, nullptr, &debug_cb_);
   }
+#endif
 }
 
 void display::init_vulkan_device(VkSurfaceKHR _dummy) {
@@ -393,7 +393,7 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
     throw std::runtime_error("failed to create command pool!");
   }
 
-  staging_ = std::make_shared<buffer>(*this, 1024 * 1024,
+  staging_ = std::make_shared<buffer_pool>(*this, 32,
                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                       VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
@@ -549,7 +549,7 @@ void display::flush_staged() {
     return;
 
 #ifdef HUT_DEBUG_STAGING
-  std::cout << "[staging] doing preflush with staging " << staging_->buffer_ << std::endl;
+  std::cout << "[staging] doing preflush" << std::endl;
 #endif
   for (auto &preflush : preflush_jobs_)
     preflush();

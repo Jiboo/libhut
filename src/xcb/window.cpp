@@ -223,7 +223,7 @@ void window::title(const std::string &_title) {
                       (uint32_t)_title.size(), _title.data());
 }
 
-void window::invalidate(const glm::uvec4 &_coords, bool _redraw) {
+void window::invalidate(const uvec4 &_coords, bool _redraw) {
   if (_redraw) {
     for (size_t i = 0; i < dirty_.size(); i++)
       dirty_[i] = true;

@@ -54,7 +54,7 @@ namespace hut {
 
 class display {
   friend class window;
-  friend class buffer;
+  friend class buffer_pool;
   friend class image;
   friend class sampler;
   friend class font;
@@ -126,7 +126,7 @@ class display {
 
   std::pair<uint32_t, VkMemoryPropertyFlags> find_memory_type(uint32_t _type_filter, VkMemoryPropertyFlags _properties);
 
-  std::shared_ptr<buffer> staging_;
+  std::shared_ptr<buffer_pool> staging_;
   VkCommandBuffer staging_cb_;
   uint staging_jobs_ = 0;
   std::mutex staging_mutex_;

@@ -35,7 +35,7 @@
 #include "hut/display.hpp"
 #include "hut/image.hpp"
 #include "hut/color.hpp"
-#include "hut/buffer.hpp"
+#include "hut/buffer_pool.hpp"
 
 using namespace hut;
 
@@ -142,23 +142,23 @@ std::shared_ptr<image> image::load_png(display &_display, const uint8_t *_data, 
   subResource.mipLevel = 0;
   subResource.layerCount = 1;
 
-  auto dst = std::make_shared<image>(_display, glm::uvec2{width, height}, format);
+  auto dst = std::make_shared<image>(_display, uvec2{width, height}, format);
   {
     std::lock_guard lk(_display.staging_mutex_);
-    uint offset = _display.staging_->do_alloc(byte_size, offsetAlignment);
+    buffer_pool::alloc alloc = _display.staging_->do_alloc(byte_size, offsetAlignment);
 
     void *data;
-    vkMapMemory(_display.device_, _display.staging_->memory_, offset, byte_size, 0, &data);
+    vkMapMemory(_display.device_, alloc.memory_, alloc.offset_, byte_size, 0, &data);
     auto dataBytes = reinterpret_cast<uint8_t *>(data);
     png_bytep rows[height];
     for (uint y = 0; y < height; y++) {
       rows[y] = dataBytes + y * row_byte_size;
     }
     png_read_image(png_ptr, rows);
-    vkUnmapMemory(_display.device_, _display.staging_->memory_);
+    vkUnmapMemory(_display.device_, alloc.memory_);
 #ifdef HUT_DEBUG_STAGING
-    std::cout << "[staging] png at " << _display.staging_->buffer_ << '['
-              << offset << '-' << (offset + byte_size) << ']' << std::endl;
+    std::cout << "[staging] png at " << alloc.buffer_ << '['
+              << alloc.offset_ << '-' << (alloc.offset_ + byte_size) << ']' << std::endl;
 #endif
 
     display::buffer2image_copy copy = {};
@@ -166,9 +166,9 @@ std::shared_ptr<image> image::load_png(display &_display, const uint8_t *_data, 
     copy.imageOffset = {0, 0, 0};
     copy.bufferRowLength = stride;
     copy.bufferImageHeight = height;
-    copy.bufferOffset = offset;
+    copy.bufferOffset = alloc.offset_;
     copy.imageSubresource = subResource;
-    copy.source = _display.staging_->buffer_;
+    copy.source = alloc.buffer_;
     copy.destination = dst->image_;
     copy.pixelSize = channels;
 
@@ -200,7 +200,7 @@ image::~image() {
   vkDestroyImage(display_.device_, image_, nullptr);
 }
 
-image::image(display &_display, glm::uvec2 _size, VkFormat _format)
+image::image(display &_display, uvec2 _size, VkFormat _format)
     : display_(_display), size_(_size), format_(_format) {
   pixel_size_ = format_size(_format);
   create(_display, _size.x, _size.y, _format, VK_IMAGE_TILING_LINEAR,
@@ -287,7 +287,7 @@ VkDeviceSize image::create(display &_display, uint32_t _width, uint32_t _height,
   return memReq.size;
 }
 
-void image::update(glm::ivec4 _coords, uint8_t *_data, uint _srcRowPitch) {
+void image::update(ivec4 _coords, uint8_t *_data, uint _srcRowPitch) {
   int width = _coords[2] - _coords[0];
   int height = _coords[3] - _coords[1];
   assert (width > 0 && height > 0);
@@ -295,14 +295,14 @@ void image::update(glm::ivec4 _coords, uint8_t *_data, uint _srcRowPitch) {
   uint alignment = display_.device_props_.limits.optimalBufferCopyOffsetAlignment;
 
   std::lock_guard lk(display_.staging_mutex_);
-  uint offset = display_.staging_->do_alloc(byte_size, alignment);
+  buffer_pool::alloc alloc = display_.staging_->do_alloc(byte_size, alignment);
   void *target;
-  vkMapMemory(display_.device_, display_.staging_->memory_, offset, byte_size, 0, &target);
+  vkMapMemory(display_.device_, alloc.memory_, alloc.offset_, byte_size, 0, &target);
   memcpy(target, _data, byte_size);
-  vkUnmapMemory(display_.device_, display_.staging_->memory_);
+  vkUnmapMemory(display_.device_, alloc.memory_);
 #ifdef HUT_DEBUG_STAGING
-  std::cout << "[staging] image update at " << display_.staging_->buffer_ << '['
-            << offset << '-' << (offset + byte_size) << ']' << std::endl;
+  std::cout << "[staging] image update at " << alloc.buffer_ << '['
+            << alloc.offset_ << '-' << (alloc.offset_ + byte_size) << ']' << std::endl;
 #endif
 
   VkImageSubresourceLayers subResource = {};
@@ -324,9 +324,9 @@ void image::update(glm::ivec4 _coords, uint8_t *_data, uint _srcRowPitch) {
   copy.imageOffset = {_coords[0], _coords[1], 0};
   copy.bufferRowLength = _srcRowPitch / pixel_size_;
   copy.bufferImageHeight = height;
-  copy.bufferOffset = offset;
+  copy.bufferOffset = alloc.offset_;
   copy.imageSubresource = subResource;
-  copy.source = display_.staging_->buffer_;
+  copy.source = alloc.buffer_;
   copy.destination = image_;
   copy.pixelSize = pixel_size_;
 
