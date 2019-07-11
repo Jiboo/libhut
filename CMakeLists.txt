@@ -6,7 +6,8 @@ project(hut)
 ###########################################################
 
 #add_definitions(-DHUT_PREFER_NONDESCRETE_DEVICES)
-add_definitions(-DHUT_ENABLE_VALIDATION)
+#add_definitions(-DHUT_ENABLE_VALIDATION)
+#add_definitions(-DHUT_ENABLE_VALIDATION_DEBUG)
 #add_definitions(-DHUT_DEBUG_STAGING)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -std=c++1z")

@@ -196,8 +196,8 @@ std::shared_ptr<image> image::load_png(display &_display, const uint8_t *_data, 
 
 image::~image() {
   vkDestroyImageView(display_.device_, view_, nullptr);
-  vkFreeMemory(display_.device_, memory_, nullptr);
   vkDestroyImage(display_.device_, image_, nullptr);
+  vkFreeMemory(display_.device_, memory_, nullptr);
 }
 
 image::image(display &_display, uvec2 _size, VkFormat _format)
@@ -287,18 +287,25 @@ VkDeviceSize image::create(display &_display, uint32_t _width, uint32_t _height,
   return memReq.size;
 }
 
-void image::update(ivec4 _coords, uint8_t *_data, uint _srcRowPitch) {
-  int width = _coords[2] - _coords[0];
-  int height = _coords[3] - _coords[1];
+void image::update(ivec4 _coords, uint8_t *_data, uint _src_row_pitch) {
+  uint width = _coords[2] - _coords[0];
+  uint height = _coords[3] - _coords[1];
   assert (width > 0 && height > 0);
-  int byte_size = height * _srcRowPitch;
-  uint alignment = display_.device_props_.limits.optimalBufferCopyOffsetAlignment;
+  uint buffer_align = display_.device_props_.limits.optimalBufferCopyRowPitchAlignment;
+  uint offset_align = display_.device_props_.limits.optimalBufferCopyOffsetAlignment;
+  uint row_byte_size = width * pixel_size_;
+  uint buffer_row_pitch = align(row_byte_size, buffer_align);
+  int byte_size = height * buffer_row_pitch;
 
   std::lock_guard lk(display_.staging_mutex_);
-  buffer_pool::alloc alloc = display_.staging_->do_alloc(byte_size, alignment);
+  buffer_pool::alloc alloc = display_.staging_->do_alloc(byte_size, offset_align);
   void *target;
   vkMapMemory(display_.device_, alloc.memory_, alloc.offset_, byte_size, 0, &target);
-  memcpy(target, _data, byte_size);
+  for (uint i = 0; i < height; i++) {
+    uint8_t *src = _data + _src_row_pitch * i;
+    uint8_t *dst = (uint8_t*)target + buffer_row_pitch * i;
+    memcpy(dst, src, row_byte_size);
+  }
   vkUnmapMemory(display_.device_, alloc.memory_);
 #ifdef HUT_DEBUG_STAGING
   std::cout << "[staging] image update at " << alloc.buffer_ << '['
@@ -322,7 +329,7 @@ void image::update(ivec4 _coords, uint8_t *_data, uint _srcRowPitch) {
   display::buffer2image_copy copy = {};
   copy.imageExtent = {(uint)width, (uint)height, 1};
   copy.imageOffset = {_coords[0], _coords[1], 0};
-  copy.bufferRowLength = _srcRowPitch / pixel_size_;
+  copy.bufferRowLength = buffer_row_pitch / pixel_size_;
   copy.bufferImageHeight = height;
   copy.bufferOffset = alloc.offset_;
   copy.imageSubresource = subResource;

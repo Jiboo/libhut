@@ -298,7 +298,11 @@ void display::init_vulkan_instance(const char *_app_name, uint32_t _app_version,
     VkDebugReportCallbackCreateInfoEXT dinfo = {};
     dinfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
     dinfo.flags = VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT
-        | VK_DEBUG_REPORT_ERROR_BIT_EXT /*| VK_DEBUG_REPORT_INFORMATION_BIT_EXT*/;
+        | VK_DEBUG_REPORT_ERROR_BIT_EXT
+#ifdef HUT_ENABLE_VALIDATION_DEBUG
+        | VK_DEBUG_REPORT_INFORMATION_BIT_EXT
+#endif
+        ;
     dinfo.pfnCallback = debug_callback;
 
     auto func = get_proc<PFN_vkCreateDebugReportCallbackEXT>("vkCreateDebugReportCallbackEXT");
@@ -393,7 +397,7 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
     throw std::runtime_error("failed to create command pool!");
   }
 
-  staging_ = std::make_shared<buffer_pool>(*this, 32,
+  staging_ = std::make_shared<buffer_pool>(*this, 1024 * 1024,
                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                       VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 

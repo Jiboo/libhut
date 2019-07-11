@@ -67,7 +67,7 @@ int main(int, char **) {
   w.clear_color({1, 1, 1, 1});
   w.title("testbed");
 
-  auto b = d.alloc_buffer(32);
+  auto b = d.alloc_buffer(1024*1024);
 
   auto indices = b->allocate<uint16_t>(6);
   indices->set({0, 1, 2, 2, 3, 0});
@@ -171,6 +171,21 @@ int main(int, char **) {
     tex_mask::instance{make_mat({  0, 200}, {1,1,1}), {1, 1, 1, 1}},
   });
 
+  auto box_rgba_pipeline = std::make_unique<box_rgba>(w);
+  auto box_rgba_vertices = b->allocate<box_rgba::vertex>(4);
+  box_rgba_vertices->set({
+    box_rgba::vertex{{  0,   0}, {1, 0, 0, 1}},
+    box_rgba::vertex{{100,   0}, {0, 1, 0, 1}},
+    box_rgba::vertex{{100, 100}, {1, 1, 1, 1}},
+    box_rgba::vertex{{  0, 100}, {0, 0, 1, 1}}
+  });
+  auto box_rgba_instances = b->allocate<box_rgba::instance>(2);
+  box_rgba_instances->set({
+    box_rgba::instance{make_mat({300, 400}, {1,1,1}), {0, 2, 0.8, 8}, {0, 0, 0, 0.66}, {300, 400, 400, 500}},
+    box_rgba::instance{make_mat({500, 400}, {1,1,1}), {8, 8, 50, 8}, {0, 0, 0, 0.66}, {500, 400, 600, 500}},
+  });
+  box_rgba_pipeline->bind(0, ubo);
+
   shared_image tex1, tex2;
   shared_font roboto, material_icons;
   shared_sampler samp = std::make_shared<sampler>(d);
@@ -194,7 +209,7 @@ int main(int, char **) {
     w.invalidate(true);  // will force to call on_draw on the next frame
 
     uint8_t data[tex1->pixel_size() * 100 * 100];
-    memset(data, 0x00, sizeof(data));
+    memset(data, 0x80, sizeof(data));
     tex1->update({100, 100, 200, 200}, data, tex1->pixel_size() * 100);
 
     tex2 = image::load_png(d, demo_png::tex2_png.data(), demo_png::tex2_png.size());
@@ -218,13 +233,12 @@ int main(int, char **) {
     s.bake(b, icons_test, material_icons, 16, u8"\uE834\uE835\uE836\uE837");
 
     w.invalidate(true);
-
-    auto deref = b->allocate<glm::mat4>(1024 * 1024); // This is just to force a "grow" on the buffer, and check that previous references are still valid
   });
 
   w.on_draw.connect([&](VkCommandBuffer _buffer, const uvec2 &_size) {
     rgb_pipeline->draw(_buffer, _size, 0, indices, rgb_instances, rgb_vertices);
     rgba_pipeline->draw(_buffer, _size, 0, indices, rgba_instances, rgba_vertices);
+    box_rgba_pipeline->draw(_buffer, _size, 0, indices, box_rgba_instances, box_rgba_vertices);
     if (tex1_ready) {
       tex_pipeline->draw(_buffer, _size, 0, indices, tex1_instances, tex_vertices);
       tex_rgb_pipeline->draw(_buffer, _size, 0, indices, tex1_rgb_instances, tex_rgb_vertices);
@@ -242,9 +256,6 @@ int main(int, char **) {
     return false;
   });
 
-  size_t fps = 0;
-  display::time_point last_infos = display::clock::now();
-
   w.on_frame.connect([&](uvec2 _size, display::duration _delta) {
     w.invalidate(false);  // asks for a redraw, without recalling on_draw (shader animation, for example)
 
@@ -261,16 +272,17 @@ int main(int, char **) {
       tex2_instances->update(1, tex::instance{make_mat({400, 100}, angle, tex2->size()/4, {tex2->size()/2, 1})});
     }
 
+    float shadow_offset = (sin(time * 4) + 1) * 4;
+    vec4 new_box_params = {0, shadow_offset, 16, 8};
+    box_rgba_instances->update(0, offsetof(box_rgba::instance, params_), sizeof(new_box_params), &new_box_params);
+
+    float border_radius = (sin(time * 4) + 1) * 20 + 10;
+    new_box_params = {16, 16, border_radius, 8};
+    box_rgba_instances->update(1, offsetof(box_rgba::instance, params_), sizeof(new_box_params), &new_box_params);
+
     float blink = (sin(time * 4) + 1) / 2;
     constexpr uint transparency_offset = offsetof(tex_mask::instance, color_) + 3 * sizeof(float);
     icons_instances->update(1, transparency_offset, sizeof(float), &blink);
-
-    if (currentTime - last_infos > 1s) {
-      std::cout << "fps: " << fps << std::endl;
-      fps = 0;
-      last_infos = currentTime;
-    }
-    fps++;
 
     return false;
   });

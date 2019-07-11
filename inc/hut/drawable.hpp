@@ -420,6 +420,8 @@ namespace hut {
 
     using descriptor_writes = std::vector<VkWriteDescriptorSet>;
 
+    // TODO JBL: Generate this from reflection on shader code at compile time, and include generated .h
+
     struct rgb {
       using impl = drawable<details::rgb>;
 
@@ -699,6 +701,54 @@ namespace hut {
       constexpr static decltype(hutgen_spv::tex_mask_frag_spv) &frag_bytecode_ = hutgen_spv::tex_mask_frag_spv;
       constexpr static decltype(hutgen_spv::tex_mask_vert_spv) &vert_bytecode_ = hutgen_spv::tex_mask_vert_spv;
     };
+
+    struct box_rgba {
+      using impl = drawable<details::box_rgba>;
+
+      struct instance {
+        mat4 transform_;
+        vec4 params_;
+        vec4 shadow_color_;
+        vec4 box_bounds_;
+      };
+
+      struct vertex {
+        vec2 pos_;
+        vec4 color_;
+      };
+
+      constexpr static uint max_descriptor_sets_ = 1;
+
+      constexpr static std::array<VkDescriptorPoolSize, 1> descriptor_pools_ {
+          VkDescriptorPoolSize{.descriptorCount = max_descriptor_sets_, .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+      };
+
+      constexpr static std::array<VkDescriptorSetLayoutBinding, 1> descriptor_bindings_{
+          VkDescriptorSetLayoutBinding{.binding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .pImmutableSamplers = nullptr},
+      };
+
+      constexpr static void fill_extra_descriptor_writes(impl::descriptor_write_context &) {}
+
+      constexpr static std::array<VkVertexInputBindingDescription, 2> vertices_binding_ = {
+          VkVertexInputBindingDescription{.binding = 0, .stride = sizeof(vertex),   .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
+          VkVertexInputBindingDescription{.binding = 1, .stride = sizeof(instance), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE},
+      };
+
+      constexpr static std::array<VkVertexInputAttributeDescription, 9> vertices_description_ {
+          VkVertexInputAttributeDescription{.binding = 0, .location = 0, .offset = offsetof(vertex, pos_),             .format = VK_FORMAT_R32G32_SFLOAT},
+          VkVertexInputAttributeDescription{.binding = 0, .location = 1, .offset = offsetof(vertex, color_),           .format = VK_FORMAT_R32G32B32A32_SFLOAT},
+          VkVertexInputAttributeDescription{.binding = 1, .location = 2, .offset = transform_offset<tex_mask>(0),      .format = VK_FORMAT_R32G32B32A32_SFLOAT},
+          VkVertexInputAttributeDescription{.binding = 1, .location = 3, .offset = transform_offset<tex_mask>(1),      .format = VK_FORMAT_R32G32B32A32_SFLOAT},
+          VkVertexInputAttributeDescription{.binding = 1, .location = 4, .offset = transform_offset<tex_mask>(2),      .format = VK_FORMAT_R32G32B32A32_SFLOAT},
+          VkVertexInputAttributeDescription{.binding = 1, .location = 5, .offset = transform_offset<tex_mask>(3),      .format = VK_FORMAT_R32G32B32A32_SFLOAT},
+          VkVertexInputAttributeDescription{.binding = 1, .location = 6, .offset = offsetof(instance, params_),        .format = VK_FORMAT_R32G32B32A32_SFLOAT},
+          VkVertexInputAttributeDescription{.binding = 1, .location = 7, .offset = offsetof(instance, shadow_color_),  .format = VK_FORMAT_R32G32B32A32_SFLOAT},
+          VkVertexInputAttributeDescription{.binding = 1, .location = 8, .offset = offsetof(instance, box_bounds_),    .format = VK_FORMAT_R32G32B32A32_SFLOAT},
+      };
+
+      constexpr static decltype(hutgen_spv::box_rgba_frag_spv) &frag_bytecode_ = hutgen_spv::box_rgba_frag_spv;
+      constexpr static decltype(hutgen_spv::box_rgba_vert_spv) &vert_bytecode_ = hutgen_spv::box_rgba_vert_spv;
+    };
   }  // namespace details
 
   using rgb      = details::rgb::impl;
@@ -707,5 +757,6 @@ namespace hut {
   using tex_rgb  = details::tex_rgb::impl;
   using tex_rgba = details::tex_rgba::impl;
   using tex_mask = details::tex_mask::impl;
+  using box_rgba = details::box_rgba::impl;
 
 }  // namespace hut
