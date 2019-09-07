@@ -61,8 +61,30 @@ namespace hut {
   using namespace glm;
 
 inline std::string to_utf8(char32_t ch) {
+  // NOTE JBL: https://stackoverflow.com/questions/30765256/linker-error-using-vs-2015-rc-cant-find-symbol-related-to-stdcodecvt
+#ifdef _MSC_VER
+  static std::wstring_convert<std::codecvt_utf8<__int32>, __int32> convert;
+#else
   static std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> convert;
+#endif
   return convert.to_bytes(ch);
+}
+
+inline std::wstring to_wstring(const std::string &utf8) {
+  static std::wstring_convert<std::codecvt_utf8<wchar_t>> convert;
+  return convert.from_bytes(utf8);
+}
+
+inline char32_t to_utf32(char16_t c) {
+  //https://unicode.org/faq/utf_bom.html#utf16-4
+  typedef uint16_t UTF16;
+  typedef uint32_t UTF32;
+  const UTF32 LEAD_OFFSET = 0xD800 - (0x10000 >> 10);
+  const UTF32 SURROGATE_OFFSET = 0x10000 - (0xD800 << 10) - 0xDC00;
+  UTF16 lead = LEAD_OFFSET + (c >> 10);
+  UTF16 trail = 0xDC00 + (c & 0x3FF);
+  UTF32 codepoint = (lead << 10) + trail + SURROGATE_OFFSET;
+  return codepoint;
 }
 
 inline vec2 bbox_center(const vec4 &_input) {
@@ -130,10 +152,6 @@ class sstream {
 
   std::string str() {
     return stream_.str();
-  }
-
-  const char* c_str() {
-    return stream_.str().c_str();
   }
 
   operator std::string() {

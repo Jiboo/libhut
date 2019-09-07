@@ -141,113 +141,95 @@ void display::flush() {
   xcb_flush(connection_);
 }
 
-void dispatch_keysym(display *thiz, window *w, xcb_keysym_t keysym, bool press) {
-  switch (keysym) {
-    case XK_KP_0:
-      keysym = XK_0;
-      break;
-    case XK_KP_1:
-      keysym = XK_1;
-      break;
-    case XK_KP_2:
-      keysym = XK_2;
-      break;
-    case XK_KP_3:
-      keysym = XK_3;
-      break;
-    case XK_KP_4:
-      keysym = XK_4;
-      break;
-    case XK_KP_5:
-      keysym = XK_5;
-      break;
-    case XK_KP_6:
-      keysym = XK_6;
-      break;
-    case XK_KP_7:
-      keysym = XK_7;
-      break;
-    case XK_KP_8:
-      keysym = XK_8;
-      break;
-    case XK_KP_9:
-      keysym = XK_9;
-      break;
-    case XK_KP_Add:
-      keysym = XK_plus;
-      break;
-    case XK_KP_Divide:
-      keysym = XK_slash;
-      break;
-    case XK_KP_Equal:
-      keysym = XK_equal;
-      break;
-    case XK_KP_Multiply:
-      keysym = XK_asterisk;
-      break;
-    case XK_KP_Subtract:
-      keysym = XK_hyphen;
-      break;
-    case XK_KP_Begin:
-      keysym = XK_Home;
-      break;
-    case XK_KP_End:
-      keysym = XK_End;
-      break;
-    case XK_KP_Home:
-      keysym = XK_Home;
-      break;
-    case XK_KP_Page_Up:
-      keysym = XK_Page_Up;
-      break;
-    case XK_KP_Page_Down:
-      keysym = XK_Page_Down;
-      break;
-    case XK_KP_Up:
-      keysym = XK_Up;
-      break;
-    case XK_KP_Right:
-      keysym = XK_Right;
-      break;
-    case XK_KP_Down:
-      keysym = XK_Down;
-      break;
-    case XK_KP_Left:
-      keysym = XK_Left;
-      break;
-    case XK_KP_Decimal:
-      keysym = XK_period;
-      break;
-    case XK_KP_Separator:
-      keysym = XK_apostrophe;
-      break;
-    case XK_KP_Enter:
-      keysym = XK_Return;
-      break;
-    case XK_KP_Delete:
-      keysym = XK_Delete;
-      break;
-    case XK_KP_F1:
-      keysym = XK_F1;
-      break;
-    case XK_KP_F2:
-      keysym = XK_F2;
-      break;
-    case XK_KP_F3:
-      keysym = XK_F3;
-      break;
-    case XK_KP_F4:
-      keysym = XK_F4;
-      break;
-    case XK_KP_Insert:
-      keysym = XK_Insert;
-      break;
-    case XK_KP_Tab:
-      keysym = XK_Tab;
-      break;
+xcb_keysym_t clean_kp_keysyms(xcb_keysym_t _input) {
+  switch (_input) {
+    case XK_KP_0: return XK_0;
+    case XK_KP_1: return XK_1;
+    case XK_KP_2: return XK_2;
+    case XK_KP_3: return XK_3;
+    case XK_KP_4: return XK_4;
+    case XK_KP_5: return XK_5;
+    case XK_KP_6: return XK_6;
+    case XK_KP_7: return XK_7;
+    case XK_KP_8: return XK_8;
+    case XK_KP_9: return XK_9;
+    case XK_KP_Add: return XK_plus;
+    case XK_KP_Divide: return XK_slash;
+    case XK_KP_Equal: return XK_equal;
+    case XK_KP_Multiply: return XK_asterisk;
+    case XK_KP_Subtract: return XK_hyphen;
+    case XK_KP_Begin: return XK_Home;
+    case XK_KP_End: return XK_End;
+    case XK_KP_Home: return XK_Home;
+    case XK_KP_Page_Up: return XK_Page_Up;
+    case XK_KP_Page_Down: return XK_Page_Down;
+    case XK_KP_Up: return XK_Up;
+    case XK_KP_Right: return XK_Right;
+    case XK_KP_Down: return XK_Down;
+    case XK_KP_Left: return XK_Left;
+    case XK_KP_Decimal: return XK_period;
+    case XK_KP_Separator: return XK_apostrophe;
+    case XK_KP_Enter: return XK_Return;
+    case XK_KP_Delete: return XK_Delete;
+    case XK_KP_F1: return XK_F1;
+    case XK_KP_F2: return XK_F2;
+    case XK_KP_F3: return XK_F3;
+    case XK_KP_F4: return XK_F4;
+    case XK_KP_Insert: return XK_Insert;
+    case XK_KP_Tab: return XK_Tab;
+    default: return _input;
   }
+}
 
-  thiz->post([w, keysym, press](auto) { w->on_keysym.fire(keysym, press); });
+keysym map_hut_enum(xcb_keysym_t _input) {
+  switch (_input) {
+    case XK_Tab: return KTAB;
+    case XK_Alt_L: return KALT_LEFT;
+    case 0xfe03: // altgr
+    case XK_Alt_R: return KALT_RIGHT;
+    case XK_Control_L: return KCTRL_LEFT;
+    case XK_Control_R: return KCTRL_RIGHT;
+    case XK_Shift_L: return KSHIFT_LEFT;
+    case XK_Shift_R: return KSHIFT_RIGHT;
+    case XK_Page_Up: return KPAGE_UP;
+    case XK_Page_Down: return KPAGE_DOWN;
+    case XK_Up: return KUP;
+    case XK_Right: return KRIGHT;
+    case XK_Down: return KDOWN;
+    case XK_Left: return KLEFT;
+    case XK_Home: return KHOME;
+    case XK_End: return KEND;
+    case XK_Return: return KRETURN;
+    case XK_BackSpace: return KBACKSPACE;
+    case XK_Delete: return KDELETE;
+    case XK_Insert: return KINSER;
+    case XK_Escape: return KESCAPE;
+    case XK_F1: return KF1;
+    case XK_F2: return KF2;
+    case XK_F3: return KF3;
+    case XK_F4: return KF4;
+    case XK_F5: return KF5;
+    case XK_F6: return KF6;
+    case XK_F7: return KF7;
+    case XK_F8: return KF8;
+    case XK_F9: return KF9;
+    case XK_F10: return KF10;
+    case XK_F11: return KF11;
+    case XK_F12: return KF12;
+    default: return (keysym)_input;
+  }
+}
+
+void dispatch_keysym(display *thiz, window *w, uint16_t _mask, xcb_keysym_t _ks, bool press) {
+  const xcb_keysym_t cleaned = clean_kp_keysyms(_ks);
+  const keysym mapped = map_hut_enum(cleaned);
+  const bool remapped =  mapped != cleaned;
+  const bool control = _mask & XCB_MOD_MASK_CONTROL;
+  const bool alt = _mask & XCB_MOD_MASK_1;
+
+  thiz->post([w, mapped, press](auto) { w->on_key.fire(mapped, press); });
+  if (!remapped && !control && !alt && mapped != 0xfe03 && press)
+    thiz->post([w, mapped](auto) { w->on_char.fire(mapped); });
 }
 
 int display::dispatch() {
@@ -255,236 +237,214 @@ int display::dispatch() {
     throw std::runtime_error("dispatch called without any window");
 
   bool loop = true;
-  dispatcher_ = std::this_thread::get_id();
 
-  std::thread event_pump([&loop, this]() {
+  std::thread job_pump([&loop, this]() {
+    dispatcher_ = std::this_thread::get_id();
     while (loop) {
-      xcb_generic_event_t *event = xcb_wait_for_event(connection_);
-      if (event != nullptr) {
-        switch (event->response_type & ~0x80) {
-          case XCB_EXPOSE: {
-            xcb_expose_event_t *e = reinterpret_cast<xcb_expose_event_t *>(event);
-
-            auto it = windows_.find(e->window);
-            if (it != windows_.end()) {
-              uvec4 r{e->x, e->y, e->x + e->width, e->y + e->height};
-              window *w = it->second;
-              post_overridable(
-                  [w, r](auto tp) {
-                    w->on_expose.fire(r);  // FIXME JB: Rects should be merged
-                    w->redraw(tp);
-                  },
-                  1);
-            }
-          } break;
-
-          case XCB_CONFIGURE_NOTIFY: {
-            xcb_configure_notify_event_t *e = reinterpret_cast<xcb_configure_notify_event_t *>(event);
-
-            auto it = windows_.find(e->event);
-            if (it != windows_.end()) {
-              window *w = it->second;
-              uvec2 s{e->width, e->height};
-              if (s != w->size_) {
-                post_overridable([w, s](auto) { w->dispatch_resize(s); }, 0);
-              }
-            }
-          } break;
-
-          case XCB_KEY_PRESS: {
-            xcb_key_press_event_t *e = reinterpret_cast<xcb_key_press_event_t *>(event);
-
-            int col;
-            if (e->state & 0x3)
-              col = 1;  // shift || caps-lock
-            else if (e->state & 0x80)
-              col = 4;  // alt-gr
-            else
-              col = 0;
-
-            auto keysym = xcb_key_press_lookup_keysym(keysyms_, e, col);
-            if (keysym >= 0xff80 && keysym <= 0xffb9 && keysym != XK_KP_Enter) {
-              col = e->state & 0x10 ? 1 : 0;
-              keysym = xcb_key_press_lookup_keysym(keysyms_, e, col);
-            }
-
-            auto it = windows_.find(e->event);
-            if (it != windows_.end())
-              dispatch_keysym(this, it->second, keysym, true);
-          } break;
-
-          case XCB_KEY_RELEASE: {
-            xcb_key_press_event_t *e = reinterpret_cast<xcb_key_release_event_t *>(event);
-
-            int col;
-            if (e->state & 0x80)
-              col = 4;  // alt-gr
-            else if (e->state & 0x3)
-              col = 1;  // shift || caps-lock
-            else
-              col = 0;
-
-            auto keysym = xcb_key_press_lookup_keysym(keysyms_, e, col);
-            if (keysym >= 0xff80 && keysym <= 0xffb9 && keysym != XK_KP_Enter) {
-              col = e->state & 0x10 ? 1 : 0;
-              keysym = xcb_key_press_lookup_keysym(keysyms_, e, col);
-            }
-
-            auto it = windows_.find(e->event);
-            if (it != windows_.end())
-              dispatch_keysym(this, it->second, keysym, false);
-          } break;
-
-          case XCB_BUTTON_PRESS: {
-            xcb_button_press_event_t *e = reinterpret_cast<xcb_button_press_event_t *>(event);
-
-            auto it = windows_.find(e->event);
-            if (it != windows_.end()) {
-              window *w = it->second;
-              uint8_t b = e->detail;
-              auto c = vec2{e->event_x, e->event_y};
-              mouse_event_type t;
-              switch (e->detail) {
-                case 4:
-                  t = mouse_event_type::MWHEEL_UP;
-                  break;
-                case 5:
-                  t = mouse_event_type::MWHEEL_DOWN;
-                  break;
-                default:
-                  t = mouse_event_type::MDOWN;
-                  break;
-              }
-              post([w, b, t, c](auto) { w->on_mouse.fire(b, t, c); });
-            }
-          } break;
-
-          case XCB_BUTTON_RELEASE: {
-            xcb_button_release_event_t *e = reinterpret_cast<xcb_button_release_event_t *>(event);
-
-            auto it = windows_.find(e->event);
-            if (it != windows_.end()) {
-              window *w = it->second;
-              uint8_t b = e->detail;
-              if (b < 4 || b > 5) {  // ignore wheel events
-                auto c = vec2{e->event_x, e->event_y};
-                post([w, b, c](auto) { w->on_mouse.fire(b, mouse_event_type::MUP, c); });
-              }
-            }
-          } break;
-
-          case XCB_ENTER_NOTIFY: {
-            xcb_enter_notify_event_t *e = reinterpret_cast<xcb_enter_notify_event_t *>(event);
-
-            auto it = windows_.find(e->event);
-            if (it != windows_.end()) {
-              window *w = it->second;
-              auto c = vec2{e->event_x, e->event_y};
-              uint8_t b = e->detail;
-              post([w, b, c](auto) { w->on_mouse.fire(b, mouse_event_type::MENTER, c); });
-            }
-          } break;
-
-          case XCB_LEAVE_NOTIFY: {
-            xcb_leave_notify_event_t *e = reinterpret_cast<xcb_leave_notify_event_t *>(event);
-
-            auto it = windows_.find(e->event);
-            if (it != windows_.end()) {
-              window *w = it->second;
-              auto c = vec2{e->event_x, e->event_y};
-              uint8_t b = e->detail;
-              post([w, b, c](auto) { w->on_mouse.fire(b, mouse_event_type::MLEAVE, c); });
-            }
-          } break;
-
-          case XCB_MOTION_NOTIFY: {
-            xcb_motion_notify_event_t *e = reinterpret_cast<xcb_motion_notify_event_t *>(event);
-
-            auto it = windows_.find(e->event);
-            if (it != windows_.end()) {
-              window *w = it->second;
-              auto c = vec2{e->event_x, e->event_y};
-              uint8_t b = e->detail;
-              post([w, b, c](auto) { w->on_mouse.fire(b, mouse_event_type::MMOVE, c); });
-            }
-          } break;
-
-          case XCB_CLIENT_MESSAGE: {
-            xcb_client_message_event_t *e = reinterpret_cast<xcb_client_message_event_t *>(event);
-
-            auto it = windows_.find(e->window);
-            if (it != windows_.end()) {
-              if (e->data.data32[0] == atom_close_) {
-                window *w = it->second;
-                post([w](auto) {
-                  if (!w->on_close.fire())
-                    w->close();
-                });
-              }
-            }
-          } break;
-
-          case XCB_FOCUS_IN: {
-            xcb_focus_in_event_t *e = reinterpret_cast<xcb_focus_in_event_t *>(event);
-
-            auto it = windows_.find(e->event);
-            if (it != windows_.end()) {
-              window *w = it->second;
-              post([w](auto) { w->on_focus.fire(); });
-            }
-          } break;
-
-          case XCB_FOCUS_OUT: {
-            xcb_focus_out_event_t *e = reinterpret_cast<xcb_focus_out_event_t *>(event);
-
-            auto it = windows_.find(e->event);
-            if (it != windows_.end()) {
-              window *w = it->second;
-              post([w](auto) { w->on_blur.fire(); });
-            }
-          } break;
-
-          case XCB_MAP_NOTIFY: {
-            xcb_map_notify_event_t *e = reinterpret_cast<xcb_map_notify_event_t *>(event);
-
-            auto it = windows_.find(e->event);
-            if (it != windows_.end()) {
-              window *w = it->second;
-              post([w](auto) { w->on_resume.fire(); });
-            }
-          } break;
-
-          case XCB_UNMAP_NOTIFY: {
-            xcb_unmap_notify_event_t *e = reinterpret_cast<xcb_unmap_notify_event_t *>(event);
-
-            auto it = windows_.find(e->event);
-            if (it != windows_.end()) {
-              window *w = it->second;
-              post([w](auto) { w->on_pause.fire(); });
-            }
-          } break;
-
-          case XCB_DESTROY_NOTIFY: {
-            if (windows_.empty()) {
-              loop = false;
-              cv_.notify_one();
-            }
-          } break;
-
-          default:
-            break;
-        }
-      }
-
-      free(event);
+      jobs_loop();
     }
   });
 
   while (loop) {
-    jobs_loop();
+    xcb_generic_event_t *event = xcb_wait_for_event(connection_);
+    if (event != nullptr) {
+      switch (event->response_type & ~0x80) {
+      case XCB_EXPOSE: {
+        xcb_expose_event_t *e = reinterpret_cast<xcb_expose_event_t *>(event);
+
+        auto it = windows_.find(e->window);
+        if (it != windows_.end()) {
+          uvec4 r{e->x, e->y, e->x + e->width, e->y + e->height};
+          window *w = it->second;
+          post_overridable(
+              [w, r](auto tp) {
+                w->on_expose.fire(r);  // FIXME JB: Rects should be merged
+                w->redraw(tp);
+              }, 1);
+        }
+      } break;
+
+      case XCB_CONFIGURE_NOTIFY: {
+        xcb_configure_notify_event_t *e = reinterpret_cast<xcb_configure_notify_event_t *>(event);
+
+        auto it = windows_.find(e->event);
+        if (it != windows_.end()) {
+          window *w = it->second;
+          uvec2 s{e->width, e->height};
+          if (s != w->size_) {
+            post_overridable([w, s](auto) { w->dispatch_resize(s); }, 0);
+          }
+        }
+      } break;
+
+      case XCB_KEY_PRESS: {
+        xcb_key_press_event_t *e = reinterpret_cast<xcb_key_press_event_t *>(event);
+
+        int col;
+        if (e->state & 0x3)
+          col = 1;  // shift || caps-lock
+        else if (e->state & 0x80)
+          col = 4;  // alt-gr
+        else
+          col = 0;
+
+        auto keysym = xcb_key_press_lookup_keysym(keysyms_, e, col);
+        if (keysym >= 0xff80 && keysym <= 0xffb9 && keysym != XK_KP_Enter) {
+          col = e->state & 0x10 ? 1 : 0;
+          keysym = xcb_key_press_lookup_keysym(keysyms_, e, col);
+        }
+
+        auto it = windows_.find(e->event);
+        if (it != windows_.end())
+          dispatch_keysym(this, it->second, e->state, keysym, true);
+      } break;
+
+      case XCB_KEY_RELEASE: {
+        xcb_key_press_event_t *e = reinterpret_cast<xcb_key_release_event_t *>(event);
+
+        int col;
+        if (e->state & 0x80)
+          col = 4;  // alt-gr
+        else if (e->state & 0x3)
+          col = 1;  // shift || caps-lock
+        else
+          col = 0;
+
+        auto keysym = xcb_key_press_lookup_keysym(keysyms_, e, col);
+        if (keysym >= 0xff80 && keysym <= 0xffb9 && keysym != XK_KP_Enter) {
+          col = e->state & 0x10 ? 1 : 0;
+          keysym = xcb_key_press_lookup_keysym(keysyms_, e, col);
+        }
+        if (keysym == 0) {
+          keysym = xcb_key_press_lookup_keysym(keysyms_, e, 0);
+        }
+
+        auto it = windows_.find(e->event);
+        if (it != windows_.end())
+          dispatch_keysym(this, it->second, e->state, keysym, false);
+      } break;
+
+      case XCB_BUTTON_PRESS: {
+        xcb_button_press_event_t *e = reinterpret_cast<xcb_button_press_event_t *>(event);
+
+        auto it = windows_.find(e->event);
+        if (it != windows_.end()) {
+          window *w = it->second;
+          uint8_t b = e->detail;
+          auto c = vec2{e->event_x, e->event_y};
+          mouse_event_type t;
+          switch (e->detail) {
+          case 4:
+            t = mouse_event_type::MWHEEL_UP;
+            break;
+          case 5:
+            t = mouse_event_type::MWHEEL_DOWN;
+            break;
+          default:
+            t = mouse_event_type::MDOWN;
+            break;
+          }
+          post([w, b, t, c](auto) { w->on_mouse.fire(b, t, c); });
+        }
+      } break;
+
+      case XCB_BUTTON_RELEASE: {
+        xcb_button_release_event_t *e = reinterpret_cast<xcb_button_release_event_t *>(event);
+
+        auto it = windows_.find(e->event);
+        if (it != windows_.end()) {
+          window *w = it->second;
+          uint8_t b = e->detail;
+          if (b < 4 || b > 5) {  // ignore wheel events
+            auto c = vec2{e->event_x, e->event_y};
+            post([w, b, c](auto) { w->on_mouse.fire(b, mouse_event_type::MUP, c); });
+          }
+        }
+      } break;
+
+      case XCB_MOTION_NOTIFY: {
+        xcb_motion_notify_event_t *e = reinterpret_cast<xcb_motion_notify_event_t *>(event);
+
+        auto it = windows_.find(e->event);
+        if (it != windows_.end()) {
+          window *w = it->second;
+          auto c = vec2{e->event_x, e->event_y};
+          uint8_t b = e->detail;
+          post([w, b, c](auto) { w->on_mouse.fire(b, mouse_event_type::MMOVE, c); });
+        }
+      } break;
+
+      case XCB_CLIENT_MESSAGE: {
+        xcb_client_message_event_t *e = reinterpret_cast<xcb_client_message_event_t *>(event);
+
+        auto it = windows_.find(e->window);
+        if (it != windows_.end()) {
+          if (e->data.data32[0] == atom_close_) {
+            window *w = it->second;
+            post([w](auto) {
+              if (!w->on_close.fire())
+                w->close();
+            });
+          }
+        }
+      } break;
+
+      case XCB_FOCUS_IN: {
+        xcb_focus_in_event_t *e = reinterpret_cast<xcb_focus_in_event_t *>(event);
+
+        auto it = windows_.find(e->event);
+        if (it != windows_.end()) {
+          window *w = it->second;
+          post([w](auto) { w->on_focus.fire(); });
+        }
+      } break;
+
+      case XCB_FOCUS_OUT: {
+        xcb_focus_out_event_t *e = reinterpret_cast<xcb_focus_out_event_t *>(event);
+
+        auto it = windows_.find(e->event);
+        if (it != windows_.end()) {
+          window *w = it->second;
+          post([w](auto) { w->on_blur.fire(); });
+        }
+      } break;
+
+      case XCB_MAP_NOTIFY: {
+        xcb_map_notify_event_t *e = reinterpret_cast<xcb_map_notify_event_t *>(event);
+
+        auto it = windows_.find(e->event);
+        if (it != windows_.end()) {
+          window *w = it->second;
+          post([w](auto) { w->on_resume.fire(); });
+        }
+      } break;
+
+      case XCB_UNMAP_NOTIFY: {
+        xcb_unmap_notify_event_t *e = reinterpret_cast<xcb_unmap_notify_event_t *>(event);
+
+        auto it = windows_.find(e->event);
+        if (it != windows_.end()) {
+          window *w = it->second;
+          post([w](auto) { w->on_pause.fire(); });
+        }
+      } break;
+
+      case XCB_DESTROY_NOTIFY: {
+        if (windows_.empty()) {
+          loop = false;
+          cv_.notify_one();
+        }
+      } break;
+
+      default:
+        break;
+      }
+    }
+
+    free(event);
   }
 
-  event_pump.join();
+  job_pump.join();
 
   return EXIT_SUCCESS;
 }

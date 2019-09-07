@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstring>
-#include <experimental/filesystem>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -9,7 +9,7 @@
 #include "hut/utils.hpp"
 
 using namespace std;
-using namespace std::experimental::filesystem::v1;
+using namespace std::filesystem;
 using namespace std::chrono;
 using namespace hut;
 
@@ -86,6 +86,6 @@ int main(int argc, char **argv) {
   output_h << "}  // namespace " << argv[1] << '\n';
   output_h << "}  // namespace hut" << std::endl;
 
-  std::cout << "Generated " << output_path << " in "
+  std::cout << "Generated " << argv[1] << " at " << output_path << " in "
             << duration<double, std::milli>(steady_clock::now() - start).count() << "ms." << std::endl;
 }

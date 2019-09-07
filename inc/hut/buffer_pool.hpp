@@ -36,6 +36,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include "hut/utils.hpp"
+
 namespace hut {
 
 class display;

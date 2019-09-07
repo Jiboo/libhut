@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6)
+cmake_minimum_required(VERSION 3.14)
 project(hut)
 
 ###########################################################
@@ -10,13 +10,19 @@ project(hut)
 #add_definitions(-DHUT_ENABLE_VALIDATION_DEBUG)
 #add_definitions(-DHUT_DEBUG_STAGING)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -std=c++1z")
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/deps/")
+#set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 ###########################################################
 message("Checking for required dependencies...")
 ###########################################################
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_COMPILE_WARNING_MODE HIGH)
+if(NOT WIN32)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+endif()
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/deps/")
 
 find_package(Threads REQUIRED)
 set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
@@ -28,7 +34,6 @@ set(LIBS ${LIBS} ${Vulkan_LIBRARIES})
 find_package(GLM REQUIRED)
 include_directories(${GLM_INCLUDE_DIRS})
 add_definitions("-DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_LEFT_HANDED")
-set(LIBS ${LIBS} ${GLM_LIBRARIES})
 
 find_package(PNG REQUIRED)
 include_directories(${PNG_INCLUDE_DIRS})
@@ -39,22 +44,25 @@ include_directories(${FREETYPE_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${FREETYPE_LIBRARIES})
 
 find_package(HarfBuzz REQUIRED)
-set(LIBS ${LIBS} harfbuzz::harfbuzz)
+include_directories(${HARFBUZZ_INCLUDE_DIRS})
+set(LIBS ${LIBS} ${HARFBUZZ_LIBRARIES})
 
 find_program(GLSLANG_VALIDATOR NAMES glslangValidator)
-if (NOT GLSLANG_VALIDATOR)
+if(NOT GLSLANG_VALIDATOR)
   message(FATAL_ERROR "Can't find glslangValidator, needed for shader compilation.")
-endif ()
+endif()
 
 ###########################################################
 message("Checking for optional dependencies...")
 ###########################################################
 
 find_package(GTest)
-include_directories(${GTEST_INCLUDE_DIR})
+if(GTEST_FOUND)
+  include_directories(${GTEST_INCLUDE_DIR})
+endif()
 
 find_package(XCB COMPONENTS xcb xcb-keysyms)
-if (XCB_FOUND AND xcb-keysyms_FOUND)
+if(XCB_FOUND AND xcb-keysyms_FOUND)
   message("Using XCB as backend")
   include_directories(${XCB_INCLUDE_DIRS})
   set(LIBS ${LIBS} ${XCB_LIBRARIES})
@@ -62,18 +70,27 @@ if (XCB_FOUND AND xcb-keysyms_FOUND)
   file(GLOB HUT_XCB_SOURCES src/xcb/*.cpp)
   set(HUT_SOURCES ${HUT_SOURCES} ${HUT_XCB_SOURCES})
   set(HUT_PLATFORM XCB)
-endif ()
+elseif(WIN32)
+  message("Using WIN32 as backend")
+  add_definitions(-D_CRT_SECURE_NO_WARNINGS=1 -DNOMINMAX=1) # glm related
+  add_definitions(-D_SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING=1) # string to_utf8(char32_t)
+  add_definitions(-DWIN32_LEAN_AND_MEAN=1)
 
-if (NOT HUT_PLATFORM)
+  file(GLOB HUT_WIN32_SOURCES src/win32/*.cpp)
+  set(HUT_SOURCES ${HUT_SOURCES} ${HUT_WIN32_SOURCES})
+  set(HUT_PLATFORM WIN32)
+endif()
+
+if(NOT HUT_PLATFORM)
   message(FATAL_ERROR "Couldn't find a suitable backend")
-endif ()
+endif()
 
 ###########################################################
-message("Configuring library build targets...")
+message("Configuring shader generation...")
 ###########################################################
 
 add_executable(gen_res src/tools/gen_res/main.cpp)
-target_link_libraries(gen_res -lstdc++fs)
+target_link_libraries(gen_res)
 
 set(HUT_GEN_DIR "${CMAKE_BINARY_DIR}/gen")
 include_directories(${HUT_GEN_DIR})
@@ -104,7 +121,7 @@ add_custom_target(shaders_spv DEPENDS ${HUT_SHADER_SPV}
     COMMENT "Checked if shaders need recompilation")
 
 add_custom_command(OUTPUT ${HUT_GEN_DIR}/hutgen_spv.cpp
-    COMMAND gen_res hutgen_spv ${HUT_GEN_DIR} ${HUT_SHADER_SPV}
+    COMMAND $<TARGET_FILE:gen_res> hutgen_spv ${HUT_GEN_DIR} ${HUT_SHADER_SPV}
     DEPENDS gen_res ${HUT_SHADER_SPV}
     COMMENT "Generating hutgen_spv.cpp")
 
@@ -112,15 +129,18 @@ add_custom_target(hutgen_spv_cpp DEPENDS ${HUT_GEN_DIR}/hutgen_spv.cpp
     COMMENT "Checked if hutgen_spv.cpp need regeneration")
 add_dependencies(hutgen_spv_cpp gen_res)
 
+###########################################################
+message("Configuring library build targets...")
+###########################################################
+
 add_definitions(-DVK_USE_PLATFORM_${HUT_PLATFORM}_KHR)
 file(GLOB_RECURSE HUT_HEADERS inc/hut/*.hpp inc/hut/drawables/*.hpp ${HUT_GEN_DIR}/*.hpp)
-file(GLOB HUT_COMMON_SOURCES src/*.cpp ${HUT_GEN_DIR}/*.cpp)
-set(HUT_SOURCES ${HUT_SOURCES} ${HUT_COMMON_SOURCES})
+file(GLOB HUT_COMMON_SOURCES src/*.cpp)
+set(HUT_SOURCES ${HUT_SOURCES} ${HUT_COMMON_SOURCES} ${HUT_GEN_DIR}/hutgen_spv.cpp)
 
 include_directories(inc)
 add_library(hut ${HUT_HEADERS} ${HUT_SOURCES})
 target_link_libraries(hut ${LIBS})
-message("${LIBS}")
 add_dependencies(hut hutgen_spv_cpp)
 
 ###########################################################
@@ -129,13 +149,13 @@ message("Configuring demo build targets...")
 
 file(GLOB HUT_DEMO_PNG tst/png/*.png)
 add_custom_command(OUTPUT ${HUT_GEN_DIR}/demo_png.cpp
-    COMMAND gen_res demo_png ${HUT_GEN_DIR} ${HUT_DEMO_PNG}
+    COMMAND $<TARGET_FILE:gen_res> demo_png ${HUT_GEN_DIR} ${HUT_DEMO_PNG}
     DEPENDS gen_res ${HUT_DEMO_PNG}
     COMMENT "Generating demo_png.cpp")
 
 file(GLOB_RECURSE HUT_DEMO_TTF tst/ttf/*.ttf)
 add_custom_command(OUTPUT ${HUT_GEN_DIR}/demo_ttf.cpp
-    COMMAND gen_res demo_ttf ${HUT_GEN_DIR} ${HUT_DEMO_TTF}
+    COMMAND $<TARGET_FILE:gen_res> demo_ttf ${HUT_GEN_DIR} ${HUT_DEMO_TTF}
     DEPENDS gen_res ${HUT_DEMO_TTF}
     COMMENT "Generating demo_ttf.cpp")
 

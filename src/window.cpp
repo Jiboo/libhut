@@ -25,6 +25,7 @@
  * SOFTWARE.
  */
 
+#include <algorithm>
 #include <iomanip>
 #include <iostream>
 #include <thread>
@@ -378,8 +379,10 @@ void window::redraw(display::time_point _tp) {
 
 void window::dispatch_resize(const uvec2 &_size) {
   size_ = _size;
-  init_vulkan_surface();
-  on_resize.fire(_size);
+  if (_size.x > 0 && _size.y > 0) {
+    init_vulkan_surface();
+    on_resize.fire(_size);
+  }
 }
 
 void window::rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
@@ -412,4 +415,48 @@ void window::rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
   vkCmdEndRenderPass(_cb);
   if (vkEndCommandBuffer(_cb) != VK_SUCCESS)
     throw std::runtime_error("failed to record command buffer!");
+}
+
+std::string window::name_key(keysym c) {
+  if (c > KENUM_START && c < KENUM_END) {
+    switch (c) {
+#define HUT_NAME_KEY(CASE) case CASE: return #CASE;
+      HUT_NAME_KEY(KTAB)
+      HUT_NAME_KEY(KALT_LEFT)
+      HUT_NAME_KEY(KALT_RIGHT)
+      HUT_NAME_KEY(KCTRL_LEFT)
+      HUT_NAME_KEY(KCTRL_RIGHT)
+      HUT_NAME_KEY(KSHIFT_LEFT)
+      HUT_NAME_KEY(KSHIFT_RIGHT)
+      HUT_NAME_KEY(KPAGE_DOWN)
+      HUT_NAME_KEY(KPAGE_UP)
+      HUT_NAME_KEY(KUP)
+      HUT_NAME_KEY(KRIGHT)
+      HUT_NAME_KEY(KDOWN)
+      HUT_NAME_KEY(KLEFT)
+      HUT_NAME_KEY(KHOME)
+      HUT_NAME_KEY(KEND)
+      HUT_NAME_KEY(KRETURN)
+      HUT_NAME_KEY(KBACKSPACE)
+      HUT_NAME_KEY(KDELETE)
+      HUT_NAME_KEY(KINSER)
+      HUT_NAME_KEY(KESCAPE)
+      HUT_NAME_KEY(KF1)
+      HUT_NAME_KEY(KF2)
+      HUT_NAME_KEY(KF3)
+      HUT_NAME_KEY(KF4)
+      HUT_NAME_KEY(KF5)
+      HUT_NAME_KEY(KF6)
+      HUT_NAME_KEY(KF7)
+      HUT_NAME_KEY(KF8)
+      HUT_NAME_KEY(KF9)
+      HUT_NAME_KEY(KF10)
+      HUT_NAME_KEY(KF11)
+      HUT_NAME_KEY(KF12)
+#undef HUT_NAME_KEY
+      case KENUM_START: break;
+      case KENUM_END: break;
+    }
+  }
+  return to_utf8(c);
 }

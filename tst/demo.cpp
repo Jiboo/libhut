@@ -230,7 +230,7 @@ int main(int, char **) {
 
     shaper s;
     s.bake(b, hello_world, roboto, 12, "The The quick brown fox, jumps over the lazy dog. fi VA");
-    s.bake(b, icons_test, material_icons, 16, u8"\uE834\uE835\uE836\uE837");
+    s.bake(b, icons_test, material_icons, 16, "\uE834\uE835\uE836\uE837");
 
     w.invalidate(true);
   });
@@ -257,7 +257,7 @@ int main(int, char **) {
   });
 
   w.on_frame.connect([&](uvec2 _size, display::duration _delta) {
-    w.invalidate(false);  // asks for a redraw, without recalling on_draw (shader animation, for example)
+    //w.invalidate(false);  // asks for a redraw, without recalling on_draw (shader animation, for example)
 
     static auto startTime = display::clock::now();
 
@@ -297,13 +297,17 @@ int main(int, char **) {
   });
 
   w.on_expose.connect([](const uvec4 &_bounds) {
-    // cout << "expose " << to_string(_bounds) << endl;
+    std::cout << "expose " << to_string(_bounds) << std::endl;
     return false;
   });
 
-  w.on_keysym.connect([](char32_t c, bool _press) {
-    std::cout << "key " << _press << '\t' << c << '\t' << window::is_cursor_key(c) << window::is_function_key(c)
-         << window::is_keypad_key(c) << window::is_modifier_key(c) << '\t' << window::name_key(c) << std::endl;
+  w.on_key.connect([](keysym c, bool _press) {
+    std::cout << "keysym " << _press << '\t' << window::name_key(c) << std::endl;
+    return true;
+  });
+
+  w.on_char.connect([](char32_t c) {
+    std::cout << "char " << to_utf8(c) << std::endl;
     return true;
   });
 
@@ -313,14 +317,12 @@ int main(int, char **) {
     return true;
   });
 
-  /*w.on_close.connect([&w, &d, start] {
-    dump_timer(start, "caught close...");
-    d.post_delayed([&w, start](auto) {
-      dump_timer(start, "closing...");
+  w.on_close.connect([&w, &d] {
+    d.post_delayed([&w](auto) {
       w.close();
     }, 5s);
     return true;
-  });*/
+  });
 
   w.on_focus.connect([]() {
     std::cout << "focused" << std::endl;
@@ -329,6 +331,16 @@ int main(int, char **) {
 
   w.on_blur.connect([]() {
     std::cout << "blurred" << std::endl;
+    return false;
+  });
+
+  w.on_pause.connect([]() {
+    std::cout << "paused" << std::endl;
+    return false;
+  });
+
+  w.on_resume.connect([]() {
+    std::cout << "resumed" << std::endl;
     return false;
   });
 

@@ -43,6 +43,10 @@
 
 #if defined(VK_USE_PLATFORM_XCB_KHR)
 #include <xcb/xcb_keysyms.h>
+#elif defined(VK_USE_PLATFORM_WIN32_KHR)
+#include <windows.h>
+#else
+#error "can't find a suitable VK_USE_PLATFORM macro"
 #endif
 
 #include <ft2build.h>
@@ -51,6 +55,10 @@
 #include "hut/utils.hpp"
 
 namespace hut {
+
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
+LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
+#endif
 
 class display {
   friend class window;
@@ -198,6 +206,22 @@ class display {
   std::unordered_map<xcb_window_t, window *> windows_;
 
   xcb_atom_t atom_wm_, atom_close_;
+#elif defined(VK_USE_PLATFORM_WIN32_KHR)
+  friend LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
+  #define HUT_WIN32_CLASSNAME L"Hut Window Class"
+  HINSTANCE hinstance_;
+  std::unordered_map<HWND, window *> windows_;
+  DWORD eventpump_ = 0;
+  using eventpump_job_cb = std::function<void()>;
+
+  struct eventpump_job {
+    static const uint sMessageID = WM_USER + 0;
+    eventpump_job_cb callback_;
+  };
+
+  void post_eventpump_job(eventpump_job_cb _callback) {
+    PostThreadMessage(eventpump_, eventpump_job::sMessageID, WPARAM(new eventpump_job{_callback}), 0);
+  }
 #endif
 };
 

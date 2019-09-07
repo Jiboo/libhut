@@ -129,8 +129,7 @@ std::shared_ptr<image> image::load_png(display &_display, const uint8_t *_data, 
   auto height = png_get_image_height(png_ptr, info_ptr);
 
   png_read_update_info(png_ptr, info_ptr);
-
-  uint offsetAlignment = _display.device_props_.limits.optimalBufferCopyOffsetAlignment;
+  uint offsetAlignment = std::max(VkDeviceSize(4), _display.device_props_.limits.optimalBufferCopyOffsetAlignment);
   uint rowAlignment = _display.device_props_.limits.optimalBufferCopyRowPitchAlignment;
   uint stride = align(width, rowAlignment);
   uint row_byte_size = stride * channels;
@@ -292,7 +291,7 @@ void image::update(ivec4 _coords, uint8_t *_data, uint _src_row_pitch) {
   uint height = _coords[3] - _coords[1];
   assert (width > 0 && height > 0);
   uint buffer_align = display_.device_props_.limits.optimalBufferCopyRowPitchAlignment;
-  uint offset_align = display_.device_props_.limits.optimalBufferCopyOffsetAlignment;
+  uint offset_align = std::max(VkDeviceSize(4), display_.device_props_.limits.optimalBufferCopyOffsetAlignment);
   uint row_byte_size = width * pixel_size_;
   uint buffer_row_pitch = align(row_byte_size, buffer_align);
   int byte_size = height * buffer_row_pitch;

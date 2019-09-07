@@ -35,6 +35,10 @@
 #if defined(VK_USE_PLATFORM_XCB_KHR)
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>
+#elif defined(VK_USE_PLATFORM_WIN32_KHR)
+#include <windows.h>
+#else
+#error "can't find a suitable VK_USE_PLATFORM macro"
 #endif
 
 #include "hut/utils.hpp"
@@ -43,7 +47,7 @@ namespace hut {
 
 enum touch_event_type { TDOWN, TUP, TMOVE };
 
-enum mouse_event_type { MDOWN, MUP, MMOVE, MENTER, MLEAVE, MWHEEL_UP, MWHEEL_DOWN };
+enum mouse_event_type { MDOWN, MUP, MMOVE, MWHEEL_UP, MWHEEL_DOWN };
 
 enum keysym : char32_t {
   KENUM_START = 0xffffff00,
@@ -99,13 +103,9 @@ class window {
   event<uint8_t /*finger*/, touch_event_type, uvec2 /*pos*/> on_touch;
   event<uint8_t /*button*/, mouse_event_type, uvec2 /*pos*/> on_mouse;
 
-  event<char32_t /*utf32_char*/, bool /*down*/> on_keysym;
-  static bool is_keypad_key(char32_t c);
-  static bool is_cursor_key(char32_t c);
-  static bool is_function_key(char32_t c);
-  static bool is_modifier_key(char32_t c);
-  static keysym map_key(char32_t c);
-  static std::string name_key(char32_t c);
+  event<keysym /*key*/, bool /*down*/> on_key;
+  event<char32_t /*utf32_char*/> on_char;
+  static std::string name_key(keysym c);
 
   window(display &_display);
   ~window();
@@ -161,9 +161,14 @@ class window {
   void destroy_vulkan();
   void redraw(display::time_point);
 
-#if defined(VK_USE_PLATFORM_XCB_KHR)
  protected:
+#if defined(VK_USE_PLATFORM_XCB_KHR)
   xcb_window_t window_, parent_;
+#elif defined(VK_USE_PLATFORM_WIN32_KHR)
+  friend LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
+  HWND window_;
+  glm::uvec2 mouse_lastmove_ = {0, 0};
+  bool mouse_inside_ = false;
 #endif
 };
 

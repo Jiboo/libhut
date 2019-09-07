@@ -35,19 +35,6 @@
 
 using namespace hut;
 
-bool window::is_keypad_key(char32_t c) {
-  return xcb_is_keypad_key(c) != 0;
-}
-bool window::is_cursor_key(char32_t c) {
-  return xcb_is_cursor_key(c) != 0;
-}
-bool window::is_function_key(char32_t c) {
-  return xcb_is_function_key(c) != 0;
-}
-bool window::is_modifier_key(char32_t c) {
-  return xcb_is_modifier_key(c) != 0;
-}
-
 window::window(display &_display) : display_(_display), size_(800, 600), parent_(_display.screen_->root) {
   window_ = xcb_generate_id(_display.connection_);
 
@@ -81,11 +68,13 @@ window::window(display &_display) : display_(_display), size_(800, 600), parent_
 }
 
 void window::close() {
-  destroy_vulkan();
-  display_.windows_.erase(window_);
-  xcb_unmap_window(display_.connection_, window_);
-  xcb_destroy_window(display_.connection_, window_);
-  xcb_flush(display_.connection_);
+  display_.post([this](auto) {
+    destroy_vulkan();
+    display_.windows_.erase(window_);
+    xcb_unmap_window(display_.connection_, window_);
+    xcb_destroy_window(display_.connection_, window_);
+    xcb_flush(display_.connection_);
+  });
 }
 
 void window::visible(bool _visible) {
@@ -94,126 +83,6 @@ void window::visible(bool _visible) {
   else
     xcb_unmap_window(display_.connection_, window_);
   xcb_flush(display_.connection_);
-}
-
-keysym window::map_key(char32_t c) {
-  switch (c) {
-    case XK_Tab:
-      return KTAB;
-    case XK_Alt_L:
-      return KALT_LEFT;
-    case XK_Alt_R:
-      return KALT_RIGHT;
-    case XK_Control_L:
-      return KCTRL_LEFT;
-    case XK_Control_R:
-      return KCTRL_RIGHT;
-    case XK_Shift_L:
-      return KSHIFT_LEFT;
-    case XK_Shift_R:
-      return KSHIFT_RIGHT;
-    case XK_Page_Up:
-      return KPAGE_UP;
-    case XK_Page_Down:
-      return KPAGE_DOWN;
-    case XK_Up:
-      return KUP;
-    case XK_Right:
-      return KRIGHT;
-    case XK_Down:
-      return KDOWN;
-    case XK_Left:
-      return KLEFT;
-    case XK_Home:
-      return KHOME;
-    case XK_End:
-      return KEND;
-    case XK_Return:
-      return KRETURN;
-    case XK_BackSpace:
-      return KBACKSPACE;
-    case XK_Delete:
-      return KDELETE;
-    case XK_Insert:
-      return KINSER;
-    case XK_Escape:
-      return KESCAPE;
-    case XK_F1:
-      return KF1;
-    case XK_F2:
-      return KF2;
-    case XK_F3:
-      return KF3;
-    case XK_F4:
-      return KF4;
-    case XK_F5:
-      return KF5;
-    case XK_F6:
-      return KF6;
-    case XK_F7:
-      return KF7;
-    case XK_F8:
-      return KF8;
-    case XK_F9:
-      return KF9;
-    case XK_F10:
-      return KF10;
-    case XK_F11:
-      return KF11;
-    case XK_F12:
-      return KF12;
-    default:
-      return (keysym)c;
-  }
-}
-
-std::string window::name_key(char32_t c) {
-  keysym mapped = map_key(c);
-  if (mapped > KENUM_START && mapped < KENUM_END) {
-    switch (mapped) {
-#define HUT_NAME_KEY(CASE) \
-  case CASE:               \
-    return #CASE;
-      HUT_NAME_KEY(KTAB)
-      HUT_NAME_KEY(KALT_LEFT)
-      HUT_NAME_KEY(KALT_RIGHT)
-      HUT_NAME_KEY(KCTRL_LEFT)
-      HUT_NAME_KEY(KCTRL_RIGHT)
-      HUT_NAME_KEY(KSHIFT_LEFT)
-      HUT_NAME_KEY(KSHIFT_RIGHT)
-      HUT_NAME_KEY(KPAGE_DOWN)
-      HUT_NAME_KEY(KPAGE_UP)
-      HUT_NAME_KEY(KUP)
-      HUT_NAME_KEY(KRIGHT)
-      HUT_NAME_KEY(KDOWN)
-      HUT_NAME_KEY(KLEFT)
-      HUT_NAME_KEY(KHOME)
-      HUT_NAME_KEY(KEND)
-      HUT_NAME_KEY(KRETURN)
-      HUT_NAME_KEY(KBACKSPACE)
-      HUT_NAME_KEY(KDELETE)
-      HUT_NAME_KEY(KINSER)
-      HUT_NAME_KEY(KESCAPE)
-      HUT_NAME_KEY(KF1)
-      HUT_NAME_KEY(KF2)
-      HUT_NAME_KEY(KF3)
-      HUT_NAME_KEY(KF4)
-      HUT_NAME_KEY(KF5)
-      HUT_NAME_KEY(KF6)
-      HUT_NAME_KEY(KF7)
-      HUT_NAME_KEY(KF8)
-      HUT_NAME_KEY(KF9)
-      HUT_NAME_KEY(KF10)
-      HUT_NAME_KEY(KF11)
-      HUT_NAME_KEY(KF12)
-#undef HUT_NAME_KEY
-      case KENUM_START:
-        break;
-      case KENUM_END:
-        break;
-    }
-  }
-  return to_utf8(c);
 }
 
 void window::title(const std::string &_title) {
