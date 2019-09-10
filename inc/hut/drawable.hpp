@@ -362,7 +362,6 @@ public:
             const shared_indices &_indices, uint _indices_offset, uint _indices_count,
             const shared_instances &_instances, uint _instances_offset, uint _instances_count,
             const shared_vertices &_vertices, uint _vertex_offset) {
-    window_.display_.check_thread();
     assert(descriptor_bound(_descriptor_index));
     assert(_indices && _instances && _vertices);
     assert(_indices_offset + _indices_count <= _indices->size());

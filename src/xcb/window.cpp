@@ -39,11 +39,10 @@ window::window(display &_display) : display_(_display), size_(800, 600), parent_
   window_ = xcb_generate_id(_display.connection_);
 
   uint32_t mask = XCB_CW_EVENT_MASK;
-  uint32_t values[1] = {XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE | XCB_EVENT_MASK_BUTTON_PRESS |
-                        XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW |
-                        XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_KEYMAP_STATE | XCB_EVENT_MASK_EXPOSURE |
-                        XCB_EVENT_MASK_VISIBILITY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE |
-                        XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_STRUCTURE_NOTIFY};
+  uint32_t values[1] = {XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE | XCB_EVENT_MASK_BUTTON_PRESS
+                        | XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_KEYMAP_STATE
+                        | XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_VISIBILITY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE
+                        | XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_STRUCTURE_NOTIFY};
 
   xcb_create_window(_display.connection_, XCB_COPY_FROM_PARENT, window_, parent_, 0, 0, 800, 600, 0,
                     XCB_WINDOW_CLASS_INPUT_OUTPUT, _display.screen_->root_visual, mask, values);
@@ -68,13 +67,11 @@ window::window(display &_display) : display_(_display), size_(800, 600), parent_
 }
 
 void window::close() {
-  display_.post([this](auto) {
-    destroy_vulkan();
-    display_.windows_.erase(window_);
-    xcb_unmap_window(display_.connection_, window_);
-    xcb_destroy_window(display_.connection_, window_);
-    xcb_flush(display_.connection_);
-  });
+  destroy_vulkan();
+  display_.windows_.erase(window_);
+  xcb_unmap_window(display_.connection_, window_);
+  xcb_destroy_window(display_.connection_, window_);
+  xcb_flush(display_.connection_);
 }
 
 void window::visible(bool _visible) {

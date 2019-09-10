@@ -44,8 +44,6 @@ void window::invalidate(bool _redraw) {
 }
 
 void window::destroy_vulkan() {
-  display_.check_thread();
-
   if (surface_ == VK_NULL_HANDLE)
     return;
 
@@ -82,8 +80,6 @@ void window::destroy_vulkan() {
 }
 
 void window::init_vulkan_surface() {
-  display_.check_thread();
-
   if (surface_ == VK_NULL_HANDLE)
     return;
 
@@ -295,8 +291,6 @@ void window::init_vulkan_surface() {
 }
 
 void window::redraw(display::time_point _tp) {
-  display_.check_thread();
-
   if (swapchain_ == VK_NULL_HANDLE)
     return;
 
@@ -386,8 +380,6 @@ void window::dispatch_resize(const uvec2 &_size) {
 }
 
 void window::rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
-  display_.check_thread();
-
   VkCommandBufferBeginInfo beginInfo = {};
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;

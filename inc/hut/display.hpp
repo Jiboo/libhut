@@ -43,6 +43,10 @@
 
 #if defined(VK_USE_PLATFORM_XCB_KHR)
 #include <xcb/xcb_keysyms.h>
+#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+#include <wayland-client.h>
+#include <xkbcommon/xkbcommon.h>
+#include "xdg-shell-client-protocol.h"
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
 #include <windows.h>
 #else
@@ -83,8 +87,6 @@ class display {
   int dispatch();
 
   void post(callback _callback);
-  void post_overridable(callback _callback, size_t _id);
-  void post_delayed(callback _callback, std::chrono::milliseconds _delay);
 
   template <typename T>
   T get_proc(const std::string &_name) {
@@ -182,46 +184,49 @@ class display {
   void stage_clear(const image_clear &_info);
 
   std::list<callback> posted_jobs_;
-  std::map<size_t, callback> overridable_jobs_;
-  std::multimap<time_point, callback> delayed_jobs_;
-  std::mutex posted_mutex_, overridable_mutex_, delayed_mutex_;
-  std::mutex cv_mutex_;
-  std::condition_variable cv_;
-  std::thread::id dispatcher_;
-
-  time_point next_job_time_point();
-  void tick_posted(time_point _now);
-  void tick_overridable(time_point _now);
-  void tick_delayed(time_point _now);
-  void jobs_loop();
-
-  inline void check_thread() {
-    assert(std::this_thread::get_id() == dispatcher_ || dispatcher_ == std::thread::id());
-  }
+  std::mutex posted_mutex_;
+  void process_posts(time_point _now);
+  void post_empty_event();
 
 #if defined(VK_USE_PLATFORM_XCB_KHR)
   xcb_connection_t *connection_;
   xcb_screen_t *screen_;
   xcb_key_symbols_t *keysyms_;
   std::unordered_map<xcb_window_t, window *> windows_;
-
   xcb_atom_t atom_wm_, atom_close_;
+#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+  friend void registry_handler(void*, wl_registry*, uint32_t, const char*, uint32_t);
+  friend void seat_handler(void*, wl_seat*, uint32_t);
+  friend void pointer_handle_enter(void*, wl_pointer*, uint32_t, wl_surface*, wl_fixed_t, wl_fixed_t);
+  friend void pointer_handle_leave(void*, wl_pointer*, uint32_t, wl_surface*);
+  friend void pointer_handle_motion(void*, wl_pointer*, uint32_t, wl_fixed_t, wl_fixed_t);
+  friend void pointer_handle_button(void*, wl_pointer*, uint32_t, uint32_t, uint32_t, uint32_t);
+  friend void pointer_handle_axis(void*, wl_pointer*, uint32_t, uint32_t, wl_fixed_t);
+  friend void keyboard_handle_keymap(void*, wl_keyboard*, uint32_t, int, uint32_t);
+  friend void keyboard_handle_enter(void*, wl_keyboard*, uint32_t, wl_surface*, wl_array*);
+  friend void keyboard_handle_leave(void*, wl_keyboard*, uint32_t, wl_surface*);
+  friend void keyboard_handle_key(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t);
+  friend void keyboard_handle_modifiers(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+  wl_display *display_;
+  wl_registry *registry_ = nullptr;
+  wl_compositor *compositor_ = nullptr;
+  xdg_wm_base *xdg_wm_base_ = nullptr;
+  wl_seat *seat_ = nullptr;
+  wl_pointer *pointer_ = nullptr;
+  wl_keyboard *keyboard_ = nullptr;
+  std::unordered_map<wl_surface*, window*> windows_;
+  bool loop_ = true;
+  std::pair<wl_surface*, window*> pointer_current_ {nullptr, nullptr};
+  std::pair<wl_surface*, window*> keyboard_current_ {nullptr, nullptr};
+  xkb_context *xkb_context_ = nullptr;
+  xkb_state *xkb_state_ = nullptr;
+  xkb_keymap *keymap_ = nullptr;
+  uint32_t kb_mod_mask_ = 0;
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
   friend LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
   #define HUT_WIN32_CLASSNAME L"Hut Window Class"
   HINSTANCE hinstance_;
   std::unordered_map<HWND, window *> windows_;
-  DWORD eventpump_ = 0;
-  using eventpump_job_cb = std::function<void()>;
-
-  struct eventpump_job {
-    static const uint sMessageID = WM_USER + 0;
-    eventpump_job_cb callback_;
-  };
-
-  void post_eventpump_job(eventpump_job_cb _callback) {
-    PostThreadMessage(eventpump_, eventpump_job::sMessageID, WPARAM(new eventpump_job{_callback}), 0);
-  }
 #endif
 };
 

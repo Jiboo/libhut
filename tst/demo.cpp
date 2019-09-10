@@ -60,9 +60,6 @@ int main(int, char **) {
 
   display d("testbed");
 
-  d.post([](auto) { std::cout << "single job" << std::endl; });
-  d.post_delayed([](auto) { std::cout << "single job, delayed" << std::endl; }, 5s);
-
   window w(d);
   w.clear_color({1, 1, 1, 1});
   w.title("testbed");
@@ -257,7 +254,9 @@ int main(int, char **) {
   });
 
   w.on_frame.connect([&](uvec2 _size, display::duration _delta) {
-    //w.invalidate(false);  // asks for a redraw, without recalling on_draw (shader animation, for example)
+    d.post([&w](auto){
+      w.invalidate(false);  // asks for a redraw, without recalling on_draw (shader animation, for example)
+    });
 
     static auto startTime = display::clock::now();
 
@@ -297,7 +296,7 @@ int main(int, char **) {
   });
 
   w.on_expose.connect([](const uvec4 &_bounds) {
-    std::cout << "expose " << to_string(_bounds) << std::endl;
+    //std::cout << "expose " << to_string(_bounds) << std::endl;
     return false;
   });
 
@@ -317,11 +316,8 @@ int main(int, char **) {
     return true;
   });
 
-  w.on_close.connect([&w, &d] {
-    d.post_delayed([&w](auto) {
-      w.close();
-    }, 5s);
-    return true;
+  w.on_close.connect([] {
+    return false;
   });
 
   w.on_focus.connect([]() {

@@ -54,46 +54,10 @@ void display::post(display::callback _callback) {
     std::lock_guard lock(posted_mutex_);
     posted_jobs_.emplace(posted_jobs_.end(), _callback);
   }
-  cv_.notify_one();
+  post_empty_event();
 }
 
-void display::post_overridable(callback _callback, size_t _id) {
-  {
-    std::lock_guard lock(overridable_mutex_);
-    overridable_jobs_.emplace(_id, _callback);
-  }
-  cv_.notify_one();
-}
-
-void display::post_delayed(display::callback _callback, std::chrono::milliseconds _delay) {
-  {
-    std::lock_guard lock(delayed_mutex_);
-    delayed_jobs_.emplace(display::clock::now() + _delay, _callback);
-  }
-  cv_.notify_one();
-}
-
-display::time_point display::next_job_time_point() {
-  time_point result = time_point::max();
-  {
-    std::lock_guard lock(overridable_mutex_);
-    if (!overridable_jobs_.empty())
-      return time_point::min();
-  }
-  {
-    std::lock_guard lock(posted_mutex_);
-    if (!posted_jobs_.empty())
-      return time_point::min();
-  }
-  {
-    std::lock_guard lock(delayed_mutex_);
-    if (!delayed_jobs_.empty())
-      result = std::min(result, delayed_jobs_.begin()->first);
-  }
-  return result;
-}
-
-void display::tick_posted(time_point _now) {
+void display::process_posts(time_point _now) {
   decltype(posted_jobs_) tmp;
   {
     std::lock_guard lock(posted_mutex_);
@@ -102,57 +66,6 @@ void display::tick_posted(time_point _now) {
 
   for (const auto &job : tmp)
     job(_now);
-}
-
-void display::tick_overridable(time_point _now) {
-  decltype(overridable_jobs_) tmp;
-  {
-    std::lock_guard lock(overridable_mutex_);
-    tmp.swap(overridable_jobs_);
-  }
-
-  for (const auto &job : tmp)
-    job.second(_now);
-}
-
-void display::tick_delayed(time_point _now) {
-  decltype(delayed_jobs_) tmp;
-  {
-    std::lock_guard lock(delayed_mutex_);
-    tmp.swap(delayed_jobs_);
-  }
-
-  for (auto it = tmp.begin(); it != tmp.end();) {
-    if (it->first > _now)
-      break;
-    it->second(_now);
-    it = tmp.erase(it);
-  }
-
-  {
-    std::lock_guard lock(delayed_mutex_);
-    for (const auto &due : tmp)
-      delayed_jobs_.insert(due);
-  }
-}
-
-void display::jobs_loop() {
-  time_point next = next_job_time_point();
-  if (next == time_point::max()) {
-    std::unique_lock lk(cv_mutex_);
-    cv_.wait(lk);
-  } else if (next != time_point::min()) {
-    std::unique_lock lk(cv_mutex_);
-    cv_.wait_until(lk, next);
-  }
-
-  const time_point now = display::clock::now();
-  tick_overridable(now);
-  tick_posted(now);
-  tick_delayed(now);
-  // std::chrono::duration<double, std::milli> duration = display::clock::now() - now;
-  // if (duration > std::chrono::milliseconds(16))
-  // std::cout << "Jobs done in " << duration.count() << "ms" << std::endl;
 }
 
 shared_buffer display::alloc_buffer(uint _byte_size, VkMemoryPropertyFlags _type, VkBufferUsageFlagBits _flags) {

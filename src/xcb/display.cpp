@@ -141,6 +141,19 @@ void display::flush() {
   xcb_flush(connection_);
 }
 
+void display::post_empty_event() {
+  xcb_client_message_event_t event;
+  event.response_type = XCB_CLIENT_MESSAGE;
+  event.format = 32;
+  event.sequence = 0;
+  event.type = 0;
+  event.data = {};
+  event.window = windows_.begin()->first;
+
+  xcb_send_event(connection_, 0, screen_->root, XCB_EVENT_MASK_STRUCTURE_NOTIFY, (const char *)&event);
+  xcb_flush(connection_);
+}
+
 xcb_keysym_t clean_kp_keysyms(xcb_keysym_t _input) {
   switch (_input) {
     case XK_KP_0: return XK_0;
@@ -167,8 +180,6 @@ xcb_keysym_t clean_kp_keysyms(xcb_keysym_t _input) {
     case XK_KP_Right: return XK_Right;
     case XK_KP_Down: return XK_Down;
     case XK_KP_Left: return XK_Left;
-    case XK_KP_Decimal: return XK_period;
-    case XK_KP_Separator: return XK_apostrophe;
     case XK_KP_Enter: return XK_Return;
     case XK_KP_Delete: return XK_Delete;
     case XK_KP_F1: return XK_F1;
@@ -227,9 +238,9 @@ void dispatch_keysym(display *thiz, window *w, uint16_t _mask, xcb_keysym_t _ks,
   const bool control = _mask & XCB_MOD_MASK_CONTROL;
   const bool alt = _mask & XCB_MOD_MASK_1;
 
-  thiz->post([w, mapped, press](auto) { w->on_key.fire(mapped, press); });
+  w->on_key.fire(mapped, press);
   if (!remapped && !control && !alt && mapped != 0xfe03 && press)
-    thiz->post([w, mapped](auto) { w->on_char.fire(mapped); });
+    w->on_char.fire(mapped);
 }
 
 int display::dispatch() {
@@ -238,15 +249,10 @@ int display::dispatch() {
 
   bool loop = true;
 
-  std::thread job_pump([&loop, this]() {
-    dispatcher_ = std::this_thread::get_id();
-    while (loop) {
-      jobs_loop();
-    }
-  });
-
   while (loop) {
     xcb_generic_event_t *event = xcb_wait_for_event(connection_);
+    auto now = display::clock::now();
+    process_posts(now);
     if (event != nullptr) {
       switch (event->response_type & ~0x80) {
       case XCB_EXPOSE: {
@@ -256,11 +262,8 @@ int display::dispatch() {
         if (it != windows_.end()) {
           uvec4 r{e->x, e->y, e->x + e->width, e->y + e->height};
           window *w = it->second;
-          post_overridable(
-              [w, r](auto tp) {
-                w->on_expose.fire(r);  // FIXME JB: Rects should be merged
-                w->redraw(tp);
-              }, 1);
+          w->on_expose.fire(r);
+          w->redraw(now);
         }
       } break;
 
@@ -272,7 +275,7 @@ int display::dispatch() {
           window *w = it->second;
           uvec2 s{e->width, e->height};
           if (s != w->size_) {
-            post_overridable([w, s](auto) { w->dispatch_resize(s); }, 0);
+            w->dispatch_resize(s);
           }
         }
       } break;
@@ -344,7 +347,7 @@ int display::dispatch() {
             t = mouse_event_type::MDOWN;
             break;
           }
-          post([w, b, t, c](auto) { w->on_mouse.fire(b, t, c); });
+          w->on_mouse.fire(b, t, c);
         }
       } break;
 
@@ -357,7 +360,7 @@ int display::dispatch() {
           uint8_t b = e->detail;
           if (b < 4 || b > 5) {  // ignore wheel events
             auto c = vec2{e->event_x, e->event_y};
-            post([w, b, c](auto) { w->on_mouse.fire(b, mouse_event_type::MUP, c); });
+            w->on_mouse.fire(b, mouse_event_type::MUP, c);
           }
         }
       } break;
@@ -370,7 +373,7 @@ int display::dispatch() {
           window *w = it->second;
           auto c = vec2{e->event_x, e->event_y};
           uint8_t b = e->detail;
-          post([w, b, c](auto) { w->on_mouse.fire(b, mouse_event_type::MMOVE, c); });
+          w->on_mouse.fire(b, mouse_event_type::MMOVE, c);
         }
       } break;
 
@@ -381,10 +384,8 @@ int display::dispatch() {
         if (it != windows_.end()) {
           if (e->data.data32[0] == atom_close_) {
             window *w = it->second;
-            post([w](auto) {
-              if (!w->on_close.fire())
-                w->close();
-            });
+            if (!w->on_close.fire())
+              w->close();
           }
         }
       } break;
@@ -395,7 +396,7 @@ int display::dispatch() {
         auto it = windows_.find(e->event);
         if (it != windows_.end()) {
           window *w = it->second;
-          post([w](auto) { w->on_focus.fire(); });
+          w->on_focus.fire();
         }
       } break;
 
@@ -405,7 +406,7 @@ int display::dispatch() {
         auto it = windows_.find(e->event);
         if (it != windows_.end()) {
           window *w = it->second;
-          post([w](auto) { w->on_blur.fire(); });
+          w->on_blur.fire();
         }
       } break;
 
@@ -415,7 +416,7 @@ int display::dispatch() {
         auto it = windows_.find(e->event);
         if (it != windows_.end()) {
           window *w = it->second;
-          post([w](auto) { w->on_resume.fire(); });
+          w->on_resume.fire();
         }
       } break;
 
@@ -425,14 +426,14 @@ int display::dispatch() {
         auto it = windows_.find(e->event);
         if (it != windows_.end()) {
           window *w = it->second;
-          post([w](auto) { w->on_pause.fire(); });
+          w->on_pause.fire();
         }
       } break;
 
       case XCB_DESTROY_NOTIFY: {
         if (windows_.empty()) {
           loop = false;
-          cv_.notify_one();
+          post_empty_event();
         }
       } break;
 
@@ -443,8 +444,6 @@ int display::dispatch() {
 
     free(event);
   }
-
-  job_pump.join();
 
   return EXIT_SUCCESS;
 }

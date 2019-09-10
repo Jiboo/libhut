@@ -35,6 +35,8 @@
 #if defined(VK_USE_PLATFORM_XCB_KHR)
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>
+#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+#include <wayland-client.h>
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
 #include <windows.h>
 #else
@@ -164,10 +166,24 @@ class window {
  protected:
 #if defined(VK_USE_PLATFORM_XCB_KHR)
   xcb_window_t window_, parent_;
+#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+  friend void handle_xdg_configure(void*, xdg_surface*, uint32_t);
+  friend void handle_toplevel_configure(void*, xdg_toplevel*, int32_t, int32_t, wl_array*);
+  friend void handle_toplevel_close(void*, xdg_toplevel*);
+  friend void pointer_handle_enter(void*, wl_pointer*, uint32_t, wl_surface*, wl_fixed_t, wl_fixed_t);
+  friend void pointer_handle_motion(void*, wl_pointer*, uint32_t, wl_fixed_t, wl_fixed_t);
+  friend void pointer_handle_button(void*, wl_pointer*, uint32_t, uint32_t, uint32_t, uint32_t);
+  friend void pointer_handle_axis(void*, wl_pointer*, uint32_t, uint32_t, wl_fixed_t);
+  wl_surface *wayland_surface_;
+  xdg_surface *window_;
+  xdg_toplevel *toplevel_;
+  bool shown_ = false;
+  bool invalidated_ = true;
+  uvec2 mouse_lastmove_ = {0, 0};
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
   friend LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
   HWND window_;
-  glm::uvec2 mouse_lastmove_ = {0, 0};
+  uvec2 mouse_lastmove_ = {0, 0};
   bool mouse_inside_ = false;
 #endif
 };

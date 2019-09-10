@@ -12,6 +12,8 @@ project(hut)
 
 #set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+#set(HUT_PREFER_XCB 1)
+
 ###########################################################
 message("Checking for required dependencies...")
 ###########################################################
@@ -61,12 +63,44 @@ if(GTEST_FOUND)
   include_directories(${GTEST_INCLUDE_DIR})
 endif()
 
+find_package(Wayland)
 find_package(XCB COMPONENTS xcb xcb-keysyms)
-if(XCB_FOUND AND xcb-keysyms_FOUND)
+
+if(WAYLAND_CLIENT_FOUND AND NOT HUT_PREFER_XCB)
+  message("Using Wayland as backend, checking for other dependencies..")
+
+  find_package(XkbCommon REQUIRED)
+  include_directories(${XKBCOMMON_INCLUDE_DIRS})
+  add_definitions(${XKBCOMMON_DEFINITIONS})
+  set(LIBS ${LIBS} ${XKBCOMMON_LIBRARIES})
+
+  find_package(PkgConfig REQUIRED)
+  pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
+  pkg_get_variable(WAYLAND_SCANNER wayland-scanner wayland_scanner)
+  set(XDG_SHELL_PROTOCOL ${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml)
+  set(WAYLAND_GEN_DIR ${CMAKE_BINARY_DIR}/wayland)
+  file(MAKE_DIRECTORY ${WAYLAND_GEN_DIR})
+  set(XDG_SHELL_CLIENT_INCLUDE ${WAYLAND_GEN_DIR}/xdg-shell-client-protocol.h)
+  set(XDG_SHELL_SOURCE ${WAYLAND_GEN_DIR}/xdg-shell-protocol.c)
+  add_custom_command(
+    OUTPUT ${XDG_SHELL_CLIENT_INCLUDE}
+    COMMAND ${WAYLAND_SCANNER} client-header ${XDG_SHELL_PROTOCOL} ${XDG_SHELL_CLIENT_INCLUDE}
+    DEPENDS ${XDG_SHELL_PROTOCOL})
+  add_custom_command(
+    OUTPUT ${XDG_SHELL_SOURCE}
+    COMMAND ${WAYLAND_SCANNER} private-code ${XDG_SHELL_PROTOCOL} ${XDG_SHELL_SOURCE}
+    DEPENDS ${XDG_SHELL_PROTOCOL})
+  include_directories(${WAYLAND_GEN_DIR})
+
+  include_directories(${WAYLAND_CLIENT_INCLUDE_DIR})
+  set(LIBS ${LIBS} ${WAYLAND_CLIENT_LIBRARIES})
+  file(GLOB HUT_WAYLAND_SOURCES src/wayland/*.cpp)
+  set(HUT_SOURCES ${HUT_SOURCES} ${HUT_WAYLAND_SOURCES} ${XDG_SHELL_CLIENT_INCLUDE} ${XDG_SHELL_SOURCE})
+  set(HUT_PLATFORM WAYLAND)
+elseif(XCB_FOUND AND xcb-keysyms_FOUND)
   message("Using XCB as backend")
   include_directories(${XCB_INCLUDE_DIRS})
   set(LIBS ${LIBS} ${XCB_LIBRARIES})
-
   file(GLOB HUT_XCB_SOURCES src/xcb/*.cpp)
   set(HUT_SOURCES ${HUT_SOURCES} ${HUT_XCB_SOURCES})
   set(HUT_PLATFORM XCB)
@@ -75,7 +109,6 @@ elseif(WIN32)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS=1 -DNOMINMAX=1) # glm related
   add_definitions(-D_SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING=1) # string to_utf8(char32_t)
   add_definitions(-DWIN32_LEAN_AND_MEAN=1)
-
   file(GLOB HUT_WIN32_SOURCES src/win32/*.cpp)
   set(HUT_SOURCES ${HUT_SOURCES} ${HUT_WIN32_SOURCES})
   set(HUT_PLATFORM WIN32)

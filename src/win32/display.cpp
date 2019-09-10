@@ -94,6 +94,10 @@ display::~display() {
 void display::flush() {
 }
 
+void display::post_empty_event() {
+  PostMessage(windows_.begin()->first, WM_NULL, 0, 0);
+}
+
 keysym map_key(WPARAM _c) {
   switch (_c) {
     case VK_TAB: return KTAB;
@@ -163,15 +167,11 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
       if (it != d->windows_.end()) {
         window *w = it->second;
         uvec4 r{0, 0, w->size_};
-        d->post_overridable(
-            [w, r, _hwnd](auto tp) {
-              PAINTSTRUCT paint;
-              BeginPaint(_hwnd, &paint);
-              w->on_expose.fire(r);
-              w->redraw(tp);
-              EndPaint(_hwnd, &paint);
-            },
-            1);
+        PAINTSTRUCT paint;
+        BeginPaint(_hwnd, &paint);
+        w->on_expose.fire(r);
+        w->redraw(display::clock::now());
+        EndPaint(_hwnd, &paint);
       }
       return 0;
     } break;
@@ -184,7 +184,7 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
         window *w = it->second;
         uvec2 s{LOWORD(_lparam), HIWORD(_lparam)};
         if (s != w->size_) {
-          d->post_overridable([w, s](auto) { w->dispatch_resize(s); }, 0);
+          w->dispatch_resize(s);
         }
       }
       return 0;
@@ -196,10 +196,8 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
       auto it = d->windows_.find(_hwnd);
       if (it != d->windows_.end()) {
         window *w = it->second;
-        d->post([w](auto) {
-          if (!w->on_close.fire())
-            w->close();
-        });
+        if (!w->on_close.fire())
+          w->close();
       }
       return 0;
     } break;
@@ -217,8 +215,8 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
           button = 1;
         else if (_umsg == WM_MBUTTONDOWN)
           button = 2;
-        glm::uvec2 pos{LOWORD(_lparam), HIWORD(_lparam)};
-        d->post([w, button, pos](auto) { w->on_mouse.fire(button, MDOWN, pos); });
+        uvec2 pos{LOWORD(_lparam), HIWORD(_lparam)};
+        w->on_mouse.fire(button, MDOWN, pos);
       }
       return 0;
     } break;
@@ -236,8 +234,8 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
           button = 1;
         else if (_umsg == WM_MBUTTONUP)
           button = 2;
-        glm::uvec2 pos{LOWORD(_lparam), HIWORD(_lparam)};
-        d->post([w, button, pos](auto) { w->on_mouse.fire(button, MUP, pos); });
+        uvec2 pos{LOWORD(_lparam), HIWORD(_lparam)};
+        w->on_mouse.fire(button, MUP, pos);
       }
       return 0;
     } break;
@@ -253,10 +251,8 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
           button = 1;
         else if (_wparam & MK_MBUTTON)
           button = 2;
-        glm::uvec2 pos{LOWORD(_lparam), HIWORD(_lparam)};
-        d->post([w, button, pos](auto) {
-          w->on_mouse.fire(button, MMOVE, pos);
-        });
+        uvec2 pos{LOWORD(_lparam), HIWORD(_lparam)};
+        w->on_mouse.fire(button, MMOVE, pos);
       }
       return 0;
     } break;
@@ -267,7 +263,7 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
       auto it = d->windows_.find(_hwnd);
       if (it != d->windows_.end()) {
         window *w = it->second;
-        d->post([w](auto) { w->on_focus.fire(); });
+        w->on_focus.fire();
       }
       return 0;
     } break;
@@ -278,7 +274,7 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
       auto it = d->windows_.find(_hwnd);
       if (it != d->windows_.end()) {
         window *w = it->second;
-        d->post([w](auto) { w->on_blur.fire(); });
+        w->on_blur.fire();
       }
       return 0;
     } break;
@@ -291,10 +287,10 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
         window *w = it->second;
         switch (_wparam) {
           case SC_MINIMIZE:
-            d->post([w](auto) { w->on_pause.fire(); });
+            w->on_pause.fire();
             break;
           case SC_RESTORE:
-            d->post([w](auto) { w->on_resume.fire(); });
+            w->on_resume.fire();
             break;
         }
       }
@@ -312,7 +308,7 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
         window *w = it->second;
         keysym k = map_key(map_controlkeys(_wparam, _lparam));
         bool pressed = _umsg == WM_KEYDOWN;
-        d->post([w, k, pressed](auto) { w->on_key.fire(k, pressed); });
+        w->on_key.fire(k, pressed);
         return 0;
       }
       return 1;
@@ -325,7 +321,7 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
       if (it != d->windows_.end()) {
         window *w = it->second;
         char32_t c = to_utf32(_wparam);
-        d->post([w, c](auto) { w->on_char.fire(c); });
+        w->on_char.fire(c);
       }
       return 0;
     } break;
@@ -339,40 +335,23 @@ int display::dispatch() {
 
   SetConsoleOutputCP(65001);
 
-  eventpump_ = GetCurrentThreadId();
-
   bool loop = true;
-  std::thread job_pump([&loop, this]() {
-    dispatcher_ = std::this_thread::get_id();
-    while (loop) {
-      jobs_loop();
-    }
-  });
-
-  MSG msg;
   while (loop) {
+    MSG msg;
     auto result = GetMessageW(&msg, nullptr, 0, 0);
+    process_posts(display::clock::now());
     if (result < 0 || msg.message == WM_QUIT) {
       loop = false;
     } else {
-      if (msg.message == eventpump_job::sMessageID) {
-        auto *data = reinterpret_cast<eventpump_job *>(msg.wParam);
-        data->callback_();
-        delete data;
-      }
-
       TranslateMessage(&msg);
       DispatchMessageW(&msg);
 
       if (windows_.empty()) {
         PostQuitMessage(0);
         loop = false;
-        cv_.notify_one();
       }
     }
   }
-
-  job_pump.join();
 
   return EXIT_SUCCESS;
 }

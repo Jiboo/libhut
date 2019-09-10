@@ -56,12 +56,9 @@ window::window(display &_display) : display_(_display), size_(800, 600) {
 }
 
 void window::close() {
-  display_.post([this](auto) {
-    destroy_vulkan();
-    display_.windows_.erase(window_);
-    PostMessage(window_, WM_NULL, 0, 0);
-    display_.post_eventpump_job([this]() { DestroyWindow(window_); });
-  });
+  destroy_vulkan();
+  display_.windows_.erase(window_);
+  DestroyWindow(window_);
 }
 
 void window::visible(bool _visible) {
