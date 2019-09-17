@@ -35,10 +35,6 @@
 
 using namespace hut;
 
-window::~window() {
-  close();
-}
-
 void window::invalidate(bool _redraw) {
   invalidate(uvec4{uvec2{0, 0}, size_}, _redraw);
 }
@@ -372,8 +368,8 @@ void window::redraw(display::time_point _tp) {
 }
 
 void window::dispatch_resize(const uvec2 &_size) {
-  size_ = _size;
   if (_size.x > 0 && _size.y > 0) {
+    size_ = _size;
     init_vulkan_surface();
     on_resize.fire(_size);
   }

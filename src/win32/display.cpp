@@ -35,8 +35,6 @@
 
 #include <windows.h>
 
-#include <glm/ext.hpp>
-
 #include "hut/display.hpp"
 #include "hut/window.hpp"
 
@@ -95,6 +93,9 @@ void display::flush() {
 }
 
 void display::post_empty_event() {
+  if (windows_.empty())
+    return;
+
   PostMessage(windows_.begin()->first, WM_NULL, 0, 0);
 }
 
@@ -166,12 +167,14 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
       auto it = d->windows_.find(_hwnd);
       if (it != d->windows_.end()) {
         window *w = it->second;
-        uvec4 r{0, 0, w->size_};
-        PAINTSTRUCT paint;
-        BeginPaint(_hwnd, &paint);
-        w->on_expose.fire(r);
-        w->redraw(display::clock::now());
-        EndPaint(_hwnd, &paint);
+        if (!IsIconic(w->window_)) {
+          uvec4 r{ 0, 0, w->size_ };
+          PAINTSTRUCT paint;
+          BeginPaint(_hwnd, &paint);
+          w->on_expose.fire(r);
+          w->redraw(display::clock::now());
+          EndPaint(_hwnd, &paint);
+        }
       }
       return 0;
     } break;
@@ -182,6 +185,18 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
       auto it = d->windows_.find(_hwnd);
       if (it != d->windows_.end()) {
         window *w = it->second;
+        switch (_wparam) {
+        case SIZE_RESTORED:
+          if (w->minimized_) {
+            w->minimized_ = false;
+            w->on_resume.fire();
+          }
+          break;
+        case SIZE_MINIMIZED:
+          w->minimized_ = true;
+          w->on_pause.fire();
+          break;
+        }
         uvec2 s{LOWORD(_lparam), HIWORD(_lparam)};
         if (s != w->size_) {
           w->dispatch_resize(s);
@@ -279,24 +294,6 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
       return 0;
     } break;
 
-    case WM_SYSCOMMAND: {
-      display *d = (display *)GetWindowLongPtr(_hwnd, GWLP_USERDATA);
-      assert(d);
-      auto it = d->windows_.find(_hwnd);
-      if (it != d->windows_.end()) {
-        window *w = it->second;
-        switch (_wparam) {
-          case SC_MINIMIZE:
-            w->on_pause.fire();
-            break;
-          case SC_RESTORE:
-            w->on_resume.fire();
-            break;
-        }
-      }
-      return DefWindowProcW(_hwnd, _umsg, _wparam, _lparam);
-    } break;
-
     case WM_SYSKEYUP:
     case WM_SYSKEYDOWN:
     case WM_KEYUP:
@@ -321,7 +318,8 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
       if (it != d->windows_.end()) {
         window *w = it->second;
         char32_t c = to_utf32(_wparam);
-        w->on_char.fire(c);
+        if (c >= 0x20)
+          w->on_char.fire(c);
       }
       return 0;
     } break;

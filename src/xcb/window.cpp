@@ -61,24 +61,61 @@ window::window(display &_display) : display_(_display), size_(800, 600), parent_
     throw std::runtime_error(sstream("failed to create window surface, code: ") << result);
 
   _display.windows_.emplace(window_, this);
-  xcb_flush(_display.connection_);
 
   init_vulkan_surface();
+
+  // borderless window
+  struct {
+    uint32_t   flags = 2;
+    uint32_t   functions = 0;
+    uint32_t   decorations = 0;
+    int32_t    input_mode = 0;
+    uint32_t   status = 0;
+  } hints;
+  xcb_change_property(_display.connection_, XCB_PROP_MODE_REPLACE, window_, _display.atom_window_hints_,
+                      XCB_ATOM_ATOM, 32, 5, &hints);
+
+  xcb_map_window(_display.connection_, window_);
+  xcb_flush(_display.connection_);
 }
 
-void window::close() {
+window::~window() {
   destroy_vulkan();
-  display_.windows_.erase(window_);
   xcb_unmap_window(display_.connection_, window_);
   xcb_destroy_window(display_.connection_, window_);
   xcb_flush(display_.connection_);
 }
 
-void window::visible(bool _visible) {
-  if (_visible)
-    xcb_map_window(display_.connection_, window_);
-  else
-    xcb_unmap_window(display_.connection_, window_);
+void window::close() {
+  display_.windows_.erase(window_);
+  display_.post_empty_event();
+}
+
+void window::pause() {
+  xcb_client_message_event_t event;
+  event.response_type = XCB_CLIENT_MESSAGE;
+  event.format = 32;
+  event.window = window_;
+  event.type = display_.atom_change_state_;
+  event.data.data32[0] = 3; // ICONIC
+
+  xcb_send_event(display_.connection_, 0, display_.screen_->root, XCB_EVENT_MASK_STRUCTURE_NOTIFY, (const char *)&event);
+  xcb_flush(display_.connection_);
+}
+
+void window::maximize(bool _set) {
+  xcb_client_message_event_t event;
+  event.response_type = XCB_CLIENT_MESSAGE;
+  event.format = 32;
+  event.window = window_;
+  event.type = display_.atom_state_;
+  event.data.data32[0] = _set ? 1 : 0; // ADD or REMOVE
+  event.data.data32[1] = display_.atom_maximizev_;
+  event.data.data32[2] = display_.atom_maximizeh_;
+  event.data.data32[3] = 1; // Source == app
+  event.data.data32[4] = 0;
+
+  xcb_send_event(display_.connection_, 0, display_.screen_->root, XCB_EVENT_MASK_STRUCTURE_NOTIFY, (const char *)&event);
   xcb_flush(display_.connection_);
 }
 

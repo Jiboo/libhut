@@ -113,11 +113,8 @@ class window {
   ~window();
 
   void close();
-
-  bool visible() {
-    return visible_;
-  }
-  void visible(bool);
+  void pause();
+  void maximize(bool _set = true);
   void title(const std::string &);
   void invalidate(const uvec4 &, bool _redraw);
   void invalidate(bool _redraw);
@@ -151,7 +148,6 @@ class window {
   VkSemaphore sem_available_ = VK_NULL_HANDLE;
   VkSemaphore sem_rendered_ = VK_NULL_HANDLE;
 
-  bool visible_ = false;
   uint16_t fps_limit_ = 0;
   uvec2 size_;
   vec4 clear_color_ = {0.0f, 0.0f, 0.0f, 1.0f};
@@ -177,7 +173,6 @@ class window {
   wl_surface *wayland_surface_;
   xdg_surface *window_;
   xdg_toplevel *toplevel_;
-  bool shown_ = false;
   bool invalidated_ = true;
   uvec2 mouse_lastmove_ = {0, 0};
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
@@ -185,6 +180,7 @@ class window {
   HWND window_;
   uvec2 mouse_lastmove_ = {0, 0};
   bool mouse_inside_ = false;
+  bool minimized_ = false;
 #endif
 };
 

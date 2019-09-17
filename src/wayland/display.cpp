@@ -35,8 +35,6 @@
 #include <linux/input-event-codes.h>
 #include <sys/mman.h>
 
-#include <glm/ext.hpp>
-
 #include "hut/display.hpp"
 #include "hut/window.hpp"
 
@@ -336,7 +334,7 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
     throw std::runtime_error("couldn't create dummy surface");
 
   VkWaylandSurfaceCreateInfoKHR info = {};
-  info.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
+  info.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
   info.display = display_;
   info.surface = dummy;
 
@@ -387,6 +385,8 @@ int display::dispatch() {
     wl_display_dispatch(display_);
     auto now = display::clock::now();
     process_posts(now);
+    if (windows_.empty())
+      loop_ = false;
     for (auto wpair : windows_) {
       window *w = wpair.second;
       if (w->invalidated_) {

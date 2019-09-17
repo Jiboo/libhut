@@ -193,7 +193,8 @@ class display {
   xcb_screen_t *screen_;
   xcb_key_symbols_t *keysyms_;
   std::unordered_map<xcb_window_t, window *> windows_;
-  xcb_atom_t atom_wm_, atom_close_;
+  xcb_atom_t atom_wm_, atom_close_, atom_change_state_, atom_state_, atom_rstate_, atom_maximizeh_, atom_maximizev_;
+  xcb_atom_t atom_window_hints_;
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
   friend void registry_handler(void*, wl_registry*, uint32_t, const char*, uint32_t);
   friend void seat_handler(void*, wl_seat*, uint32_t);

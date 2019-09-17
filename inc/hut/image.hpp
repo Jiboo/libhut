@@ -30,7 +30,7 @@
 #include <memory>
 #include <set>
 
-#include <glm/glm.hpp>
+#include "hut/utils.hpp"
 
 namespace hut {
 

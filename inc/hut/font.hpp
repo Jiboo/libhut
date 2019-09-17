@@ -30,7 +30,6 @@
 #include <unordered_map>
 #include <memory>
 
-#include <glm/glm.hpp>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include <harfbuzz/hb.h>
@@ -39,7 +38,6 @@
 #include "hut/image.hpp"
 #include "hut/drawable.hpp"
 #include "buffer_pool.hpp"
-
 
 namespace hut {
 

@@ -39,6 +39,9 @@ void hut::handle_xdg_configure(void *_data, xdg_surface *, uint32_t _serial) {
 }
 
 void hut::handle_toplevel_configure(void *_data, xdg_toplevel *, int32_t _width, int32_t _height, wl_array *) {
+  if (_width == 0 || _height == 0)
+    return;
+
   auto *w = static_cast<window*>(_data);
   uvec2 new_size{_width, _height};
   if (new_size != w->size_)
@@ -63,7 +66,7 @@ window::window(display &_display) : display_(_display), size_(800, 600) {
     throw std::runtime_error("couldn't create wayland surface for new window");
 
   VkWaylandSurfaceCreateInfoKHR info = {};
-  info.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
+  info.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
   info.display = _display.display_;
   info.surface = wayland_surface_;
 
@@ -84,20 +87,32 @@ window::window(display &_display) : display_(_display), size_(800, 600) {
   wl_surface_commit(wayland_surface_);
 }
 
-void window::close() {
+window::~window() {
+  close();
   destroy_vulkan();
-  display_.windows_.erase(wayland_surface_);
   xdg_toplevel_destroy(toplevel_);
   xdg_surface_destroy(window_);
   wl_surface_destroy(wayland_surface_);
 }
 
-void window::visible(bool) {
-  //TODO
+void window::close() {
+  display_.windows_.erase(wayland_surface_);
+  display_.post_empty_event();
 }
 
 void window::title(const std::string &_title) {
   xdg_toplevel_set_title(toplevel_, _title.c_str());
+}
+
+void window::pause() {
+  xdg_toplevel_set_minimized(toplevel_);
+}
+
+void window::maximize(bool _set) {
+  if (_set)
+    xdg_toplevel_set_maximized(toplevel_);
+  else
+    xdg_toplevel_unset_maximized(toplevel_);
 }
 
 void window::invalidate(const uvec4 &, bool _redraw) {

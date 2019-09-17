@@ -34,7 +34,7 @@
 using namespace hut;
 
 window::window(display &_display) : display_(_display), size_(800, 600) {
-  window_ = CreateWindowExW(WS_EX_OVERLAPPEDWINDOW, HUT_WIN32_CLASSNAME, L"hut", WS_OVERLAPPEDWINDOW,
+  window_ = CreateWindowExW(WS_EX_APPWINDOW, HUT_WIN32_CLASSNAME, L"hut", WS_POPUP,
     0, 0, 800, 600, NULL, NULL, display_.hinstance_, &display_);
   if (!window_) {
     throw std::runtime_error("couldn't create window");
@@ -53,17 +53,26 @@ window::window(display &_display) : display_(_display), size_(800, 600) {
   _display.windows_.emplace(window_, this);
 
   init_vulkan_surface();
-}
 
-void window::close() {
+  ShowWindow(window_, SW_SHOWNA);
+  UpdateWindow(window_);
+}
+window::~window() {
   destroy_vulkan();
-  display_.windows_.erase(window_);
   DestroyWindow(window_);
 }
 
-void window::visible(bool _visible) {
-  ShowWindow(window_, _visible ? SW_SHOWNA : SW_HIDE);
-  UpdateWindow(window_);
+void window::close() {
+  display_.windows_.erase(window_);
+  display_.post_empty_event();
+}
+
+void window::pause() {
+  ShowWindow(window_, SW_MINIMIZE);
+}
+
+void window::maximize(bool _set) {
+  ShowWindow(window_, _set ? SW_MAXIMIZE : SW_RESTORE);
 }
 
 void window::title(const std::string &_title) {

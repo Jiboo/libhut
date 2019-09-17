@@ -32,8 +32,6 @@
 #include <mutex>
 #include <set>
 
-#include <glm/glm.hpp>
-
 #include <vulkan/vulkan.h>
 
 #include "hut/utils.hpp"

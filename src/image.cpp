@@ -376,5 +376,6 @@ sampler::sampler(display &_display, bool _hiquality) : device_(_display.device_)
 }
 
 sampler::~sampler() {
+  vkDeviceWaitIdle(device_);
   vkDestroySampler(device_, sampler_, nullptr);
 }

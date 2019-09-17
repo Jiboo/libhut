@@ -159,6 +159,7 @@ int main(int, char **) {
   tmask_pipeline->alloc_next_descriptors(1);
   auto text_instances = b->allocate<tex_mask::instance>(2);
   auto icons_instances = b->allocate<tex_mask::instance>(2);
+  auto fps_instances = b->allocate<tex_mask::instance>(2);
   text_instances->set({
     tex_mask::instance{make_mat({  1, 101}, {1,1,1}), {0, 0, 0, 1}},
     tex_mask::instance{make_mat({  0, 100}, {1,1,1}), {1, 1, 1, 1}},
@@ -167,6 +168,10 @@ int main(int, char **) {
     tex_mask::instance{make_mat({  1, 201}, {1,1,1}), {0, 0, 0, 1}},
     tex_mask::instance{make_mat({  0, 200}, {1,1,1}), {1, 1, 1, 1}},
   });
+  fps_instances->set({
+    tex_mask::instance{make_mat({  6, 16}, {1,1,1}), {0, 0, 0, 1}},
+    tex_mask::instance{make_mat({  5, 15}, {1,1,1}), {1, 1, 1, 1}},
+   });
 
   auto box_rgba_pipeline = std::make_unique<box_rgba>(w);
   auto box_rgba_vertices = b->allocate<box_rgba::vertex>(4);
@@ -187,8 +192,10 @@ int main(int, char **) {
   shared_font roboto, material_icons;
   shared_sampler samp = std::make_shared<sampler>(d);
 
+  shaper s;
   // in this context to keep a ref on buffers
   shaper::result hello_world;
+  shaper::result fps_counter;
   shaper::result icons_test;
 
   std::atomic_bool tex1_ready = false, tex2_ready = false;
@@ -225,7 +232,6 @@ int main(int, char **) {
     tmask_pipeline->bind(0, ubo, roboto->atlas(), samp);
     tmask_pipeline->bind(1, ubo, material_icons->atlas(), samp);
 
-    shaper s;
     s.bake(b, hello_world, roboto, 12, "The The quick brown fox, jumps over the lazy dog. fi VA");
     s.bake(b, icons_test, material_icons, 16, "\uE834\uE835\uE836\uE837");
 
@@ -250,12 +256,31 @@ int main(int, char **) {
       tmask_pipeline->draw(_buffer, _size, 0, hello_world.indices_, text_instances, hello_world.vertices_);
     if (icons_test)
       tmask_pipeline->draw(_buffer, _size, 1, icons_test.indices_, icons_instances, icons_test.vertices_);
+
+    static int frameCount = 0;
+    static auto lastReport = display::clock::now();
+
+    frameCount++;
+    auto currentTime = display::clock::now();
+    auto diffReport = currentTime - lastReport;
+    if (hello_world) {
+      double fps = double(frameCount) / std::chrono::duration<double>(diffReport).count();
+      char buff[32];
+      snprintf(buff, 32, "fps: %f", fps);
+      s.bake(b, fps_counter, roboto, 11, buff);
+      tmask_pipeline->draw(_buffer, _size, 0, fps_counter.indices_, fps_instances, fps_counter.vertices_);
+      if (diffReport > 1s) {
+        lastReport = currentTime;
+        frameCount = 0;
+      }
+    }
+
     return false;
   });
 
   w.on_frame.connect([&](uvec2 _size, display::duration _delta) {
     d.post([&w](auto){
-      w.invalidate(false);  // asks for a redraw, without recalling on_draw (shader animation, for example)
+      w.invalidate(true);  // asks for a redraw
     });
 
     static auto startTime = display::clock::now();
@@ -287,7 +312,7 @@ int main(int, char **) {
   });
 
   w.on_resize.connect([&](const uvec2 &_size) {
-    //cout << "resize " << to_string(_size) << endl;
+    std::cout << "resize " << to_string(_size) << std::endl;
     buffer_ubo new_ubo;
     new_ubo.proj_ = ortho<float>(0, _size.x, 0, _size.y);
 
@@ -300,13 +325,21 @@ int main(int, char **) {
     return false;
   });
 
-  w.on_key.connect([](keysym c, bool _press) {
+  w.on_key.connect([&w](keysym c, bool _press) {
     std::cout << "keysym " << _press << '\t' << window::name_key(c) << std::endl;
+    if (c == KESCAPE)
+      w.close();
+    else if (c == KUP)
+      w.pause();
+    else if (c == KLEFT)
+      w.maximize(false);
+    else if (c == KRIGHT)
+      w.maximize(true);
     return true;
   });
 
   w.on_char.connect([](char32_t c) {
-    std::cout << "char " << to_utf8(c) << std::endl;
+    std::cout << "char '" << to_utf8(c) << "' (0x" << std::hex << uint32_t(c) << std::dec << ')' << std::endl;
     return true;
   });
 
@@ -339,8 +372,6 @@ int main(int, char **) {
     std::cout << "resumed" << std::endl;
     return false;
   });
-
-  w.visible(true);
 
   auto result = d.dispatch();
   load_res.join();

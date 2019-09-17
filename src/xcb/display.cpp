@@ -37,8 +37,6 @@
 #include <X11/keysymdef.h>
 #include <xcb/xcb.h>
 
-#include <glm/ext.hpp>
-
 #include "hut/display.hpp"
 #include "hut/window.hpp"
 
@@ -88,7 +86,14 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
   };
 
   std::map<std::string, atom_item_t> atoms = {
-      {"WM_PROTOCOLS", {atom_wm_}}, {"WM_DELETE_WINDOW", {atom_close_}},
+      {"WM_PROTOCOLS",                 {atom_wm_}},
+      {"WM_DELETE_WINDOW",             {atom_close_}},
+      {"WM_CHANGE_STATE",              {atom_change_state_}},
+      {"_NET_WM_STATE",                {atom_state_}},
+      {"_NET_WM_STATE_REMOVE",         {atom_rstate_}},
+      {"_NET_WM_STATE_MAXIMIZED_VERT", {atom_maximizeh_}},
+      {"_NET_WM_STATE_MAXIMIZED_HORZ", {atom_maximizev_}},
+      {"_MOTIF_WM_HINTS",              {atom_window_hints_}},
   };
 
   for (auto &atom : atoms)
@@ -108,7 +113,7 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
   uint32_t values[1] = {screen_->white_pixel};
 
   xcb_window_t dummy = xcb_generate_id(connection_);
-  xcb_create_window(connection_, XCB_COPY_FROM_PARENT, dummy, screen_->root, 0, 0, 800, 600, 10,
+  xcb_create_window(connection_, XCB_COPY_FROM_PARENT, dummy, screen_->root, 0, 0, 800, 600, 0,
                     XCB_WINDOW_CLASS_INPUT_OUTPUT, screen_->root_visual, mask, values);
 
   VkXcbSurfaceCreateInfoKHR info = {};
@@ -145,10 +150,6 @@ void display::post_empty_event() {
   xcb_client_message_event_t event;
   event.response_type = XCB_CLIENT_MESSAGE;
   event.format = 32;
-  event.sequence = 0;
-  event.type = 0;
-  event.data = {};
-  event.window = windows_.begin()->first;
 
   xcb_send_event(connection_, 0, screen_->root, XCB_EVENT_MASK_STRUCTURE_NOTIFY, (const char *)&event);
   xcb_flush(connection_);
@@ -231,7 +232,7 @@ keysym map_hut_enum(xcb_keysym_t _input) {
   }
 }
 
-void dispatch_keysym(display *thiz, window *w, uint16_t _mask, xcb_keysym_t _ks, bool press) {
+void dispatch_keysym(window *w, uint16_t _mask, xcb_keysym_t _ks, bool press) {
   const xcb_keysym_t cleaned = clean_kp_keysyms(_ks);
   const keysym mapped = map_hut_enum(cleaned);
   const bool remapped =  mapped != cleaned;
@@ -252,7 +253,6 @@ int display::dispatch() {
   while (loop) {
     xcb_generic_event_t *event = xcb_wait_for_event(connection_);
     auto now = display::clock::now();
-    process_posts(now);
     if (event != nullptr) {
       switch (event->response_type & ~0x80) {
       case XCB_EXPOSE: {
@@ -299,7 +299,7 @@ int display::dispatch() {
 
         auto it = windows_.find(e->event);
         if (it != windows_.end())
-          dispatch_keysym(this, it->second, e->state, keysym, true);
+          dispatch_keysym(it->second, e->state, keysym, true);
       } break;
 
       case XCB_KEY_RELEASE: {
@@ -324,7 +324,7 @@ int display::dispatch() {
 
         auto it = windows_.find(e->event);
         if (it != windows_.end())
-          dispatch_keysym(this, it->second, e->state, keysym, false);
+          dispatch_keysym(it->second, e->state, keysym, false);
       } break;
 
       case XCB_BUTTON_PRESS: {
@@ -430,19 +430,14 @@ int display::dispatch() {
         }
       } break;
 
-      case XCB_DESTROY_NOTIFY: {
-        if (windows_.empty()) {
-          loop = false;
-          post_empty_event();
-        }
-      } break;
-
       default:
         break;
       }
     }
-
     free(event);
+    process_posts(now);
+    if (windows_.empty())
+      loop = false;
   }
 
   return EXIT_SUCCESS;

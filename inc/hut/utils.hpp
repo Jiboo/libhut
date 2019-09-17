@@ -67,7 +67,12 @@ inline std::string to_utf8(char32_t ch) {
 #else
   static std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> convert;
 #endif
-  return convert.to_bytes(ch);
+  try {
+    return convert.to_bytes(ch);
+  }
+  catch (std::range_error& _e) {
+    return std::string{};
+  }
 }
 
 inline std::wstring to_wstring(const std::string &utf8) {
