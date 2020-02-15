@@ -194,7 +194,7 @@ private:
   constexpr static hb_feature_t features[] = {
     { HB_TAG('k', 'e', 'r', 'n'), 1, 0, std::numeric_limits<unsigned int>::max() },
     { HB_TAG('l', 'i', 'g', 'a'), 1, 0, std::numeric_limits<unsigned int>::max() },
-    { HB_TAG('l', 'i', 'g', 'a'), 1, 0, std::numeric_limits<unsigned int>::max() }
+    { HB_TAG('c', 'l', 'i', 'g'), 1, 0, std::numeric_limits<unsigned int>::max() }
   };
 
 public:
