@@ -30,6 +30,8 @@
 #include <memory>
 #include <set>
 
+#include <vulkan/vulkan.h>
+
 #include "hut/utils.hpp"
 
 namespace hut {

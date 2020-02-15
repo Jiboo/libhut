@@ -78,20 +78,33 @@ class buffer_pool {
       set(_data.begin());
     }
 
-    void update(uint _offset, const T &_src) {
-      const uint byte_offset = _offset * sizeof(T);
-      assert(byte_offset <= byte_size_);
-      pool_.do_update(buffer_, offset_ + byte_offset, sizeof(T), (void *)&_src);
+    void update_raw(uint _byte_offset, uint _byte_size, void *_data) {
+      assert(_byte_offset + _byte_size <= byte_size_);
+      pool_.do_update(buffer_, offset_ + _byte_offset, _byte_size, (void *)_data);
     }
 
-    void update(uint _offset, uint _byte_offset, uint _byte_size, void *_data) {
-      const uint byte_offset = _offset * sizeof(T) + _byte_offset;
-      assert(byte_offset + _byte_size <= byte_size_);
-      pool_.do_update(buffer_, offset_ + byte_offset, _byte_size, (void *)_data);
+    void update_some(uint _index_offset, uint _count, const T *_src) {
+      const uint byte_offset = _index_offset * sizeof(T);
+      const uint byte_size = _count * sizeof(T);
+      update_raw(byte_offset, byte_size, (void *)_src);
+    }
+
+    void update_one(uint _index, const T &_src) {
+      update_some(_index, 1, &_src);
+    }
+
+    void update_subone(uint _index_offset, uint _byte_offset, uint _byte_size, void *_data) {
+      const uint byte_offset = _index_offset * sizeof(T) + _byte_offset;
+      assert(_byte_size < sizeof(T));
+      update_raw(byte_offset, _byte_size, (void *)_data);
     }
 
     uint size() const {
       return byte_size_ / sizeof(T);
+    }
+
+    uint byte_size() const {
+      return byte_size_;
     }
   };
 

@@ -375,7 +375,7 @@ void display::flush() {
 }
 
 void display::post_empty_event() {
-  wl_display_sync(display_);
+  wl_callback_destroy(wl_display_sync(display_));
 }
 
 int display::dispatch() {

@@ -232,9 +232,6 @@ int main(int, char **) {
     tmask_pipeline->bind(0, ubo, roboto->atlas(), samp);
     tmask_pipeline->bind(1, ubo, material_icons->atlas(), samp);
 
-    s.bake(b, hello_world, roboto, 12, "The The quick brown fox, jumps over the lazy dog. fi VA");
-    s.bake(b, icons_test, material_icons, 16, "\uE834\uE835\uE836\uE837");
-
     w.invalidate(true);
   });
 
@@ -252,35 +249,25 @@ int main(int, char **) {
       tex_rgb_pipeline->draw(_buffer, _size, 1, indices, tex2_rgb_instances, tex_rgb_vertices);
       tex_rgba_pipeline->draw(_buffer, _size, 1, indices, tex2_rgba_instances, tex_rgba_vertices);
     }
+
+    if (roboto && !hello_world)
+      s.bake(b, hello_world, roboto, 12, "The The quick brown fox, jumps over the lazy dog. fi VA");
     if (hello_world)
       tmask_pipeline->draw(_buffer, _size, 0, hello_world.indices_, text_instances, hello_world.vertices_);
+    if (material_icons && !icons_test)
+      s.bake(b, icons_test, material_icons, 16, "\uE834\uE835\uE836\uE837");
     if (icons_test)
       tmask_pipeline->draw(_buffer, _size, 1, icons_test.indices_, icons_instances, icons_test.vertices_);
 
-    static int frameCount = 0;
-    static auto lastReport = display::clock::now();
-
-    frameCount++;
-    auto currentTime = display::clock::now();
-    auto diffReport = currentTime - lastReport;
-    if (hello_world) {
-      double fps = double(frameCount) / std::chrono::duration<double>(diffReport).count();
-      char buff[32];
-      snprintf(buff, 32, "fps: %f", fps);
-      s.bake(b, fps_counter, roboto, 11, buff);
+    if (fps_counter)
       tmask_pipeline->draw(_buffer, _size, 0, fps_counter.indices_, fps_instances, fps_counter.vertices_);
-      if (diffReport > 1s) {
-        lastReport = currentTime;
-        frameCount = 0;
-      }
-    }
 
     return false;
   });
 
   w.on_frame.connect([&](uvec2 _size, display::duration _delta) {
     d.post([&w](auto){
-      w.invalidate(true);  // asks for a redraw
+      w.invalidate(false);  // asks for another frame without a redraw
     });
 
     static auto startTime = display::clock::now();
@@ -290,23 +277,40 @@ int main(int, char **) {
 
     float angle = radians(time * 10);
     if (tex1_ready) {
-      tex1_instances->update(1, tex::instance{make_mat({300, 100}, angle, tex1->size()/4, {tex1->size()/2, 1})});
+      tex1_instances->update_one(1, tex::instance{make_mat({300, 100}, angle, tex1->size()/4, {tex1->size()/2, 1})});
     }
     if (tex2_ready) {
-      tex2_instances->update(1, tex::instance{make_mat({400, 100}, angle, tex2->size()/4, {tex2->size()/2, 1})});
+      tex2_instances->update_one(1, tex::instance{make_mat({400, 100}, angle, tex2->size()/4, {tex2->size()/2, 1})});
     }
 
     float shadow_offset = (sin(time * 4) + 1) * 4;
     vec4 new_box_params = {0, shadow_offset, 16, 8};
-    box_rgba_instances->update(0, offsetof(box_rgba::instance, params_), sizeof(new_box_params), &new_box_params);
+    box_rgba_instances->update_subone(0, offsetof(box_rgba::instance, params_), sizeof(new_box_params), &new_box_params);
 
     float border_radius = (sin(time * 4) + 1) * 20 + 10;
     new_box_params = {16, 16, border_radius, 8};
-    box_rgba_instances->update(1, offsetof(box_rgba::instance, params_), sizeof(new_box_params), &new_box_params);
+    box_rgba_instances->update_subone(1, offsetof(box_rgba::instance, params_), sizeof(new_box_params), &new_box_params);
 
     float blink = (sin(time * 4) + 1) / 2;
     constexpr uint transparency_offset = offsetof(tex_mask::instance, color_) + 3 * sizeof(float);
-    icons_instances->update(1, transparency_offset, sizeof(float), &blink);
+    icons_instances->update_subone(1, transparency_offset, sizeof(float), &blink);
+
+    static int frameCount = 0;
+    static auto lastReport = display::clock::now();
+
+    frameCount++;
+    auto diffReport = currentTime - lastReport;
+    if (roboto) {
+      double fps = double(frameCount) / std::chrono::duration<double>(diffReport).count();
+      char buff[32];
+      snprintf(buff, 32, "fps: %.2f", fps);
+      if (s.bake(b, fps_counter, roboto, 11, buff))
+        w.invalidate(true);
+      if (diffReport > 1s) {
+        lastReport = currentTime;
+        frameCount = 0;
+      }
+    }
 
     return false;
   });

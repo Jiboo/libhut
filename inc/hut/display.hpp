@@ -147,10 +147,6 @@ class display {
     preflush_jobs_.emplace_back(_callback);
   }
 
-  inline void postflush(flush_callback _callback) {
-    postflush_jobs_.emplace_back(_callback);
-  }
-
   struct buffer_copy : public VkBufferCopy {
     VkBuffer source;
     VkBuffer destination;

@@ -489,9 +489,6 @@ void display::flush_staged() {
   vkQueueWaitIdle(queueg_);
 
   staging_->clear_ranges();
-  for (auto &postflush : postflush_jobs_)
-    postflush();
-  postflush_jobs_.clear();
 
   VkCommandBufferBeginInfo beginInfo = {};
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
