@@ -43,9 +43,10 @@ using namespace hut;
 void hut::pointer_handle_enter(void *_data, wl_pointer *_pointer, uint32_t, wl_surface *_surface, wl_fixed_t _sx, wl_fixed_t _sy) {
   //std::cout << "pointer_handle_enter " << _pointer << ", " << _surface << ", " << wl_fixed_to_double(_sx) << ", " << wl_fixed_to_double(_sy) << std::endl;
   auto d = static_cast<display*>(_data);
-  if (_pointer == d->pointer_) {
+  auto w = d->windows_.find(_surface);
+  if (_pointer == d->pointer_ && w != d->windows_.cend()) {
     d->pointer_current_.first = _surface;
-    d->pointer_current_.second = d->windows_[_surface];
+    d->pointer_current_.second = w->second;
     assert(d->pointer_current_.second);
     uvec2 coords {wl_fixed_to_int(_sx), wl_fixed_to_int(_sy)};
     d->pointer_current_.second->mouse_lastmove_ = coords;
@@ -118,10 +119,10 @@ void hut::keyboard_handle_keymap(void *_data, wl_keyboard *_keyboard, uint32_t _
 void hut::keyboard_handle_enter(void *_data, wl_keyboard *_keyboard, uint32_t, wl_surface *_surface, wl_array *) {
   //std::cout << "keyboard_handle_enter " << _keyboard << ", " << _surface << std::endl;
   auto d = static_cast<display*>(_data);
-  if (_keyboard == d->keyboard_) {
+  auto w = d->windows_.find(_surface);
+  if (_keyboard == d->keyboard_ && w != d->windows_.cend()) {
     d->keyboard_current_.first = _surface;
-    d->keyboard_current_.second = d->windows_[_surface];
-    assert(d->keyboard_current_.second);
+    d->keyboard_current_.second = w->second;
   }
 }
 

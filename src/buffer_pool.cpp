@@ -120,6 +120,9 @@ buffer_pool::alloc buffer_pool::do_alloc(uint _size, uint _align) {
   range *fit = nullptr;
   const buffer *container = nullptr;
   for (const auto &buffer : buffers_) {
+    if (fit != nullptr)
+      break;
+
     range *cur = buffer.root_;
     assert(cur);
     while (cur != nullptr) {
@@ -189,13 +192,17 @@ void buffer_pool::do_free(range *_range) {
     delete next;
   }
   else if (prev_free) {
+    // merge _range into prev
     prev->size_ += _range->size_;
     prev->next_ = next;
-    next->prev_ = prev;
+    if (next->next_)
+      next->prev_ = prev;
     delete _range;
   }
   else if (next_free) {
+    // merge next into _range
     _range->size_ += next->size_;
+    _range->allocated_ = false;
     _range->next_ = next->next_;
     if (next->next_)
       next->next_->prev_ = _range;

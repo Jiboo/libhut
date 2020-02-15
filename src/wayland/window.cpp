@@ -50,7 +50,8 @@ void hut::handle_toplevel_configure(void *_data, xdg_toplevel *, int32_t _width,
 
 void hut::handle_toplevel_close(void *_data, xdg_toplevel *) {
   auto *w = static_cast<window*>(_data);
-  w->close();
+  if (!w->on_close.fire())
+    w->close();
 }
 
 window::window(display &_display) : display_(_display), size_(800, 600) {

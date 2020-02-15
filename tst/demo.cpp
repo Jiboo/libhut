@@ -350,6 +350,7 @@ int main(int, char **) {
   });
 
   w.on_close.connect([] {
+    std::cout << "closing window..." << std::endl;
     return false;
   });
 

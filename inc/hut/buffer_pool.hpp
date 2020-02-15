@@ -105,11 +105,6 @@ class buffer_pool {
     return std::make_shared<ref<T>>(alloc.node_, *this, alloc.buffer_, alloc.offset_, size);
   }
 
-  template <typename T>
-  void free(const ref<T> &_ref) {
-    do_free(_ref.buffer_, _ref.offset_);
-  };
-
   void debug();
 
  private:

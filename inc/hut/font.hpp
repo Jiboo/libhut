@@ -160,13 +160,14 @@ private:
       throw std::runtime_error("couldn't load char");
 
     glyph g;
-    g.bearing_ = {face_->glyph->bitmap_left, face_->glyph->bitmap_top};
+    FT_GlyphSlot &ftg = face_->glyph;
+    g.bearing_ = {ftg->bitmap_left, ftg->bitmap_top};
 
-    if (face_->glyph->outline.n_contours > 0) {
-      if (FT_Render_Glyph(face_->glyph, FT_RENDER_MODE_NORMAL))
+    if (ftg->outline.n_contours > 0 && ftg->metrics.width > 0 && ftg->metrics.height > 0) {
+      if (FT_Render_Glyph(ftg, FT_RENDER_MODE_NORMAL))
         throw std::runtime_error("couldn't render char");
 
-      FT_Bitmap render = face_->glyph->bitmap;
+      FT_Bitmap render = ftg->bitmap;
       g.bounds_ = {render.width, render.rows};
       node *packed = binpack(&root_, g.bounds_);
       if (packed == nullptr) {
@@ -286,8 +287,11 @@ public:
     bbox[2] = x;
     _dst.bbox_ = bbox;
 
+    _dst.indices_.reset();
     _dst.indices_ = _buff->allocate<uint16_t>(6 * drawn_codepoints);
     _dst.indices_->set(indices);
+
+    _dst.vertices_.reset();
     _dst.vertices_ = _buff->allocate<tex_mask::vertex>(4 * drawn_codepoints);
     _dst.vertices_->set(vertices);
   }
