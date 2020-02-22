@@ -90,15 +90,20 @@ window::window(display &_display) : display_(_display), size_(800, 600) {
 
 window::~window() {
   close();
-  destroy_vulkan();
-  xdg_toplevel_destroy(toplevel_);
-  xdg_surface_destroy(window_);
-  wl_surface_destroy(wayland_surface_);
 }
 
 void window::close() {
-  display_.windows_.erase(wayland_surface_);
-  display_.post_empty_event();
+  if (window_ != nullptr) {
+    display_.windows_.erase(wayland_surface_);
+
+    destroy_vulkan();
+    xdg_toplevel_destroy(toplevel_);
+    xdg_surface_destroy(window_);
+    wl_surface_destroy(wayland_surface_);
+    window_ = nullptr;
+
+    display_.post_empty_event();
+  }
 }
 
 void window::title(const std::string &_title) {

@@ -64,6 +64,10 @@ int main(int, char **) {
   w.clear_color({1, 1, 1, 1});
   w.title("testbed");
 
+  window w2(d);
+  w2.clear_color({0, 0, 1, 1});
+  w2.title("testbed2");
+
   auto b = d.alloc_buffer(1024*1024);
 
   auto indices = b->allocate<uint16_t>(6);
@@ -88,6 +92,9 @@ int main(int, char **) {
   });
   rgb_pipeline->bind(0, ubo);
 
+  auto rgb_pipeline2 = std::make_unique<rgb>(w2);
+  rgb_pipeline2->bind(0, ubo);
+
   auto rgba_pipeline = std::make_unique<rgba>(w);
   auto rgba_instances = b->allocate<rgba::instance>(2);
   auto rgba_vertices = b->allocate<rgba::vertex>(4);
@@ -104,7 +111,7 @@ int main(int, char **) {
   rgba_pipeline->bind(0, ubo);
 
   auto tex_pipeline = std::make_unique<tex>(w);
-  tex_pipeline->alloc_next_descriptors(1);
+  tex_pipeline->alloc_next_descriptors(2);
   auto tex1_instances = b->allocate<tex::instance>(2);
   auto tex2_instances = b->allocate<tex::instance>(2);
   auto tex_vertices = b->allocate<tex::vertex>(4);
@@ -160,6 +167,8 @@ int main(int, char **) {
   auto text_instances = b->allocate<tex_mask::instance>(2);
   auto icons_instances = b->allocate<tex_mask::instance>(2);
   auto fps_instances = b->allocate<tex_mask::instance>(2);
+  auto atlas_instances = b->allocate<tex_mask::instance>(1);
+  auto atlas_vertices = b->allocate<tex_mask::vertex>(4);
   text_instances->set({
     tex_mask::instance{make_mat({  1, 101}, {1,1,1}), {0, 0, 0, 1}},
     tex_mask::instance{make_mat({  0, 100}, {1,1,1}), {1, 1, 1, 1}},
@@ -169,22 +178,38 @@ int main(int, char **) {
     tex_mask::instance{make_mat({  0, 200}, {1,1,1}), {1, 1, 1, 1}},
   });
   fps_instances->set({
-    tex_mask::instance{make_mat({  6, 16}, {1,1,1}), {0, 0, 0, 1}},
-    tex_mask::instance{make_mat({  5, 15}, {1,1,1}), {1, 1, 1, 1}},
-   });
+    tex_mask::instance{make_mat({  6, 17}, {1,1,1}), {0, 0, 0, 1}},
+    tex_mask::instance{make_mat({  5, 16}, {1,1,1}), {1, 1, 1, 1}},
+  });
+  atlas_vertices->set({
+    tex_mask::vertex{{0, 0}, {0, 0}},
+    tex_mask::vertex{{1, 0}, {1, 0}},
+    tex_mask::vertex{{1, 1}, {1, 1}},
+    tex_mask::vertex{{0, 1}, {0, 1}}
+  });
 
   auto box_rgba_pipeline = std::make_unique<box_rgba>(w);
   auto box_rgba_vertices = b->allocate<box_rgba::vertex>(4);
+  auto shadow_vertices = b->allocate<box_rgba::vertex>(4);
   box_rgba_vertices->set({
     box_rgba::vertex{{  0,   0}, {1, 0, 0, 1}},
     box_rgba::vertex{{100,   0}, {0, 1, 0, 1}},
     box_rgba::vertex{{100, 100}, {1, 1, 1, 1}},
     box_rgba::vertex{{  0, 100}, {0, 0, 1, 1}}
   });
-  auto box_rgba_instances = b->allocate<box_rgba::instance>(2);
+  shadow_vertices->set({
+     box_rgba::vertex{{  0,   0}, {0, 0, 0, 1}},
+     box_rgba::vertex{{100,   0}, {0, 0, 0, 1}},
+     box_rgba::vertex{{100, 100}, {0, 0, 0, 1}},
+     box_rgba::vertex{{  0, 100}, {0, 0, 0, 1}}
+  });
+  auto box_rgba_instances = b->allocate<box_rgba::instance>(1);
+  auto shadow_instances = b->allocate<box_rgba::instance>(1);
   box_rgba_instances->set({
-    box_rgba::instance{make_mat({300, 400}, {1,1,1}), {0, 2, 0.8, 8}, {0, 0, 0, 0.66}, {300, 400, 400, 500}},
-    box_rgba::instance{make_mat({500, 400}, {1,1,1}), {8, 8, 50, 8}, {0, 0, 0, 0.66}, {500, 400, 600, 500}},
+    box_rgba::instance{make_mat({300, 400}, {1,1,1}), {8, 8}, {300, 400, 400, 500}},
+  });
+  shadow_instances->set({
+    box_rgba::instance{make_mat({300, 400}, {1,1,1}), {8, 8}, {300, 400, 400, 500}},
   });
   box_rgba_pipeline->bind(0, ubo);
 
@@ -213,8 +238,9 @@ int main(int, char **) {
     w.invalidate(true);  // will force to call on_draw on the next frame
 
     uint8_t data[tex1->pixel_size() * 100 * 100];
-    memset(data, 0x80, sizeof(data));
+    memset(data, 0x90, sizeof(data));
     tex1->update({100, 100, 200, 200}, data, tex1->pixel_size() * 100);
+    w.invalidate(true);  // will force to call on_draw on the next frame
 
     tex2 = image::load_png(d, demo_png::tex2_png.data(), demo_png::tex2_png.size());
     tex_pipeline->bind(1, ubo, tex2, samp);
@@ -227,17 +253,24 @@ int main(int, char **) {
     tex2_ready = true;
     w.invalidate(true);  // will force to call on_draw on the next frame
 
-    roboto = std::make_shared<font>(d, demo_ttf::Roboto_Regular_ttf.data(), demo_ttf::Roboto_Regular_ttf.size(), uvec2{256, 256}, true);
-    material_icons = std::make_shared<font>(d, demo_ttf::MaterialIcons_Regular_ttf.data(), demo_ttf::MaterialIcons_Regular_ttf.size(), uvec2{256, 256}, false);
+    roboto = std::make_shared<font>(d, demo_ttf::Roboto_Regular_ttf.data(), demo_ttf::Roboto_Regular_ttf.size(), uvec2{512, 512}, true);
     tmask_pipeline->bind(0, ubo, roboto->atlas(), samp);
-    tmask_pipeline->bind(1, ubo, material_icons->atlas(), samp);
+    atlas_instances->set(tex_mask::instance{make_mat({256, 0}, {512, 512, 1}), {1, 0, 0, 1}});
+    w.invalidate(true);  // will force to call on_draw on the next frame
 
-    w.invalidate(true);
+    material_icons = std::make_shared<font>(d, demo_ttf::MaterialIcons_Regular_ttf.data(), demo_ttf::MaterialIcons_Regular_ttf.size(), uvec2{256, 256}, false);
+    tmask_pipeline->bind(1, ubo, material_icons->atlas(), samp);
+    s.bake(b, icons_test, material_icons, 16, "\uE834\uE835\uE836\uE837");
+    w.invalidate(true);  // will force to call on_draw on the next frame
   });
 
   w.on_draw.connect([&](VkCommandBuffer _buffer, const uvec2 &_size) {
+    if (roboto)
+      tmask_pipeline->draw(_buffer, _size, 0, indices, atlas_instances, atlas_vertices);
+
     rgb_pipeline->draw(_buffer, _size, 0, indices, rgb_instances, rgb_vertices);
     rgba_pipeline->draw(_buffer, _size, 0, indices, rgba_instances, rgba_vertices);
+    box_rgba_pipeline->draw(_buffer, _size, 0, indices, shadow_instances, shadow_vertices);
     box_rgba_pipeline->draw(_buffer, _size, 0, indices, box_rgba_instances, box_rgba_vertices);
     if (tex1_ready) {
       tex_pipeline->draw(_buffer, _size, 0, indices, tex1_instances, tex_vertices);
@@ -250,24 +283,24 @@ int main(int, char **) {
       tex_rgba_pipeline->draw(_buffer, _size, 1, indices, tex2_rgba_instances, tex_rgba_vertices);
     }
 
-    if (roboto && !hello_world)
-      s.bake(b, hello_world, roboto, 12, "The The quick brown fox, jumps over the lazy dog. fi VA");
     if (hello_world)
-      tmask_pipeline->draw(_buffer, _size, 0, hello_world.indices_, text_instances, hello_world.vertices_);
-    if (material_icons && !icons_test)
-      s.bake(b, icons_test, material_icons, 16, "\uE834\uE835\uE836\uE837");
+      tmask_pipeline->draw(_buffer, _size, 0, hello_world.indices_, hello_world.indices_count_, text_instances, hello_world.vertices_);
     if (icons_test)
-      tmask_pipeline->draw(_buffer, _size, 1, icons_test.indices_, icons_instances, icons_test.vertices_);
-
+      tmask_pipeline->draw(_buffer, _size, 1, icons_test.indices_, icons_test.indices_count_, icons_instances, icons_test.vertices_);
     if (fps_counter)
-      tmask_pipeline->draw(_buffer, _size, 0, fps_counter.indices_, fps_instances, fps_counter.vertices_);
+      tmask_pipeline->draw(_buffer, _size, 0, fps_counter.indices_, fps_counter.indices_count_, fps_instances, fps_counter.vertices_);
 
+    return false;
+  });
+
+  w2.on_draw.connect([&](VkCommandBuffer _buffer, const uvec2 &_size) {
+    rgb_pipeline2->draw(_buffer, _size, 0, indices, rgb_instances, rgb_vertices);
     return false;
   });
 
   w.on_frame.connect([&](uvec2 _size, display::duration _delta) {
     d.post([&w](auto){
-      w.invalidate(false);  // asks for another frame without a redraw
+      w.invalidate(false);  // asks for another frame without a redraw to continue animations and fps count
     });
 
     static auto startTime = display::clock::now();
@@ -283,17 +316,24 @@ int main(int, char **) {
       tex2_instances->update_one(1, tex::instance{make_mat({400, 100}, angle, tex2->size()/4, {tex2->size()/2, 1})});
     }
 
-    float shadow_offset = (sin(time * 4) + 1) * 4;
-    vec4 new_box_params = {0, shadow_offset, 16, 8};
+    float border_radius = (sin(time * 4) + 1) * 20 + 1;
+    vec2 new_box_params = {border_radius, 1};
     box_rgba_instances->update_subone(0, offsetof(box_rgba::instance, params_), sizeof(new_box_params), &new_box_params);
 
-    float border_radius = (sin(time * 4) + 1) * 20 + 10;
-    new_box_params = {16, 16, border_radius, 8};
-    box_rgba_instances->update_subone(1, offsetof(box_rgba::instance, params_), sizeof(new_box_params), &new_box_params);
+    new_box_params[1] = (sin(time * 4) + 1) * 10 + 1;
+    shadow_instances->update_subone(0, offsetof(box_rgba::instance, params_), sizeof(new_box_params), &new_box_params);
 
     float blink = (sin(time * 4) + 1) / 2;
     constexpr uint transparency_offset = offsetof(tex_mask::instance, color_) + 3 * sizeof(float);
     icons_instances->update_subone(1, transparency_offset, sizeof(float), &blink);
+
+    {
+      int font_size = round((sin(time * 2) + 1) * 14 + 8);
+      char buff[64];
+      snprintf(buff, sizeof(buff), "The The quick brown %d foxes, jump over the lazy dog. fi", font_size);
+      if (roboto && s.bake(b, hello_world, roboto, font_size, buff))
+        w.invalidate(true);
+    }
 
     static int frameCount = 0;
     static auto lastReport = display::clock::now();
@@ -303,8 +343,8 @@ int main(int, char **) {
     if (roboto) {
       double fps = double(frameCount) / std::chrono::duration<double>(diffReport).count();
       char buff[32];
-      snprintf(buff, 32, "fps: %.2f", fps);
-      if (s.bake(b, fps_counter, roboto, 11, buff))
+      snprintf(buff, sizeof(buff), "fps: %.2f", fps);
+      if (s.bake(b, fps_counter, roboto, 12, buff))
         w.invalidate(true);
       if (diffReport > 1s) {
         lastReport = currentTime;
@@ -320,7 +360,7 @@ int main(int, char **) {
     buffer_ubo new_ubo;
     new_ubo.proj_ = ortho<float>(0, _size.x, 0, _size.y);
 
-    ubo->set(&new_ubo);
+    ubo->set(new_ubo);
     return false;
   });
 
@@ -330,15 +370,28 @@ int main(int, char **) {
   });
 
   w.on_key.connect([&w](keysym c, bool _press) {
-    std::cout << "keysym " << _press << '\t' << window::name_key(c) << std::endl;
-    if (c == KESCAPE)
+    std::cout << "w keysym " << _press << '\t' << window::name_key(c) << std::endl;
+    if (c == KESCAPE && !_press)
       w.close();
-    else if (c == KUP)
+    else if (c == KUP && !_press)
       w.pause();
-    else if (c == KLEFT)
+    else if (c == KLEFT && !_press)
       w.maximize(false);
-    else if (c == KRIGHT)
+    else if (c == KRIGHT && !_press)
       w.maximize(true);
+    return true;
+  });
+
+  w2.on_key.connect([&w2](keysym c, bool _press) {
+    std::cout << "w2 keysym " << _press << '\t' << window::name_key(c) << std::endl;
+    if (c == KESCAPE && !_press)
+      w2.close();
+    else if (c == KUP && !_press)
+      w2.pause();
+    else if (c == KLEFT && !_press)
+      w2.maximize(false);
+    else if (c == KRIGHT && !_press)
+      w2.maximize(true);
     return true;
   });
 

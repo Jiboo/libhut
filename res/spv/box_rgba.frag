@@ -2,9 +2,8 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 layout(location = 0) in vec4 inColor;
-layout(location = 1) in vec4 inParams; // offset x/y, corner radius, shadow radius
-layout(location = 2) in vec4 inShadowColor;
-layout(location = 3) in vec4 inBoxBounds;
+layout(location = 1) in vec2 inParams; // corner radius, blur radius
+layout(location = 2) in vec4 inBoxBounds;
 
 layout(location = 0) out vec4 outColor;
 
@@ -28,29 +27,22 @@ float rrect(in vec2 uv, in vec2 pos, in vec2 size, float rad, float s)
 	 */
     return 1.0 - smoothstep(rad - s, rad + s, d);
 }
-void draw_rect(inout vec4 pixel, in vec2 uv, in vec2 pos, in vec2 size, in vec2 offset, float corner_rad, float shadow_blur)
-{
-    pixel = mix(pixel, inShadowColor, inShadowColor.a * rrect(uv, pos + offset, size, corner_rad, shadow_blur));
-    pixel = mix(pixel, inColor,       rrect(uv, pos, size, corner_rad, 0.001));
-}
 
 void main() {
-    float blur = inParams[3];
+    float blur = inParams[1];
     vec2 box_screen_offset = inBoxBounds.xy;
     vec2 box_screen_size = vec2(inBoxBounds[2] - inBoxBounds[0], inBoxBounds[3] - inBoxBounds[1]);
-    vec2 frag_bounds_offset = min(box_screen_offset + inParams.xy, box_screen_offset) - blur;
-    vec2 frag_bounds_size = box_screen_size + abs(inParams.xy) + 2 * blur;
+    vec2 frag_bounds_offset = min(box_screen_offset , box_screen_offset) - blur;
+    vec2 frag_bounds_size = box_screen_size + 2 * blur;
     vec2 screen = gl_FragCoord.xy;
     float aspect = frag_bounds_size.x / frag_bounds_size.y;
     vec2 screen_pos = screen - frag_bounds_offset;
     vec2 uv = vec2(aspect, 1.0) * screen_pos.xy / frag_bounds_size;
 
-    vec2 shadow_offset = vec2(aspect, 1.0) * inParams.xy / frag_bounds_size;
-    vec2 params_radius = vec2(aspect, 1.0) * inParams.zw / frag_bounds_size;
+    vec2 params_radius = vec2(aspect, 1.0) * inParams.xy / frag_bounds_size;
     vec2 box_uv_offset = vec2(aspect, 1.0) * (box_screen_offset - frag_bounds_offset) / frag_bounds_size;
     vec2 box_uv_size = vec2(aspect, 1.0) * box_screen_size / frag_bounds_size;
 
-    vec4 col = vec4(0, 0, 0, 0);
-    draw_rect(col, uv, box_uv_offset, box_uv_size, shadow_offset, params_radius.x, params_radius.y);
-    outColor = col;
+    vec4 transparent_col = vec4(inColor.rgb, 0);
+    outColor = mix(transparent_col, inColor, rrect(uv, box_uv_offset, box_uv_size, params_radius.x, params_radius.y));
 }

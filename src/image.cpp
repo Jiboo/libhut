@@ -155,10 +155,6 @@ std::shared_ptr<image> image::load_png(display &_display, const uint8_t *_data, 
     }
     png_read_image(png_ptr, rows);
     vkUnmapMemory(_display.device_, alloc.memory_);
-#ifdef HUT_DEBUG_STAGING
-    std::cout << "[staging] png at " << alloc.buffer_ << '['
-              << alloc.offset_ << '-' << (alloc.offset_ + byte_size) << ']' << std::endl;
-#endif
 
     display::buffer2image_copy copy = {};
     copy.imageExtent = {width, height, 1};
@@ -206,30 +202,6 @@ image::image(display &_display, uvec2 _size, VkFormat _format)
          VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &image_,
          &memory_);
 
-  {
-    std::lock_guard lk(display_.staging_mutex_);
-
-    display::image_transition pre = {};
-    pre.destination = image_;
-    pre.oldLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
-    pre.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    display::image_transition post = {};
-    post.destination = image_;
-    post.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    post.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    display::image_clear clear = {};
-    clear.destination = image_;
-    clear.color = VkClearColorValue{};
-
-    display_.staging_jobs_++;
-    display_.preflush([this, pre, post, clear]() {
-      display_.stage_transition(pre);
-      display_.stage_clear(clear);
-      display_.stage_transition(post);
-      display_.staging_jobs_--;
-    });
-  }
-
   VkImageViewCreateInfo viewInfo = {};
   viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
   viewInfo.image = image_;
@@ -244,6 +216,27 @@ image::image(display &_display, uvec2 _size, VkFormat _format)
   if (vkCreateImageView(_display.device_, &viewInfo, nullptr, &view_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create texture image view!");
   }
+
+  display::image_transition pre = {};
+  pre.destination = image_;
+  pre.oldLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+  pre.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  display::image_transition post = {};
+  post.destination = image_;
+  post.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  post.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  display::image_clear clear = {};
+  clear.destination = image_;
+  clear.color = VkClearColorValue{};
+
+  std::lock_guard lk(display_.staging_mutex_);
+  display_.staging_jobs_++;
+  display_.preflush([this, pre, post, clear]() {
+    display_.stage_transition(pre);
+    display_.stage_clear(clear);
+    display_.stage_transition(post);
+    display_.staging_jobs_--;
+  });
 }
 
 VkDeviceSize image::create(display &_display, uint32_t _width, uint32_t _height, VkFormat _format,
@@ -306,10 +299,6 @@ void image::update(ivec4 _coords, uint8_t *_data, uint _src_row_pitch) {
     memcpy(dst, src, row_byte_size);
   }
   vkUnmapMemory(display_.device_, alloc.memory_);
-#ifdef HUT_DEBUG_STAGING
-  std::cout << "[staging] image update at " << alloc.buffer_ << '['
-            << alloc.offset_ << '-' << (alloc.offset_ + byte_size) << ']' << std::endl;
-#endif
 
   VkImageSubresourceLayers subResource = {};
   subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;

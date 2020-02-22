@@ -6,13 +6,17 @@ project(hut)
 ###########################################################
 
 #add_definitions(-DHUT_PREFER_NONDESCRETE_DEVICES)
-#add_definitions(-DHUT_ENABLE_VALIDATION)
-#add_definitions(-DHUT_ENABLE_VALIDATION_DEBUG)
-#add_definitions(-DHUT_DEBUG_STAGING)
+#set(HUT_PREFER_XCB 1)
+
+###########################################################
+# Debug
+###########################################################
 
 #set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-#set(HUT_PREFER_XCB 1)
+#add_definitions(-DHUT_ENABLE_VALIDATION)
+#add_definitions(-DHUT_ENABLE_VALIDATION_DEBUG)
+#add_definitions(-DHUT_DEBUG_STAGING)
 
 ###########################################################
 message("Checking for required dependencies...")

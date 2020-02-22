@@ -52,10 +52,6 @@ void buffer_pool::do_update(VkBuffer _buf, uint _offset, uint _size, const void 
   vkMapMemory(display_.device_, staging.memory_, staging.offset_, _size, 0, &target);
   memcpy(target, _data, _size);
   vkUnmapMemory(display_.device_, staging.memory_);
-#ifdef HUT_DEBUG_STAGING
-  std::cout << "[staging] buffer " << _buf << " update at " << staging.buffer_
-            << '[' << staging.offset_ << '-' << (staging.offset_ + _size) << ']' << std::endl;
-#endif
 
   display::buffer_copy copy = {};
   copy.size = _size;

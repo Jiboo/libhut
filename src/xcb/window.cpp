@@ -80,15 +80,21 @@ window::window(display &_display) : display_(_display), size_(800, 600), parent_
 }
 
 window::~window() {
-  destroy_vulkan();
-  xcb_unmap_window(display_.connection_, window_);
-  xcb_destroy_window(display_.connection_, window_);
-  xcb_flush(display_.connection_);
+  close();
 }
 
 void window::close() {
-  display_.windows_.erase(window_);
-  display_.post_empty_event();
+  if (window_ != 0) {
+    display_.windows_.erase(window_);
+
+    destroy_vulkan();
+    xcb_unmap_window(display_.connection_, window_);
+    xcb_destroy_window(display_.connection_, window_);
+    xcb_flush(display_.connection_);
+    window_ = 0;
+
+    display_.post_empty_event();
+  }
 }
 
 void window::pause() {

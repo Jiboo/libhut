@@ -45,7 +45,7 @@ struct buffer_ubo {
 
   static shared_ubo alloc(shared_buffer &_buf, const buffer_ubo &_default) {
     auto ref = _buf->allocate<buffer_ubo>(1, _buf->display_.limits().minUniformBufferOffsetAlignment);
-    ref->set(&_default);
+    ref->set(_default);
     return ref;
   }
 };
@@ -288,7 +288,9 @@ public:
     uint current_count = descriptors_.size();
     descriptors_.resize(current_count + _count);
 
-    VkDescriptorSetLayout layouts[] = {descriptor_layout_};
+    VkDescriptorSetLayout layouts[_count];
+    for (uint i = 0; i < _count; i++)
+      layouts[i] = descriptor_layout_;
     VkDescriptorSetAllocateInfo alloc_info = {};
     alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     alloc_info.descriptorPool = descriptor_pool_;
@@ -407,6 +409,17 @@ public:
         _indices, 0, _indices->size(),
         _instances, 0, _instances->size(),
         _vertices, 0);
+  }
+
+  void draw(VkCommandBuffer _buffer, const uvec2 &_size, uint _descriptor_index,
+            const shared_indices &_indices, uint _indices_count,
+            const shared_instances &_instances,
+            const shared_vertices &_vertices) {
+    assert(_indices && _instances);
+    draw(_buffer, _size, _descriptor_index,
+         _indices, 0, _indices_count,
+         _instances, 0, _instances->size(),
+         _vertices, 0);
   }
 };
 
@@ -705,8 +718,7 @@ namespace details {
 
     struct instance {
       mat4 transform_;
-      vec4 params_;
-      vec4 shadow_color_;
+      vec2 params_;
       vec4 box_bounds_;
     };
 
@@ -732,16 +744,15 @@ namespace details {
         VkVertexInputBindingDescription{.binding = 1, .stride = sizeof(instance), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE},
     };
 
-    constexpr static std::array<VkVertexInputAttributeDescription, 9> vertices_description_ {
-        VkVertexInputAttributeDescription{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(vertex, pos_)},
+    constexpr static std::array<VkVertexInputAttributeDescription, 8> vertices_description_ {
+        VkVertexInputAttributeDescription{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT,       .offset = offsetof(vertex, pos_)},
         VkVertexInputAttributeDescription{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(vertex, color_)},
         VkVertexInputAttributeDescription{.location = 2, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex_mask>(0)},
         VkVertexInputAttributeDescription{.location = 3, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex_mask>(1)},
         VkVertexInputAttributeDescription{.location = 4, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex_mask>(2)},
         VkVertexInputAttributeDescription{.location = 5, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex_mask>(3)},
-        VkVertexInputAttributeDescription{.location = 6, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(instance, params_)},
-        VkVertexInputAttributeDescription{.location = 7, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(instance, shadow_color_)},
-        VkVertexInputAttributeDescription{.location = 8, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(instance, box_bounds_)},
+        VkVertexInputAttributeDescription{.location = 6, .binding = 1, .format = VK_FORMAT_R32G32_SFLOAT,       .offset = offsetof(instance, params_)},
+        VkVertexInputAttributeDescription{.location = 7, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(instance, box_bounds_)},
     };
 
     constexpr static decltype(hutgen_spv::box_rgba_frag_spv) &frag_bytecode_ = hutgen_spv::box_rgba_frag_spv;

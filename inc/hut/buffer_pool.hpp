@@ -69,15 +69,6 @@ class buffer_pool {
       pool_.do_free(range_);
     }
 
-    void set(const T *_data) {
-      pool_.do_update(buffer_, offset_, byte_size_, (void *)_data);
-    }
-
-    void set(const std::initializer_list<T> &_data) {
-      assert(_data.size() * sizeof(T) == byte_size_);
-      set(_data.begin());
-    }
-
     void update_raw(uint _byte_offset, uint _byte_size, void *_data) {
       assert(_byte_offset + _byte_size <= byte_size_);
       pool_.do_update(buffer_, offset_ + _byte_offset, _byte_size, (void *)_data);
@@ -97,6 +88,16 @@ class buffer_pool {
       const uint byte_offset = _index_offset * sizeof(T) + _byte_offset;
       assert(_byte_size < sizeof(T));
       update_raw(byte_offset, _byte_size, (void *)_data);
+    }
+
+    void set(const T &_data) {
+      assert(byte_size_ == sizeof(T));
+      update_one(0, _data);
+    }
+
+    void set(const std::initializer_list<T> &_data) {
+      assert(_data.size() * sizeof(T) == byte_size_);
+      update_some(0, _data.size(), _data.begin());
     }
 
     uint size() const {

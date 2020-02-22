@@ -57,14 +57,20 @@ window::window(display &_display) : display_(_display), size_(800, 600) {
   ShowWindow(window_, SW_SHOWNA);
   UpdateWindow(window_);
 }
+
 window::~window() {
-  destroy_vulkan();
-  DestroyWindow(window_);
+  close();
 }
 
 void window::close() {
-  display_.windows_.erase(window_);
-  display_.post_empty_event();
+  if (window_ != nullptr) {
+    display_.windows_.erase(window_);
+
+    destroy_vulkan();
+    DestroyWindow(window_);
+
+    display_.post_empty_event();
+  }
 }
 
 void window::pause() {

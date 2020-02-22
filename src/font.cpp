@@ -29,32 +29,32 @@
 
 using namespace hut;
 
+constexpr size_t font_scale = 64;
+
 font::font(display &_display, const uint8_t *_addr, size_t _size, uvec2 _atlas_size, bool _hinting) {
   load_flags_ = FT_LOAD_NO_BITMAP | (_hinting ? FT_LOAD_FORCE_AUTOHINT : FT_LOAD_NO_HINTING);
   FT_New_Memory_Face(_display.ft_library_, _addr, _size, 0, &face_);
-  font_ = hb_ft_font_create(face_, nullptr);
-  hb_ft_font_set_load_flags(font_, load_flags_);
 
   atlas_ = std::make_shared<image>(_display, _atlas_size, VK_FORMAT_R8_UNORM);
   root_.coords_ = {0, 0, _atlas_size};
 }
 
 font::~font() {
-  hb_font_destroy (font_);
+  for (auto & cache : caches_)
+    hb_font_destroy(cache.second.font_);
   FT_Done_Face(face_);
 }
 
 font::node::~node() {
-  for (int i = 0; i < 2; i++) {
-    if (children_[i] != nullptr)
-      delete children_[i];
+  for (auto & i : children_) {
+    delete i;
   }
 }
 
 font::node *font::binpack(node *_cur_node, const uvec2 &_bounds) {
   if (!_cur_node->leaf()) {
-    for (int i = 0; i < 2; i++) {
-      node *new_node = binpack(_cur_node->children_[i], _bounds);
+    for (auto & i : _cur_node->children_) {
+      node *new_node = binpack(i, _bounds);
       if (new_node)
         return new_node;
     }
@@ -98,45 +98,48 @@ font::node *font::binpack(node *_cur_node, const uvec2 &_bounds) {
   return _cur_node;
 }
 
-font::glyph &font::load_glyph(uint _char_index, uint8_t _size) {
-  cache_t &cache = caches_[_size];
-  auto already_cached = cache.find(_char_index);
-  if (already_cached != cache.end())
-    return already_cached->second;
+font::glyph &font::load_glyph(glyph_cache_t &_cache, uint _char_index) {
+  glyph &g = _cache[_char_index];
+  if (g)
+    return g;
 
   if(FT_Load_Glyph(face_, _char_index, load_flags_))
     throw std::runtime_error("couldn't load char");
 
-  glyph g;
   FT_GlyphSlot &ftg = face_->glyph;
-  g.bearing_ = {ftg->bitmap_left, ftg->bitmap_top};
 
-  if (ftg->outline.n_contours > 0 && ftg->metrics.width > 0 && ftg->metrics.height > 0) {
+  if (ftg->outline.n_contours > 0) {
     if (FT_Render_Glyph(ftg, FT_RENDER_MODE_NORMAL))
       throw std::runtime_error("couldn't render char");
 
     FT_Bitmap render = ftg->bitmap;
+    g.bearing_ = {ftg->bitmap_left, ftg->bitmap_top};
     g.bounds_ = {render.width, render.rows};
-    node *packed = binpack(&root_, g.bounds_);
+    const uvec2 padding = {2, 2};
+    node *packed = binpack(&root_, g.bounds_ + padding);
     if (packed == nullptr) {
       // Can't pack, return same bitmap than for '\0'
       throw std::runtime_error("font altas overflow");
     }
     g.texcoords_[0] = float(packed->coords_[0]) / atlas_->size().x;
     g.texcoords_[1] = float(packed->coords_[1]) / atlas_->size().y;
-    g.texcoords_[2] = float(packed->coords_[2]) / atlas_->size().x;
-    g.texcoords_[3] = float(packed->coords_[3]) / atlas_->size().y;
-    atlas_->update(packed->coords_, render.buffer, render.pitch);
+    g.texcoords_[2] = float(packed->coords_[2] - padding.x) / atlas_->size().x;
+    g.texcoords_[3] = float(packed->coords_[3] - padding.y) / atlas_->size().y;
+    atlas_->update(packed->coords_ - uvec4{0, 0, padding}, render.buffer, render.pitch);
   }
 
-  return cache[_char_index] = g;
+  return g;
 }
 
-constexpr static hb_feature_t features[] = {
-    { HB_TAG('k', 'e', 'r', 'n'), 1, 0, std::numeric_limits<unsigned int>::max() },
-    { HB_TAG('l', 'i', 'g', 'a'), 1, 0, std::numeric_limits<unsigned int>::max() },
-    { HB_TAG('c', 'l', 'i', 'g'), 1, 0, std::numeric_limits<unsigned int>::max() }
-};
+font::cache &font::load_cache(uint8_t _size) {
+  auto &cache = caches_[_size];
+  if (cache)
+    return cache;
+
+  cache.font_ = hb_ft_font_create(face_, nullptr);
+  hb_ft_font_set_load_flags(cache.font_, load_flags_);
+  return cache;
+}
 
 shaper::shaper() {
   buffer_ = hb_buffer_create();
@@ -148,17 +151,19 @@ shaper::~shaper() {
 
 bool shaper::bake(shared_buffer &_buff, result &_dst, const shared_font &_font, uint8_t _size, const std::string_view &_text) {
   assert(!_text.empty());
-  FT_Set_Char_Size(_font->face_, _size * 64, _size * 64, 96, 96);
 
+  std::lock_guard lk(_font->baking_mutex_);
+  FT_Set_Char_Size(_font->face_, _size * font_scale, _size * font_scale, 0, 0);
+
+  auto &cache = _font->load_cache(_size);
   hb_buffer_reset(buffer_);
   hb_buffer_add_utf8(buffer_, _text.data(), _text.size(), 0, -1);
   hb_buffer_guess_segment_properties(buffer_);
-
-  hb_shape(_font->font_, buffer_, features, sizeof(features) / sizeof(hb_feature_t));
+  hb_shape(cache.font_, buffer_, nullptr, 0);
 
   uint codepoints;
-  hb_glyph_info_t *info = hb_buffer_get_glyph_infos (buffer_, &codepoints);
-  hb_glyph_position_t *pos = hb_buffer_get_glyph_positions (buffer_, nullptr);
+  hb_glyph_info_t *info = hb_buffer_get_glyph_infos(buffer_, &codepoints);
+  hb_glyph_position_t *pos = hb_buffer_get_glyph_positions(buffer_, nullptr);
 
   size_t drawn_codepoints = 0;
   size_t max_indices = 6 * codepoints;
@@ -171,11 +176,11 @@ bool shaper::bake(shared_buffer &_buff, result &_dst, const shared_font &_font, 
   // https://github.com/tangrams/harfbuzz-example/blob/master/src/hbshaper.h
   for (uint i = 0; i < codepoints; i++) {
     uint cindex = info[i].codepoint; // FIXME: Isn't "codepoint" for UTF codes? This seems to be a char index..
-    font::glyph &glyph = _font->load_glyph(cindex, _size);
+    font::glyph &glyph = _font->load_glyph(cache.glyphs_, cindex);
 
     if (glyph) {
-      float xo = float(pos[i].x_offset) / 64;
-      float yo = float(pos[i].y_offset) / 64;
+      float xo = float(pos[i].x_offset) / font_scale;
+      float yo = float(pos[i].y_offset) / font_scale;
 
       float x0 = x + xo + glyph.bearing_.x;
       float y0 = y + yo + glyph.bearing_.y;
@@ -210,51 +215,35 @@ bool shaper::bake(shared_buffer &_buff, result &_dst, const shared_font &_font, 
       drawn_codepoints++;
     }
 
-    x += float(pos[i].x_advance) / 64;
-    y += float(pos[i].y_advance) / 64;
+    x += float(pos[i].x_advance) / font_scale;
+    y += float(pos[i].y_advance) / font_scale;
   }
   bbox[0] = 0;
   bbox[2] = x;
   _dst.bbox_ = bbox;
 
-  bool redraw = false;
-  const size_t indices_count = 6 * drawn_codepoints;
-  const size_t prev_indices_count = _dst.indices_ ? _dst.indices_->size() : 0;
-  const ssize_t indices_diff = indices_count - prev_indices_count;
+  const uint indices_count = 6 * drawn_codepoints;
+  const uint prev_indices_count = _dst.indices_ ? _dst.indices_->size() : 0;
+  const int indices_diff = indices_count - prev_indices_count;
   if (indices_diff > 0) {
     _dst.indices_ = _buff->allocate<uint16_t>(indices_count);
-    _dst.indices_->set(indices);
-    redraw = true;
-  }
-  else if (indices_diff < 0) {
     _dst.indices_->update_some(0, indices_count, indices);
-    size_t zeroes_count = -indices_diff;
-    uint16_t zeroes[zeroes_count];
-    memset(zeroes, 0, zeroes_count * sizeof(uint16_t));
-    _dst.indices_->update_some(indices_count, zeroes_count, zeroes);
   }
-  else {
-    _dst.indices_->set(indices);
+  else if (indices_count > 0) {
+    _dst.indices_->update_some(0, indices_count, indices);
   }
 
-  const size_t vertices_count = 4 * drawn_codepoints;
-  const size_t prev_vertices_count = _dst.vertices_ ? _dst.vertices_->size() : 0;
-  const ssize_t vertices_diff = vertices_count - prev_vertices_count;
+  const uint vertices_count = 4 * drawn_codepoints;
+  const uint prev_vertices_count = _dst.vertices_ ? _dst.vertices_->size() : 0;
+  const int vertices_diff = vertices_count - prev_vertices_count;
   if (vertices_diff > 0) {
     _dst.vertices_ = _buff->allocate<tex_mask::vertex>(vertices_count);
-    _dst.vertices_->set(vertices);
-    redraw = true;
-  }
-  else if (vertices_diff < 0) {
     _dst.vertices_->update_some(0, vertices_count, vertices);
-    size_t zeroes_count = -vertices_diff;
-    tex_mask::vertex zeroes[zeroes_count];
-    memset(zeroes, 0, zeroes_count * sizeof(tex_mask::vertex));
-    _dst.vertices_->update_some(vertices_count, zeroes_count, zeroes);
   }
-  else {
-    _dst.vertices_->set(vertices);
+  else if (vertices_count > 0) {
+    _dst.vertices_->update_some(0, vertices_count, vertices);
   }
 
-  return redraw;
+  _dst.indices_count_ = indices_count;
+  return indices_diff != 0 || vertices_diff != 0;
 }

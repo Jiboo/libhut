@@ -364,10 +364,22 @@ std::pair<uint32_t, VkMemoryPropertyFlags> display::find_memory_type(uint32_t ty
   throw std::runtime_error("failed to find suitable memory type!");
 }
 
+#ifdef HUT_DEBUG_STAGING
+const char *transition_name(const VkImageLayout _layout) {
+  switch (_layout) {
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL: return "READ";
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL: return "SRC";
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL: return "DST";
+    case VK_IMAGE_LAYOUT_PREINITIALIZED: return "PREINIT";
+    default: return "???";
+  }
+}
+#endif
+
 void display::stage_transition(const image_transition &_info) {
 #ifdef HUT_DEBUG_STAGING
-  /*std::cout << "[staging] transition " << _info.destination << " from " << _info.oldLayout << " to "
-            <<  _info.new_layout << std::endl;*/
+  std::cout << "[staging] transition " << _info.destination << " from " << transition_name(_info.oldLayout) << " to "
+            <<  transition_name(_info.newLayout) << std::endl;
 #endif
 
   VkImageMemoryBarrier barrier = {};
@@ -439,7 +451,10 @@ void display::stage_copy(const buffer2image_copy &_info) {
 #ifdef HUT_DEBUG_STAGING
   uint size = _info.bufferRowLength * _info.bufferImageHeight * _info.pixelSize;
   std::cout << "[staging] buffer " << _info.source << '[' << _info.bufferOffset << "-" << (_info.bufferOffset+size)
-            << "] to image " << _info.destination << std::endl;
+            << "] to image " << _info.destination
+            << "[" << _info.imageOffset.x << ", " << _info.imageOffset.y << ", "
+            << _info.imageExtent.width << ", " << _info.imageExtent.height << "]"
+            << std::endl;
 #endif
 
   vkCmdCopyBufferToImage(staging_cb_, _info.source, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &_info);

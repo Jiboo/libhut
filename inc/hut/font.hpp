@@ -43,11 +43,6 @@ namespace hut {
 
 class font {
   friend class shaper;
- private:
-  FT_Face face_;
-  hb_font_t *font_;
-  shared_image atlas_;
-  uint load_flags_;
 
  public:
   font(display &_display, const uint8_t *_addr, size_t _size, uvec2 _atlas_size = {512, 512}, bool _hinting = true);
@@ -76,12 +71,24 @@ class font {
     inline explicit operator bool() { return bounds_.x > 0 && bounds_.y > 0; }
   };
 
+  using glyph_cache_t = std::unordered_map<uint , glyph>;
+  struct cache {
+    glyph_cache_t glyphs_;
+    hb_font_t *font_ = nullptr;
+
+    explicit operator bool() { return font_ != nullptr; }
+  };
+
+  FT_Face face_;
+  shared_image atlas_;
+  uint load_flags_;
   node root_;
-  using cache_t = std::unordered_map<uint32_t, glyph>;
-  std::unordered_map<uint8_t, cache_t> caches_;
+  std::unordered_map<uint8_t, cache> caches_;
+  std::mutex baking_mutex_;
 
   static node *binpack(node *_cur_node, const uvec2 &_bounds);
-  glyph &load_glyph(uint _char_index, uint8_t _size);
+  glyph &load_glyph(glyph_cache_t &_cache, uint _char_index);
+  cache &load_cache(uint8_t _size);
 };
 
 using shared_font = std::shared_ptr<font>;
@@ -94,6 +101,7 @@ class shaper {
   struct result {
     tex_mask::shared_vertices vertices_;
     tex_mask::shared_indices indices_;
+    uint indices_count_;
     vec4 bbox_;
 
     inline explicit operator bool() {

@@ -173,7 +173,7 @@ class window {
   wl_surface *wayland_surface_;
   xdg_surface *window_;
   xdg_toplevel *toplevel_;
-  bool invalidated_ = true;
+  std::atomic_bool invalidated_ = true;
   uvec2 mouse_lastmove_ = {0, 0};
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
   friend LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
