@@ -44,7 +44,6 @@ class buffer_pool {
   friend class display;
   friend class shaper;
   friend class image;
-  friend struct buffer_ubo;
   template<typename TDetails, typename... TExtraBindings> friend class drawable;
 
   struct range;

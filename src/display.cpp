@@ -43,8 +43,10 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT /*fla
                                                      VkDebugReportObjectTypeEXT /*objType*/, uint64_t /*obj*/,
                                                      size_t /*location*/, int32_t /*code*/, const char *layerPrefix,
                                                      const char *msg, void * /*userData*/) {
-  std::cout << '[' << layerPrefix << "] " << msg << std::endl;
+  if (strcmp(layerPrefix, "Loader Message") == 0)
+    return VK_FALSE;
 
+  std::cout << '[' << layerPrefix << "] " << msg << std::endl;
   return VK_FALSE;
 }
 #endif

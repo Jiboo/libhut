@@ -98,12 +98,12 @@ class window {
   event<> on_pause, on_resume, on_focus, on_blur, on_close;
   event<uvec4> on_expose;
   event<uvec2> on_resize;
-  event<VkCommandBuffer, uvec2 /*canvas_size*/> on_draw;
-  event<uvec2, display::duration /*delta*/> on_frame;
+  event<VkCommandBuffer> on_draw;
+  event<display::duration> on_frame;
   event<std::string /*path*/, uvec2 /*pos*/> on_drop;
 
-  event<uint8_t /*finger*/, touch_event_type, uvec2 /*pos*/> on_touch;
-  event<uint8_t /*button*/, mouse_event_type, uvec2 /*pos*/> on_mouse;
+  event<uint8_t /*finger*/, touch_event_type, vec2 /*pos*/> on_touch;
+  event<uint8_t /*button*/, mouse_event_type, vec2 /*pos*/> on_mouse;
 
   event<keysym /*key*/, bool /*down*/> on_key;
   event<char32_t /*utf32_char*/> on_char;
@@ -148,7 +148,6 @@ class window {
   VkSemaphore sem_available_ = VK_NULL_HANDLE;
   VkSemaphore sem_rendered_ = VK_NULL_HANDLE;
 
-  uint16_t fps_limit_ = 0;
   uvec2 size_;
   vec4 clear_color_ = {0.0f, 0.0f, 0.0f, 1.0f};
   display::time_point last_frame_ = display::clock::now();
@@ -174,11 +173,11 @@ class window {
   xdg_surface *window_;
   xdg_toplevel *toplevel_;
   std::atomic_bool invalidated_ = true;
-  uvec2 mouse_lastmove_ = {0, 0};
+  vec2 mouse_lastmove_ = {0, 0};
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
   friend LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
   HWND window_;
-  uvec2 mouse_lastmove_ = {0, 0};
+  vec2 mouse_lastmove_ = {0, 0};
   bool mouse_inside_ = false;
   bool minimized_ = false;
 #endif

@@ -9,10 +9,7 @@ layout(location = 0) in vec2 inVertexPosition;
 layout(location = 1) in vec2 inVertexTexCoord;
 layout(location = 2) in vec3 inVertexColor;
 
-layout(location = 3) in vec4 inInstanceCol0;
-layout(location = 4) in vec4 inInstanceCol1;
-layout(location = 5) in vec4 inInstanceCol2;
-layout(location = 6) in vec4 inInstanceCol3;
+layout(location = 3) in mat4 inInstanceTransform;
 
 layout(location = 0) out vec2 outTexCoord;
 layout(location = 1) out vec3 outColor;
@@ -22,8 +19,7 @@ out gl_PerVertex {
 };
 
 void main() {
-    mat4 transform = mat4(inInstanceCol0, inInstanceCol1, inInstanceCol2, inInstanceCol3);
-    gl_Position = ubo.proj * transform * vec4(inVertexPosition, 0.0, 1.0);
+    gl_Position = ubo.proj * inInstanceTransform * vec4(inVertexPosition, 0.0, 1.0);
     outColor = inVertexColor;
     outTexCoord = inVertexTexCoord;
 }

@@ -37,9 +37,12 @@
 #include <string>
 #include <vector>
 
-#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
-#include <glm/ext.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/string_cast.hpp>
+#include <glm/gtx/io.hpp>
+#include <glm/gtx/scalar_multiplication.hpp>
 
 namespace hut {
 
@@ -145,7 +148,8 @@ class sstream {
   std::ostringstream stream_;
 
  public:
-  sstream(const char *_base) {
+  template <typename T>
+  sstream(const T &_base) {
     stream_ << _base;
   }
 

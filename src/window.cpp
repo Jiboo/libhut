@@ -301,7 +301,7 @@ void window::redraw(display::time_point _tp) {
     throw std::runtime_error("failed to acquire swap chain image!");
   }
 
-  on_frame.fire(size_, last_frame_ - _tp);
+  on_frame.fire(last_frame_ - _tp);
   display_.flush_staged();
 
   if (dirty_[imageIndex]) {
@@ -353,17 +353,6 @@ void window::redraw(display::time_point _tp) {
   auto present = display::clock::now();
 
   cbs_.clear();
-
-  auto diff = present - last_frame_;
-  if (fps_limit_ != 0) {
-    auto limit = std::chrono::microseconds((uint)(1. / fps_limit_ * 1000 * 1000));
-    if (diff < limit)
-      std::this_thread::sleep_for(limit - diff);
-  }
-  else if (diff > 20ms) {
-    std::cout << "[hut] frame took " << std::chrono::duration<double, std::milli>(diff).count() << "ms..." << std::endl;
-  }
-
   last_frame_ = present;
 }
 
@@ -398,7 +387,21 @@ void window::rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
   // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS
   // to enable secondary command buffers
 
-  on_draw.fire(_cb, size_);
+  VkRect2D scissor = {};
+  scissor.offset = {0, 0};
+  scissor.extent = {size_.x, size_.y};
+  vkCmdSetScissor(_cb, 0, 1, &scissor);
+
+  VkViewport viewport = {};
+  viewport.x = 0.0f;
+  viewport.y = 0.0f;
+  viewport.width = (float)size_.x;
+  viewport.height = (float)size_.y;
+  viewport.minDepth = 0.0f;
+  viewport.maxDepth = 1.0f;
+  vkCmdSetViewport(_cb, 0, 1, &viewport);
+
+  on_draw.fire(_cb);
 
   vkCmdEndRenderPass(_cb);
   if (vkEndCommandBuffer(_cb) != VK_SUCCESS)

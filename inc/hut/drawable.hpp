@@ -37,24 +37,26 @@
 
 namespace hut {
 
-struct buffer_ubo;
-using shared_ubo = shared_ref<buffer_ubo>;
-
-struct buffer_ubo {
+struct proj_ubo {
   mat4 proj_ {1};
-
-  static shared_ubo alloc(shared_buffer &_buf, const buffer_ubo &_default) {
-    auto ref = _buf->allocate<buffer_ubo>(1, _buf->display_.limits().minUniformBufferOffsetAlignment);
-    ref->set(_default);
-    return ref;
-  }
 };
+
+template<typename T>
+using shared_ubo = shared_ref<T>;
+
+template<typename T>
+static shared_ubo<T> alloc_ubo(const display &_display, shared_buffer &_buf, const T &_default) {
+  auto ref = _buf->allocate<T>(1, _display.limits().minUniformBufferOffsetAlignment);
+  ref->set(_default);
+  return ref;
+}
 
 template<typename TDetails, typename... TExtraBindings>
 class drawable {
 public:
   using instance = typename TDetails::instance;
   using vertex = typename TDetails::vertex;
+  using ubo = typename TDetails::ubo;
   using indice = uint16_t;
 
   using shared_instances = shared_ref<instance>;
@@ -65,7 +67,7 @@ private:
   using extra_bindings = std::tuple<TExtraBindings...>;
 
   struct bindings {
-    shared_ubo ubo_buffer_;
+    shared_ubo<ubo> ubo_buffer_;
     extra_bindings extras_;
   };
 
@@ -185,7 +187,7 @@ private:
     rasterizer_create_info.rasterizerDiscardEnable = VK_FALSE;
     rasterizer_create_info.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer_create_info.lineWidth = 1.0f;
-    rasterizer_create_info.cullMode = VK_CULL_MODE_FRONT_BIT;
+    rasterizer_create_info.cullMode = VK_CULL_MODE_BACK_BIT;
     rasterizer_create_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer_create_info.depthBiasEnable = VK_FALSE;
     rasterizer_create_info.depthBiasConstantFactor = 0.0f;
@@ -307,7 +309,7 @@ public:
     std::vector<VkDescriptorBufferInfo> buffers_;
     VkDescriptorSet dst_ = VK_NULL_HANDLE;
 
-    void buffer(uint _binding, const shared_ubo &_ubo) {
+    void buffer(uint _binding, const shared_ubo<ubo> &_ubo) {
       VkDescriptorBufferInfo info = {};
       info.buffer = _ubo->buffer_;
       info.offset = _ubo->offset_;
@@ -344,7 +346,7 @@ public:
     }
   };
 
-  void bind(uint _descriptor_index, const shared_ubo &_ubo, TExtraBindings... _bindings) {
+  void bind(uint _descriptor_index, const shared_ubo<ubo> &_ubo, TExtraBindings... _bindings) {
     assert(_descriptor_index < descriptors_.size());
     bindings_.emplace(_descriptor_index, bindings{_ubo, std::forward_as_tuple(_bindings...)});
 
@@ -360,7 +362,7 @@ public:
     return bindings_.find(_descriptor_index) != bindings_.end();
   }
 
-  void draw(VkCommandBuffer _buffer, const uvec2 &_size, uint _descriptor_index,
+  void draw(VkCommandBuffer _buffer, uint _descriptor_index,
             const shared_indices &_indices, uint _indices_offset, uint _indices_count,
             const shared_instances &_instances, uint _instances_offset, uint _instances_count,
             const shared_vertices &_vertices, uint _vertex_offset) {
@@ -382,41 +384,26 @@ public:
     vkCmdBindVertexBuffers(_buffer, 1, 1, instancesBuffers, instancesOffsets);
 
     vkCmdBindIndexBuffer(_buffer, _indices->buffer_, _indices->offset_, VK_INDEX_TYPE_UINT16);
-
-    VkRect2D scissor = {};
-    scissor.offset = {0, 0};
-    scissor.extent = {_size.x, _size.y};
-    vkCmdSetScissor(_buffer, 0, 1, &scissor);
-
-    VkViewport viewport = {};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = (float)_size.x;
-    viewport.height = (float)_size.y;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(_buffer, 0, 1, &viewport);
-
     vkCmdDrawIndexed(_buffer, _indices_count, _instances_count, _indices_offset, _vertex_offset, _instances_offset);
   }
 
-  void draw(VkCommandBuffer _buffer, const uvec2 &_size, uint _descriptor_index,
+  void draw(VkCommandBuffer _buffer, uint _descriptor_index,
             const shared_indices &_indices,
             const shared_instances &_instances,
             const shared_vertices &_vertices) {
     assert(_indices && _instances);
-    draw(_buffer, _size, _descriptor_index,
+    draw(_buffer, _descriptor_index,
         _indices, 0, _indices->size(),
         _instances, 0, _instances->size(),
         _vertices, 0);
   }
 
-  void draw(VkCommandBuffer _buffer, const uvec2 &_size, uint _descriptor_index,
+  void draw(VkCommandBuffer _buffer, uint _descriptor_index,
             const shared_indices &_indices, uint _indices_count,
             const shared_instances &_instances,
             const shared_vertices &_vertices) {
     assert(_indices && _instances);
-    draw(_buffer, _size, _descriptor_index,
+    draw(_buffer, _descriptor_index,
          _indices, 0, _indices_count,
          _instances, 0, _instances->size(),
          _vertices, 0);
@@ -436,6 +423,7 @@ namespace details {
 
   struct rgb {
     using impl = drawable<details::rgb>;
+    using ubo = proj_ubo;
 
     struct instance {
       mat4 transform_;
@@ -446,7 +434,7 @@ namespace details {
       vec3 color_;
     };
 
-    constexpr static uint max_descriptor_sets_ = 1; // 128 textures ought to be enough for everyone
+    constexpr static uint max_descriptor_sets_ = 1;
 
     constexpr static std::array<VkDescriptorPoolSize, 1> descriptor_pools_ {
         VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = max_descriptor_sets_},
@@ -479,6 +467,7 @@ namespace details {
 
   struct rgba {
     using impl = drawable<details::rgba>;
+    using ubo = proj_ubo;
 
     struct instance {
       mat4 transform_;
@@ -489,7 +478,7 @@ namespace details {
       vec4 color_;
     };
 
-    constexpr static uint max_descriptor_sets_ = 1; // 128 textures ought to be enough for everyone
+    constexpr static uint max_descriptor_sets_ = 1;
 
     constexpr static std::array<VkDescriptorPoolSize, 1> descriptor_pools_ {
         VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = max_descriptor_sets_},
@@ -521,6 +510,7 @@ namespace details {
 
   struct tex {
     using impl = drawable<details::tex, const shared_image &, const shared_sampler &>;
+    using ubo = proj_ubo;
 
     struct instance {
       mat4 transform_;
@@ -531,7 +521,7 @@ namespace details {
       vec2 texcoords_;
     };
 
-    constexpr static uint max_descriptor_sets_ = 128; // 128 textures ought to be enough for everyone
+    constexpr static uint max_descriptor_sets_ = 128;
 
     constexpr static std::array<VkDescriptorPoolSize, 2> descriptor_pools_ {
         VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = max_descriptor_sets_},
@@ -568,6 +558,7 @@ namespace details {
 
   struct tex_rgb {
     using impl = drawable<details::tex_rgb, const shared_image &, const shared_sampler &>;
+    using ubo = proj_ubo;
 
     struct instance {
       mat4 transform_;
@@ -579,7 +570,7 @@ namespace details {
       vec3 color_;
     };
 
-    constexpr static uint max_descriptor_sets_ = 128; // 128 textures ought to be enough for everyone
+    constexpr static uint max_descriptor_sets_ = 128;
 
     constexpr static std::array<VkDescriptorPoolSize, 2> descriptor_pools_ {
         VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = max_descriptor_sets_},
@@ -617,6 +608,7 @@ namespace details {
 
   struct tex_rgba {
     using impl = drawable<details::tex_rgba, const shared_image &, const shared_sampler &>;
+    using ubo = proj_ubo;
 
     struct instance {
       mat4 transform_;
@@ -628,7 +620,7 @@ namespace details {
       vec4 color_;
     };
 
-    constexpr static uint max_descriptor_sets_ = 128; // 128 textures ought to be enough for everyone
+    constexpr static uint max_descriptor_sets_ = 128;
 
     constexpr static std::array<VkDescriptorPoolSize, 2> descriptor_pools_ {
         VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = max_descriptor_sets_},
@@ -666,6 +658,7 @@ namespace details {
 
   struct tex_mask {
     using impl = drawable<details::tex_mask, const shared_image &, const shared_sampler &>;
+    using ubo = proj_ubo;
 
     struct instance {
       mat4 transform_;
@@ -677,7 +670,7 @@ namespace details {
       vec2 texcoords_;
     };
 
-    constexpr static uint max_descriptor_sets_ = 128; // 128 textures ought to be enough for everyone
+    constexpr static uint max_descriptor_sets_ = 128;
 
     constexpr static std::array<VkDescriptorPoolSize, 2> descriptor_pools_ {
         VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = max_descriptor_sets_},
@@ -715,6 +708,7 @@ namespace details {
 
   struct box_rgba {
     using impl = drawable<details::box_rgba>;
+    using ubo = proj_ubo;
 
     struct instance {
       mat4 transform_;

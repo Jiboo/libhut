@@ -104,7 +104,7 @@ class display {
     }
   }
 
-  VkPhysicalDeviceLimits limits() {
+  const VkPhysicalDeviceLimits &limits() const {
     return device_props_.limits;
   }
 

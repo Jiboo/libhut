@@ -58,33 +58,33 @@ mat4 make_mat(vec2 _translate, float _rot_angle, vec2 _rot_center, vec3 _scale) 
 int main(int, char **) {
   std::cout << std::fixed << std::setprecision(1);
 
-  display d("testbed");
+  display d("hut demo");
 
   window w(d);
   w.clear_color({1, 1, 1, 1});
-  w.title("testbed");
+  w.title("hut demo win1");
 
   window w2(d);
   w2.clear_color({0, 0, 1, 1});
-  w2.title("testbed2");
+  w2.title("hut demo win2");
 
   auto b = d.alloc_buffer(1024*1024);
 
   auto indices = b->allocate<uint16_t>(6);
-  indices->set({0, 1, 2, 2, 3, 0});
+  indices->set({0, 1, 2, 2, 1, 3});
 
-  buffer_ubo default_ubo;
+  proj_ubo default_ubo;
   default_ubo.proj_ = ortho<float>(0, w.size().x, 0, w.size().y);
-  shared_ubo ubo = buffer_ubo::alloc(b, default_ubo);
+  shared_ubo<proj_ubo> ubo = alloc_ubo(d, b, default_ubo);
 
   auto rgb_pipeline = std::make_unique<rgb>(w);
   auto rgb_instances = b->allocate<rgb::instance>(2);
   auto rgb_vertices = b->allocate<rgb::vertex>(4);
   rgb_vertices->set({
     rgb::vertex{{0,     0}, {1, 0, 0}},
+    rgb::vertex{{0,   100}, {0, 0, 1}},
     rgb::vertex{{100,   0}, {0, 1, 0}},
     rgb::vertex{{100, 100}, {1, 1, 1}},
-    rgb::vertex{{0,   100}, {0, 0, 1}}
   });
   rgb_instances->set({
     rgb::instance{make_mat({  0, 100}, {1,1,1})},
@@ -100,9 +100,9 @@ int main(int, char **) {
   auto rgba_vertices = b->allocate<rgba::vertex>(4);
   rgba_vertices->set({
     rgba::vertex{{0,     0}, {1, 0, 0, 0.25}},
+    rgba::vertex{{0,   100}, {0, 0, 1, 0.25}},
     rgba::vertex{{100,   0}, {0, 1, 0, 0.25}},
     rgba::vertex{{100, 100}, {1, 1, 1, 0.25}},
-    rgba::vertex{{0,   100}, {0, 0, 1, 0.25}}
   });
   rgba_instances->set({
     rgba::instance{make_mat({  0,   0}, {1,1,1})},
@@ -117,9 +117,9 @@ int main(int, char **) {
   auto tex_vertices = b->allocate<tex::vertex>(4);
   tex_vertices->set({
     tex::vertex{{0, 0}, {0, 0}},
+    tex::vertex{{0, 1}, {0, 1}},
     tex::vertex{{1, 0}, {1, 0}},
     tex::vertex{{1, 1}, {1, 1}},
-    tex::vertex{{0, 1}, {0, 1}}
   });
 
   auto tex_rgb_pipeline = std::make_unique<tex_rgb>(w);
@@ -129,9 +129,9 @@ int main(int, char **) {
   auto tex_rgb_vertices = b->allocate<tex_rgb::vertex>(4);
   tex_rgb_vertices->set({
     tex_rgb::vertex{{0, 0}, {0, 0}, {1, 0, 0}},
+    tex_rgb::vertex{{0, 1}, {0, 1}, {0, 0, 1}},
     tex_rgb::vertex{{1, 0}, {1, 0}, {0, 1, 0}},
     tex_rgb::vertex{{1, 1}, {1, 1}, {1, 1, 1}},
-    tex_rgb::vertex{{0, 1}, {0, 1}, {0, 0, 1}}
   });
   tex1_rgb_instances->set({
     tex_rgb::instance{make_mat({  0, 200}, {100,100,1})},
@@ -149,9 +149,9 @@ int main(int, char **) {
   auto tex_rgba_vertices = b->allocate<tex_rgba::vertex>(4);
   tex_rgba_vertices->set({
     tex_rgba::vertex{{0, 0}, {0, 0}, {1, 0, 0, 0.25}},
+    tex_rgba::vertex{{0, 1}, {0, 1}, {0, 0, 1, 0.25}},
     tex_rgba::vertex{{1, 0}, {1, 0}, {0, 1, 0, 0.25}},
     tex_rgba::vertex{{1, 1}, {1, 1}, {1, 1, 1, 0.25}},
-    tex_rgba::vertex{{0, 1}, {0, 1}, {0, 0, 1, 0.25}}
   });
   tex1_rgba_instances->set({
     tex_rgba::instance{make_mat({  0, 400}, {100,100,1})},
@@ -183,9 +183,9 @@ int main(int, char **) {
   });
   atlas_vertices->set({
     tex_mask::vertex{{0, 0}, {0, 0}},
+    tex_mask::vertex{{0, 1}, {0, 1}},
     tex_mask::vertex{{1, 0}, {1, 0}},
     tex_mask::vertex{{1, 1}, {1, 1}},
-    tex_mask::vertex{{0, 1}, {0, 1}}
   });
 
   auto box_rgba_pipeline = std::make_unique<box_rgba>(w);
@@ -193,15 +193,15 @@ int main(int, char **) {
   auto shadow_vertices = b->allocate<box_rgba::vertex>(4);
   box_rgba_vertices->set({
     box_rgba::vertex{{  0,   0}, {1, 0, 0, 1}},
+    box_rgba::vertex{{  0, 100}, {0, 0, 1, 1}},
     box_rgba::vertex{{100,   0}, {0, 1, 0, 1}},
     box_rgba::vertex{{100, 100}, {1, 1, 1, 1}},
-    box_rgba::vertex{{  0, 100}, {0, 0, 1, 1}}
   });
   shadow_vertices->set({
      box_rgba::vertex{{  0,   0}, {0, 0, 0, 1}},
+     box_rgba::vertex{{  0, 100}, {0, 0, 0, 1}},
      box_rgba::vertex{{100,   0}, {0, 0, 0, 1}},
      box_rgba::vertex{{100, 100}, {0, 0, 0, 1}},
-     box_rgba::vertex{{  0, 100}, {0, 0, 0, 1}}
   });
   auto box_rgba_instances = b->allocate<box_rgba::instance>(1);
   auto shadow_instances = b->allocate<box_rgba::instance>(1);
@@ -264,41 +264,41 @@ int main(int, char **) {
     w.invalidate(true);  // will force to call on_draw on the next frame
   });
 
-  w.on_draw.connect([&](VkCommandBuffer _buffer, const uvec2 &_size) {
+  w.on_draw.connect([&](VkCommandBuffer _buffer) {
     if (roboto)
-      tmask_pipeline->draw(_buffer, _size, 0, indices, atlas_instances, atlas_vertices);
+      tmask_pipeline->draw(_buffer, 0, indices, atlas_instances, atlas_vertices);
 
-    rgb_pipeline->draw(_buffer, _size, 0, indices, rgb_instances, rgb_vertices);
-    rgba_pipeline->draw(_buffer, _size, 0, indices, rgba_instances, rgba_vertices);
-    box_rgba_pipeline->draw(_buffer, _size, 0, indices, shadow_instances, shadow_vertices);
-    box_rgba_pipeline->draw(_buffer, _size, 0, indices, box_rgba_instances, box_rgba_vertices);
+    rgb_pipeline->draw(_buffer, 0, indices, rgb_instances, rgb_vertices);
+    rgba_pipeline->draw(_buffer, 0, indices, rgba_instances, rgba_vertices);
+    box_rgba_pipeline->draw(_buffer, 0, indices, shadow_instances, shadow_vertices);
+    box_rgba_pipeline->draw(_buffer, 0, indices, box_rgba_instances, box_rgba_vertices);
     if (tex1_ready) {
-      tex_pipeline->draw(_buffer, _size, 0, indices, tex1_instances, tex_vertices);
-      tex_rgb_pipeline->draw(_buffer, _size, 0, indices, tex1_rgb_instances, tex_rgb_vertices);
-      tex_rgba_pipeline->draw(_buffer, _size, 0, indices, tex1_rgba_instances, tex_rgba_vertices);
+      tex_pipeline->draw(_buffer, 0, indices, tex1_instances, tex_vertices);
+      tex_rgb_pipeline->draw(_buffer, 0, indices, tex1_rgb_instances, tex_rgb_vertices);
+      tex_rgba_pipeline->draw(_buffer, 0, indices, tex1_rgba_instances, tex_rgba_vertices);
     }
     if (tex2_ready) {
-      tex_pipeline->draw(_buffer, _size, 1, indices, tex2_instances, tex_vertices);
-      tex_rgb_pipeline->draw(_buffer, _size, 1, indices, tex2_rgb_instances, tex_rgb_vertices);
-      tex_rgba_pipeline->draw(_buffer, _size, 1, indices, tex2_rgba_instances, tex_rgba_vertices);
+      tex_pipeline->draw(_buffer, 1, indices, tex2_instances, tex_vertices);
+      tex_rgb_pipeline->draw(_buffer, 1, indices, tex2_rgb_instances, tex_rgb_vertices);
+      tex_rgba_pipeline->draw(_buffer, 1, indices, tex2_rgba_instances, tex_rgba_vertices);
     }
 
     if (hello_world)
-      tmask_pipeline->draw(_buffer, _size, 0, hello_world.indices_, hello_world.indices_count_, text_instances, hello_world.vertices_);
+      tmask_pipeline->draw(_buffer, 0, hello_world.indices_, hello_world.indices_count_, text_instances, hello_world.vertices_);
     if (icons_test)
-      tmask_pipeline->draw(_buffer, _size, 1, icons_test.indices_, icons_test.indices_count_, icons_instances, icons_test.vertices_);
+      tmask_pipeline->draw(_buffer, 1, icons_test.indices_, icons_test.indices_count_, icons_instances, icons_test.vertices_);
     if (fps_counter)
-      tmask_pipeline->draw(_buffer, _size, 0, fps_counter.indices_, fps_counter.indices_count_, fps_instances, fps_counter.vertices_);
+      tmask_pipeline->draw(_buffer, 0, fps_counter.indices_, fps_counter.indices_count_, fps_instances, fps_counter.vertices_);
 
     return false;
   });
 
-  w2.on_draw.connect([&](VkCommandBuffer _buffer, const uvec2 &_size) {
-    rgb_pipeline2->draw(_buffer, _size, 0, indices, rgb_instances, rgb_vertices);
+  w2.on_draw.connect([&](VkCommandBuffer _buffer) {
+    rgb_pipeline2->draw(_buffer, 0, indices, rgb_instances, rgb_vertices);
     return false;
   });
 
-  w.on_frame.connect([&](uvec2 _size, display::duration _delta) {
+  w.on_frame.connect([&](display::duration _delta) {
     d.post([&w](auto){
       w.invalidate(false);  // asks for another frame without a redraw to continue animations and fps count
     });
@@ -357,7 +357,7 @@ int main(int, char **) {
 
   w.on_resize.connect([&](const uvec2 &_size) {
     std::cout << "resize " << to_string(_size) << std::endl;
-    buffer_ubo new_ubo;
+    proj_ubo new_ubo;
     new_ubo.proj_ = ortho<float>(0, _size.x, 0, _size.y);
 
     ubo->set(new_ubo);
@@ -400,7 +400,7 @@ int main(int, char **) {
     return true;
   });
 
-  w.on_mouse.connect([](uint8_t _button, mouse_event_type _type, uvec2 _pos) {
+  w.on_mouse.connect([](uint8_t _button, mouse_event_type _type, vec2 _pos) {
     if (_type != MMOVE)
       std::cout << "mouse " << std::to_string(_button) << ", type: " << _type << ", pos: " << to_string(_pos) << std::endl;
     return true;

@@ -8,10 +8,7 @@ layout(binding = 0) uniform UniformBufferObject {
 layout(location = 0) in vec2 inVertexPosition;
 layout(location = 1) in vec4 inVertexColor;
 
-layout(location = 2) in vec4 inInstanceCol0;
-layout(location = 3) in vec4 inInstanceCol1;
-layout(location = 4) in vec4 inInstanceCol2;
-layout(location = 5) in vec4 inInstanceCol3;
+layout(location = 2) in mat4 inInstanceTransform;
 layout(location = 6) in vec2 inInstanceParams; //  corner radius, blur radius
 layout(location = 7) in vec4 inInstanceBoxBounds;
 
@@ -24,8 +21,6 @@ out gl_PerVertex {
 };
 
 void main() {
-    mat4 transform = mat4(inInstanceCol0, inInstanceCol1, inInstanceCol2, inInstanceCol3);
-
     float blur = inInstanceParams[1];
     vec2 pos = inVertexPosition.xy;
 
@@ -33,21 +28,22 @@ void main() {
         case 0: // top left
             pos = pos - blur;
             break;
-        case 1: // top right
+        case 1: // bot left
+            pos.x = pos.x - blur;
+            pos.y = pos.y + blur;
+            break;
+        case 2: // top right
             pos.x = pos.x + blur;
             pos.y = pos.y - blur;
             break;
-        case 2: // bot right
+        case 3: // bot right
             pos = pos + blur;
             break;
-        case 3: // bot left
-            pos.x = pos.x - blur;
-            pos.y = pos.y + blur;
     }
 
     outColor = inVertexColor;
     outParams = inInstanceParams;
     outBoxBounds = inInstanceBoxBounds;
 
-    gl_Position = ubo.proj * transform * vec4(pos, 0.0, 1.0);
+    gl_Position = ubo.proj * inInstanceTransform * vec4(pos, 0.0, 1.0);
 }

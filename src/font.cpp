@@ -40,7 +40,7 @@ font::font(display &_display, const uint8_t *_addr, size_t _size, uvec2 _atlas_s
 }
 
 font::~font() {
-  for (auto & cache : caches_)
+  for (auto &cache : caches_)
     hb_font_destroy(cache.second.font_);
   FT_Done_Face(face_);
 }
@@ -200,16 +200,16 @@ bool shaper::bake(shared_buffer &_buff, result &_dst, const shared_font &_font, 
       size_t vertices_offset = 4 * drawn_codepoints;
       tex_mask::vertex *vertice = vertices + vertices_offset;
       vertice[0] = {{x0, y0}, {s0, t0}};
-      vertice[1] = {{x1, y0}, {s1, t0}};
-      vertice[2] = {{x1, y1}, {s1, t1}};
-      vertice[3] = {{x0, y1}, {s0, t1}};
+      vertice[1] = {{x0, y1}, {s0, t1}};
+      vertice[2] = {{x1, y0}, {s1, t0}};
+      vertice[3] = {{x1, y1}, {s1, t1}};
 
       uint16_t *indice = indices + 6 * drawn_codepoints;
       indice[0] = vertices_offset + 0;
       indice[1] = vertices_offset + 1;
       indice[2] = vertices_offset + 2;
-      indice[3] = vertices_offset + 0;
-      indice[4] = vertices_offset + 2;
+      indice[3] = vertices_offset + 2;
+      indice[4] = vertices_offset + 1;
       indice[5] = vertices_offset + 3;
 
       drawn_codepoints++;

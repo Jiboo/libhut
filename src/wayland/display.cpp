@@ -48,7 +48,7 @@ void hut::pointer_handle_enter(void *_data, wl_pointer *_pointer, uint32_t, wl_s
     d->pointer_current_.first = _surface;
     d->pointer_current_.second = w->second;
     assert(d->pointer_current_.second);
-    uvec2 coords {wl_fixed_to_int(_sx), wl_fixed_to_int(_sy)};
+    vec2 coords {wl_fixed_to_int(_sx), wl_fixed_to_int(_sy)};
     d->pointer_current_.second->mouse_lastmove_ = coords;
     d->pointer_current_.second->on_mouse.fire(0, MMOVE, coords);
   }
@@ -67,7 +67,7 @@ void hut::pointer_handle_motion(void *_data, wl_pointer *_pointer, uint32_t, wl_
   //std::cout << "pointer_handle_motion " << _pointer << ", " << wl_fixed_to_double(_sx) << ", " << wl_fixed_to_double(_sy) << std::endl;
   auto d = static_cast<display*>(_data);
   if (_pointer == d->pointer_) {
-    uvec2 coords {wl_fixed_to_int(_sx), wl_fixed_to_int(_sy)};
+    vec2 coords {wl_fixed_to_int(_sx), wl_fixed_to_int(_sy)};
     assert(d->pointer_current_.second);
     d->pointer_current_.second->mouse_lastmove_ = coords;
     d->pointer_current_.second->on_mouse.fire(0, MMOVE, coords);

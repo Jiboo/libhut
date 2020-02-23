@@ -7,6 +7,7 @@ project(hut)
 
 #add_definitions(-DHUT_PREFER_NONDESCRETE_DEVICES)
 #set(HUT_PREFER_XCB 1)
+set(HUT_COMPILE_DEMOS 1)
 
 ###########################################################
 # Debug
@@ -39,7 +40,7 @@ set(LIBS ${LIBS} ${Vulkan_LIBRARIES})
 
 find_package(GLM REQUIRED)
 include_directories(${GLM_INCLUDE_DIRS})
-add_definitions("-DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_LEFT_HANDED")
+add_definitions("-DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_RADIANS -DGLM_FORCE_LEFT_HANDED")
 
 find_package(PNG REQUIRED)
 include_directories(${PNG_INCLUDE_DIRS})
@@ -141,6 +142,11 @@ if(CMAKE_BUILD_TYPE MATCHES DEBUG)
   set(GLSLANG_VALIDATOR_FLAGS "${GLSLANG_VALIDATOR_FLAGS} -g")
 endif()
 
+if(HUT_COMPILE_DEMOS)
+  file(GLOB HUT_SHADER_SOURCES_DEMOS tst/spv/*.frag tst/spv/*.vert)
+  set(HUT_SHADER_SOURCES ${HUT_SHADER_SOURCES} ${HUT_SHADER_SOURCES_DEMOS})
+endif()
+
 foreach(shader_source ${HUT_SHADER_SOURCES})
   get_filename_component(shader_target ${shader_source} NAME)
   string(REPLACE ".frag" ".frag.spv" shader_target "${shader_target}")
@@ -184,26 +190,31 @@ add_dependencies(hut hutgen_spv_cpp)
 message("Configuring demo build targets...")
 ###########################################################
 
-file(GLOB HUT_DEMO_PNG tst/png/*.png)
-add_custom_command(OUTPUT ${HUT_GEN_DIR}/demo_png.cpp
-    COMMAND $<TARGET_FILE:gen_res> demo_png ${HUT_GEN_DIR} ${HUT_DEMO_PNG}
-    DEPENDS gen_res ${HUT_DEMO_PNG}
-    COMMENT "Generating demo_png.cpp")
+if(HUT_COMPILE_DEMOS)
+  file(GLOB HUT_DEMO_PNG tst/png/*.png)
+  add_custom_command(OUTPUT ${HUT_GEN_DIR}/demo_png.cpp
+      COMMAND $<TARGET_FILE:gen_res> demo_png ${HUT_GEN_DIR} ${HUT_DEMO_PNG}
+      DEPENDS gen_res ${HUT_DEMO_PNG}
+      COMMENT "Generating demo_png.cpp")
 
-file(GLOB_RECURSE HUT_DEMO_TTF tst/ttf/*.ttf)
-add_custom_command(OUTPUT ${HUT_GEN_DIR}/demo_ttf.cpp
-    COMMAND $<TARGET_FILE:gen_res> demo_ttf ${HUT_GEN_DIR} ${HUT_DEMO_TTF}
-    DEPENDS gen_res ${HUT_DEMO_TTF}
-    COMMENT "Generating demo_ttf.cpp")
+  file(GLOB_RECURSE HUT_DEMO_TTF tst/ttf/*.ttf)
+  add_custom_command(OUTPUT ${HUT_GEN_DIR}/demo_ttf.cpp
+      COMMAND $<TARGET_FILE:gen_res> demo_ttf ${HUT_GEN_DIR} ${HUT_DEMO_TTF}
+      DEPENDS gen_res ${HUT_DEMO_TTF}
+      COMMENT "Generating demo_ttf.cpp")
 
-add_custom_target(gen_demo_cpp DEPENDS
-    ${HUT_GEN_DIR}/demo_png.cpp
-    ${HUT_GEN_DIR}/demo_ttf.cpp
-    COMMENT "Checked if resources need regeneration")
+  add_custom_target(gen_demo_cpp DEPENDS
+      ${HUT_GEN_DIR}/demo_png.cpp
+      ${HUT_GEN_DIR}/demo_ttf.cpp
+      COMMENT "Checked if resources need regeneration")
 
-add_executable(demo tst/demo.cpp ${HUT_GEN_DIR}/demo_png.cpp ${HUT_GEN_DIR}/demo_ttf.cpp)
-target_link_libraries(demo hut)
-add_dependencies(demo gen_demo_cpp)
+  add_executable(demo tst/demo.cpp ${HUT_GEN_DIR}/demo_png.cpp ${HUT_GEN_DIR}/demo_ttf.cpp)
+  target_link_libraries(demo hut)
+  add_dependencies(demo gen_demo_cpp)
+
+  add_executable(demo3d tst/demo3d.cpp)
+  target_link_libraries(demo3d hut)
+endif()
 
 if(GTEST_FOUND)
   ###########################################################

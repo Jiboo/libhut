@@ -230,7 +230,7 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
           button = 1;
         else if (_umsg == WM_MBUTTONDOWN)
           button = 2;
-        uvec2 pos{LOWORD(_lparam), HIWORD(_lparam)};
+        vec2 pos{LOWORD(_lparam), HIWORD(_lparam)};
         w->on_mouse.fire(button, MDOWN, pos);
       }
       return 0;
@@ -249,7 +249,7 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
           button = 1;
         else if (_umsg == WM_MBUTTONUP)
           button = 2;
-        uvec2 pos{LOWORD(_lparam), HIWORD(_lparam)};
+        vec2 pos{LOWORD(_lparam), HIWORD(_lparam)};
         w->on_mouse.fire(button, MUP, pos);
       }
       return 0;
@@ -266,7 +266,7 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
           button = 1;
         else if (_wparam & MK_MBUTTON)
           button = 2;
-        uvec2 pos{LOWORD(_lparam), HIWORD(_lparam)};
+        vec2 pos{LOWORD(_lparam), HIWORD(_lparam)};
         w->on_mouse.fire(button, MMOVE, pos);
       }
       return 0;
