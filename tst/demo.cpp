@@ -226,7 +226,7 @@ int main(int, char **) {
   std::atomic_bool tex1_ready = false, tex2_ready = false;
 
   std::thread load_res([&]() {
-    tex1 = image::load_png(d, demo_png::tex1_png.data(), demo_png::tex1_png.size());
+    tex1 = image::load_png(d, demo_png::tex1_png);
     tex_pipeline->bind(0, ubo, tex1, samp);
     tex_rgb_pipeline->bind(0, ubo, tex1, samp);
     tex_rgba_pipeline->bind(0, ubo, tex1, samp);
@@ -242,7 +242,7 @@ int main(int, char **) {
     tex1->update({100, 100, 200, 200}, data, tex1->pixel_size() * 100);
     w.invalidate(true);  // will force to call on_draw on the next frame
 
-    tex2 = image::load_png(d, demo_png::tex2_png.data(), demo_png::tex2_png.size());
+    tex2 = image::load_png(d, demo_png::tex2_png);
     tex_pipeline->bind(1, ubo, tex2, samp);
     tex_rgb_pipeline->bind(1, ubo, tex2, samp);
     tex_rgba_pipeline->bind(1, ubo, tex2, samp);

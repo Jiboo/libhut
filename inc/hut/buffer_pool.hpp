@@ -31,6 +31,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <span>
 
 #include <vulkan/vulkan.h>
 
@@ -48,7 +49,35 @@ class buffer_pool {
 
   struct range;
 
+  struct alloc {
+    VkBuffer buffer_;
+    VkDeviceMemory memory_;
+    uint offset_;
+    range *node_;
+  };
+
  public:
+  /** Advance update usage, to write directly to staging memory. */
+  class updator {
+    friend buffer_pool;
+
+    buffer_pool &parent_;
+    VkBuffer target_;
+    buffer_pool::alloc staging_;
+    uint offset_;
+    std::span<uint8_t> data_;
+
+    updator(buffer_pool &_parent, VkBuffer _target, buffer_pool::alloc _staging, std::span<uint8_t> _data, uint _offset)
+      : parent_(_parent), target_(_target), staging_(_staging), offset_(_offset), data_(_data) {
+    }
+
+  public:
+    ~updator() { parent_.finalize_update(*this); }
+
+    uint8_t *data() { return data_.data(); }
+    size_t size_bytes() { return data_.size_bytes(); }
+  };
+
   /** Holds a reference to a zone in a buffer. */
   template <typename T>
   class ref {
@@ -73,6 +102,11 @@ class buffer_pool {
       pool_.do_update(buffer_, offset_ + _byte_offset, _byte_size, (void *)_data);
     }
 
+    updator update_raw_indirect(uint _byte_offset, uint _byte_size) {
+      assert(_byte_offset + _byte_size <= byte_size_);
+      return pool_.prepare_update(buffer_, offset_ + _byte_offset, _byte_size);
+    }
+
     void update_some(uint _index_offset, uint _count, const T *_src) {
       const uint byte_offset = _index_offset * sizeof(T);
       const uint byte_size = _count * sizeof(T);
@@ -85,7 +119,7 @@ class buffer_pool {
 
     void update_subone(uint _index_offset, uint _byte_offset, uint _byte_size, void *_data) {
       const uint byte_offset = _index_offset * sizeof(T) + _byte_offset;
-      assert(_byte_size < sizeof(T));
+      assert(_byte_size <= sizeof(T));
       update_raw(byte_offset, _byte_size, (void *)_data);
     }
 
@@ -103,7 +137,7 @@ class buffer_pool {
       return byte_size_ / sizeof(T);
     }
 
-    uint byte_size() const {
+    uint size_bytes() const {
       return byte_size_;
     }
   };
@@ -132,13 +166,6 @@ class buffer_pool {
     uint offset_, size_;
   };
 
-  struct alloc {
-    VkBuffer buffer_;
-    VkDeviceMemory memory_;
-    uint offset_;
-    range *node_;
-  };
-
   struct buffer {
     uint size_;
     VkBuffer buffer_;
@@ -154,6 +181,8 @@ class buffer_pool {
   alloc do_alloc(uint _size, uint _align = 4);
   void do_free(range *_ref);
   void do_update(VkBuffer _buf, uint _offset, uint _size, const void *_data);
+  updator prepare_update(VkBuffer _buf, uint _offset, uint _size);
+  void finalize_update(updator &_update);
   void clear_ranges();
 };
 

@@ -32,6 +32,8 @@
 #include "hut/font.hpp"
 #include "hut/window.hpp"
 
+#include "demo_shaders.hpp"
+
 using namespace hut;
 
 struct vp_ubo {
@@ -80,8 +82,8 @@ namespace hut::details {
         VkVertexInputAttributeDescription{.location = 5, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<rgb>(3)},
     };
 
-    constexpr static decltype(hutgen_spv::rgb_frag_spv) &frag_bytecode_ = hutgen_spv::rgb_frag_spv;
-    constexpr static decltype(hutgen_spv::rgb3d_vert_spv) &vert_bytecode_ = hutgen_spv::rgb3d_vert_spv;
+    constexpr static decltype(hut_shaders::rgb_frag_spv) &frag_bytecode_ = hut_shaders::rgb_frag_spv;
+    constexpr static decltype(demo_shaders::rgb3d_vert_spv) &vert_bytecode_ = demo_shaders::rgb3d_vert_spv;
   };
 }
 using rgb3d = hut::details::rgb3d::impl;

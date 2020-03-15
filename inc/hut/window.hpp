@@ -140,6 +140,9 @@ class window {
   VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
   std::vector<VkImage> swapchain_images_;
   std::vector<VkImageView> swapchain_imageviews_;
+#ifdef HUT_ENABLE_WINDOW_DEPTH_BUFFER
+  shared_image depth_;
+#endif
   std::vector<VkFramebuffer> swapchain_fbos_;
   std::vector<VkCommandBuffer> primary_cbs_;
   std::vector<VkCommandBuffer> cbs_;

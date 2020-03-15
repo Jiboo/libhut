@@ -29,6 +29,7 @@
 
 #include <memory>
 #include <set>
+#include <span>
 
 #include <vulkan/vulkan.h>
 
@@ -42,11 +43,20 @@ class image {
   friend class display;
   friend class font;
   template<typename TDetails, typename... TExtraBindings> friend class drawable;
+  friend class window;
 
  public:
-  static std::shared_ptr<image> load_png(display &, const uint8_t *_data, size_t _size);
+  static constexpr VkImageTiling defaultImageTiling = VkImageTiling::VK_IMAGE_TILING_LINEAR;
+  static constexpr VkImageUsageFlags defaultImageUsageFlags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
-  image(display &_display, uvec2 _size, VkFormat _format);
+  static std::shared_ptr<image> load_png(display &, std::span<const uint8_t> _data);
+  static std::shared_ptr<image> load_raw(display &, uvec2 _extent, std::span<const uint8_t> _data, VkFormat _format,
+                                         VkImageTiling _tiling = defaultImageTiling,
+                                         VkImageUsageFlags _flags = defaultImageUsageFlags);
+
+  image(display &_display, uvec2 _size, VkFormat _format,
+      VkImageTiling _tiling = defaultImageTiling, VkImageUsageFlags _flags = defaultImageUsageFlags,
+      VkImageAspectFlags _aspect = VK_IMAGE_ASPECT_COLOR_BIT);
   ~image();
 
   void update(ivec4 _coords, uint8_t *_data, uint _srcRowPitch);
@@ -55,7 +65,7 @@ class image {
   uvec2 size() const { return size_; }
 
  private:
-  static VkDeviceSize create(display &_display, uint32_t _width, uint32_t _height, VkFormat _format,
+  static VkMemoryRequirements create(display &_display, uint32_t _width, uint32_t _height, VkFormat _format,
                              VkImageTiling _tiling, VkImageUsageFlags _usage, VkMemoryPropertyFlags _properties,
                              VkImage *_image, VkDeviceMemory *_imageMemory);
 
@@ -66,6 +76,7 @@ class image {
 
   VkImage image_;
   VkDeviceMemory memory_;
+  VkMemoryRequirements mem_reqs_;
   VkImageView view_;
 };
 

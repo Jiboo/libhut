@@ -67,6 +67,32 @@ void buffer_pool::do_update(VkBuffer _buf, uint _offset, uint _size, const void 
   });
 }
 
+buffer_pool::updator buffer_pool::prepare_update(VkBuffer _buf, uint _offset, uint _size) {
+  std::lock_guard lk(display_.staging_mutex_);
+  auto staging = display_.staging_->do_alloc(_size, 4);
+  void *target;
+  vkMapMemory(display_.device_, staging.memory_, staging.offset_, _size, 0, &target);
+  return updator(*this, _buf, staging, std::span<uint8_t>{(uint8_t*)target, _size}, _offset);
+}
+
+void buffer_pool::finalize_update(updator &_update) {
+  vkUnmapMemory(display_.device_, _update.staging_.memory_);
+
+  display::buffer_copy copy = {};
+  copy.size = _update.data_.size_bytes();
+  copy.srcOffset = _update.staging_.offset_;
+  copy.dstOffset = _update.offset_;
+  copy.source = _update.staging_.buffer_;
+  copy.destination = _update.target_;
+
+  std::lock_guard lk(display_.staging_mutex_);
+  display_.staging_jobs_++;
+  display_.preflush([this, copy]() {
+    display_.stage_copy(copy);
+    display_.staging_jobs_--;
+  });
+}
+
 buffer_pool::buffer *buffer_pool::grow(uint _size) {
   buffers_.resize(buffers_.size() + 1);
   buffer &result = buffers_.back();

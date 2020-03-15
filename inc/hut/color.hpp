@@ -31,29 +31,15 @@
 
 namespace hut {
 
-enum blend_mode {
-  BLEND_NONE = -1,
-  BLEND_CLEAR = 0,
-  BLEND_SRC = 1,
-  BLEND_DST = 2,
-  BLEND_XOR = 3,
-  BLEND_ATOP = 4,
-  BLEND_OVER = 5,
-  BLEND_IN = 6,
-  BLEND_OUT = 7,
-  BLEND_DST_ATOP = 8,
-  BLEND_DST_OVER = 9,
-  BLEND_DST_IN = 10,
-  BLEND_DST_OUT = 11
-};
-
 inline uint format_size(VkFormat _format) {
   switch (_format) {
     case VK_FORMAT_R8_UNORM: return 1;
     case VK_FORMAT_R8G8_UNORM: return 2;
+    case VK_FORMAT_R8G8B8_UNORM: return 3;
     case VK_FORMAT_R8G8B8A8_UNORM: return 4;
+
     default:
-      throw std::runtime_error("can't determine size of VkFormat");
+      return 0;
   }
 }
 

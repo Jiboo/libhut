@@ -60,8 +60,25 @@
 
 namespace hut {
 
-#if defined(VK_USE_PLATFORM_WIN32_KHR)
-LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
+#if defined(VK_USE_PLATFORM_XCB_KHR)
+#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+  void registry_handler(void*, wl_registry*, uint32_t, const char*, uint32_t);
+  void seat_handler(void*, wl_seat*, uint32_t);
+  void handle_xdg_configure(void*, xdg_surface*, uint32_t);
+  void handle_toplevel_configure(void*, xdg_toplevel*, int32_t, int32_t, wl_array*);
+  void handle_toplevel_close(void*, xdg_toplevel*);
+  void pointer_handle_enter(void*, wl_pointer*, uint32_t, wl_surface*, wl_fixed_t, wl_fixed_t);
+  void pointer_handle_leave(void*, wl_pointer*, uint32_t, wl_surface*);
+  void pointer_handle_motion(void*, wl_pointer*, uint32_t, wl_fixed_t, wl_fixed_t);
+  void pointer_handle_button(void*, wl_pointer*, uint32_t, uint32_t, uint32_t, uint32_t);
+  void pointer_handle_axis(void*, wl_pointer*, uint32_t, uint32_t, wl_fixed_t);
+  void keyboard_handle_keymap(void*, wl_keyboard*, uint32_t, int, uint32_t);
+  void keyboard_handle_enter(void*, wl_keyboard*, uint32_t, wl_surface*, wl_array*);
+  void keyboard_handle_leave(void*, wl_keyboard*, uint32_t, wl_surface*);
+  void keyboard_handle_key(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t);
+  void keyboard_handle_modifiers(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+#elif defined(VK_USE_PLATFORM_WIN32_KHR)
+  LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
 #endif
 
 class display {

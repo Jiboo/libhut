@@ -51,8 +51,8 @@ void png_mem_read(png_structp _png_ptr, png_bytep _target, png_size_t _size) {
   a->data_ += _size;
 }
 
-std::shared_ptr<image> image::load_png(display &_display, const uint8_t *_data, size_t _size) {
-  if (png_sig_cmp((png_bytep)_data, 0, 8))
+std::shared_ptr<image> image::load_png(display &_display, std::span<const uint8_t> _data) {
+  if (png_sig_cmp((png_bytep)_data.data(), 0, 8))
     throw std::runtime_error("load_png: invalid data, can't validate PNG signature");
 
   png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
@@ -73,8 +73,8 @@ std::shared_ptr<image> image::load_png(display &_display, const uint8_t *_data, 
   }
 
   png_ctx ctx;
-  ctx.data_ = _data;
-  ctx.size_ = _size;
+  ctx.data_ = _data.data();
+  ctx.size_ = _data.size_bytes();
   png_set_read_fn(png_ptr, (png_voidp)&ctx, png_mem_read);
 
   png_read_info(png_ptr, info_ptr);
@@ -189,25 +189,77 @@ std::shared_ptr<image> image::load_png(display &_display, const uint8_t *_data, 
   return dst;
 }
 
+std::shared_ptr<image> image::load_raw(display &_display, uvec2 _extent,
+    std::span<const uint8_t> _data, VkFormat _format, VkImageTiling _tiling, VkImageUsageFlags _flags) {
+  auto dst = std::make_shared<image>(_display, _extent, _format, _tiling, _flags);
+
+  uint offsetAlignment = std::max(VkDeviceSize(4), _display.device_props_.limits.optimalBufferCopyOffsetAlignment);
+  {
+    std::lock_guard lk(_display.staging_mutex_);
+    buffer_pool::alloc alloc = _display.staging_->do_alloc(_data.size_bytes(), offsetAlignment);
+
+    void *data;
+    vkMapMemory(_display.device_, alloc.memory_, alloc.offset_, _data.size_bytes(), 0, &data);
+    auto dataBytes = reinterpret_cast<uint8_t *>(data);
+    memcpy(dataBytes, _data.data(), _data.size_bytes());
+    vkUnmapMemory(_display.device_, alloc.memory_);
+
+    VkImageSubresourceLayers subResource = {};
+    subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    subResource.baseArrayLayer = 0;
+    subResource.layerCount = 1;
+    subResource.mipLevel = 0;
+
+    display::buffer2image_copy copy = {};
+    copy.imageExtent = {_extent.x, _extent.y, 1};
+    copy.imageOffset = {0, 0, 0};
+    copy.bufferRowLength = _extent.x;
+    copy.bufferImageHeight = _extent.y;
+    copy.bufferOffset = alloc.offset_;
+    copy.imageSubresource = subResource;
+    copy.source = alloc.buffer_;
+    copy.destination = dst->image_;
+    copy.pixelSize = dst->pixel_size_;
+
+    display::image_transition pre = {};
+    pre.destination = dst->image_;
+    pre.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    pre.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    display::image_transition post = {};
+    post.destination = dst->image_;
+    post.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    post.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    _display.staging_jobs_++;
+    _display.preflush([&_display, pre, post, copy] {
+      _display.stage_transition(pre);
+      _display.stage_copy(copy);
+      _display.stage_transition(post);
+      _display.staging_jobs_--;
+    });
+  }
+  return dst;
+}
+
 image::~image() {
   vkDestroyImageView(display_.device_, view_, nullptr);
   vkDestroyImage(display_.device_, image_, nullptr);
   vkFreeMemory(display_.device_, memory_, nullptr);
 }
 
-image::image(display &_display, uvec2 _size, VkFormat _format)
+image::image(display &_display, uvec2 _size, VkFormat _format, VkImageTiling _tiling, VkImageUsageFlags _flags,
+             VkImageAspectFlags _aspect)
     : display_(_display), size_(_size), format_(_format) {
   pixel_size_ = format_size(_format);
-  create(_display, _size.x, _size.y, _format, VK_IMAGE_TILING_LINEAR,
-         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &image_,
-         &memory_);
+  mem_reqs_ = create(_display, _size.x, _size.y, _format, _tiling, _flags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+      &image_, &memory_);
 
   VkImageViewCreateInfo viewInfo = {};
   viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
   viewInfo.image = image_;
   viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
   viewInfo.format = _format;
-  viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  viewInfo.subresourceRange.aspectMask = _aspect;
   viewInfo.subresourceRange.baseMipLevel = 0;
   viewInfo.subresourceRange.levelCount = 1;
   viewInfo.subresourceRange.baseArrayLayer = 0;
@@ -216,6 +268,9 @@ image::image(display &_display, uvec2 _size, VkFormat _format)
   if (vkCreateImageView(_display.device_, &viewInfo, nullptr, &view_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create texture image view!");
   }
+
+  if (_aspect & VK_IMAGE_ASPECT_DEPTH_BIT)
+    return;
 
   display::image_transition pre = {};
   pre.destination = image_;
@@ -233,13 +288,14 @@ image::image(display &_display, uvec2 _size, VkFormat _format)
   display_.staging_jobs_++;
   display_.preflush([this, pre, post, clear]() {
     display_.stage_transition(pre);
-    display_.stage_clear(clear);
+    if (this->pixel_size_ != 0)
+      display_.stage_clear(clear);
     display_.stage_transition(post);
     display_.staging_jobs_--;
   });
 }
 
-VkDeviceSize image::create(display &_display, uint32_t _width, uint32_t _height, VkFormat _format,
+VkMemoryRequirements image::create(display &_display, uint32_t _width, uint32_t _height, VkFormat _format,
                            VkImageTiling _tiling, VkImageUsageFlags _usage, VkMemoryPropertyFlags _properties,
                            VkImage *_image, VkDeviceMemory *_imageMemory) {
   VkImageCreateInfo imageInfo = {};
@@ -276,7 +332,7 @@ VkDeviceSize image::create(display &_display, uint32_t _width, uint32_t _height,
 
   vkBindImageMemory(_display.device_, *_image, *_imageMemory, 0);
 
-  return memReq.size;
+  return memReq;
 }
 
 void image::update(ivec4 _coords, uint8_t *_data, uint _src_row_pitch) {

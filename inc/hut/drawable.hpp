@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "hutgen_spv.hpp"
+#include "hut_shaders.hpp"
 
 #include "hut/buffer_pool.hpp"
 #include "hut/color.hpp"
@@ -135,7 +135,7 @@ private:
       throw std::runtime_error("[sample] failed to create pipeline layout!");
   }
 
-  void init_pipeline(uvec2 _default_size) {
+  void init_pipeline(uvec2 _default_size, VkPrimitiveTopology _topology) {
     VkPipelineShaderStageCreateInfo vert_stage_info = {};
     vert_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vert_stage_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -159,7 +159,7 @@ private:
 
     VkPipelineInputAssemblyStateCreateInfo assembly_create_info = {};
     assembly_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    assembly_create_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    assembly_create_info.topology = _topology;
     assembly_create_info.primitiveRestartEnable = VK_FALSE;
 
     VkViewport viewport = {};
@@ -246,7 +246,6 @@ private:
     pipelineInfo.pViewportState = &viewport_create_info;
     pipelineInfo.pRasterizationState = &rasterizer_create_info;
     pipelineInfo.pMultisampleState = &msaa_create_info;
-    pipelineInfo.pDepthStencilState = nullptr;
     pipelineInfo.pColorBlendState = &blend_create_info;
     pipelineInfo.pDynamicState = &dynamic_states_create_info;
     pipelineInfo.layout = layout_;
@@ -255,18 +254,35 @@ private:
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;  // Optional
 
+#ifdef HUT_ENABLE_WINDOW_DEPTH_BUFFER
+    VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.minDepthBounds = 0.0f; // Optional
+    depthStencil.maxDepthBounds = 1.0f; // Optional
+    depthStencil.stencilTestEnable = VK_FALSE;
+    depthStencil.front = {}; // Optional
+    depthStencil.back = {}; // Optional
+
+    pipelineInfo.pDepthStencilState = &depthStencil;
+#endif
+
     if (vkCreateGraphicsPipelines(window_.display_.device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_) != VK_SUCCESS)
       throw std::runtime_error("failed to create graphics pipeline!");
   }
 
 public:
-  explicit drawable(window &_window) : window_(_window) {
+  explicit drawable(window &_window, VkPrimitiveTopology _topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+      : window_(_window) {
     init_pools();
     init_descriptor_layout();
     alloc_next_descriptors(1);
     init_shaders();
     init_pipeline_layout();
-    init_pipeline(_window.size());
+    init_pipeline(_window.size(), _topology);
   }
 
   virtual ~drawable() {
@@ -461,8 +477,8 @@ namespace details {
         VkVertexInputAttributeDescription{.location = 5, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<rgb>(3)},
     };
 
-    constexpr static decltype(hutgen_spv::rgb_frag_spv) &frag_bytecode_ = hutgen_spv::rgb_frag_spv;
-    constexpr static decltype(hutgen_spv::rgb_vert_spv) &vert_bytecode_ = hutgen_spv::rgb_vert_spv;
+    constexpr static decltype(hut_shaders::rgb_frag_spv) &frag_bytecode_ = hut_shaders::rgb_frag_spv;
+    constexpr static decltype(hut_shaders::rgb_vert_spv) &vert_bytecode_ = hut_shaders::rgb_vert_spv;
   };
 
   struct rgba {
@@ -504,8 +520,8 @@ namespace details {
         VkVertexInputAttributeDescription{.location = 5, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<rgb>(3)},
     };
 
-    constexpr static decltype(hutgen_spv::rgba_frag_spv) &frag_bytecode_ = hutgen_spv::rgba_frag_spv;
-    constexpr static decltype(hutgen_spv::rgba_vert_spv) &vert_bytecode_ = hutgen_spv::rgba_vert_spv;
+    constexpr static decltype(hut_shaders::rgba_frag_spv) &frag_bytecode_ = hut_shaders::rgba_frag_spv;
+    constexpr static decltype(hut_shaders::rgba_vert_spv) &vert_bytecode_ = hut_shaders::rgba_vert_spv;
   };
 
   struct tex {
@@ -552,8 +568,8 @@ namespace details {
         VkVertexInputAttributeDescription{.location = 5, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(3)},
     };
 
-    constexpr static decltype(hutgen_spv::tex_frag_spv) &frag_bytecode_ = hutgen_spv::tex_frag_spv;
-    constexpr static decltype(hutgen_spv::tex_vert_spv) &vert_bytecode_ = hutgen_spv::tex_vert_spv;
+    constexpr static decltype(hut_shaders::tex_frag_spv) &frag_bytecode_ = hut_shaders::tex_frag_spv;
+    constexpr static decltype(hut_shaders::tex_vert_spv) &vert_bytecode_ = hut_shaders::tex_vert_spv;
   };
 
   struct tex_rgb {
@@ -602,8 +618,8 @@ namespace details {
         VkVertexInputAttributeDescription{.location = 6, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(3)},
     };
 
-    constexpr static decltype(hutgen_spv::tex_rgb_frag_spv) &frag_bytecode_ = hutgen_spv::tex_rgb_frag_spv;
-    constexpr static decltype(hutgen_spv::tex_rgb_vert_spv) &vert_bytecode_ = hutgen_spv::tex_rgb_vert_spv;
+    constexpr static decltype(hut_shaders::tex_rgb_frag_spv) &frag_bytecode_ = hut_shaders::tex_rgb_frag_spv;
+    constexpr static decltype(hut_shaders::tex_rgb_vert_spv) &vert_bytecode_ = hut_shaders::tex_rgb_vert_spv;
   };
 
   struct tex_rgba {
@@ -652,8 +668,8 @@ namespace details {
         VkVertexInputAttributeDescription{.location = 6, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(3)},
     };
 
-    constexpr static decltype(hutgen_spv::tex_rgba_frag_spv) &frag_bytecode_ = hutgen_spv::tex_rgba_frag_spv;
-    constexpr static decltype(hutgen_spv::tex_rgba_vert_spv) &vert_bytecode_ = hutgen_spv::tex_rgba_vert_spv;
+    constexpr static decltype(hut_shaders::tex_rgba_frag_spv) &frag_bytecode_ = hut_shaders::tex_rgba_frag_spv;
+    constexpr static decltype(hut_shaders::tex_rgba_vert_spv) &vert_bytecode_ = hut_shaders::tex_rgba_vert_spv;
   };
 
   struct tex_mask {
@@ -702,8 +718,8 @@ namespace details {
         VkVertexInputAttributeDescription{.location = 6, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(instance, color_)},
     };
 
-    constexpr static decltype(hutgen_spv::tex_mask_frag_spv) &frag_bytecode_ = hutgen_spv::tex_mask_frag_spv;
-    constexpr static decltype(hutgen_spv::tex_mask_vert_spv) &vert_bytecode_ = hutgen_spv::tex_mask_vert_spv;
+    constexpr static decltype(hut_shaders::tex_mask_frag_spv) &frag_bytecode_ = hut_shaders::tex_mask_frag_spv;
+    constexpr static decltype(hut_shaders::tex_mask_vert_spv) &vert_bytecode_ = hut_shaders::tex_mask_vert_spv;
   };
 
   struct box_rgba {
@@ -749,8 +765,8 @@ namespace details {
         VkVertexInputAttributeDescription{.location = 7, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(instance, box_bounds_)},
     };
 
-    constexpr static decltype(hutgen_spv::box_rgba_frag_spv) &frag_bytecode_ = hutgen_spv::box_rgba_frag_spv;
-    constexpr static decltype(hutgen_spv::box_rgba_vert_spv) &vert_bytecode_ = hutgen_spv::box_rgba_vert_spv;
+    constexpr static decltype(hut_shaders::box_rgba_frag_spv) &frag_bytecode_ = hut_shaders::box_rgba_frag_spv;
+    constexpr static decltype(hut_shaders::box_rgba_vert_spv) &vert_bytecode_ = hut_shaders::box_rgba_vert_spv;
   };
 }  // namespace details
 
