@@ -135,7 +135,11 @@ private:
       throw std::runtime_error("[sample] failed to create pipeline layout!");
   }
 
-  void init_pipeline(uvec2 _default_size, VkPrimitiveTopology _topology) {
+  void init_pipeline(uvec2 _default_size, VkPrimitiveTopology _topology
+#ifdef HUT_ENABLE_WINDOW_DEPTH_BUFFER
+      , VkCompareOp _depthCompare
+#endif
+    ) {
     VkPipelineShaderStageCreateInfo vert_stage_info = {};
     vert_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vert_stage_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -259,7 +263,7 @@ private:
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencil.depthTestEnable = VK_TRUE;
     depthStencil.depthWriteEnable = VK_TRUE;
-    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+    depthStencil.depthCompareOp = _depthCompare;
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.minDepthBounds = 0.0f; // Optional
     depthStencil.maxDepthBounds = 1.0f; // Optional
@@ -267,7 +271,7 @@ private:
     depthStencil.front = {}; // Optional
     depthStencil.back = {}; // Optional
 
-    pipelineInfo.pDepthStencilState = &depthStencil;
+    pipelineInfo.pDepthStencilState = _depthCompare == VK_COMPARE_OP_NEVER ? nullptr : &depthStencil;
 #endif
 
     if (vkCreateGraphicsPipelines(window_.display_.device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_) != VK_SUCCESS)
@@ -275,14 +279,22 @@ private:
   }
 
 public:
-  explicit drawable(window &_window, VkPrimitiveTopology _topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+  explicit drawable(window &_window, VkPrimitiveTopology _topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+#ifdef HUT_ENABLE_WINDOW_DEPTH_BUFFER
+    , VkCompareOp _depthCompare = VK_COMPARE_OP_LESS
+#endif
+      )
       : window_(_window) {
     init_pools();
     init_descriptor_layout();
     alloc_next_descriptors(1);
     init_shaders();
     init_pipeline_layout();
-    init_pipeline(_window.size(), _topology);
+    init_pipeline(_window.size(), _topology
+#ifdef HUT_ENABLE_WINDOW_DEPTH_BUFFER
+        , _depthCompare
+#endif
+    );
   }
 
   virtual ~drawable() {
