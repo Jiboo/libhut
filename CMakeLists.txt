@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.14)
 project(hut)
 
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_COMPILE_WARNING_MODE HIGH)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/deps/")
+
 ###########################################################
 # Configuration
 ###########################################################
@@ -17,21 +21,15 @@ set(HUT_COMPILE_DEMOS 1)
 
 #set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+if(NOT WIN32)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION_DEBUG)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_DEBUG_STAGING)
+endif()
 
 ###########################################################
 message("Checking for required dependencies...")
 ###########################################################
-
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_COMPILE_WARNING_MODE HIGH)
-if(NOT WIN32)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
-endif()
-
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/deps/")
 
 find_package(Threads REQUIRED)
 set(HUT_LIBS ${HUT_LIBS} ${CMAKE_THREAD_LIBS_INIT})
@@ -74,10 +72,10 @@ if(GTEST_FOUND)
   set(HUT_INCLUDES_TEST ${HUT_INCLUDES} ${GTEST_INCLUDE_DIR})
 endif()
 
-find_package(Wayland)
-find_package(XCB COMPONENTS xcb xcb-keysyms)
+find_package(Wayland COMPONENTS wayland-client)
+find_package(XCB COMPONENTS xcb xcb-keysyms xcb-util)
 
-if(WAYLAND_CLIENT_FOUND AND NOT HUT_PREFER_XCB)
+if(Wayland_FOUND AND NOT HUT_PREFER_XCB)
   message("Using Wayland as backend, checking for other dependencies..")
 
   find_package(XkbCommon REQUIRED)
@@ -88,6 +86,16 @@ if(WAYLAND_CLIENT_FOUND AND NOT HUT_PREFER_XCB)
   find_package(PkgConfig REQUIRED)
   pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
   pkg_get_variable(WAYLAND_SCANNER wayland-scanner wayland_scanner)
+  if (NOT WAYLAND_PROTOCOLS_DIR)
+    message(FATAL_ERROR "Couldn't locate wayland-protocols directory, might need to install")
+  else()
+    message("Found wayland-protocols: ${WAYLAND_PROTOCOLS_DIR}")
+  endif()
+  if (NOT WAYLAND_SCANNER)
+    message(FATAL_ERROR "Couldn't locate wayland-scanner, might need to install")
+  else()
+    message("Found wayland-scanner: ${WAYLAND_SCANNER}")
+  endif()
   set(XDG_SHELL_PROTOCOL ${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml)
   set(WAYLAND_GEN_DIR ${CMAKE_BINARY_DIR}/wayland)
   file(MAKE_DIRECTORY ${WAYLAND_GEN_DIR})
@@ -103,12 +111,12 @@ if(WAYLAND_CLIENT_FOUND AND NOT HUT_PREFER_XCB)
     DEPENDS ${XDG_SHELL_PROTOCOL})
   set(HUT_INCLUDES ${HUT_INCLUDES} ${WAYLAND_GEN_DIR})
 
-  set(HUT_INCLUDES ${HUT_INCLUDES} ${WAYLAND_CLIENT_INCLUDE_DIR})
-  set(HUT_LIBS ${HUT_LIBS} ${WAYLAND_CLIENT_LIBRARIES})
+  set(HUT_INCLUDES ${HUT_INCLUDES} ${WAYLAND_INCLUDE_DIRS})
+  set(HUT_LIBS ${HUT_LIBS} ${WAYLAND_LIBRARIES})
   file(GLOB HUT_WAYLAND_SOURCES src/wayland/*.cpp)
   set(HUT_SOURCES ${HUT_SOURCES} ${HUT_WAYLAND_SOURCES} ${XDG_SHELL_CLIENT_INCLUDE} ${XDG_SHELL_SOURCE})
   set(HUT_PLATFORM WAYLAND)
-elseif(XCB_FOUND AND xcb-keysyms_FOUND)
+elseif(XCB_FOUND)
   message("Using XCB as backend")
   set(HUT_INCLUDES ${HUT_INCLUDES} ${XCB_INCLUDE_DIRS})
   set(HUT_LIBS ${HUT_LIBS} ${XCB_LIBRARIES})
@@ -195,6 +203,7 @@ set(HUT_SOURCES ${HUT_SOURCES} ${HUT_COMMON_SOURCES})
 
 set(HUT_INCLUDES ${HUT_INCLUDES} inc)
 add_library(hut ${HUT_HEADERS} ${HUT_SOURCES} ${hut_shaders_cpp})
+#message("Done configuring hut, includes: ${HUT_INCLUDES}, libs: ${HUT_LIBS}, defs: ${HUT_DEFINITIONS}")
 target_link_libraries(hut ${HUT_LIBS})
 target_compile_definitions(hut PUBLIC ${HUT_DEFINITIONS})
 target_include_directories(hut PUBLIC ${HUT_INCLUDES})

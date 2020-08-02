@@ -36,6 +36,7 @@
 #define XK_LATIN1
 #include <X11/keysymdef.h>
 #include <xcb/xcb.h>
+#include <xcb/xcb_event.h>
 
 #include "hut/display.hpp"
 #include "hut/window.hpp"
@@ -79,21 +80,22 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
   class atom_item_t {
    public:
     xcb_atom_t &ref_;
-    xcb_intern_atom_cookie_t cookie_;
+    xcb_intern_atom_cookie_t cookie_ = {0};
 
-    atom_item_t(xcb_atom_t &_ref) : ref_(_ref) {
+    explicit atom_item_t(xcb_atom_t &_ref) : ref_(_ref) {
     }
   };
 
   std::map<std::string, atom_item_t> atoms = {
-      {"WM_PROTOCOLS",                 {atom_wm_}},
-      {"WM_DELETE_WINDOW",             {atom_close_}},
-      {"WM_CHANGE_STATE",              {atom_change_state_}},
-      {"_NET_WM_STATE",                {atom_state_}},
-      {"_NET_WM_STATE_REMOVE",         {atom_rstate_}},
-      {"_NET_WM_STATE_MAXIMIZED_VERT", {atom_maximizeh_}},
-      {"_NET_WM_STATE_MAXIMIZED_HORZ", {atom_maximizev_}},
-      {"_MOTIF_WM_HINTS",              {atom_window_hints_}},
+      {"WM_PROTOCOLS",                 atom_item_t{atom_wm_}},
+      {"WM_DELETE_WINDOW",             atom_item_t{atom_close_}},
+      {"WM_CHANGE_STATE",              atom_item_t{atom_change_state_}},
+      {"_NET_WM_STATE",                atom_item_t{atom_state_}},
+      {"_NET_WM_STATE_REMOVE",         atom_item_t{atom_rstate_}},
+      {"_NET_WM_STATE_HIDDEN",         atom_item_t{atom_hstate_}},
+      {"_NET_WM_STATE_MAXIMIZED_VERT", atom_item_t{atom_maximizeh_}},
+      {"_NET_WM_STATE_MAXIMIZED_HORZ", atom_item_t{atom_maximizev_}},
+      {"_MOTIF_WM_HINTS",              atom_item_t{atom_window_hints_}},
   };
 
   for (auto &atom : atoms)
@@ -244,198 +246,246 @@ void dispatch_keysym(window *w, uint16_t _mask, xcb_keysym_t _ks, bool press) {
     w->on_char.fire(mapped);
 }
 
+template<typename TResult>
+hut::span<TResult> get_atom_values(xcb_connection_t *_con, xcb_window_t _win, xcb_atom_t _other, xcb_atom_t _type, size_t _count) {
+  // https://stackoverflow.com/questions/37568142/what-event-is-used-for-maximizing-minimizing
+  xcb_get_property_cookie_t cookie = xcb_get_property(_con, false, _win, _other, _type, 0, sizeof(TResult) / 4 * _count);
+  xcb_generic_error_t *err = nullptr;
+  xcb_get_property_reply_t *reply = xcb_get_property_reply(_con, cookie, &err);
+  TResult *data = reinterpret_cast<TResult*>(xcb_get_property_value(reply));
+  size_t size = xcb_get_property_value_length(reply) / sizeof(xcb_atom_t);
+  return {data, size};
+}
+
+std::string_view get_atom_name(xcb_connection_t *_con, xcb_atom_t _other) {
+  xcb_get_atom_name_cookie_t cookie = xcb_get_atom_name(_con, _other);
+  xcb_get_atom_name_reply_t *reply = xcb_get_atom_name_reply(_con, cookie, nullptr);
+  const char *data = xcb_get_atom_name_name(reply);
+  size_t size = static_cast<size_t>(xcb_get_atom_name_name_length(reply));
+  return {data, size};
+}
+
 int display::dispatch() {
   if (windows_.empty())
     throw std::runtime_error("dispatch called without any window");
 
   bool loop = true;
+  display::time_point now;
 
   while (loop) {
     xcb_generic_event_t *event = xcb_wait_for_event(connection_);
-    auto now = display::clock::now();
-    if (event != nullptr) {
-      switch (event->response_type & ~0x80) {
-      case XCB_EXPOSE: {
-        xcb_expose_event_t *e = reinterpret_cast<xcb_expose_event_t *>(event);
+    do {
+        now = display::clock::now();
+        if (event != nullptr) {
+          switch (event->response_type & ~0x80U) {
+          case XCB_EXPOSE: {
+            const auto *e = reinterpret_cast<xcb_expose_event_t *>(event);
 
-        auto it = windows_.find(e->window);
-        if (it != windows_.end()) {
-          uvec4 r{e->x, e->y, e->x + e->width, e->y + e->height};
-          window *w = it->second;
-          w->on_expose.fire(r);
-          w->redraw(now);
-        }
-      } break;
+            auto it = windows_.find(e->window);
+            if (it != windows_.end()) {
+              uvec4 r{e->x, e->y, e->x + e->width, e->y + e->height};
+              window *w = it->second;
+              if (!w->minimized_) {
+                w->on_expose.fire(r);
+                w->redraw(now);
+              }
+            }
+          } break;
 
-      case XCB_CONFIGURE_NOTIFY: {
-        xcb_configure_notify_event_t *e = reinterpret_cast<xcb_configure_notify_event_t *>(event);
+          case XCB_CONFIGURE_NOTIFY: {
+            const auto *e = reinterpret_cast<xcb_configure_notify_event_t *>(event);
 
-        auto it = windows_.find(e->event);
-        if (it != windows_.end()) {
-          window *w = it->second;
-          uvec2 s{e->width, e->height};
-          if (s != w->size_) {
-            w->dispatch_resize(s);
-          }
-        }
-      } break;
+            auto it = windows_.find(e->event);
+            if (it != windows_.end()) {
+              window *w = it->second;
+              uvec2 s{e->width, e->height};
+              if (s != w->size_) {
+                w->dispatch_resize(s);
+              }
+            }
+          } break;
 
-      case XCB_KEY_PRESS: {
-        xcb_key_press_event_t *e = reinterpret_cast<xcb_key_press_event_t *>(event);
+          case XCB_KEY_PRESS: {
+            auto *e = reinterpret_cast<xcb_key_press_event_t *>(event);
 
-        int col;
-        if (e->state & 0x3)
-          col = 1;  // shift || caps-lock
-        else if (e->state & 0x80)
-          col = 4;  // alt-gr
-        else
-          col = 0;
+            int col;
+            if (e->state & 0x3U)
+              col = 1;  // shift || caps-lock
+            else if (e->state & 0x80U)
+              col = 4;  // alt-gr
+            else
+              col = 0;
 
-        auto keysym = xcb_key_press_lookup_keysym(keysyms_, e, col);
-        if (keysym >= 0xff80 && keysym <= 0xffb9 && keysym != XK_KP_Enter) {
-          col = e->state & 0x10 ? 1 : 0;
-          keysym = xcb_key_press_lookup_keysym(keysyms_, e, col);
-        }
+            auto keysym = xcb_key_press_lookup_keysym(keysyms_, e, col);
+            if (keysym >= 0xff80 && keysym <= 0xffb9 && keysym != XK_KP_Enter) {
+              col = e->state & 0x10U ? 1 : 0;
+              keysym = xcb_key_press_lookup_keysym(keysyms_, e, col);
+            }
 
-        auto it = windows_.find(e->event);
-        if (it != windows_.end())
-          dispatch_keysym(it->second, e->state, keysym, true);
-      } break;
+            auto it = windows_.find(e->event);
+            if (it != windows_.end())
+              dispatch_keysym(it->second, e->state, keysym, true);
+          } break;
 
-      case XCB_KEY_RELEASE: {
-        xcb_key_press_event_t *e = reinterpret_cast<xcb_key_release_event_t *>(event);
+          case XCB_KEY_RELEASE: {
+            auto *e = reinterpret_cast<xcb_key_release_event_t *>(event);
 
-        int col;
-        if (e->state & 0x80)
-          col = 4;  // alt-gr
-        else if (e->state & 0x3)
-          col = 1;  // shift || caps-lock
-        else
-          col = 0;
+            int col;
+            if (e->state & 0x80U)
+              col = 4;  // alt-gr
+            else if (e->state & 0x3U)
+              col = 1;  // shift || caps-lock
+            else
+              col = 0;
 
-        auto keysym = xcb_key_press_lookup_keysym(keysyms_, e, col);
-        if (keysym >= 0xff80 && keysym <= 0xffb9 && keysym != XK_KP_Enter) {
-          col = e->state & 0x10 ? 1 : 0;
-          keysym = xcb_key_press_lookup_keysym(keysyms_, e, col);
-        }
-        if (keysym == 0) {
-          keysym = xcb_key_press_lookup_keysym(keysyms_, e, 0);
-        }
+            auto keysym = xcb_key_press_lookup_keysym(keysyms_, e, col);
+            if (keysym >= 0xff80 && keysym <= 0xffb9 && keysym != XK_KP_Enter) {
+              col = e->state & 0x10U ? 1 : 0;
+              keysym = xcb_key_press_lookup_keysym(keysyms_, e, col);
+            }
+            if (keysym == 0) {
+              keysym = xcb_key_press_lookup_keysym(keysyms_, e, 0);
+            }
 
-        auto it = windows_.find(e->event);
-        if (it != windows_.end())
-          dispatch_keysym(it->second, e->state, keysym, false);
-      } break;
+            auto it = windows_.find(e->event);
+            if (it != windows_.end())
+              dispatch_keysym(it->second, e->state, keysym, false);
+          } break;
 
-      case XCB_BUTTON_PRESS: {
-        xcb_button_press_event_t *e = reinterpret_cast<xcb_button_press_event_t *>(event);
+          case XCB_BUTTON_PRESS: {
+            const auto *e = reinterpret_cast<xcb_button_press_event_t *>(event);
 
-        auto it = windows_.find(e->event);
-        if (it != windows_.end()) {
-          window *w = it->second;
-          uint8_t b = e->detail;
-          auto c = vec2{e->event_x, e->event_y};
-          mouse_event_type t;
-          switch (e->detail) {
-          case 4:
-            t = mouse_event_type::MWHEEL_UP;
-            break;
-          case 5:
-            t = mouse_event_type::MWHEEL_DOWN;
-            break;
+            auto it = windows_.find(e->event);
+            if (it != windows_.end()) {
+              window *w = it->second;
+              uint8_t b = e->detail;
+              auto c = vec2{e->event_x, e->event_y};
+              mouse_event_type t;
+              switch (e->detail) {
+              case 4:
+                t = mouse_event_type::MWHEEL_UP;
+                break;
+              case 5:
+                t = mouse_event_type::MWHEEL_DOWN;
+                break;
+              default:
+                t = mouse_event_type::MDOWN;
+                break;
+              }
+              w->on_mouse.fire(b, t, c);
+            }
+          } break;
+
+          case XCB_BUTTON_RELEASE: {
+            const auto *e = reinterpret_cast<xcb_button_release_event_t *>(event);
+
+            auto it = windows_.find(e->event);
+            if (it != windows_.end()) {
+              window *w = it->second;
+              uint8_t b = e->detail;
+              if (b < 4 || b > 5) {  // ignore wheel events
+                auto c = vec2{e->event_x, e->event_y};
+                w->on_mouse.fire(b, mouse_event_type::MUP, c);
+              }
+            }
+          } break;
+
+          case XCB_MOTION_NOTIFY: {
+            const auto *e = reinterpret_cast<xcb_motion_notify_event_t *>(event);
+
+            auto it = windows_.find(e->event);
+            if (it != windows_.end()) {
+              window *w = it->second;
+              auto c = vec2{e->event_x, e->event_y};
+              uint8_t b = e->detail;
+              w->on_mouse.fire(b, mouse_event_type::MMOVE, c);
+            }
+          } break;
+
+          case XCB_CLIENT_MESSAGE: {
+            const auto *e = reinterpret_cast<xcb_client_message_event_t *>(event);
+
+            auto it = windows_.find(e->window);
+            if (it != windows_.end()) {
+              if (e->data.data32[0] == atom_close_) {
+                window *w = it->second;
+                if (!w->on_close.fire())
+                  w->close();
+              }
+            }
+          } break;
+
+          case XCB_FOCUS_IN: {
+            const auto *e = reinterpret_cast<xcb_focus_in_event_t *>(event);
+
+            auto it = windows_.find(e->event);
+            if (it != windows_.end()) {
+              window *w = it->second;
+              w->on_focus.fire();
+            }
+          } break;
+
+          case XCB_FOCUS_OUT: {
+            const auto *e = reinterpret_cast<xcb_focus_out_event_t *>(event);
+
+            auto it = windows_.find(e->event);
+            if (it != windows_.end()) {
+              window *w = it->second;
+              w->on_blur.fire();
+            }
+          } break;
+
+          case XCB_MAP_NOTIFY: {
+            const auto *e = reinterpret_cast<xcb_map_notify_event_t *>(event);
+
+            auto it = windows_.find(e->event);
+            if (it != windows_.end()) {
+              window *w = it->second;
+              w->on_resume.fire();
+            }
+          } break;
+
+          case XCB_UNMAP_NOTIFY: {
+            const auto *e = reinterpret_cast<xcb_unmap_notify_event_t *>(event);
+
+            auto it = windows_.find(e->event);
+            if (it != windows_.end()) {
+              window *w = it->second;
+              w->on_pause.fire();
+            }
+          } break;
+
+          case XCB_PROPERTY_NOTIFY: {
+            const auto *e = reinterpret_cast<xcb_property_notify_event_t *>(event);
+
+            auto it = windows_.find(e->window);
+            if (it != windows_.end()) {
+              window *w = it->second;
+              if (e->atom == atom_state_) {
+                auto state_vals = get_atom_values<xcb_atom_t>(connection_, e->window, atom_state_, XCB_ATOM_ATOM, 32);
+                bool is_minimized = std::find(state_vals.begin(), state_vals.end(), atom_hstate_) != state_vals.end();
+                if (is_minimized && !w->minimized_) {
+                  w->minimized_ = true;
+                  w->on_pause.fire();
+                }
+                else if (!is_minimized && w->minimized_) {
+                  w->minimized_ = false;
+                  w->on_resume.fire();
+                  w->invalidate(true);
+                }
+              }
+            }
+          } break;
+
           default:
-            t = mouse_event_type::MDOWN;
+            //std::cout << "ingored even of type: " << xcb_event_get_label(event->response_type) << std::endl;
             break;
           }
-          w->on_mouse.fire(b, t, c);
         }
-      } break;
-
-      case XCB_BUTTON_RELEASE: {
-        xcb_button_release_event_t *e = reinterpret_cast<xcb_button_release_event_t *>(event);
-
-        auto it = windows_.find(e->event);
-        if (it != windows_.end()) {
-          window *w = it->second;
-          uint8_t b = e->detail;
-          if (b < 4 || b > 5) {  // ignore wheel events
-            auto c = vec2{e->event_x, e->event_y};
-            w->on_mouse.fire(b, mouse_event_type::MUP, c);
-          }
-        }
-      } break;
-
-      case XCB_MOTION_NOTIFY: {
-        xcb_motion_notify_event_t *e = reinterpret_cast<xcb_motion_notify_event_t *>(event);
-
-        auto it = windows_.find(e->event);
-        if (it != windows_.end()) {
-          window *w = it->second;
-          auto c = vec2{e->event_x, e->event_y};
-          uint8_t b = e->detail;
-          w->on_mouse.fire(b, mouse_event_type::MMOVE, c);
-        }
-      } break;
-
-      case XCB_CLIENT_MESSAGE: {
-        xcb_client_message_event_t *e = reinterpret_cast<xcb_client_message_event_t *>(event);
-
-        auto it = windows_.find(e->window);
-        if (it != windows_.end()) {
-          if (e->data.data32[0] == atom_close_) {
-            window *w = it->second;
-            if (!w->on_close.fire())
-              w->close();
-          }
-        }
-      } break;
-
-      case XCB_FOCUS_IN: {
-        xcb_focus_in_event_t *e = reinterpret_cast<xcb_focus_in_event_t *>(event);
-
-        auto it = windows_.find(e->event);
-        if (it != windows_.end()) {
-          window *w = it->second;
-          w->on_focus.fire();
-        }
-      } break;
-
-      case XCB_FOCUS_OUT: {
-        xcb_focus_out_event_t *e = reinterpret_cast<xcb_focus_out_event_t *>(event);
-
-        auto it = windows_.find(e->event);
-        if (it != windows_.end()) {
-          window *w = it->second;
-          w->on_blur.fire();
-        }
-      } break;
-
-      case XCB_MAP_NOTIFY: {
-        xcb_map_notify_event_t *e = reinterpret_cast<xcb_map_notify_event_t *>(event);
-
-        auto it = windows_.find(e->event);
-        if (it != windows_.end()) {
-          window *w = it->second;
-          w->on_resume.fire();
-        }
-      } break;
-
-      case XCB_UNMAP_NOTIFY: {
-        xcb_unmap_notify_event_t *e = reinterpret_cast<xcb_unmap_notify_event_t *>(event);
-
-        auto it = windows_.find(e->event);
-        if (it != windows_.end()) {
-          window *w = it->second;
-          w->on_pause.fire();
-        }
-      } break;
-
-      default:
-        break;
-      }
-    }
-    free(event);
-    process_posts(now);
+        free(event);
+        event = xcb_poll_for_event(connection_);
+    } while (event != nullptr);
+    process_posts(clock::now());
     if (windows_.empty())
       loop = false;
   }

@@ -68,7 +68,7 @@ class font {
     vec2 bearing_ {0, 0};
     uvec2 bounds_ {0, 0};
 
-    inline explicit operator bool() { return bounds_.x > 0 && bounds_.y > 0; }
+    inline explicit operator bool() const { return bounds_.x > 0 && bounds_.y > 0; }
   };
 
   using glyph_cache_t = std::unordered_map<uint , glyph>;
@@ -76,7 +76,7 @@ class font {
     glyph_cache_t glyphs_;
     hb_font_t *font_ = nullptr;
 
-    explicit operator bool() { return font_ != nullptr; }
+    explicit operator bool() const { return font_ != nullptr; }
   };
 
   FT_Face face_;
@@ -99,12 +99,15 @@ class shaper {
 
  public:
   struct result {
+    friend class shaper;
+
     tex_mask::shared_vertices vertices_;
     tex_mask::shared_indices indices_;
-    uint indices_count_;
+    uint indices_count_ = 0;
+    uint vertices_count_ = 0;
     vec4 bbox_;
 
-    inline explicit operator bool() {
+    inline explicit operator bool() const {
       return vertices_ && indices_;
     }
   };

@@ -298,7 +298,7 @@ int main(int, char **) {
     return false;
   });
 
-  w.on_frame.connect([&](display::duration _delta) {
+  w.on_frame.connect([&](display::duration) {
     d.post([&w](auto){
       w.invalidate(false);  // asks for another frame without a redraw to continue animations and fps count
     });
@@ -343,7 +343,7 @@ int main(int, char **) {
     if (roboto) {
       double fps = double(frameCount) / std::chrono::duration<double>(diffReport).count();
       char buff[32];
-      snprintf(buff, sizeof(buff), "fps: %.2f", fps);
+      snprintf(buff, sizeof(buff), "fps: %f", fps);
       if (s.bake(b, fps_counter, roboto, 12, buff))
         w.invalidate(true);
       if (diffReport > 1s) {
@@ -364,7 +364,7 @@ int main(int, char **) {
     return false;
   });
 
-  w.on_expose.connect([](const uvec4 &_bounds) {
+  w.on_expose.connect([](const uvec4 &) {
     //std::cout << "expose " << to_string(_bounds) << std::endl;
     return false;
   });

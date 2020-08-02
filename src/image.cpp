@@ -51,7 +51,7 @@ void png_mem_read(png_structp _png_ptr, png_bytep _target, png_size_t _size) {
   a->data_ += _size;
 }
 
-std::shared_ptr<image> image::load_png(display &_display, std::span<const uint8_t> _data) {
+std::shared_ptr<image> image::load_png(display &_display, span<const uint8_t> _data) {
   if (png_sig_cmp((png_bytep)_data.data(), 0, 8))
     throw std::runtime_error("load_png: invalid data, can't validate PNG signature");
 
@@ -190,7 +190,7 @@ std::shared_ptr<image> image::load_png(display &_display, std::span<const uint8_
 }
 
 std::shared_ptr<image> image::load_raw(display &_display, uvec2 _extent,
-    std::span<const uint8_t> _data, VkFormat _format, VkImageTiling _tiling, VkImageUsageFlags _flags) {
+    span<const uint8_t> _data, VkFormat _format, VkImageTiling _tiling, VkImageUsageFlags _flags) {
   auto dst = std::make_shared<image>(_display, _extent, _format, _tiling, _flags);
 
   uint offsetAlignment = std::max(VkDeviceSize(4), _display.device_props_.limits.optimalBufferCopyOffsetAlignment);
@@ -335,9 +335,9 @@ VkMemoryRequirements image::create(display &_display, uint32_t _width, uint32_t 
   return memReq;
 }
 
-void image::update(ivec4 _coords, uint8_t *_data, uint _src_row_pitch) {
-  uint width = _coords[2] - _coords[0];
-  uint height = _coords[3] - _coords[1];
+void image::update(ivec4 coords, uint8_t *_data, uint _src_row_pitch) {
+  uint width = coords[2] - coords[0];
+  uint height = coords[3] - coords[1];
   assert (width > 0 && height > 0);
   uint buffer_align = display_.device_props_.limits.optimalBufferCopyRowPitchAlignment;
   uint offset_align = std::max(VkDeviceSize(4), display_.device_props_.limits.optimalBufferCopyOffsetAlignment);
@@ -372,7 +372,7 @@ void image::update(ivec4 _coords, uint8_t *_data, uint _src_row_pitch) {
   post.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   display::buffer2image_copy copy = {};
   copy.imageExtent = {(uint)width, (uint)height, 1};
-  copy.imageOffset = {_coords[0], _coords[1], 0};
+  copy.imageOffset = {coords[0], coords[1], 0};
   copy.bufferRowLength = buffer_row_pitch / pixel_size_;
   copy.bufferImageHeight = height;
   copy.bufferOffset = alloc.offset_;

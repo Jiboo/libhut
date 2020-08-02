@@ -25,8 +25,6 @@
  * SOFTWARE.
  */
 
-#include <malloc.h>
-
 #include <atomic>
 #include <chrono>
 #include <iostream>
@@ -54,7 +52,7 @@ void hut::pointer_handle_enter(void *_data, wl_pointer *_pointer, uint32_t, wl_s
   }
 }
 
-void hut::pointer_handle_leave(void *_data, wl_pointer *_pointer, uint32_t, wl_surface *) {
+void hut::pointer_handle_leave(void *_data, wl_pointer *_pointer, uint32_t, [[maybe_unused]] wl_surface *_surface) {
   //std::cout << "pointer_handle_leave " << _pointer << ", " << _surface << std::endl;
   auto d = static_cast<display*>(_data);
   if (_pointer == d->pointer_) {
@@ -123,15 +121,19 @@ void hut::keyboard_handle_enter(void *_data, wl_keyboard *_keyboard, uint32_t, w
   if (_keyboard == d->keyboard_ && w != d->windows_.cend()) {
     d->keyboard_current_.first = _surface;
     d->keyboard_current_.second = w->second;
+    w->second->on_focus.fire();
   }
 }
 
-void hut::keyboard_handle_leave(void *_data, wl_keyboard *_keyboard, uint32_t, wl_surface *) {
+void hut::keyboard_handle_leave(void *_data, wl_keyboard *_keyboard, uint32_t, wl_surface *_surface) {
   //std::cout << "keyboard_handle_enter " << _keyboard << ", " << _surface << std::endl;
   auto d = static_cast<display*>(_data);
+  auto w = d->windows_.find(_surface);
   if (_keyboard == d->keyboard_) {
     d->keyboard_current_.first = nullptr;
     d->keyboard_current_.second = nullptr;
+    if (w != d->windows_.end())
+      w->second->on_blur.fire();
   }
 }
 
@@ -182,7 +184,7 @@ keysym map_keysym(xkb_keysym_t _keysym) {
   switch(_keysym) {
     case XKB_KEY_Tab: return KTAB;
     case XKB_KEY_Alt_L: return KALT_LEFT;
-    case XKB_KEY_Alt_R: return KALT_RIGHT;
+    case XKB_KEY_Alt_R: [[fallthrough]];
     case XKB_KEY_ISO_Level3_Shift: return KALT_RIGHT;
     case XKB_KEY_Control_L: return KCTRL_LEFT;
     case XKB_KEY_Control_R: return KCTRL_RIGHT;
@@ -228,9 +230,9 @@ void hut::keyboard_handle_key(void *_data, wl_keyboard *_keyboard, uint32_t, uin
     const auto cleaned = clean_kp_keysyms(ks);
     const auto mapped = map_keysym(cleaned);
     const bool remapped =  mapped != cleaned && mapped != KENUM_END;
-    const bool ctrl = d->kb_mod_mask_ & 4;
-    const bool alt = d->kb_mod_mask_ & 262152;
-    const bool altgr = d->kb_mod_mask_ & 128;
+    const bool ctrl = d->kb_mod_mask_ & 4U;
+    const bool alt = d->kb_mod_mask_ & 262152U;
+    const bool altgr = d->kb_mod_mask_ & 128U;
 
     w->on_key.fire(mapped, _state != 0);
     if (!remapped && !ctrl && !alt && !altgr && _state != 0)
@@ -247,25 +249,25 @@ void hut::keyboard_handle_modifiers(void *_data, wl_keyboard *, uint32_t, uint32
 
 void hut::seat_handler(void *_data, wl_seat *_seat, uint32_t _caps) {
   //std::cout << "seat_handler " << _seat << ", " << _caps << std::endl;
-  static const wl_keyboard_listener keyboard_listener = {
+  static const wl_keyboard_listener wl_keyboard_listeners = {
       keyboard_handle_keymap, keyboard_handle_enter, keyboard_handle_leave, keyboard_handle_key, keyboard_handle_modifiers, nullptr
   };
 
-  static const wl_pointer_listener pointer_listener = {
+  static const wl_pointer_listener wl_pointer_listeners = {
       pointer_handle_enter, pointer_handle_leave, pointer_handle_motion, pointer_handle_button, pointer_handle_axis, nullptr, nullptr, nullptr, nullptr
   };
 
   auto d = static_cast<display*>(_data);
   if ((_caps & WL_SEAT_CAPABILITY_POINTER) && !d->pointer_) {
     d->pointer_ = wl_seat_get_pointer(_seat);
-    wl_pointer_add_listener(d->pointer_, &pointer_listener, _data);
+    wl_pointer_add_listener(d->pointer_, &wl_pointer_listeners, _data);
   } else if (!(_caps & WL_SEAT_CAPABILITY_POINTER) && d->pointer_) {
     wl_pointer_destroy(d->pointer_);
     d->pointer_ = nullptr;
   }
   if (_caps & WL_SEAT_CAPABILITY_KEYBOARD) {
     d->keyboard_ = wl_seat_get_keyboard(_seat);
-    wl_keyboard_add_listener(d->keyboard_, &keyboard_listener, _data);
+    wl_keyboard_add_listener(d->keyboard_, &wl_keyboard_listeners, _data);
   } else if (!(_caps & WL_SEAT_CAPABILITY_KEYBOARD)) {
     wl_keyboard_destroy(d->keyboard_);
     d->keyboard_ = nullptr;
@@ -281,12 +283,12 @@ void handle_xdg_ping(void *, struct xdg_wm_base *_shell, uint32_t _serial) {
 }
 
 void hut::registry_handler(void *_data, wl_registry *_registry, uint32_t _id,
-                                  const char *_interface, uint32_t) {
+                                  const char *_interface, [[maybe_unused]] uint32_t _version) {
   //std::cout << "registry_handler " << _id << ", " << _interface << ", " << _version << std::endl;
-  static const wl_seat_listener seat_listener = {
+  static const wl_seat_listener wl_seat_listeners = {
       seat_handler, seat_name
   };
-  static const xdg_wm_base_listener xdg_wm_base_listener = {
+  static const xdg_wm_base_listener xdg_wm_base_listeners = {
       handle_xdg_ping,
   };
 
@@ -296,11 +298,11 @@ void hut::registry_handler(void *_data, wl_registry *_registry, uint32_t _id,
   }
   else if (strcmp(_interface, "xdg_wm_base") == 0) {
     d->xdg_wm_base_ = static_cast<xdg_wm_base*>(wl_registry_bind(_registry, _id, &xdg_wm_base_interface, 1));
-    xdg_wm_base_add_listener(d->xdg_wm_base_, &xdg_wm_base_listener, _data);
+    xdg_wm_base_add_listener(d->xdg_wm_base_, &xdg_wm_base_listeners, _data);
   }
   else if (strcmp(_interface, "wl_seat") == 0) {
     d->seat_ = static_cast<wl_seat*>(wl_registry_bind(_registry, _id, &wl_seat_interface, 1));
-    wl_seat_add_listener(d->seat_, &seat_listener, _data);
+    wl_seat_add_listener(d->seat_, &wl_seat_listeners, _data);
   }
 }
 

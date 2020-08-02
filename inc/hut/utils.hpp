@@ -37,12 +37,19 @@
 #include <string>
 #include <vector>
 
+#if __has_include("span")
+#include <span>
+#else
+#include "span.hpp"
+#endif
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/io.hpp>
 #include <glm/gtx/scalar_multiplication.hpp>
+#include <glm/gtx/hash.hpp>
 
 namespace hut {
 
@@ -54,6 +61,14 @@ namespace hut {
   class image;
   class sampler;
   class window;
+
+#if __has_include("span")
+  template<typename TType, size_t TExtent = std::dynamic_extent>
+  using span = std::span<TType, TExtent>;
+#else
+  template<typename TType, size_t TExtent = TCB_SPAN_NAMESPACE_NAME::dynamic_extent>
+  using span = TCB_SPAN_NAMESPACE_NAME::span<TType, TExtent>;
+#endif
 
   using shared_buffer = std::shared_ptr<buffer_pool>;
   using shared_font = std::shared_ptr<font>;
@@ -78,20 +93,16 @@ inline std::string to_utf8(char32_t ch) {
   }
 }
 
-inline std::wstring to_wstring(const std::string &utf8) {
-  static std::wstring_convert<std::codecvt_utf8<wchar_t>> convert;
-  return convert.from_bytes(utf8);
-}
-
 inline char32_t to_utf32(char16_t c) {
   //https://unicode.org/faq/utf_bom.html#utf16-4
   typedef uint16_t UTF16;
   typedef uint32_t UTF32;
-  const UTF32 LEAD_OFFSET = 0xD800 - (0x10000 >> 10);
-  const UTF32 SURROGATE_OFFSET = 0x10000 - (0xD800 << 10) - 0xDC00;
-  UTF16 lead = LEAD_OFFSET + (c >> 10);
-  UTF16 trail = 0xDC00 + (c & 0x3FF);
-  UTF32 codepoint = (lead << 10) + trail + SURROGATE_OFFSET;
+  const UTF32 LEAD_OFFSET = 0xD800 - (0x10000U >> 10U);
+  const UTF32 SURROGATE_OFFSET = 0x10000 - (0xD800U << 10U) - 0xDC00;
+  const UTF16 uc = c;
+  const UTF16 lead = LEAD_OFFSET + (uc >> 10U);
+  const UTF16 trail = 0xDC00 + (uc & 0x3FFU);
+  const UTF32 codepoint = (lead << 10U) + trail + SURROGATE_OFFSET;
   return codepoint;
 }
 
@@ -149,7 +160,7 @@ class sstream {
 
  public:
   template <typename T>
-  sstream(const T &_base) {
+  explicit sstream(const T &_base) {
     stream_ << _base;
   }
 
@@ -159,13 +170,40 @@ class sstream {
     return *this;
   }
 
-  std::string str() {
+  std::string str() const {
     return stream_.str();
   }
 
-  operator std::string() {
+  operator std::string() const {
     return str();
   }
 };
+
+struct dur_t {
+    std::chrono::nanoseconds time;
+
+    template <typename TRep, typename TPeriod>
+    explicit dur_t(std::chrono::duration<TRep, TPeriod> pTime)
+            : time(std::chrono::duration_cast<std::chrono::nanoseconds>(pTime)) {}
+};
+inline std::ostream &operator<<(std::ostream &pOS, const dur_t &pDur) {
+    auto lNano = pDur.time.count();
+    if (lNano < 1000)
+        return pOS << lNano << "ns";
+    else if (lNano < 1'000'000)
+        return pOS << lNano / 1000.0 << "µs";
+    else if (lNano < 1'000'000'000)
+        return pOS << lNano / 1'000'000.0 << "ms";
+    return pOS << lNano / 1'000'000'000.0 << "s";
+}
+
+inline void hash_combine(std::size_t&) { }
+
+template <typename T, typename... Rest>
+inline void hash_combine(std::size_t &_seed, const T &_v, Rest &&..._rest) {
+  std::hash<T> hasher;
+  _seed ^= hasher(_v) + 0x9e3779b9 + (_seed<<6U) + (_seed>>2U);
+  hash_combine(_seed, std::forward<Rest>(_rest)...);
+}
 
 }  // namespace hut

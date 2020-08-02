@@ -24,29 +24,30 @@ foreach (comp ${XCB_FIND_COMPONENTS})
 
   #message("searching for ${comp}: ${headername} and ${libname}")
 
-  find_path(${compname}_INCLUDE_DIR NAMES ${headername}
-      HINTS
-      ${PC_${comp}_INCLUDEDIR}
-      ${PC_${comp}_INCLUDE_DIRS}
-      )
-
-  find_library(${compname}_LIBRARY NAMES ${libname}
-      HINTS
-      ${PC_${comp}_LIBDIR}
-      ${PC_${comp}_LIBRARY_DIRS}
-      )
-
-  find_package_handle_standard_args(${comp}
-      FOUND_VAR ${comp}_FOUND
-      REQUIRED_VARS ${compname}_INCLUDE_DIR ${compname}_LIBRARY)
-  mark_as_advanced(${compname}_INCLUDE_DIR ${compname}_LIBRARY)
-
-  list(APPEND XCB_INCLUDE_DIRS ${${compname}_INCLUDE_DIR})
-  list(APPEND XCB_LIBRARIES ${${compname}_LIBRARY})
-
-  if (NOT ${comp}_FOUND)
+  if(NOT PC_${comp}_FOUND)
+    message("Couldn't find xcb component: ${comp}")
     set(XCB_FOUND false)
-  endif ()
+  else()
+    find_path(${compname}_INCLUDE_DIR NAMES ${headername}
+        HINTS
+        ${PC_${comp}_INCLUDEDIR}
+        ${PC_${comp}_INCLUDE_DIRS}
+        )
+
+    find_library(${compname}_LIBRARY NAMES ${libname}
+        HINTS
+        ${PC_${comp}_LIBDIR}
+        ${PC_${comp}_LIBRARY_DIRS}
+        )
+
+    list(APPEND XCB_INCLUDE_DIRS ${${compname}_INCLUDE_DIR})
+    list(APPEND XCB_LIBRARIES ${${compname}_LIBRARY})
+  endif()
 endforeach ()
+
+find_package_handle_standard_args(XCB
+        FOUND_VAR XCB_FOUND
+        REQUIRED_VARS XCB_INCLUDE_DIRS XCB_LIBRARIES)
+mark_as_advanced(XCB_INCLUDE_DIRS XCB_LIBRARIES)
 
 list(REMOVE_DUPLICATES XCB_INCLUDE_DIRS)

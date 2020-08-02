@@ -109,7 +109,7 @@ class window {
   event<char32_t /*utf32_char*/> on_char;
   static std::string name_key(keysym c);
 
-  window(display &_display);
+  explicit window(display &_display);
   ~window();
 
   void close();
@@ -146,7 +146,7 @@ class window {
   std::vector<VkFramebuffer> swapchain_fbos_;
   std::vector<VkCommandBuffer> primary_cbs_;
   std::vector<VkCommandBuffer> cbs_;
-  std::vector<bool> dirty_;
+  std::vector<uint8_t> dirty_;
 
   VkSemaphore sem_available_ = VK_NULL_HANDLE;
   VkSemaphore sem_rendered_ = VK_NULL_HANDLE;
@@ -154,6 +154,7 @@ class window {
   uvec2 size_;
   vec4 clear_color_ = {0.0f, 0.0f, 0.0f, 1.0f};
   display::time_point last_frame_ = display::clock::now();
+  bool minimized_ = false;
 
   void init_vulkan_surface();
   void dispatch_resize(const uvec2 &);
@@ -182,7 +183,6 @@ class window {
   HWND window_;
   vec2 mouse_lastmove_ = {0, 0};
   bool mouse_inside_ = false;
-  bool minimized_ = false;
 #endif
 };
 

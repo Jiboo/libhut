@@ -72,7 +72,7 @@ buffer_pool::updator buffer_pool::prepare_update(VkBuffer _buf, uint _offset, ui
   auto staging = display_.staging_->do_alloc(_size, 4);
   void *target;
   vkMapMemory(display_.device_, staging.memory_, staging.offset_, _size, 0, &target);
-  return updator(*this, _buf, staging, std::span<uint8_t>{(uint8_t*)target, _size}, _offset);
+  return updator(*this, _buf, staging, span<uint8_t>{(uint8_t*)target, _size}, _offset);
 }
 
 void buffer_pool::finalize_update(updator &_update) {
@@ -89,6 +89,19 @@ void buffer_pool::finalize_update(updator &_update) {
   display_.staging_jobs_++;
   display_.preflush([this, copy]() {
     display_.stage_copy(copy);
+    display_.staging_jobs_--;
+  });
+}
+
+void buffer_pool::do_zero(VkBuffer _buf, uint _offset, uint _size) {
+  display::buffer_zero zero = {};
+  zero.size = _size;
+  zero.offset = _offset;
+  zero.destination = _buf;
+
+  display_.staging_jobs_++;
+  display_.preflush([this, zero]() {
+    display_.stage_zero(zero);
     display_.staging_jobs_--;
   });
 }

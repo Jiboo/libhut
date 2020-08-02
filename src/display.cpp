@@ -51,7 +51,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT /*fla
 }
 #endif
 
-void display::post(display::callback _callback) {
+void display::post(const display::callback &_callback) {
   {
     std::lock_guard lock(posted_mutex_);
     posted_jobs_.emplace(posted_jobs_.end(), _callback);
@@ -165,7 +165,7 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
 
 const std::vector<const char *> layers = {
 #ifdef HUT_ENABLE_VALIDATION
-    "VK_LAYER_LUNARG_standard_validation",
+    "VK_LAYER_KHRONOS_validation",
 #endif
 };
 
@@ -442,6 +442,15 @@ void display::stage_copy(const buffer_copy &_info) {
 #endif
 
   vkCmdCopyBuffer(staging_cb_, _info.source, _info.destination, 1, &_info);
+}
+
+void display::stage_zero(const display::buffer_zero &_info) {
+#ifdef HUT_DEBUG_STAGING
+  std::cout << "[staging] buffer " << _info.destination << '[' << _info.offset << "-" << (_info.offset+_info.size)
+            << "] zeroed" << std::endl;
+#endif
+
+  vkCmdFillBuffer(staging_cb_, _info.destination, _info.offset, _info.size, 0);
 }
 
 void display::stage_copy(const image_copy &_info) {

@@ -25,6 +25,8 @@
  * SOFTWARE.
  */
 
+#include <iostream>
+
 #include "hut/font.hpp"
 
 using namespace hut;
@@ -115,11 +117,14 @@ font::glyph &font::load_glyph(glyph_cache_t &_cache, uint _char_index) {
     FT_Bitmap render = ftg->bitmap;
     g.bearing_ = {ftg->bitmap_left, ftg->bitmap_top};
     g.bounds_ = {render.width, render.rows};
+    if (g.bounds_.x == 0 && g.bounds_.y == 0)
+        return g;
+
     const uvec2 padding = {2, 2};
     node *packed = binpack(&root_, g.bounds_ + padding);
     if (packed == nullptr) {
-      // Can't pack, return same bitmap than for '\0'
-      throw std::runtime_error("font altas overflow");
+        // Can't pack, return same bitmap than for '\0'
+        throw std::runtime_error("font altas overflow");
     }
     g.texcoords_[0] = float(packed->coords_[0]) / atlas_->size().x;
     g.texcoords_[1] = float(packed->coords_[1]) / atlas_->size().y;
@@ -222,9 +227,10 @@ bool shaper::bake(shared_buffer &_buff, result &_dst, const shared_font &_font, 
   bbox[2] = x;
   _dst.bbox_ = bbox;
 
-  const uint indices_count = 6 * drawn_codepoints;
-  const uint prev_indices_count = _dst.indices_ ? _dst.indices_->size() : 0;
+  const int indices_count = 6 * static_cast<int>(drawn_codepoints);
+  const int prev_indices_count = _dst.indices_ ? _dst.indices_->size() : 0;
   const int indices_diff = indices_count - prev_indices_count;
+  const size_t clear_indices = _dst.indices_count_ - indices_count;
   if (indices_diff > 0) {
     _dst.indices_ = _buff->allocate<uint16_t>(indices_count);
     _dst.indices_->update_some(0, indices_count, indices);
@@ -232,10 +238,15 @@ bool shaper::bake(shared_buffer &_buff, result &_dst, const shared_font &_font, 
   else if (indices_count > 0) {
     _dst.indices_->update_some(0, indices_count, indices);
   }
+  if (indices_diff < 0 && clear_indices > 0) {
+    _dst.indices_->zero(indices_count, clear_indices);
+  }
+  _dst.indices_count_ = indices_count;
 
-  const uint vertices_count = 4 * drawn_codepoints;
-  const uint prev_vertices_count = _dst.vertices_ ? _dst.vertices_->size() : 0;
+  const int vertices_count = 4 * static_cast<int>(drawn_codepoints);
+  const int prev_vertices_count = _dst.vertices_ ? _dst.vertices_->size() : 0;
   const int vertices_diff = vertices_count - prev_vertices_count;
+  const size_t clear_vertices = _dst.vertices_count_ - vertices_count;
   if (vertices_diff > 0) {
     _dst.vertices_ = _buff->allocate<tex_mask::vertex>(vertices_count);
     _dst.vertices_->update_some(0, vertices_count, vertices);
@@ -243,7 +254,12 @@ bool shaper::bake(shared_buffer &_buff, result &_dst, const shared_font &_font, 
   else if (vertices_count > 0) {
     _dst.vertices_->update_some(0, vertices_count, vertices);
   }
+  if (vertices_diff < 0 && clear_vertices > 0) {
+    _dst.vertices_->zero(vertices_count, clear_vertices);
+  }
+  _dst.vertices_count_ = vertices_count;
 
-  _dst.indices_count_ = indices_count;
-  return indices_diff != 0 || vertices_diff != 0;
+  if (indices_diff > 0 || vertices_diff > 0)
+    std::cout << "baking bufer grow requires redraw" << std::endl;
+  return indices_diff > 0 || vertices_diff > 0;
 }

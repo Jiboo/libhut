@@ -25,10 +25,13 @@
  * SOFTWARE.
  */
 
+#include <cstring>
+
+#include <unordered_set>
+
 #define XK_MISCELLANY
 #define XK_LATIN1
 #include <X11/keysymdef.h>
-#include <cstring>
 
 #include "hut/display.hpp"
 #include "hut/window.hpp"
@@ -133,10 +136,33 @@ void window::title(const std::string &_title) {
 }
 
 void window::invalidate(const uvec4 &_coords, bool _redraw) {
+  struct cmd_t {
+    uvec4 coords_;
+    bool redraw_;
+    bool operator==(const cmd_t&) const = default;
+  };
+  struct cmd_hasher {
+    std::size_t operator()(const cmd_t& _node) const {
+      std::size_t seed = 0;
+      hash_combine(seed, _node.coords_, _node.redraw_);
+      return seed;
+    }
+  };
+  static std::mutex mutex;
+  static std::unordered_set<cmd_t, cmd_hasher> posted_this_frame;
+
   if (_redraw) {
-    for (size_t i = 0; i < dirty_.size(); i++)
-      dirty_[i] = true;
+    for (auto &d : dirty_)
+      d = true;
   }
+
+  cmd_t thiz {_coords, _redraw};
+  {
+    std::scoped_lock sl(mutex);
+    if (!posted_this_frame.emplace(thiz).second)
+      return;
+  }
+
   xcb_expose_event_t event = {};
   event.window = window_;
   event.x = (uint16_t)_coords.x;
@@ -148,4 +174,9 @@ void window::invalidate(const uvec4 &_coords, bool _redraw) {
   uint32_t mask = XCB_EVENT_MASK_EXPOSURE;
   xcb_send_event(display_.connection_, 0, window_, mask, (const char *)&event);
   xcb_flush(display_.connection_);
+
+  display_.post([&](display::time_point) {
+    std::scoped_lock sl(mutex);
+    posted_this_frame.clear();
+  });
 }

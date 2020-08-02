@@ -1,6 +1,6 @@
 # https://github.com/glfw/glfw/blob/master/CMake/modules/FindXKBCommon.cmakehttps://github.com/glfw/glfw/blob/master/CMake/modules/FindXKBCommon.cmake
 
-# - Try to find XKBCommon
+# - Try to find XkbCommon
 # Once done, this will define
 #
 #   XKBCOMMON_FOUND - System has XKBCommon
@@ -27,7 +27,7 @@ set(XKBCOMMON_LIBRARY_DIRS ${XKBCOMMON_LIBRARY_DIRS})
 set(XKBCOMMON_INCLUDE_DIRS ${XKBCOMMON_INCLUDE_DIR})
 
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(XKBCommon DEFAULT_MSG
+find_package_handle_standard_args(XkbCommon DEFAULT_MSG
         XKBCOMMON_LIBRARY
         XKBCOMMON_INCLUDE_DIR
         )

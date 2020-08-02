@@ -96,14 +96,15 @@ class display {
   using callback = std::function<void(time_point)>;
   using scheduled_item = std::tuple<callback, duration>;
 
-  display(const char *_app_name, uint32_t _app_version = VK_MAKE_VERSION(1, 0, 0), const char *_display_name = nullptr);
+  explicit display(const char *_app_name, uint32_t _app_version = VK_MAKE_VERSION(1, 0, 0),
+                   const char *_display_name = nullptr);
   ~display();
 
   void flush();
   void flush_staged();
   int dispatch();
 
-  void post(callback _callback);
+  void post(const callback &_callback);
 
   template <typename T>
   T get_proc(const std::string &_name) {
@@ -160,13 +161,19 @@ class display {
   using flush_callback = std::function<void()>;
   std::vector<flush_callback> preflush_jobs_, postflush_jobs_;
 
-  inline void preflush(flush_callback _callback) {
+  inline void preflush(const flush_callback &_callback) {
     preflush_jobs_.emplace_back(_callback);
   }
 
   struct buffer_copy : public VkBufferCopy {
     VkBuffer source;
     VkBuffer destination;
+  };
+
+  struct buffer_zero {
+    VkBuffer destination;
+    VkDeviceSize size;
+    VkDeviceSize offset;
   };
 
   struct buffer2image_copy : public VkBufferImageCopy {
@@ -192,6 +199,7 @@ class display {
 
   void stage_transition(const image_transition &_info);
   void stage_copy(const buffer_copy &_info);
+  void stage_zero(const buffer_zero &_info);
   void stage_copy(const image_copy &_info);
   void stage_copy(const buffer2image_copy &_info);
   void stage_clear(const image_clear &_info);
@@ -206,8 +214,9 @@ class display {
   xcb_screen_t *screen_;
   xcb_key_symbols_t *keysyms_;
   std::unordered_map<xcb_window_t, window *> windows_;
-  xcb_atom_t atom_wm_, atom_close_, atom_change_state_, atom_state_, atom_rstate_, atom_maximizeh_, atom_maximizev_;
-  xcb_atom_t atom_window_hints_;
+  xcb_atom_t atom_wm_, atom_close_, atom_change_state_, atom_state_, atom_hstate_, atom_rstate_;
+  xcb_atom_t atom_maximizeh_, atom_maximizev_, atom_window_hints_;
+
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
   friend void registry_handler(void*, wl_registry*, uint32_t, const char*, uint32_t);
   friend void seat_handler(void*, wl_seat*, uint32_t);
@@ -238,7 +247,7 @@ class display {
   uint32_t kb_mod_mask_ = 0;
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
   friend LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
-  #define HUT_WIN32_CLASSNAME L"Hut Window Class"
+  #define HUT_WIN32_CLASSNAME "Hut Window Class"
   HINSTANCE hinstance_;
   std::unordered_map<HWND, window *> windows_;
 #endif

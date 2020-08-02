@@ -31,7 +31,6 @@
 #include <memory>
 #include <mutex>
 #include <set>
-#include <span>
 
 #include <vulkan/vulkan.h>
 
@@ -65,9 +64,9 @@ class buffer_pool {
     VkBuffer target_;
     buffer_pool::alloc staging_;
     uint offset_;
-    std::span<uint8_t> data_;
+    span<uint8_t> data_;
 
-    updator(buffer_pool &_parent, VkBuffer _target, buffer_pool::alloc _staging, std::span<uint8_t> _data, uint _offset)
+    updator(buffer_pool &_parent, VkBuffer _target, buffer_pool::alloc _staging, span<uint8_t> _data, uint _offset)
       : parent_(_parent), target_(_target), staging_(_staging), offset_(_offset), data_(_data) {
     }
 
@@ -133,6 +132,15 @@ class buffer_pool {
       update_some(0, _data.size(), _data.begin());
     }
 
+    void zero(uint _indice, uint _count) {
+      size_t byte_offset = _indice * sizeof(T);
+      size_t byte_size = _count * sizeof(T);
+      assert(byte_offset % 4U == 0);
+      assert(byte_size % 4U == 0);
+      assert(byte_offset + byte_size <= byte_size_);
+      pool_.do_zero(buffer_, offset_ + byte_offset, byte_size);
+    }
+
     uint size() const {
       return byte_size_ / sizeof(T);
     }
@@ -183,6 +191,7 @@ class buffer_pool {
   void do_update(VkBuffer _buf, uint _offset, uint _size, const void *_data);
   updator prepare_update(VkBuffer _buf, uint _offset, uint _size);
   void finalize_update(updator &_update);
+  void do_zero(VkBuffer _buf, uint _offset, uint _size);
   void clear_ranges();
 };
 

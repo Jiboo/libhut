@@ -29,11 +29,13 @@
 
 #include <memory>
 #include <set>
-#include <span>
 
 #include <vulkan/vulkan.h>
 
 #include "hut/utils.hpp"
+#include "display.hpp"
+#include "buffer_pool.hpp"
+
 
 namespace hut {
 
@@ -49,8 +51,8 @@ class image {
   static constexpr VkImageTiling defaultImageTiling = VkImageTiling::VK_IMAGE_TILING_LINEAR;
   static constexpr VkImageUsageFlags defaultImageUsageFlags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
-  static std::shared_ptr<image> load_png(display &, std::span<const uint8_t> _data);
-  static std::shared_ptr<image> load_raw(display &, uvec2 _extent, std::span<const uint8_t> _data, VkFormat _format,
+  static std::shared_ptr<image> load_png(display &, span<const uint8_t> _data);
+  static std::shared_ptr<image> load_raw(display &, uvec2 _extent, span<const uint8_t> _data, VkFormat _format,
                                          VkImageTiling _tiling = defaultImageTiling,
                                          VkImageUsageFlags _flags = defaultImageUsageFlags);
 
@@ -61,8 +63,8 @@ class image {
 
   void update(ivec4 _coords, uint8_t *_data, uint _srcRowPitch);
 
-  uint pixel_size() const { return pixel_size_; }
-  uvec2 size() const { return size_; }
+  [[nodiscard]] uint pixel_size() const { return pixel_size_; }
+  [[nodiscard]] uvec2 size() const { return size_; }
 
  private:
   static VkMemoryRequirements create(display &_display, uint32_t _width, uint32_t _height, VkFormat _format,
@@ -89,7 +91,7 @@ class sampler {
   VkDevice device_;
 
 public:
-  sampler(display &_display, bool _hiquality = true);
+  explicit sampler(display &_display, bool _hiquality = true);
   sampler(display &_display, VkSamplerCreateInfo *_info);
   ~sampler();
 };

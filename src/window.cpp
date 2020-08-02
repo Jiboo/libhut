@@ -76,6 +76,32 @@ void window::destroy_vulkan() {
   }
 }
 
+VkPresentModeKHR select_best_mode(const span<VkPresentModeKHR> &_modes)
+{
+  VkPresentModeKHR preferred_modes[] = {
+#ifdef VK_USE_PLATFORM_WAYLAND_KHR
+      VK_PRESENT_MODE_FIFO_KHR,
+#endif
+      VK_PRESENT_MODE_FIFO_RELAXED_KHR,
+      VK_PRESENT_MODE_MAILBOX_KHR,
+      VK_PRESENT_MODE_IMMEDIATE_KHR,
+#ifdef VK_USE_PLATFORM_XCB_KHR
+      VK_PRESENT_MODE_FIFO_KHR,
+#endif
+  };
+
+  for (const auto &preferred_mode : preferred_modes) {
+    for (const auto &mode : _modes) {
+      if (mode == preferred_mode) {
+        return preferred_mode;
+      }
+    }
+  }
+
+  assert(false); // VK_PRESENT_MODE_FIFO_KHR should at least have been selected
+  return VK_PRESENT_MODE_MAX_ENUM_KHR;
+}
+
 void window::init_vulkan_surface() {
   if (surface_ == VK_NULL_HANDLE)
     return;
@@ -128,12 +154,7 @@ void window::init_vulkan_surface() {
   vkGetPhysicalDeviceSurfacePresentModesKHR(pdevice, surface_, &modes_count, nullptr);
   std::vector<VkPresentModeKHR> modes(modes_count);
   vkGetPhysicalDeviceSurfacePresentModesKHR(pdevice, surface_, &modes_count, modes.data());
-  present_mode_ = VK_PRESENT_MODE_FIFO_KHR;
-  /*for (const auto &it : modes) {
-    if (it == VK_PRESENT_MODE_MAILBOX_KHR) {
-      present_mode_ = it;
-    }
-  }*/
+  present_mode_ = select_best_mode(modes);
 
   if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
     swapchain_extents_ = capabilities.currentExtent;
@@ -340,26 +361,30 @@ void window::redraw(display::time_point _tp) {
   if (swapchain_ == VK_NULL_HANDLE)
     return;
 
+  auto before_acquire = display::clock::now();
   uint32_t imageIndex;
   VkResult result = vkAcquireNextImageKHR(display_.device_, swapchain_, std::numeric_limits<uint64_t>::max(),
                                           sem_available_, VK_NULL_HANDLE, &imageIndex);
 
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
     init_vulkan_surface();
+    invalidate(false);
     return;
   } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
     throw std::runtime_error("failed to acquire swap chain image!");
   }
 
-  on_frame.fire(last_frame_ - _tp);
-  display_.flush_staged();
-
+  auto before_rebuild = display::clock::now();
   if (dirty_[imageIndex]) {
     vkDeviceWaitIdle(display_.device_);
     dirty_[imageIndex] = false;
     rebuild_cb(swapchain_fbos_[imageIndex], primary_cbs_[imageIndex]);
   }
 
+  auto before_on_frame = display::clock::now();
+  on_frame.fire(last_frame_ - _tp);
+  auto before_staging = display::clock::now();
+  display_.flush_staged();
   cbs_.emplace_back(primary_cbs_[imageIndex]);
 
   VkSubmitInfo submitInfo = {};
@@ -378,6 +403,7 @@ void window::redraw(display::time_point _tp) {
   submitInfo.signalSemaphoreCount = 1;
   submitInfo.pSignalSemaphores = signalSemaphores;
 
+  auto before_submit = display::clock::now();
   if (vkQueueSubmit(display_.queueg_, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
     throw std::runtime_error("failed to submit draw command buffer!");
 
@@ -393,6 +419,7 @@ void window::redraw(display::time_point _tp) {
   presentInfo.pImageIndices = &imageIndex;
   presentInfo.pResults = nullptr;  // Optional
 
+  auto before_present = display::clock::now();
   result = vkQueuePresentKHR(display_.queuep_, &presentInfo);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
     init_vulkan_surface();
@@ -400,14 +427,25 @@ void window::redraw(display::time_point _tp) {
     throw std::runtime_error("failed to present swap chain image!");
   }
 
-  auto present = display::clock::now();
-  auto diff = present - last_frame_;
-  if (diff > 16ms) {
-    std::cout << "frame budget exceeded: " << std::chrono::duration<double, std::milli>(diff).count() << std::endl;
-  }
-
   cbs_.clear();
-  last_frame_ = present;
+
+  auto done = display::clock::now();
+  auto diff = done - last_frame_;
+  constexpr auto budget = 1000.ms/60.;
+  if (diff > budget) {
+    std::cout << "frame overbudget: " << dur_t(diff) << " ("
+      << "acquire: " << dur_t(before_rebuild - before_acquire) << ", "
+      << "draw: " << dur_t(before_on_frame - before_rebuild) << ", "
+      << "frame: " << dur_t(before_staging - before_on_frame) << ", "
+      << "staging: " << dur_t(before_submit - before_staging) << ", "
+      << "submit: " << dur_t(before_present - before_submit) << ", "
+      << "present: " << dur_t(done - before_present)
+      << ")" << std::endl;
+  }
+  else if (present_mode_ != VK_PRESENT_MODE_FIFO_KHR && diff < budget) {
+    std::this_thread::sleep_for(budget - diff);
+  }
+  last_frame_ = display::clock::now();
 }
 
 void window::dispatch_resize(const uvec2 &_size) {

@@ -38,14 +38,27 @@ void hut::handle_xdg_configure(void *_data, xdg_surface *, uint32_t _serial) {
   xdg_surface_ack_configure(w->window_, _serial);
 }
 
-void hut::handle_toplevel_configure(void *_data, xdg_toplevel *, int32_t _width, int32_t _height, wl_array *) {
-  if (_width == 0 || _height == 0)
-    return;
-
+void hut::handle_toplevel_configure(void *_data, xdg_toplevel *, int32_t _width, int32_t _height, wl_array *_states) {
   auto *w = static_cast<window*>(_data);
-  uvec2 new_size{_width, _height};
-  if (new_size != w->size_)
-    w->dispatch_resize(new_size);
+  if (_width > 0 && _height > 0) {
+    uvec2 new_size{_width, _height};
+    if (new_size != w->size_)
+      w->dispatch_resize(new_size);
+  }
+  span<xdg_toplevel_state> states {
+      reinterpret_cast<xdg_toplevel_state*>(_states->data),
+      static_cast<std::size_t>(_states->size / sizeof(xdg_toplevel_state))
+  };
+  bool minimized = std::find(states.begin(), states.end(), XDG_TOPLEVEL_STATE_ACTIVATED) == states.end();
+  // FIXME: This doesn't really represent minimized state, loosing focus also lose this state
+  if (!minimized && w->minimized_) {
+    w->minimized_ = false;
+    w->on_resume.fire();
+  }
+  else if (minimized && !w->minimized_) {
+    w->minimized_ = true;
+    w->on_pause.fire();
+  }
 }
 
 void hut::handle_toplevel_close(void *_data, xdg_toplevel *) {
@@ -55,10 +68,10 @@ void hut::handle_toplevel_close(void *_data, xdg_toplevel *) {
 }
 
 window::window(display &_display) : display_(_display), size_(800, 600) {
-  static const xdg_surface_listener xdg_surface_listener = {
+  static const xdg_surface_listener xdg_surface_listeners = {
       handle_xdg_configure,
   };
-  static const xdg_toplevel_listener xdg_toplevel_listener = {
+  static const xdg_toplevel_listener xdg_toplevel_listeners = {
       handle_toplevel_configure, handle_toplevel_close
   };
 
@@ -79,10 +92,10 @@ window::window(display &_display) : display_(_display), size_(800, 600) {
   _display.windows_.emplace(wayland_surface_, this);
 
   window_ = xdg_wm_base_get_xdg_surface(_display.xdg_wm_base_, wayland_surface_);
-  xdg_surface_add_listener(window_, &xdg_surface_listener, this);
+  xdg_surface_add_listener(window_, &xdg_surface_listeners, this);
 
   toplevel_ = xdg_surface_get_toplevel(window_);
-  xdg_toplevel_add_listener(toplevel_, &xdg_toplevel_listener, this);
+  xdg_toplevel_add_listener(toplevel_, &xdg_toplevel_listeners, this);
 
   init_vulkan_surface();
   wl_surface_commit(wayland_surface_);

@@ -44,22 +44,23 @@ display::display(const char *_app_name, uint32_t _app_version, const char *) {
   std::vector<const char *> extensions = {VK_KHR_WIN32_SURFACE_EXTENSION_NAME};
   init_vulkan_instance(_app_name, _app_version, extensions);
 
-  hinstance_ = GetModuleHandle(NULL);
+  hinstance_ = GetModuleHandle(nullptr);
 
   // Register window class
-  WNDCLASSEXW wc = {};
+  WNDCLASSEXA wc = {};
   wc.cbSize = sizeof(wc);
-  wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-  wc.lpfnWndProc = hut::WindowProc;
-  wc.hInstance = hinstance_;
   wc.lpszClassName = HUT_WIN32_CLASSNAME;
-  if (!RegisterClassExW(&wc)) {
+  wc.hInstance = hinstance_;
+  wc.lpfnWndProc = hut::WindowProc;
+  wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+  wc.hCursor = LoadCursorA(nullptr, IDC_ARROW);
+  if (!RegisterClassExA(&wc)) {
     throw std::runtime_error("couldn't register window class");
   }
 
   // Dummy window to request surface capabilities
-  HWND dummy = CreateWindowExW(WS_EX_OVERLAPPEDWINDOW, HUT_WIN32_CLASSNAME, L"Dummy", WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
-                               0, 0, 800, 600, NULL, NULL, hinstance_, this);
+  HWND dummy = CreateWindowExA(WS_EX_OVERLAPPEDWINDOW, HUT_WIN32_CLASSNAME, "Dummy", WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+                               0, 0, 800, 600, nullptr, nullptr, hinstance_, this);
   if (!dummy) {
     throw std::runtime_error("couldn't create window");
   }
@@ -84,7 +85,7 @@ display::display(const char *_app_name, uint32_t _app_version, const char *) {
 }
 
 display::~display() {
-  UnregisterClassW(HUT_WIN32_CLASSNAME, hinstance_);
+  UnregisterClassA(HUT_WIN32_CLASSNAME, hinstance_);
   FT_Done_FreeType(ft_library_);
   destroy_vulkan();
 }
@@ -136,14 +137,15 @@ keysym map_key(WPARAM _c) {
     HUT_MAPFUNCKEY(12);
 #undef HUT_MAPFUNCKEY
     default:
-      return keysym(char32_t(MapVirtualKeyW(_c, MAPVK_VK_TO_CHAR)));
+      return keysym(char32_t(MapVirtualKeyA(_c, MAPVK_VK_TO_CHAR)));
   }
 }
 
 // https://stackoverflow.com/questions/15966642/how-do-you-tell-lshift-apart-from-rshift-in-wm-keydown-events
 WPARAM map_controlkeys(WPARAM _vk, LPARAM _lparam) {
-  UINT scancode = (_lparam & 0x00ff0000) >> 16;
-  int extended = (_lparam & 0x01000000) != 0;
+  const UINT ulparam = _lparam;
+  const UINT scancode = (ulparam & 0x00ff0000U) >> 16U;
+  const int extended = (ulparam & 0x01000000U) != 0;
 
   switch (_vk) {
     case VK_SHIFT: return MapVirtualKey(scancode, MAPVK_VSC_TO_VK_EX);
@@ -155,18 +157,25 @@ WPARAM map_controlkeys(WPARAM _vk, LPARAM _lparam) {
 }
 
 LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam) {
+  window *w = nullptr;
+  auto   *d = (display*)GetWindowLongPtr(_hwnd, GWLP_USERDATA);
+  if (d) {
+    const auto &windows = d->windows_;
+    auto it = windows.find(_hwnd);
+    if (it != windows.end()) {
+      assert(_hwnd == it->first);
+      w = it->second;
+    }
+  }
+
   switch (_umsg) {
     case WM_CREATE: {
       SetWindowLongPtr(_hwnd, GWLP_USERDATA, (LONG_PTR)((CREATESTRUCT *)_lparam)->lpCreateParams);
-      return TRUE;
-    } break;
+      return 1;
+    }
 
     case WM_PAINT: {
-      display *d = (display *)GetWindowLongPtr(_hwnd, GWLP_USERDATA);
-      assert(d);
-      auto it = d->windows_.find(_hwnd);
-      if (it != d->windows_.end()) {
-        window *w = it->second;
+      if (w) {
         if (!IsIconic(w->window_)) {
           uvec4 r{ 0, 0, w->size_ };
           PAINTSTRUCT paint;
@@ -177,14 +186,10 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
         }
       }
       return 0;
-    } break;
+    }
 
     case WM_SIZE: {
-      display *d = (display *)GetWindowLongPtr(_hwnd, GWLP_USERDATA);
-      assert(d);
-      auto it = d->windows_.find(_hwnd);
-      if (it != d->windows_.end()) {
-        window *w = it->second;
+      if (w) {
         switch (_wparam) {
         case SIZE_RESTORED:
           if (w->minimized_) {
@@ -196,6 +201,8 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
           w->minimized_ = true;
           w->on_pause.fire();
           break;
+        default:
+          break;
         }
         uvec2 s{LOWORD(_lparam), HIWORD(_lparam)};
         if (s != w->size_) {
@@ -203,28 +210,20 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
         }
       }
       return 0;
-    } break;
+    }
 
     case WM_CLOSE: {
-      display *d = (display *)GetWindowLongPtr(_hwnd, GWLP_USERDATA);
-      assert(d);
-      auto it = d->windows_.find(_hwnd);
-      if (it != d->windows_.end()) {
-        window *w = it->second;
+      if (w) {
         if (!w->on_close.fire())
           w->close();
       }
       return 0;
-    } break;
+    }
 
     case WM_LBUTTONDOWN:
     case WM_RBUTTONDOWN:
     case WM_MBUTTONDOWN: {
-      display *d = (display *)GetWindowLongPtr(_hwnd, GWLP_USERDATA);
-      assert(d);
-      auto it = d->windows_.find(_hwnd);
-      if (it != d->windows_.end()) {
-        window *w = it->second;
+      if (w) {
         uint8_t button = 0;
         if (_umsg == WM_RBUTTONDOWN)
           button = 1;
@@ -234,16 +233,12 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
         w->on_mouse.fire(button, MDOWN, pos);
       }
       return 0;
-    } break;
+    }
 
     case WM_LBUTTONUP:
     case WM_RBUTTONUP:
     case WM_MBUTTONUP: {
-      display *d = (display *)GetWindowLongPtr(_hwnd, GWLP_USERDATA);
-      assert(d);
-      auto it = d->windows_.find(_hwnd);
-      if (it != d->windows_.end()) {
-        window *w = it->second;
+      if (w) {
         uint8_t button = 0;
         if (_umsg == WM_RBUTTONUP)
           button = 1;
@@ -253,14 +248,10 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
         w->on_mouse.fire(button, MUP, pos);
       }
       return 0;
-    } break;
+    }
 
     case WM_MOUSEMOVE: {
-      display *d = (display *)GetWindowLongPtr(_hwnd, GWLP_USERDATA);
-      assert(d);
-      auto it = d->windows_.find(_hwnd);
-      if (it != d->windows_.end()) {
-        window *w = it->second;
+      if (w) {
         uint8_t button = 0;
         if (_wparam & MK_RBUTTON)
           button = 1;
@@ -270,61 +261,48 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
         w->on_mouse.fire(button, MMOVE, pos);
       }
       return 0;
-    } break;
+    }
 
     case WM_SETFOCUS: {
-      display *d = (display *)GetWindowLongPtr(_hwnd, GWLP_USERDATA);
-      assert(d);
-      auto it = d->windows_.find(_hwnd);
-      if (it != d->windows_.end()) {
-        window *w = it->second;
+      if (w) {
         w->on_focus.fire();
       }
       return 0;
-    } break;
+    }
 
     case WM_KILLFOCUS: {
-      display *d = (display *)GetWindowLongPtr(_hwnd, GWLP_USERDATA);
-      assert(d);
-      auto it = d->windows_.find(_hwnd);
-      if (it != d->windows_.end()) {
-        window *w = it->second;
+      if (w) {
         w->on_blur.fire();
       }
       return 0;
-    } break;
+    }
 
     case WM_SYSKEYUP:
     case WM_SYSKEYDOWN:
     case WM_KEYUP:
     case WM_KEYDOWN: {
-      display *d = (display *)GetWindowLongPtr(_hwnd, GWLP_USERDATA);
-      assert(d);
-      auto it = d->windows_.find(_hwnd);
-      if (it != d->windows_.end()) {
-        window *w = it->second;
+      if (w) {
         keysym k = map_key(map_controlkeys(_wparam, _lparam));
         bool pressed = _umsg == WM_KEYDOWN;
         w->on_key.fire(k, pressed);
         return 0;
       }
       return 1;
-    } break;
+    }
 
     case WM_CHAR: {
-      display *d = (display *)GetWindowLongPtr(_hwnd, GWLP_USERDATA);
-      assert(d);
-      auto it = d->windows_.find(_hwnd);
-      if (it != d->windows_.end()) {
-        window *w = it->second;
+      if (w) {
         char32_t c = to_utf32(_wparam);
         if (c >= 0x20)
           w->on_char.fire(c);
       }
       return 0;
-    } break;
+    }
+
+    default:
+      break;
   }
-  return DefWindowProcW(_hwnd, _umsg, _wparam, _lparam);
+  return DefWindowProcA(_hwnd, _umsg, _wparam, _lparam);
 }
 
 int display::dispatch() {
@@ -336,19 +314,22 @@ int display::dispatch() {
   bool loop = true;
   while (loop) {
     MSG msg;
-    auto result = GetMessageW(&msg, nullptr, 0, 0);
-    process_posts(display::clock::now());
-    if (result < 0 || msg.message == WM_QUIT) {
-      loop = false;
-    } else {
-      TranslateMessage(&msg);
-      DispatchMessageW(&msg);
-
-      if (windows_.empty()) {
-        PostQuitMessage(0);
+    auto result = GetMessageA(&msg, nullptr, 0, 0);
+    do {
+      if (result < 0 || msg.message == WM_QUIT) {
         loop = false;
+      } else {
+        TranslateMessage(&msg);
+        DispatchMessageA(&msg);
+
+        if (windows_.empty()) {
+          PostQuitMessage(0);
+          loop = false;
+        }
       }
-    }
+      result = PeekMessageA(&msg, nullptr, 0, 0, PM_REMOVE);
+    } while(result != 0);
+    process_posts(display::clock::now());
   }
 
   return EXIT_SUCCESS;

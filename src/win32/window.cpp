@@ -26,6 +26,8 @@
  */
 #include <cstring>
 
+#include <iostream>
+
 #include <windows.h>
 
 #include "hut/display.hpp"
@@ -34,8 +36,8 @@
 using namespace hut;
 
 window::window(display &_display) : display_(_display), size_(800, 600) {
-  window_ = CreateWindowExW(WS_EX_APPWINDOW, HUT_WIN32_CLASSNAME, L"hut", WS_POPUP,
-    0, 0, 800, 600, NULL, NULL, display_.hinstance_, &display_);
+  window_ = CreateWindowExA(WS_EX_APPWINDOW, HUT_WIN32_CLASSNAME, "hut", WS_POPUP,
+    0, 0, 800, 600, nullptr, nullptr, display_.hinstance_, &display_);
   if (!window_) {
     throw std::runtime_error("couldn't create window");
   }
@@ -82,19 +84,18 @@ void window::maximize(bool _set) {
 }
 
 void window::title(const std::string &_title) {
-  auto titlew = to_wstring(_title);
-  SetWindowTextW(window_, titlew.c_str());
+  SetWindowTextA(window_, _title.c_str());
 }
 
 void window::invalidate(const uvec4 &_coords, bool _redraw) {
   if (_redraw) {
-    for (size_t i = 0; i < dirty_.size(); i++)
-      dirty_[i] = true;
+    for (auto &d : dirty_)
+      d = true;
   }
   RECT rect;
   rect.left = _coords.x;
   rect.top = _coords.y;
   rect.right = _coords.z;
   rect.bottom = _coords.w;
-  RedrawWindow(window_, &rect, NULL, RDW_INTERNALPAINT);
+  RedrawWindow(window_, &rect, nullptr, RDW_INTERNALPAINT);
 }
