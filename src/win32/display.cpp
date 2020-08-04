@@ -299,6 +299,13 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
       return 0;
     }
 
+    case WM_SETCURSOR: {
+      if (w) {
+        w->set_cursor(w->current_cursor_type_);
+      }
+      return 0;
+    }
+
     default:
       break;
   }

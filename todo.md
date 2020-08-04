@@ -1,6 +1,7 @@
 fix:
 
 refactor:
+- have the staging buffer always mapped?
 - texture atlas (decouple from font code)
 - isolate (same?) platform code (like xcb vs wayland) in shared library that could be loaded at runtime
 - buffer allocation strategies/algorithms
@@ -8,7 +9,6 @@ refactor:
 
 features:
 - multisampling
-- change cursor to a system one
 - clipboard
 - drap&drop URI/text
 

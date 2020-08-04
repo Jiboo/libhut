@@ -20,9 +20,8 @@ foreach (comp ${XCB_FIND_COMPONENTS})
   set(libname ${comp})
   string(REPLACE "-" "_" headername xcb/${comp}.h)
 
+  message("searching for ${comp}: ${headername} and ${libname}")
   pkg_check_modules(PC_${comp} ${comp})
-
-  #message("searching for ${comp}: ${headername} and ${libname}")
 
   if(NOT PC_${comp}_FOUND)
     message("Couldn't find xcb component: ${comp}")

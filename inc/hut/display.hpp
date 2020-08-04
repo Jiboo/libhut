@@ -43,8 +43,10 @@
 
 #if defined(VK_USE_PLATFORM_XCB_KHR)
 #include <xcb/xcb_keysyms.h>
+#include <xcb/xcb_cursor.h>
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
 #include <wayland-client.h>
+#include <wayland-cursor.h>
 #include <xkbcommon/xkbcommon.h>
 #include "xdg-shell-client-protocol.h"
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
@@ -59,6 +61,49 @@
 #include "hut/utils.hpp"
 
 namespace hut {
+
+enum cursor_type {
+  CNONE,
+  CDEFAULT,
+
+  CCONTEXT_MENU,
+  CHELP,
+  CPOINTER,
+  CPROGRESS,
+  CWAIT,
+
+  CCELL,
+  CCROSSHAIR,
+  CTEXT,
+
+  CALIAS,
+  CCOPY,
+  CMOVE,
+  CNO_DROP,
+  CNOT_ALLOWED,
+  CGRAB,
+  CGRABBING,
+
+  CSCROLL_ALL,
+  CRESIZE_COL,
+  CRESIZE_ROW,
+  CRESIZE_N,
+  CRESIZE_E,
+  CRESIZE_S,
+  CRESIZE_W,
+  CRESIZE_NE,
+  CRESIZE_NW,
+  CRESIZE_SE,
+  CRESIZE_SW,
+  CRESIZE_EW,
+  CRESIZE_NS,
+  CRESIZE_NESW,
+  CRESIZE_NWSE,
+
+  CZOOM_IN,
+  CZOOM_OUT,
+};
+const char* cursor_css_name(cursor_type _c);
 
 #if defined(VK_USE_PLATFORM_XCB_KHR)
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
@@ -135,7 +180,7 @@ class display {
       VkBufferUsageFlagBits _flags = GENERAL_FLAGS);
 
  protected:
-  FT_Library ft_library_;
+  FT_Library ft_library_ = nullptr;
   VkInstance instance_ = VK_NULL_HANDLE;
   VkDebugReportCallbackEXT debug_cb_ = VK_NULL_HANDLE;
 
@@ -210,12 +255,13 @@ class display {
   void post_empty_event();
 
 #if defined(VK_USE_PLATFORM_XCB_KHR)
-  xcb_connection_t *connection_;
-  xcb_screen_t *screen_;
-  xcb_key_symbols_t *keysyms_;
+  xcb_connection_t *connection_ = nullptr;
+  xcb_screen_t *screen_ = nullptr;
+  xcb_key_symbols_t *keysyms_ = nullptr;
   std::unordered_map<xcb_window_t, window *> windows_;
   xcb_atom_t atom_wm_, atom_close_, atom_change_state_, atom_state_, atom_hstate_, atom_rstate_;
   xcb_atom_t atom_maximizeh_, atom_maximizev_, atom_window_hints_;
+  xcb_cursor_context_t *cursor_context_ = nullptr;
 
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
   friend void registry_handler(void*, wl_registry*, uint32_t, const char*, uint32_t);
@@ -230,6 +276,21 @@ class display {
   friend void keyboard_handle_leave(void*, wl_keyboard*, uint32_t, wl_surface*);
   friend void keyboard_handle_key(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t);
   friend void keyboard_handle_modifiers(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+
+  struct animate_cursor_context {
+    display &display_;
+    std::thread thread_;
+    std::mutex mutex_;
+    std::condition_variable cv_;
+    wl_cursor *cursor_ = nullptr;
+    size_t frame_ = 0;
+    bool stop_request_ = false;
+  };
+  void set_cursor(cursor_type _c);
+  void set_cursor_frame(wl_cursor *_cursor, size_t _frame);
+  void animate_cursor(wl_cursor *_cursor);
+  static void animate_cursor_thread(animate_cursor_context *_ctx);
+
   wl_display *display_;
   wl_registry *registry_ = nullptr;
   wl_compositor *compositor_ = nullptr;
@@ -237,6 +298,9 @@ class display {
   wl_seat *seat_ = nullptr;
   wl_pointer *pointer_ = nullptr;
   wl_keyboard *keyboard_ = nullptr;
+  wl_shm *shm_ = nullptr;
+  wl_cursor_theme *cursor_theme_ = nullptr;
+  wl_surface *cursor_surface_ = nullptr;
   std::unordered_map<wl_surface*, window*> windows_;
   bool loop_ = true;
   std::pair<wl_surface*, window*> pointer_current_ {nullptr, nullptr};
@@ -245,6 +309,8 @@ class display {
   xkb_state *xkb_state_ = nullptr;
   xkb_keymap *keymap_ = nullptr;
   uint32_t kb_mod_mask_ = 0;
+  uint32_t last_serial_ = 0;
+  animate_cursor_context animate_cursor_ctx_;
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
   friend LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
   #define HUT_WIN32_CLASSNAME "Hut Window Class"

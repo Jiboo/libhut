@@ -135,13 +135,18 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
   xcb_destroy_window(connection_, dummy);
 
   FT_Init_FreeType(&ft_library_);
+
+  if (int error = xcb_cursor_context_new(connection_, screen_, &cursor_context_) < 0)
+    throw std::runtime_error(sstream("couldn't create cursor context: ") << error);
 }
 
 display::~display() {
-  FT_Done_FreeType(ft_library_);
   destroy_vulkan();
-  xcb_key_symbols_free(keysyms_);
-  xcb_disconnect(connection_);
+
+  if (ft_library_) FT_Done_FreeType(ft_library_);
+  if (cursor_context_) xcb_cursor_context_free(cursor_context_);
+  if (keysyms_) xcb_key_symbols_free(keysyms_);
+  if (connection_) xcb_disconnect(connection_);
 }
 
 void display::flush() {

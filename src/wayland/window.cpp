@@ -69,10 +69,10 @@ void hut::handle_toplevel_close(void *_data, xdg_toplevel *) {
 
 window::window(display &_display) : display_(_display), size_(800, 600) {
   static const xdg_surface_listener xdg_surface_listeners = {
-      handle_xdg_configure,
+    handle_xdg_configure,
   };
   static const xdg_toplevel_listener xdg_toplevel_listeners = {
-      handle_toplevel_configure, handle_toplevel_close
+    handle_toplevel_configure, handle_toplevel_close
   };
 
   wayland_surface_ = wl_compositor_create_surface(_display.compositor_);
@@ -136,9 +136,14 @@ void window::maximize(bool _set) {
 
 void window::invalidate(const uvec4 &, bool _redraw) {
   if (_redraw) {
-    for (size_t i = 0; i < dirty_.size(); i++)
-      dirty_[i] = true;
+    for (auto &d : dirty_)
+      d = true;
   }
   invalidated_ = true;
   display_.post_empty_event();
+}
+
+void window::set_cursor(cursor_type _c) {
+  current_cursor_type_ = _c;
+  display_.set_cursor(_c);
 }

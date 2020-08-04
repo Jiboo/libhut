@@ -431,6 +431,16 @@ int main(int, char **) {
     return false;
   });
 
+  w.on_mouse.connect([&w, &w2](uint8_t _button, mouse_event_type _type, vec2 _pos) {
+    if (_type == MUP) {
+      static int current_cursor = CDEFAULT;
+      if (++current_cursor > CZOOM_OUT)
+        current_cursor = CDEFAULT;
+      w.set_cursor(static_cast<cursor_type>(current_cursor));
+    }
+    return true;
+  });
+
   auto result = d.dispatch();
   load_res.join();
   std::cout << "done!" << std::endl;

@@ -180,3 +180,9 @@ void window::invalidate(const uvec4 &_coords, bool _redraw) {
     posted_this_frame.clear();
   });
 }
+
+void window::set_cursor(cursor_type _c) {
+  xcb_cursor_t cursor = xcb_cursor_load_cursor(display_.cursor_context_, cursor_css_name(_c));
+  if (cursor != XCB_CURSOR_NONE)
+    xcb_change_window_attributes(display_.connection_, window_, XCB_CW_CURSOR, &cursor);
+}

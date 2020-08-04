@@ -228,9 +228,9 @@ bool shaper::bake(shared_buffer &_buff, result &_dst, const shared_font &_font, 
   _dst.bbox_ = bbox;
 
   const int indices_count = 6 * static_cast<int>(drawn_codepoints);
-  const int prev_indices_count = _dst.indices_ ? _dst.indices_->size() : 0;
+  const int prev_indices_count = _dst.indices_ ? static_cast<int>(_dst.indices_->size()) : 0;
   const int indices_diff = indices_count - prev_indices_count;
-  const size_t clear_indices = _dst.indices_count_ - indices_count;
+  const int clear_indices = static_cast<int>(_dst.indices_count_) - indices_count;
   if (indices_diff > 0) {
     _dst.indices_ = _buff->allocate<uint16_t>(indices_count);
     _dst.indices_->update_some(0, indices_count, indices);
@@ -244,9 +244,9 @@ bool shaper::bake(shared_buffer &_buff, result &_dst, const shared_font &_font, 
   _dst.indices_count_ = indices_count;
 
   const int vertices_count = 4 * static_cast<int>(drawn_codepoints);
-  const int prev_vertices_count = _dst.vertices_ ? _dst.vertices_->size() : 0;
+  const int prev_vertices_count = _dst.vertices_ ? static_cast<int>(_dst.vertices_->size()) : 0;
   const int vertices_diff = vertices_count - prev_vertices_count;
-  const size_t clear_vertices = _dst.vertices_count_ - vertices_count;
+  const int clear_vertices = static_cast<int>(_dst.vertices_count_) - vertices_count;
   if (vertices_diff > 0) {
     _dst.vertices_ = _buff->allocate<tex_mask::vertex>(vertices_count);
     _dst.vertices_->update_some(0, vertices_count, vertices);

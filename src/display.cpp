@@ -51,6 +51,47 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT /*fla
 }
 #endif
 
+const char* hut::cursor_css_name(cursor_type _c) {
+  using namespace hut;
+  switch(_c) {
+    case CNONE:         return "none";
+    default: [[fallthrough]];
+    case CDEFAULT:      return "default";
+    case CCONTEXT_MENU: return "context-menu";
+    case CHELP:         return "help";
+    case CPOINTER:      return "pointer";
+    case CPROGRESS:     return "progress";
+    case CWAIT:         return "wait";
+    case CCELL:         return "cell";
+    case CCROSSHAIR:    return "crosshair";
+    case CTEXT:         return "text";
+    case CALIAS:        return "alias";
+    case CCOPY:         return "copy";
+    case CMOVE:         return "move";
+    case CNO_DROP:      return "no-drop";
+    case CNOT_ALLOWED:  return "not-allowed";
+    case CGRAB:         return "grab";
+    case CGRABBING:     return "grabbing";
+    case CSCROLL_ALL:   return "all-scroll";
+    case CRESIZE_COL:   return "col-resize";
+    case CRESIZE_ROW:   return "row-resize";
+    case CRESIZE_N:     return "n-resize";
+    case CRESIZE_E:     return "e-resize";
+    case CRESIZE_S:     return "s-resize";
+    case CRESIZE_W:     return "w-resize";
+    case CRESIZE_NE:    return "ne-resize";
+    case CRESIZE_NW:    return "nw-resize";
+    case CRESIZE_SE:    return "se-resize";
+    case CRESIZE_SW:    return "sw-resize";
+    case CRESIZE_EW:    return "ew-resize";
+    case CRESIZE_NS:    return "ns-resize";
+    case CRESIZE_NESW:  return "nesw-resize";
+    case CRESIZE_NWSE:  return "nwse-resize";
+    case CZOOM_IN:      return "zoom-in";
+    case CZOOM_OUT:     return "zoom-out";
+  }
+}
+
 void display::post(const display::callback &_callback) {
   {
     std::lock_guard lock(posted_mutex_);

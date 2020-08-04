@@ -12,7 +12,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/de
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_WINDOW_DEPTH_BUFFER)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_PREFER_NONDESCRETE_DEVICES)
 
-#set(HUT_PREFER_XCB 1)
+set(HUT_PREFER_XCB 1)
 set(HUT_COMPILE_DEMOS 1)
 
 ###########################################################
@@ -72,8 +72,8 @@ if(GTEST_FOUND)
   set(HUT_INCLUDES_TEST ${HUT_INCLUDES} ${GTEST_INCLUDE_DIR})
 endif()
 
-find_package(Wayland COMPONENTS wayland-client)
-find_package(XCB COMPONENTS xcb xcb-keysyms xcb-util)
+find_package(Wayland COMPONENTS wayland-client wayland-cursor)
+find_package(XCB COMPONENTS xcb xcb-keysyms xcb-util xcb-cursor)
 
 if(Wayland_FOUND AND NOT HUT_PREFER_XCB)
   message("Using Wayland as backend, checking for other dependencies..")

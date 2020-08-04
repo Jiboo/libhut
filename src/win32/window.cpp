@@ -99,3 +99,95 @@ void window::invalidate(const uvec4 &_coords, bool _redraw) {
   rect.bottom = _coords.w;
   RedrawWindow(window_, &rect, nullptr, RDW_INTERNALPAINT);
 }
+
+#define AFX_IDC_CONTEXTHELP             30977       // context sensitive help
+#define AFX_IDC_MAGNIFY                 30978       // print preview zoom
+#define AFX_IDC_SMALLARROWS             30979       // splitter
+#define AFX_IDC_HSPLITBAR               30980       // splitter
+#define AFX_IDC_VSPLITBAR               30981       // splitter
+#define AFX_IDC_NODROPCRSR              30982       // No Drop Cursor
+#define AFX_IDC_TRACKNWSE               30983       // tracker
+#define AFX_IDC_TRACKNESW               30984       // tracker
+#define AFX_IDC_TRACKNS                 30985       // tracker
+#define AFX_IDC_TRACKWE                 30986       // tracker
+#define AFX_IDC_TRACK4WAY               30987       // tracker
+#define AFX_IDC_MOVE4WAY                30988       // resize bar (server only)
+
+HCURSOR load_cursor(cursor_type _c) {
+  switch (_c) {
+    case CNONE:
+      return nullptr;
+    case CDEFAULT:
+      return LoadCursorA(nullptr, IDC_ARROW);
+    case CCONTEXT_MENU:
+      break;
+    case CHELP:
+      return LoadCursorA(nullptr, IDC_HELP);
+    case CPOINTER:
+      return LoadCursorA(nullptr, IDC_HAND);
+    case CPROGRESS:
+      return LoadCursorA(nullptr, IDC_APPSTARTING);
+    case CWAIT:
+      return LoadCursorA(nullptr, IDC_WAIT);
+    case CCELL:
+      break;
+    case CCROSSHAIR:
+      return LoadCursorA(nullptr, IDC_CROSS);
+    case CTEXT:
+      return LoadCursorA(nullptr, IDC_IBEAM);
+    case CALIAS:
+      break;
+    case CCOPY:
+      break;
+    case CMOVE:
+      return LoadCursorA(nullptr, IDC_SIZEALL);
+    case CNO_DROP:
+      return LoadCursorA(nullptr, IDC_NO);
+    case CNOT_ALLOWED:
+      return LoadCursorA(nullptr, IDC_NO);
+    case CGRAB:
+      return LoadCursorA(nullptr, IDC_SIZEALL);
+    case CGRABBING:
+      return LoadCursorA(nullptr, IDC_SIZEALL);
+    case CSCROLL_ALL:
+      return LoadCursorA(nullptr, IDC_SIZEALL);
+    case CRESIZE_COL:
+      return LoadCursorA(nullptr, IDC_SIZEWE);
+    case CRESIZE_ROW:
+      return LoadCursorA(nullptr, IDC_SIZENS);
+    case CRESIZE_N:
+      return LoadCursorA(nullptr, IDC_SIZENS);
+    case CRESIZE_E:
+      return LoadCursorA(nullptr, IDC_SIZEWE);
+    case CRESIZE_S:
+      return LoadCursorA(nullptr, IDC_SIZENS);
+    case CRESIZE_W:
+      return LoadCursorA(nullptr, IDC_SIZEWE);
+    case CRESIZE_NE:
+      return LoadCursorA(nullptr, IDC_SIZENESW);
+    case CRESIZE_NW:
+      return LoadCursorA(nullptr, IDC_SIZENWSE);
+    case CRESIZE_SE:
+      return LoadCursorA(nullptr, IDC_SIZENWSE);
+    case CRESIZE_SW:
+      return LoadCursorA(nullptr, IDC_SIZENESW);
+    case CRESIZE_EW:
+      return LoadCursorA(nullptr, IDC_SIZEWE);
+    case CRESIZE_NS:
+      return LoadCursorA(nullptr, IDC_SIZENS);
+    case CRESIZE_NESW:
+      return LoadCursorA(nullptr, IDC_SIZENESW);
+    case CRESIZE_NWSE:
+      return LoadCursorA(nullptr, IDC_SIZENWSE);
+    case CZOOM_IN:
+      break;
+    case CZOOM_OUT:
+      break;
+  }
+  return LoadCursorA(nullptr, IDC_ARROW);
+}
+
+void window::set_cursor(cursor_type _c) {
+  SetCursor(load_cursor(_c));
+  current_cursor_type_ = _c;
+}

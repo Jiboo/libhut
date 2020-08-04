@@ -128,6 +128,8 @@ class window {
     invalidate(true);
   }
 
+  void set_cursor(cursor_type _c);
+
  protected:
   display &display_;
   VkSurfaceKHR surface_ = VK_NULL_HANDLE;
@@ -178,11 +180,12 @@ class window {
   xdg_toplevel *toplevel_;
   std::atomic_bool invalidated_ = true;
   vec2 mouse_lastmove_ = {0, 0};
+  cursor_type current_cursor_type_ = CDEFAULT;
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
   friend LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
   HWND window_;
   vec2 mouse_lastmove_ = {0, 0};
-  bool mouse_inside_ = false;
+  cursor_type current_cursor_type_ = CDEFAULT;
 #endif
 };
 

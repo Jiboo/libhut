@@ -26,6 +26,7 @@
  */
 
 #include <atomic>
+#include <charconv>
 #include <chrono>
 #include <iostream>
 
@@ -38,24 +39,27 @@
 
 using namespace hut;
 
-void hut::pointer_handle_enter(void *_data, wl_pointer *_pointer, uint32_t, wl_surface *_surface, wl_fixed_t _sx, wl_fixed_t _sy) {
+void hut::pointer_handle_enter(void *_data, wl_pointer *_pointer, uint32_t _serial, wl_surface *_surface, wl_fixed_t _sx, wl_fixed_t _sy) {
   //std::cout << "pointer_handle_enter " << _pointer << ", " << _surface << ", " << wl_fixed_to_double(_sx) << ", " << wl_fixed_to_double(_sy) << std::endl;
   auto d = static_cast<display*>(_data);
   auto w = d->windows_.find(_surface);
   if (_pointer == d->pointer_ && w != d->windows_.cend()) {
+    d->last_serial_ = _serial;
     d->pointer_current_.first = _surface;
     d->pointer_current_.second = w->second;
     assert(d->pointer_current_.second);
     vec2 coords {wl_fixed_to_int(_sx), wl_fixed_to_int(_sy)};
     d->pointer_current_.second->mouse_lastmove_ = coords;
+    d->set_cursor(w->second->current_cursor_type_);
     d->pointer_current_.second->on_mouse.fire(0, MMOVE, coords);
   }
 }
 
-void hut::pointer_handle_leave(void *_data, wl_pointer *_pointer, uint32_t, [[maybe_unused]] wl_surface *_surface) {
+void hut::pointer_handle_leave(void *_data, wl_pointer *_pointer, uint32_t _serial, [[maybe_unused]] wl_surface *_surface) {
   //std::cout << "pointer_handle_leave " << _pointer << ", " << _surface << std::endl;
   auto d = static_cast<display*>(_data);
   if (_pointer == d->pointer_) {
+    d->last_serial_ =  _serial;
     d->pointer_current_.first = nullptr;
     d->pointer_current_.second = nullptr;
   }
@@ -72,10 +76,11 @@ void hut::pointer_handle_motion(void *_data, wl_pointer *_pointer, uint32_t, wl_
   }
 }
 
-void hut::pointer_handle_button(void *_data, wl_pointer *_pointer, uint32_t, uint32_t, uint32_t _button, uint32_t _state) {
+void hut::pointer_handle_button(void *_data, wl_pointer *_pointer, uint32_t _serial, uint32_t, uint32_t _button, uint32_t _state) {
   //std::cout << "pointer_handle_button " << _pointer << ", " << _button << ", " << _state << std::endl;
   auto d = static_cast<display*>(_data);
   if (_pointer == d->pointer_) {
+    d->last_serial_ =  _serial;
     assert(d->pointer_current_.second);
     d->pointer_current_.second->on_mouse.fire(_button - BTN_MOUSE + 1, _state ? MDOWN : MUP, d->pointer_current_.second->mouse_lastmove_);
   }
@@ -114,22 +119,24 @@ void hut::keyboard_handle_keymap(void *_data, wl_keyboard *_keyboard, uint32_t _
     throw std::runtime_error("Failed to create XKB state");
 }
 
-void hut::keyboard_handle_enter(void *_data, wl_keyboard *_keyboard, uint32_t, wl_surface *_surface, wl_array *) {
+void hut::keyboard_handle_enter(void *_data, wl_keyboard *_keyboard, uint32_t _serial, wl_surface *_surface, wl_array *) {
   //std::cout << "keyboard_handle_enter " << _keyboard << ", " << _surface << std::endl;
   auto d = static_cast<display*>(_data);
   auto w = d->windows_.find(_surface);
   if (_keyboard == d->keyboard_ && w != d->windows_.cend()) {
+    d->last_serial_ =  _serial;
     d->keyboard_current_.first = _surface;
     d->keyboard_current_.second = w->second;
     w->second->on_focus.fire();
   }
 }
 
-void hut::keyboard_handle_leave(void *_data, wl_keyboard *_keyboard, uint32_t, wl_surface *_surface) {
+void hut::keyboard_handle_leave(void *_data, wl_keyboard *_keyboard, uint32_t _serial, wl_surface *_surface) {
   //std::cout << "keyboard_handle_enter " << _keyboard << ", " << _surface << std::endl;
   auto d = static_cast<display*>(_data);
   auto w = d->windows_.find(_surface);
   if (_keyboard == d->keyboard_) {
+    d->last_serial_ =  _serial;
     d->keyboard_current_.first = nullptr;
     d->keyboard_current_.second = nullptr;
     if (w != d->windows_.end())
@@ -219,7 +226,7 @@ keysym map_keysym(xkb_keysym_t _keysym) {
   }
 }
 
-void hut::keyboard_handle_key(void *_data, wl_keyboard *_keyboard, uint32_t, uint32_t, uint32_t _key, uint32_t _state) {
+void hut::keyboard_handle_key(void *_data, wl_keyboard *_keyboard, uint32_t _serial, uint32_t, uint32_t _key, uint32_t _state) {
   //std::cout << "keyboard_handle_key " << _keyboard << ", " << _key << ", " << _state << std::endl;
   auto d = static_cast<display*>(_data);
   if (_keyboard == d->keyboard_) {
@@ -234,15 +241,17 @@ void hut::keyboard_handle_key(void *_data, wl_keyboard *_keyboard, uint32_t, uin
     const bool alt = d->kb_mod_mask_ & 262152U;
     const bool altgr = d->kb_mod_mask_ & 128U;
 
+    d->last_serial_ =  _serial;
     w->on_key.fire(mapped, _state != 0);
     if (!remapped && !ctrl && !alt && !altgr && _state != 0)
       w->on_char.fire(mapped);
   }
 }
 
-void hut::keyboard_handle_modifiers(void *_data, wl_keyboard *, uint32_t, uint32_t _mods_depressed, uint32_t _mods_latched, uint32_t _mods_locked, uint32_t _group) {
+void hut::keyboard_handle_modifiers(void *_data, wl_keyboard *, uint32_t _serial, uint32_t _mods_depressed, uint32_t _mods_latched, uint32_t _mods_locked, uint32_t _group) {
   //std::cout << "keyboard_handle_modifiers " << _keyboard << ", " << _mods_depressed << ", " << _mods_latched << ", " << _mods_locked << std::endl;
   auto d = static_cast<display*>(_data);
+  d->last_serial_ =  _serial;
   d->kb_mod_mask_ = _mods_depressed;
   xkb_state_update_mask(d->xkb_state_, _mods_depressed, _mods_latched, _mods_locked, 0, 0, _group);
 }
@@ -284,7 +293,7 @@ void handle_xdg_ping(void *, struct xdg_wm_base *_shell, uint32_t _serial) {
 
 void hut::registry_handler(void *_data, wl_registry *_registry, uint32_t _id,
                                   const char *_interface, [[maybe_unused]] uint32_t _version) {
-  //std::cout << "registry_handler " << _id << ", " << _interface << ", " << _version << std::endl;
+  std::cout << "[hut] wayland registry item " << _id << ", " << _interface << ", " << _version << std::endl;
   static const wl_seat_listener wl_seat_listeners = {
       seat_handler, seat_name
   };
@@ -304,13 +313,17 @@ void hut::registry_handler(void *_data, wl_registry *_registry, uint32_t _id,
     d->seat_ = static_cast<wl_seat*>(wl_registry_bind(_registry, _id, &wl_seat_interface, 1));
     wl_seat_add_listener(d->seat_, &wl_seat_listeners, _data);
   }
+  else if (strcmp(_interface, "wl_shm") == 0) {
+    d->shm_ = static_cast<wl_shm*>(wl_registry_bind(_registry, _id, &wl_shm_interface, 1));
+  }
 }
 
 void registry_remove(void *, wl_registry *, uint32_t) {
   //std::cout << "registry_remove " << _id << std::endl;
 }
 
-display::display(const char *_app_name, uint32_t _app_version, const char *_name) {
+display::display(const char *_app_name, uint32_t _app_version, const char *_name)
+  : animate_cursor_ctx_{*this} {
   std::vector<const char *> extensions = {VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME};
   init_vulkan_instance(_app_name, _app_version, extensions);
 
@@ -353,16 +366,42 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
   wl_surface_destroy(dummy);
 
   FT_Init_FreeType(&ft_library_);
+
+  if (shm_ != nullptr) {
+    char *env_cursor_theme = getenv("XCURSOR_THEME");
+    char *env_cursor_size = getenv("XCURSOR_SIZE");
+    size_t env_cursor_size_length = env_cursor_size == nullptr ? 0 : strlen(env_cursor_size);
+    int cursor_size = 24;
+    if (env_cursor_size_length > 0)
+      std::from_chars(env_cursor_size, env_cursor_size + env_cursor_size_length, cursor_size);
+    cursor_theme_ = wl_cursor_theme_load(env_cursor_theme, cursor_size, shm_);
+    cursor_surface_ = wl_compositor_create_surface(compositor_);
+
+    animate_cursor_ctx_.thread_ = std::thread(animate_cursor_thread, &animate_cursor_ctx_);
+  }
 }
 
 display::~display() {
   FT_Done_FreeType(ft_library_);
   destroy_vulkan();
 
+  if (animate_cursor_ctx_.thread_.joinable()) {
+    {
+      std::scoped_lock lock(animate_cursor_ctx_.mutex_);
+      animate_cursor_ctx_.cursor_ = nullptr;
+      animate_cursor_ctx_.stop_request_ = true;
+    }
+    animate_cursor_ctx_.cv_.notify_all();
+    animate_cursor_ctx_.thread_.join();
+  }
+
   if (keymap_) xkb_keymap_unref(keymap_);
   if (xkb_state_) xkb_state_unref(xkb_state_);
   if (xkb_context_) xkb_context_unref(xkb_context_);
 
+  if (cursor_surface_) wl_surface_destroy(cursor_surface_);
+  if (cursor_theme_) wl_cursor_theme_destroy(cursor_theme_);
+  if (shm_) wl_shm_destroy(shm_);
   if (keyboard_) wl_keyboard_destroy(keyboard_);
   if (pointer_) wl_pointer_destroy(pointer_);
   if (seat_) wl_seat_destroy(seat_);
@@ -386,18 +425,70 @@ int display::dispatch() {
 
   while (loop_) {
     wl_display_dispatch(display_);
-    auto now = display::clock::now();
-    process_posts(now);
+    process_posts(display::clock::now());
     if (windows_.empty())
       loop_ = false;
     for (auto wpair : windows_) {
       window *w = wpair.second;
       if (w->invalidated_) {
-        w->redraw(now);
+        w->redraw(display::clock::now());
         w->invalidated_ = false;
       }
     }
   }
 
   return EXIT_SUCCESS;
+}
+
+void display::set_cursor_frame(wl_cursor *_cursor, size_t _frame) {
+  assert(_frame < _cursor->image_count);
+  wl_cursor_image* image = _cursor->images[_frame];
+  wl_buffer *buffer = wl_cursor_image_get_buffer(image);
+  wl_surface_attach(cursor_surface_, buffer, 0, 0);
+  wl_surface_damage(cursor_surface_, 0, 0, image->width, image->height);
+  wl_surface_commit(cursor_surface_);
+
+  wl_pointer_set_cursor(pointer_, last_serial_, cursor_surface_, image->hotspot_x, image->hotspot_y);
+}
+
+void display::set_cursor(cursor_type _c) {
+  if (cursor_theme_ == nullptr || pointer_ == nullptr)
+    return;
+
+  wl_cursor *result = wl_cursor_theme_get_cursor(cursor_theme_, cursor_css_name(_c));
+  if (result) {
+    if (result->image_count == 1) {
+      animate_cursor(nullptr);
+      set_cursor_frame(result, 0);
+    }
+    else {
+      animate_cursor(result);
+    }
+  }
+}
+
+void display::animate_cursor(wl_cursor *_cursor) {
+  if (_cursor != animate_cursor_ctx_.cursor_) {
+    {
+      std::scoped_lock lock(animate_cursor_ctx_.mutex_);
+      animate_cursor_ctx_.cursor_ = _cursor;
+      animate_cursor_ctx_.frame_ = 0;
+    }
+    animate_cursor_ctx_.cv_.notify_all();
+  }
+}
+
+void display::animate_cursor_thread(animate_cursor_context *_ctx) {
+  std::unique_lock lock(_ctx->mutex_);
+  while (!_ctx->stop_request_) {
+    if (_ctx->cursor_ == nullptr)
+      _ctx->cv_.wait(lock);
+    if (_ctx->cursor_) {
+      auto *cur_frame = _ctx->cursor_->images[_ctx->frame_];
+      _ctx->display_.set_cursor_frame(_ctx->cursor_, _ctx->frame_++);
+      if (_ctx->frame_ >= _ctx->cursor_->image_count)
+        _ctx->frame_ = 0;
+      _ctx->cv_.wait_for(lock, std::chrono::milliseconds(cur_frame->delay));
+    }
+  }
 }
