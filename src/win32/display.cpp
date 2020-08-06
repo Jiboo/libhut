@@ -283,8 +283,14 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
     case WM_KEYDOWN: {
       if (w) {
         keysym k = map_key(map_controlkeys(_wparam, _lparam));
-        bool pressed = _umsg == WM_KEYDOWN;
-        w->on_key.fire(k, pressed);
+        if ((k == KALT_LEFT || k == KALT_RIGHT) && _umsg == WM_SYSKEYUP)
+          return 0; // Alt up would send both WM_SYSKEYUP and WM_KEYUP
+        const bool pressed = _umsg == WM_KEYDOWN || _umsg == WM_SYSKEYDOWN;
+        const bool alt = GetKeyState(VK_MENU);
+        const bool ctrl = GetKeyState(VK_CONTROL);
+        const bool shift = GetKeyState(VK_SHIFT);
+        auto mods = modifiers{ (alt ? KMOD_ALT : 0U) | (ctrl ? KMOD_CTRL : 0U) | (shift ? KMOD_SHIFT : 0U) };
+        w->on_key.fire(k, mods, pressed);
         return 0;
       }
       return 1;

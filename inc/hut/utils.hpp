@@ -62,6 +62,7 @@ namespace hut {
   class sampler;
   class window;
 
+  // FIXME JBL: Not in mingw64
 #if __has_include("span")
   template<typename TType, size_t TExtent = std::dynamic_extent>
   using span = std::span<TType, TExtent>;
@@ -205,5 +206,56 @@ inline void hash_combine(std::size_t &_seed, const T &_v, Rest &&..._rest) {
   _seed ^= hasher(_v) + 0x9e3779b9 + (_seed<<6U) + (_seed>>2U);
   hash_combine(_seed, std::forward<Rest>(_rest)...);
 }
+
+template<typename T>
+constexpr T bit_width(T _in) {
+  // FIXME JBL: Not in mingw64
+  return std::numeric_limits<T>::digits - std::countl_zero(_in);
+}
+
+template<typename TEnum, TEnum TEnd, typename TUnderlying = uint32_t>
+struct flagged {
+  static constexpr size_t underlying_bits = sizeof(TUnderlying) * 8;
+  static constexpr TUnderlying mask(TEnum _flag) { return 1U << _flag; }
+  static_assert(bit_width(mask(TEnd)) <= underlying_bits, "underlying type too small to hold values to end");
+
+  TUnderlying active_ = 0;
+
+  operator bool() { return active_ != 0; }
+
+  bool query(TEnum _flag)       const { return active_ & mask(_flag); }
+  bool operator[](TEnum _flag) const { return query(_flag); }
+  bool operator&(TEnum _flag)  const { return query(_flag); }
+
+  void reset(TUnderlying _underlying) { active_ = _underlying; }
+  flagged &operator=(TUnderlying _underlying) { reset(_underlying); return *this; }
+
+  void flip(TEnum _flag)  { active_ ^= mask(_flag); }
+  void set(TEnum _flag)   { active_ |= mask(_flag); }
+
+  flagged operator|(TEnum _flag) const { flagged result{active_}; result.set(_flag); return result; }
+  flagged &operator|=(TEnum _flag) { set(_flag); return *this; }
+
+  struct const_iterator {
+    TUnderlying shifted_;
+    TUnderlying current_;
+
+    const_iterator &operator++() {
+      shifted_ = shifted_ >> 1U;
+      current_++;
+      auto to_skip = std::countr_zero(shifted_);
+      shifted_ >>= to_skip;
+      current_ = std::min(TUnderlying(underlying_bits), TUnderlying(current_ + to_skip));
+      return *this;
+    }
+    bool operator!=(const const_iterator &_other) const { return current_ != _other.current_; }
+    TEnum operator*() const { return static_cast<TEnum>(current_); }
+  };
+
+  const_iterator cbegin() const { TUnderlying to_skip = std::countr_zero(active_); return const_iterator{active_ >> to_skip, to_skip}; }
+  const_iterator begin() const { return cbegin(); }
+  const_iterator cend() const { return const_iterator{0, underlying_bits}; }
+  const_iterator end() const { return cend(); }
+};
 
 }  // namespace hut

@@ -186,3 +186,19 @@ void window::set_cursor(cursor_type _c) {
   if (cursor != XCB_CURSOR_NONE)
     xcb_change_window_attributes(display_.connection_, window_, XCB_CW_CURSOR, &cursor);
 }
+
+size_t window::clipboard_sender::write(span<uint8_t> _data) {
+  return 0;
+}
+size_t window::clipboard_receiver::read(span<uint8_t> _data) {
+  return 0;
+}
+
+void window::clipboard_offer(file_formats _supported_formats, const send_clipboard_data &_callback) {
+  //TODO
+  //xcb_set_selection_owner(display_.connection_, window_, display_.atom_clipboard_, XCB_CURRENT_TIME);
+}
+
+bool window::clipboard_receive(file_formats _supported_formats, const receive_clipboard_data &_callback) {
+  return false;
+}

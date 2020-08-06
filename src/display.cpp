@@ -92,6 +92,28 @@ const char* hut::cursor_css_name(cursor_type _c) {
   }
 }
 
+const char *hut::format_mime_type(file_format _f) {
+  switch(_f) {
+    case FTEXT_PLAIN: return "text/plain";
+    case FTEXT_HTML: return "text/html";
+    case FTEXT_URI_LIST: return "text/uri-list";
+    case FIMAGE_BMP: return "image/bmp";
+    case FIMAGE_PNG: return "image/png";
+    case FIMAGE_JPEG: return "image/jpeg";
+  }
+  return nullptr;
+}
+
+std::optional<file_format> hut::mime_type_format(const char * _mime_type) {
+  if (strcmp(_mime_type, "text/plain;charset=utf-8") == 0) return FTEXT_PLAIN;
+  if (strcmp(_mime_type, "text/html") == 0) return FTEXT_HTML;
+  if (strcmp(_mime_type, "text/uri-list") == 0) return FTEXT_URI_LIST;
+  if (strcmp(_mime_type, "image/bmp") == 0) return FIMAGE_BMP;
+  if (strcmp(_mime_type, "image/png") == 0) return FIMAGE_PNG;
+  if (strcmp(_mime_type, "image/jpeg") == 0) return FIMAGE_JPEG;
+  return {};
+}
+
 void display::post(const display::callback &_callback) {
   {
     std::lock_guard lock(posted_mutex_);

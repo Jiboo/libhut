@@ -369,7 +369,7 @@ int main(int, char **) {
     return false;
   });
 
-  w.on_key.connect([&w](keysym c, bool _press) {
+  w.on_key.connect([&w](keysym c, modifiers _mods, bool _press) {
     std::cout << "w keysym " << _press << '\t' << window::name_key(c) << std::endl;
     if (c == KESCAPE && !_press)
       w.close();
@@ -382,7 +382,7 @@ int main(int, char **) {
     return true;
   });
 
-  w2.on_key.connect([&w2](keysym c, bool _press) {
+  w2.on_key.connect([&w2](keysym c, modifiers _mods, bool _press) {
     std::cout << "w2 keysym " << _press << '\t' << window::name_key(c) << std::endl;
     if (c == KESCAPE && !_press)
       w2.close();
@@ -437,6 +437,38 @@ int main(int, char **) {
       if (++current_cursor > CZOOM_OUT)
         current_cursor = CDEFAULT;
       w.set_cursor(static_cast<cursor_type>(current_cursor));
+    }
+    return true;
+  });
+
+  w.on_key.connect([&w](keysym _keysym, modifiers _mods, bool _pressed) {
+    if ((_keysym == 'c' || _keysym == 'C') && (_mods == KMOD_CTRL) && _pressed) {
+      std::cout << "Offering to clipboard" << std::endl;
+
+      static const char text_html[] = R"(<meta http-equiv="content-type" content="text/html; charset=UTF-8"><html><body><b>Hello</b> from <i>libhut</i></body></html>)";
+      static const char text_plain[] = "Hello from libhut";
+      w.clipboard_offer(file_formats{} | FTEXT_HTML | FTEXT_PLAIN, [](file_format _mime, window::clipboard_sender &_sender) {
+        std::cout << "Writing to clipboard in " << format_mime_type(_mime) << std::endl;
+        if (_mime == FTEXT_HTML) {
+          _sender.write({(uint8_t*)text_html, strlen(text_html)});
+        }
+        else if (_mime == FTEXT_PLAIN) {
+          _sender.write({(uint8_t*)text_plain, strlen(text_plain)});
+        }
+      });
+    }
+    if ((_keysym == 'v' || _keysym == 'V') && (_mods == KMOD_CTRL) && _pressed) {
+      std::cout << "Receiving from clipboard" << std::endl;
+
+      w.clipboard_receive(file_formats{} | FTEXT_HTML | FTEXT_PLAIN, [](file_format _mime, window::clipboard_receiver &_receiver) {
+        std::cout << "Clipboard contents in " << format_mime_type(_mime) << ": ";
+        uint8_t buffer[2048];
+        size_t read_bytes;
+        while ((read_bytes = _receiver.read(buffer))) {
+          std::cout << std::string_view{(const char*)buffer, read_bytes};
+        }
+        std::cout << std::endl;
+      });
     }
     return true;
   });

@@ -117,6 +117,10 @@ void hut::keyboard_handle_keymap(void *_data, wl_keyboard *_keyboard, uint32_t _
   d->xkb_state_ = xkb_state_new(d->keymap_);
   if (!d->xkb_state_)
     throw std::runtime_error("Failed to create XKB state");
+
+  d->mod_index_alt_ = xkb_keymap_mod_get_index(d->keymap_, XKB_MOD_NAME_ALT);
+  d->mod_index_ctrl_ = xkb_keymap_mod_get_index(d->keymap_, XKB_MOD_NAME_CTRL);
+  d->mod_index_shift_ = xkb_keymap_mod_get_index(d->keymap_, XKB_MOD_NAME_SHIFT);
 }
 
 void hut::keyboard_handle_enter(void *_data, wl_keyboard *_keyboard, uint32_t _serial, wl_surface *_surface, wl_array *) {
@@ -125,6 +129,7 @@ void hut::keyboard_handle_enter(void *_data, wl_keyboard *_keyboard, uint32_t _s
   auto w = d->windows_.find(_surface);
   if (_keyboard == d->keyboard_ && w != d->windows_.cend()) {
     d->last_serial_ =  _serial;
+    d->last_keyboard_enter_serial_ = _serial;
     d->keyboard_current_.first = _surface;
     d->keyboard_current_.second = w->second;
     w->second->on_focus.fire();
@@ -232,18 +237,18 @@ void hut::keyboard_handle_key(void *_data, wl_keyboard *_keyboard, uint32_t _ser
   if (_keyboard == d->keyboard_) {
     assert(d->keyboard_current_.second);
     auto *w = d->keyboard_current_.second;
-    const auto keycode = xkb_keycode_t(_key + 8);
+    const auto keycode = xkb_keycode_t(_key + 8); // +8 for evdev scancode to XCB scancode
     const auto ks = xkb_state_key_get_one_sym(d->xkb_state_, keycode);
     const auto cleaned = clean_kp_keysyms(ks);
     const auto mapped = map_keysym(cleaned);
     const bool remapped =  mapped != cleaned && mapped != KENUM_END;
-    const bool ctrl = d->kb_mod_mask_ & 4U;
-    const bool alt = d->kb_mod_mask_ & 262152U;
-    const bool altgr = d->kb_mod_mask_ & 128U;
+    const auto mods = d->kb_mod_mask_;
+    const bool alt = mods & KMOD_ALT;
+    const bool ctrl = mods & KMOD_CTRL;
 
     d->last_serial_ =  _serial;
-    w->on_key.fire(mapped, _state != 0);
-    if (!remapped && !ctrl && !alt && !altgr && _state != 0)
+    w->on_key.fire(mapped, mods, _state != 0);
+    if (!remapped && !ctrl && !alt && _state != 0)
       w->on_char.fire(mapped);
   }
 }
@@ -252,8 +257,16 @@ void hut::keyboard_handle_modifiers(void *_data, wl_keyboard *, uint32_t _serial
   //std::cout << "keyboard_handle_modifiers " << _keyboard << ", " << _mods_depressed << ", " << _mods_latched << ", " << _mods_locked << std::endl;
   auto d = static_cast<display*>(_data);
   d->last_serial_ =  _serial;
-  d->kb_mod_mask_ = _mods_depressed;
   xkb_state_update_mask(d->xkb_state_, _mods_depressed, _mods_latched, _mods_locked, 0, 0, _group);
+
+  uint32_t mod_mask = 0;
+  if (xkb_state_mod_index_is_active(d->xkb_state_, d->mod_index_alt_, XKB_STATE_MODS_EFFECTIVE))
+    mod_mask |= KMOD_ALT;
+  if (xkb_state_mod_index_is_active(d->xkb_state_, d->mod_index_ctrl_, XKB_STATE_MODS_EFFECTIVE))
+    mod_mask |= KMOD_CTRL;
+  if (xkb_state_mod_index_is_active(d->xkb_state_, d->mod_index_shift_, XKB_STATE_MODS_EFFECTIVE))
+    mod_mask |= KMOD_SHIFT;
+  d->kb_mod_mask_ = mod_mask;
 }
 
 void hut::seat_handler(void *_data, wl_seat *_seat, uint32_t _caps) {
@@ -302,25 +315,47 @@ void hut::registry_handler(void *_data, wl_registry *_registry, uint32_t _id,
   };
 
   auto d = static_cast<display*>(_data);
-  if (strcmp(_interface, "wl_compositor") == 0) {
+  if (strcmp(_interface, wl_compositor_interface.name) == 0) {
     d->compositor_ = static_cast<wl_compositor*>(wl_registry_bind(_registry, _id, &wl_compositor_interface, 1));
   }
-  else if (strcmp(_interface, "xdg_wm_base") == 0) {
+  else if (strcmp(_interface, xdg_wm_base_interface.name) == 0) {
     d->xdg_wm_base_ = static_cast<xdg_wm_base*>(wl_registry_bind(_registry, _id, &xdg_wm_base_interface, 1));
     xdg_wm_base_add_listener(d->xdg_wm_base_, &xdg_wm_base_listeners, _data);
   }
-  else if (strcmp(_interface, "wl_seat") == 0) {
+  else if (strcmp(_interface, wl_seat_interface.name) == 0) {
     d->seat_ = static_cast<wl_seat*>(wl_registry_bind(_registry, _id, &wl_seat_interface, 1));
     wl_seat_add_listener(d->seat_, &wl_seat_listeners, _data);
   }
-  else if (strcmp(_interface, "wl_shm") == 0) {
+  else if (strcmp(_interface, wl_shm_interface.name) == 0) {
     d->shm_ = static_cast<wl_shm*>(wl_registry_bind(_registry, _id, &wl_shm_interface, 1));
+  }
+  else if (strcmp(_interface, wl_data_device_manager_interface.name) == 0) {
+    d->data_device_manager_ = static_cast<wl_data_device_manager*>(wl_registry_bind(_registry, _id, &wl_data_device_manager_interface, 1));
   }
 }
 
 void registry_remove(void *, wl_registry *, uint32_t) {
   //std::cout << "registry_remove " << _id << std::endl;
 }
+
+void hut::data_offer_handle_offer(void *_data, wl_data_offer *_offer, const char *_mime_type) {
+  auto d = static_cast<display*>(_data);
+  auto format = mime_type_format(_mime_type);
+  if (format)
+    d->current_data_offer_formats_ |= *format;
+}
+
+void hut::data_device_handle_data_offer(void *_data, wl_data_device *_device, wl_data_offer *_offer) {
+  static const struct wl_data_offer_listener data_offer_listeners = {
+      .offer = data_offer_handle_offer,
+  };
+  auto d = static_cast<display*>(_data);
+  d->current_data_offer_ = _offer;
+  d->current_data_offer_formats_ = 0;
+  wl_data_offer_add_listener(_offer, &data_offer_listeners, _data);
+}
+
+void hut::data_device_handle_selection(void *_data, wl_data_device *_device, wl_data_offer *_offer) {}
 
 display::display(const char *_app_name, uint32_t _app_version, const char *_name)
   : animate_cursor_ctx_{*this} {
@@ -334,6 +369,10 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
   static const wl_registry_listener reg_listeners = {
       registry_handler, registry_remove
   };
+  static const wl_data_device_listener data_device_listeners = {
+      .data_offer = data_device_handle_data_offer,
+      .selection = data_device_handle_selection,
+  };
 
   xkb_context_ = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
 
@@ -344,6 +383,11 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
   if (!compositor_) throw std::runtime_error("couldn't retrieve a wl_compositor in the wayland registry");
   if (!xdg_wm_base_) throw std::runtime_error("couldn't retrieve a xdg_wm_base in the wayland registry");
   if (!seat_) throw std::runtime_error("couldn't retrieve a wl_seat in the wayland registry");
+
+  if (data_device_manager_) {
+    data_device_ = wl_data_device_manager_get_data_device(data_device_manager_, seat_);
+    wl_data_device_add_listener(data_device_, &data_device_listeners, this);
+  }
 
   auto dummy = wl_compositor_create_surface(compositor_);
   if (!dummy)
@@ -399,6 +443,9 @@ display::~display() {
   if (xkb_state_) xkb_state_unref(xkb_state_);
   if (xkb_context_) xkb_context_unref(xkb_context_);
 
+  if (current_data_offer_) wl_data_offer_destroy(current_data_offer_);
+  if (data_device_) wl_data_device_destroy(data_device_);
+  if (data_device_manager_) wl_data_device_manager_destroy(data_device_manager_);
   if (cursor_surface_) wl_surface_destroy(cursor_surface_);
   if (cursor_theme_) wl_cursor_theme_destroy(cursor_theme_);
   if (shm_) wl_shm_destroy(shm_);

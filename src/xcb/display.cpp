@@ -96,6 +96,8 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
       {"_NET_WM_STATE_MAXIMIZED_VERT", atom_item_t{atom_maximizeh_}},
       {"_NET_WM_STATE_MAXIMIZED_HORZ", atom_item_t{atom_maximizev_}},
       {"_MOTIF_WM_HINTS",              atom_item_t{atom_window_hints_}},
+      {"CLIPBOARD",                    atom_item_t{atom_clipboard_}},
+      {"UTF8_STRING",                  atom_item_t{atom_utf8_string_}},
   };
 
   for (auto &atom : atoms)
@@ -243,11 +245,13 @@ void dispatch_keysym(window *w, uint16_t _mask, xcb_keysym_t _ks, bool press) {
   const xcb_keysym_t cleaned = clean_kp_keysyms(_ks);
   const keysym mapped = map_hut_enum(cleaned);
   const bool remapped =  mapped != cleaned;
-  const bool control = _mask & XCB_MOD_MASK_CONTROL;
   const bool alt = _mask & XCB_MOD_MASK_1;
+  const bool ctrl = _mask & XCB_MOD_MASK_CONTROL;
+  const bool shift = _mask & XCB_MOD_MASK_SHIFT;
+  auto mods = modifiers((alt ? KMOD_ALT : 0U) | (ctrl ? KMOD_CTRL : 0U) | (shift ? KMOD_SHIFT : 0U));
 
-  w->on_key.fire(mapped, press);
-  if (!remapped && !control && !alt && mapped != 0xfe03 && press)
+  w->on_key.fire(mapped, mods, press);
+  if (!remapped && !ctrl && !alt && mapped != 0xfe03 && press)
     w->on_char.fire(mapped);
 }
 
@@ -284,7 +288,7 @@ int display::dispatch() {
         if (event != nullptr) {
           switch (event->response_type & ~0x80U) {
           case XCB_EXPOSE: {
-            const auto *e = reinterpret_cast<xcb_expose_event_t *>(event);
+            const auto *e = reinterpret_cast<xcb_expose_event_t*>(event);
 
             auto it = windows_.find(e->window);
             if (it != windows_.end()) {
@@ -298,7 +302,7 @@ int display::dispatch() {
           } break;
 
           case XCB_CONFIGURE_NOTIFY: {
-            const auto *e = reinterpret_cast<xcb_configure_notify_event_t *>(event);
+            const auto *e = reinterpret_cast<xcb_configure_notify_event_t*>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
@@ -311,7 +315,7 @@ int display::dispatch() {
           } break;
 
           case XCB_KEY_PRESS: {
-            auto *e = reinterpret_cast<xcb_key_press_event_t *>(event);
+            auto *e = reinterpret_cast<xcb_key_press_event_t*>(event);
 
             int col;
             if (e->state & 0x3U)
@@ -333,7 +337,7 @@ int display::dispatch() {
           } break;
 
           case XCB_KEY_RELEASE: {
-            auto *e = reinterpret_cast<xcb_key_release_event_t *>(event);
+            auto *e = reinterpret_cast<xcb_key_release_event_t*>(event);
 
             int col;
             if (e->state & 0x80U)
@@ -358,7 +362,7 @@ int display::dispatch() {
           } break;
 
           case XCB_BUTTON_PRESS: {
-            const auto *e = reinterpret_cast<xcb_button_press_event_t *>(event);
+            const auto *e = reinterpret_cast<xcb_button_press_event_t*>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
@@ -382,7 +386,7 @@ int display::dispatch() {
           } break;
 
           case XCB_BUTTON_RELEASE: {
-            const auto *e = reinterpret_cast<xcb_button_release_event_t *>(event);
+            const auto *e = reinterpret_cast<xcb_button_release_event_t*>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
@@ -396,7 +400,7 @@ int display::dispatch() {
           } break;
 
           case XCB_MOTION_NOTIFY: {
-            const auto *e = reinterpret_cast<xcb_motion_notify_event_t *>(event);
+            const auto *e = reinterpret_cast<xcb_motion_notify_event_t*>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
@@ -408,7 +412,7 @@ int display::dispatch() {
           } break;
 
           case XCB_CLIENT_MESSAGE: {
-            const auto *e = reinterpret_cast<xcb_client_message_event_t *>(event);
+            const auto *e = reinterpret_cast<xcb_client_message_event_t*>(event);
 
             auto it = windows_.find(e->window);
             if (it != windows_.end()) {
@@ -421,7 +425,7 @@ int display::dispatch() {
           } break;
 
           case XCB_FOCUS_IN: {
-            const auto *e = reinterpret_cast<xcb_focus_in_event_t *>(event);
+            const auto *e = reinterpret_cast<xcb_focus_in_event_t*>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
@@ -431,7 +435,7 @@ int display::dispatch() {
           } break;
 
           case XCB_FOCUS_OUT: {
-            const auto *e = reinterpret_cast<xcb_focus_out_event_t *>(event);
+            const auto *e = reinterpret_cast<xcb_focus_out_event_t*>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
@@ -441,7 +445,7 @@ int display::dispatch() {
           } break;
 
           case XCB_MAP_NOTIFY: {
-            const auto *e = reinterpret_cast<xcb_map_notify_event_t *>(event);
+            const auto *e = reinterpret_cast<xcb_map_notify_event_t*>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
@@ -451,7 +455,7 @@ int display::dispatch() {
           } break;
 
           case XCB_UNMAP_NOTIFY: {
-            const auto *e = reinterpret_cast<xcb_unmap_notify_event_t *>(event);
+            const auto *e = reinterpret_cast<xcb_unmap_notify_event_t*>(event);
 
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
@@ -461,7 +465,7 @@ int display::dispatch() {
           } break;
 
           case XCB_PROPERTY_NOTIFY: {
-            const auto *e = reinterpret_cast<xcb_property_notify_event_t *>(event);
+            const auto *e = reinterpret_cast<xcb_property_notify_event_t*>(event);
 
             auto it = windows_.find(e->window);
             if (it != windows_.end()) {
@@ -480,6 +484,16 @@ int display::dispatch() {
                 }
               }
             }
+          } break;
+
+          case XCB_SELECTION_CLEAR: {
+            const auto *e = reinterpret_cast<xcb_selection_clear_event_t*>(event);
+            //TODO
+          } break;
+
+          case XCB_SELECTION_REQUEST: {
+            const auto *e = reinterpret_cast<xcb_selection_request_event_t*>(event);
+            //TODO
           } break;
 
           default:

@@ -28,6 +28,8 @@
 #include <cstring>
 #include <iostream>
 
+#include <unistd.h>
+
 #include "hut/display.hpp"
 #include "hut/window.hpp"
 
@@ -146,4 +148,100 @@ void window::invalidate(const uvec4 &, bool _redraw) {
 void window::set_cursor(cursor_type _c) {
   current_cursor_type_ = _c;
   display_.set_cursor(_c);
+}
+
+void hut::data_source_handle_send(void *_data, wl_data_source *_source, const char *_mime, int32_t _fd) {
+  auto *w = (window*)_data;
+  auto format = mime_type_format(_mime);
+  if (!format) {
+    if (strcmp("text/plain;charset=utf-8", _mime) == 0) format = FTEXT_PLAIN;
+    else if (strcmp("text/plain;charset=unicode", _mime) == 0) format = FTEXT_PLAIN;
+    else if (strcmp("STRING", _mime) == 0) format = FTEXT_PLAIN;
+    else if (strcmp("TEXT", _mime) == 0) format = FTEXT_PLAIN;
+    else if (strcmp("UTF8_STRING", _mime) == 0) format = FTEXT_PLAIN;
+  }
+  if (format) {
+    window::clipboard_sender sender{_fd};
+    w->current_clipboard_sender_(*format, sender);
+    ::close(_fd);
+  }
+}
+
+size_t window::clipboard_sender::write(span<uint8_t> _data) {
+  return ::write(fd_, _data.data(), _data.size_bytes());
+}
+size_t window::clipboard_receiver::read(span<uint8_t> _data) {
+  return ::read(fd_, _data.data(), _data.size_bytes());
+}
+
+void hut::data_source_handle_cancelled(void *_data, wl_data_source *_source) {
+  wl_data_source_destroy(_source);
+  auto *w = (window*)_data;
+  w->current_selection_ = nullptr;
+}
+
+void data_source_handle_target(void *data, struct wl_data_source *wl_data_source, const char *mime_type) {}
+
+void window::clipboard_offer(file_formats _supported_formats, const send_clipboard_data &_callback) {
+  static const wl_data_source_listener wl_data_source_listeners = {
+    data_source_handle_target,
+    data_source_handle_send,
+    data_source_handle_cancelled,
+  };
+
+  if (!display_.data_device_manager_ || !display_.data_device_)
+    return;
+
+  if (current_selection_) {
+    wl_data_source_destroy(current_selection_);
+    current_selection_ = nullptr;
+  }
+
+  if (!_supported_formats)
+    return;
+
+  current_clipboard_sender_ = _callback;
+  current_selection_ = wl_data_device_manager_create_data_source(display_.data_device_manager_);
+  wl_data_source_add_listener(current_selection_, &wl_data_source_listeners, this);
+  for (const file_format mime : std::as_const(_supported_formats)) {
+    wl_data_source_offer(current_selection_, format_mime_type(mime));
+    switch(mime) {
+      default: break;
+      case FTEXT_URI_LIST:
+      case FTEXT_HTML:
+      case FTEXT_PLAIN:
+        wl_data_source_offer(current_selection_, "text/plain;charset=utf-8");
+        wl_data_source_offer(current_selection_, "text/plain;charset=unicode");
+        wl_data_source_offer(current_selection_, "STRING");
+        wl_data_source_offer(current_selection_, "TEXT");
+        wl_data_source_offer(current_selection_, "UTF8_STRING");
+        break;
+    }
+  }
+
+  wl_data_device_set_selection(display_.data_device_, current_selection_, display_.last_serial_);
+}
+
+bool window::clipboard_receive(file_formats _supported_formats, const receive_clipboard_data &_callback) {
+  if (display_.current_data_offer_ == nullptr)
+    return false;
+
+  for (file_format mime : std::as_const(_supported_formats)) {
+    if (display_.current_data_offer_formats_ & mime) {
+      int fds[2];
+      if (pipe(fds) != 0)
+        return false;
+      wl_data_offer_receive(display_.current_data_offer_, format_mime_type(mime), fds[1]);
+      ::close(fds[1]);
+
+      wl_display_roundtrip(display_.display_);
+
+      clipboard_receiver receiver{fds[0]};
+      _callback(mime, receiver);
+      ::close(fds[0]);
+      return true;
+    }
+  }
+
+  return false;
 }

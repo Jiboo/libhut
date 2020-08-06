@@ -105,7 +105,7 @@ class window {
   event<uint8_t /*finger*/, touch_event_type, vec2 /*pos*/> on_touch;
   event<uint8_t /*button*/, mouse_event_type, vec2 /*pos*/> on_mouse;
 
-  event<keysym /*key*/, bool /*down*/> on_key;
+  event<keysym /*key*/, modifiers /*mods*/, bool /*down*/> on_key;
   event<char32_t /*utf32_char*/> on_char;
   static std::string name_key(keysym c);
 
@@ -129,6 +129,24 @@ class window {
   }
 
   void set_cursor(cursor_type _c);
+
+  struct clipboard_sender {
+#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
+    int fd_;
+#endif
+    size_t write(span<uint8_t>);
+  };
+  using send_clipboard_data = std::function<void(file_format /*_selected_format*/, clipboard_sender&)>;
+  void clipboard_offer(file_formats _supported_formats, const send_clipboard_data &_callback);
+
+  struct clipboard_receiver {
+#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
+    int fd_;
+#endif
+    size_t read(span<uint8_t>);
+  };
+  using receive_clipboard_data = std::function<void(file_format /*selected_format*/, clipboard_receiver&)>;
+  bool clipboard_receive(file_formats _supported_formats, const receive_clipboard_data &_callback);
 
  protected:
   display &display_;
@@ -175,9 +193,15 @@ class window {
   friend void pointer_handle_motion(void*, wl_pointer*, uint32_t, wl_fixed_t, wl_fixed_t);
   friend void pointer_handle_button(void*, wl_pointer*, uint32_t, uint32_t, uint32_t, uint32_t);
   friend void pointer_handle_axis(void*, wl_pointer*, uint32_t, uint32_t, wl_fixed_t);
+  friend void data_source_handle_send(void*, wl_data_source*, const char*, int32_t);
+  friend void data_source_handle_cancelled(void*, wl_data_source*);
+
   wl_surface *wayland_surface_;
   xdg_surface *window_;
   xdg_toplevel *toplevel_;
+  wl_data_source *current_selection_ = nullptr;
+  send_clipboard_data current_clipboard_sender_;
+
   std::atomic_bool invalidated_ = true;
   vec2 mouse_lastmove_ = {0, 0};
   cursor_type current_cursor_type_ = CDEFAULT;

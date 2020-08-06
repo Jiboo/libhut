@@ -164,6 +164,7 @@ bool shaper::bake(shared_buffer &_buff, result &_dst, const shared_font &_font, 
   hb_buffer_reset(buffer_);
   hb_buffer_add_utf8(buffer_, _text.data(), _text.size(), 0, -1);
   hb_buffer_guess_segment_properties(buffer_);
+  hb_buffer_set_content_type(buffer_, HB_BUFFER_CONTENT_TYPE_UNICODE);
   hb_shape(cache.font_, buffer_, nullptr, 0);
 
   uint codepoints;

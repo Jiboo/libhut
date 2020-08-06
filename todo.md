@@ -1,4 +1,5 @@
 fix:
+- [w32] ctrl/shift KEYUP event sent two times
 
 refactor:
 - have the staging buffer always mapped?
@@ -6,11 +7,9 @@ refactor:
 - isolate (same?) platform code (like xcb vs wayland) in shared library that could be loaded at runtime
 - buffer allocation strategies/algorithms
     - the staging buffer strategy could be much simpler, as it is cleared at once when submitted, fragmentation isn't a problem
+- [wl] async clipboard read/write
 
 features:
 - multisampling
-- clipboard
-- drap&drop URI/text
-
-build:
-- compile against a statically compiled harfbuzz?
+- [xcb][w32] clipboard
+- [wl][xcb][w32] drap&drop URI/text

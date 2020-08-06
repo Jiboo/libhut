@@ -37,6 +37,7 @@
 #include <thread>
 #include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include <vulkan/vulkan.h>
@@ -103,7 +104,26 @@ enum cursor_type {
   CZOOM_IN,
   CZOOM_OUT,
 };
-const char* cursor_css_name(cursor_type _c);
+const char *cursor_css_name(cursor_type _c);
+
+enum file_format {
+  FIMAGE_PNG,
+  FIMAGE_JPEG,
+  FIMAGE_BMP,
+  FTEXT_HTML,
+  FTEXT_URI_LIST,
+  FTEXT_PLAIN,
+};
+using file_formats = flagged<file_format, FTEXT_PLAIN>;
+const char *format_mime_type(file_format _f);
+std::optional<file_format> mime_type_format(const char * _mime_type);
+
+enum modifier {
+  KMOD_ALT,
+  KMOD_CTRL,
+  KMOD_SHIFT,
+};
+using modifiers = flagged<modifier, KMOD_SHIFT>;
 
 #if defined(VK_USE_PLATFORM_XCB_KHR)
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
@@ -122,6 +142,11 @@ const char* cursor_css_name(cursor_type _c);
   void keyboard_handle_leave(void*, wl_keyboard*, uint32_t, wl_surface*);
   void keyboard_handle_key(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t);
   void keyboard_handle_modifiers(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+  void data_source_handle_send(void*, wl_data_source*, const char*, int32_t);
+  void data_source_handle_cancelled(void*, wl_data_source*);
+  void data_offer_handle_offer(void*, wl_data_offer*, const char*);
+  void data_device_handle_data_offer(void*, wl_data_device*, wl_data_offer*);
+  void data_device_handle_selection(void*, wl_data_device*, wl_data_offer*);
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
   LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
 #endif
@@ -261,6 +286,7 @@ class display {
   std::unordered_map<xcb_window_t, window *> windows_;
   xcb_atom_t atom_wm_, atom_close_, atom_change_state_, atom_state_, atom_hstate_, atom_rstate_;
   xcb_atom_t atom_maximizeh_, atom_maximizev_, atom_window_hints_;
+  xcb_atom_t atom_clipboard_, atom_utf8_string_;
   xcb_cursor_context_t *cursor_context_ = nullptr;
 
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
@@ -276,6 +302,9 @@ class display {
   friend void keyboard_handle_leave(void*, wl_keyboard*, uint32_t, wl_surface*);
   friend void keyboard_handle_key(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t);
   friend void keyboard_handle_modifiers(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+  friend void data_offer_handle_offer(void*, wl_data_offer*, const char*);
+  friend void data_device_handle_data_offer(void*, wl_data_device*, wl_data_offer*);
+  friend void data_device_handle_selection(void*, wl_data_device*, wl_data_offer*);
 
   struct animate_cursor_context {
     display &display_;
@@ -301,15 +330,27 @@ class display {
   wl_shm *shm_ = nullptr;
   wl_cursor_theme *cursor_theme_ = nullptr;
   wl_surface *cursor_surface_ = nullptr;
-  std::unordered_map<wl_surface*, window*> windows_;
-  bool loop_ = true;
-  std::pair<wl_surface*, window*> pointer_current_ {nullptr, nullptr};
-  std::pair<wl_surface*, window*> keyboard_current_ {nullptr, nullptr};
+  wl_data_device_manager *data_device_manager_ = nullptr;
+  wl_data_device *data_device_ = nullptr;
+  wl_data_offer *current_data_offer_ = nullptr;
+
   xkb_context *xkb_context_ = nullptr;
   xkb_state *xkb_state_ = nullptr;
   xkb_keymap *keymap_ = nullptr;
-  uint32_t kb_mod_mask_ = 0;
+
+  std::unordered_map<wl_surface*, window*> windows_;
+  std::pair<wl_surface*, window*> pointer_current_ {nullptr, nullptr};
+  std::pair<wl_surface*, window*> keyboard_current_ {nullptr, nullptr};
+  file_formats current_data_offer_formats_;
+
+  bool loop_ = true;
+  modifiers kb_mod_mask_;
+  uint32_t mod_index_alt_ = 0;
+  uint32_t mod_index_ctrl_ = 0;
+  uint32_t mod_index_shift_ = 0;
+
   uint32_t last_serial_ = 0;
+  uint32_t last_keyboard_enter_serial_ = 0;
   animate_cursor_context animate_cursor_ctx_;
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
   friend LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
