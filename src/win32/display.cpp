@@ -79,20 +79,31 @@ display::display(const char *_app_name, uint32_t _app_version, const char *) {
   hinstance_ = GetModuleHandle(nullptr);
 
   // Register window class
-  WNDCLASSEXA wc = {};
-  wc.cbSize = sizeof(wc);
-  wc.lpszClassName = HUT_WIN32_CLASSNAME;
-  wc.hInstance = hinstance_;
-  wc.lpfnWndProc = hut::WindowProc;
-  wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-  wc.hCursor = LoadCursorA(nullptr, IDC_ARROW);
-  if (!RegisterClassExA(&wc)) {
-    throw std::runtime_error("couldn't register window class");
+  WNDCLASSEXA wc_ssd = {};
+  wc_ssd.cbSize = sizeof(wc_ssd);
+  wc_ssd.lpszClassName = HUT_WIN32_CLASSNAME_SSD;
+  wc_ssd.hInstance = hinstance_;
+  wc_ssd.lpfnWndProc = hut::WindowProc;
+  wc_ssd.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+  wc_ssd.hCursor = LoadCursorA(nullptr, IDC_ARROW);
+  if (!RegisterClassExA(&wc_ssd)) {
+    throw std::runtime_error("couldn't register window ssd class");
+  }
+
+  WNDCLASSEXA wc_csd = {};
+  wc_csd.cbSize = sizeof(wc_csd);
+  wc_csd.lpszClassName = HUT_WIN32_CLASSNAME_CSD;
+  wc_csd.hInstance = hinstance_;
+  wc_csd.lpfnWndProc = hut::WindowProc;
+  wc_csd.style = 0;
+  wc_csd.hCursor = LoadCursorA(nullptr, IDC_ARROW);
+  if (!RegisterClassExA(&wc_csd)) {
+    throw std::runtime_error("couldn't register window csd class");
   }
 
   // Dummy window to request surface capabilities
-  HWND dummy = CreateWindowExA(WS_EX_OVERLAPPEDWINDOW, HUT_WIN32_CLASSNAME, "Dummy", WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
-                               0, 0, 800, 600, nullptr, nullptr, hinstance_, this);
+  HWND dummy = CreateWindowExA(WS_EX_OVERLAPPEDWINDOW, HUT_WIN32_CLASSNAME_SSD, "Dummy", WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+                               0, 0, 100, 100, nullptr, nullptr, hinstance_, this);
   if (!dummy) {
     throw std::runtime_error("couldn't create window");
   }
@@ -119,7 +130,8 @@ display::display(const char *_app_name, uint32_t _app_version, const char *) {
 }
 
 display::~display() {
-  UnregisterClassA(HUT_WIN32_CLASSNAME, hinstance_);
+  UnregisterClassA(HUT_WIN32_CLASSNAME_CSD, hinstance_);
+  UnregisterClassA(HUT_WIN32_CLASSNAME_SSD, hinstance_);
   FT_Done_FreeType(ft_library_);
   destroy_vulkan();
 }

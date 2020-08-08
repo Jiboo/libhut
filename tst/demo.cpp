@@ -62,11 +62,11 @@ int main(int, char **) {
 
   window w(d);
   w.clear_color({1, 1, 1, 1});
-  w.title("hut demo win1");
+  w.set_title("hut demo win1");
 
   window w2(d);
   w2.clear_color({0, 0, 1, 1});
-  w2.title("hut demo win2");
+  w2.set_title("hut demo win2");
 
   auto b = d.alloc_buffer(1024*1024);
 

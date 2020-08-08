@@ -69,7 +69,13 @@ void hut::handle_toplevel_close(void *_data, xdg_toplevel *) {
     w->close();
 }
 
-window::window(display &_display) : display_(_display), size_(800, 600) {
+void hut::handle_toplevel_decoration_configure(void *_data, zxdg_toplevel_decoration_v1 *_deco, uint32_t _mode) {
+  auto *w = static_cast<window*>(_data);
+  w->has_system_decorations_ = _mode == ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE;
+}
+
+window::window(display &_display, const window_params &_init_params)
+  : display_(_display), size_(bbox_size(_init_params.position_)) {
   static const xdg_surface_listener xdg_surface_listeners = {
     handle_xdg_configure,
   };
@@ -99,8 +105,23 @@ window::window(display &_display) : display_(_display), size_(800, 600) {
   toplevel_ = xdg_surface_get_toplevel(window_);
   xdg_toplevel_add_listener(toplevel_, &xdg_toplevel_listeners, this);
 
-  init_vulkan_surface();
+  has_system_decorations_ = false;
+  if (_init_params.flags_ & window_params::SYSTEM_DECORATIONS && display_.decoration_manager_) {
+    static const zxdg_toplevel_decoration_v1_listener zxdg_toplevel_decoration_v1_listeners = {
+        handle_toplevel_decoration_configure,
+    };
+    decoration_ = zxdg_decoration_manager_v1_get_toplevel_decoration(display_.decoration_manager_, toplevel_);
+    zxdg_toplevel_decoration_v1_add_listener(decoration_, &zxdg_toplevel_decoration_v1_listeners, this);
+    zxdg_toplevel_decoration_v1_set_mode(decoration_, ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
+    has_system_decorations_ = true;
+  }
+  if (_init_params.min_size_ != uvec2{0, 0})
+    xdg_toplevel_set_min_size(toplevel_, _init_params.min_size_.x, _init_params.min_size_.y);
+  if (_init_params.max_size_ != uvec2{0, 0})
+    xdg_toplevel_set_max_size(toplevel_, _init_params.max_size_.x, _init_params.max_size_.y);
+
   wl_surface_commit(wayland_surface_);
+  init_vulkan_surface();
 }
 
 window::~window() {
@@ -112,6 +133,7 @@ void window::close() {
     display_.windows_.erase(wayland_surface_);
 
     destroy_vulkan();
+    if (decoration_) zxdg_toplevel_decoration_v1_destroy(decoration_);
     xdg_toplevel_destroy(toplevel_);
     xdg_surface_destroy(window_);
     wl_surface_destroy(wayland_surface_);
@@ -121,7 +143,7 @@ void window::close() {
   }
 }
 
-void window::title(const std::string &_title) {
+void window::set_title(const std::string &_title) {
   xdg_toplevel_set_title(toplevel_, _title.c_str());
 }
 

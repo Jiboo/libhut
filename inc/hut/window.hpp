@@ -90,6 +90,18 @@ enum keysym : char32_t {
 
 class display;
 
+struct window_params {
+  enum flag {
+    SYSTEM_DECORATIONS,
+    FLAG_LAST_VALUE = SYSTEM_DECORATIONS,
+  };
+  using flags = flagged<flag, flag::FLAG_LAST_VALUE>;
+
+  flags flags_ {SYSTEM_DECORATIONS};
+  uvec4 position_ = {0, 0, 800, 600};
+  uvec2 min_size_ = {0, 0}, max_size_ = {0, 0};
+};
+
 class window {
   friend class display;
   template<typename TDetails, typename... TExtraBindings> friend class drawable;
@@ -109,26 +121,28 @@ class window {
   event<char32_t /*utf32_char*/> on_char;
   static std::string name_key(keysym c);
 
-  explicit window(display &_display);
+  explicit window(display &_display, const window_params &_init_params = {});
   ~window();
+
+  bool has_system_decorations() { return has_system_decorations_; }
 
   void close();
   void pause();
-  void maximize(bool _set = true);
-  void title(const std::string &);
+
   void invalidate(const uvec4 &, bool _redraw);
   void invalidate(bool _redraw);
 
+  void maximize(bool _set = true);
   uvec2 size() {
     return size_;
   }
 
+  void set_title(const std::string &);
+  void set_cursor(cursor_type _c);
   void clear_color(const vec4 &_color) {
     clear_color_ = _color;
     invalidate(true);
   }
-
-  void set_cursor(cursor_type _c);
 
   struct clipboard_sender {
 #if defined(VK_USE_PLATFORM_WAYLAND_KHR)
@@ -180,6 +194,7 @@ class window {
   vec4 clear_color_ = {0.0f, 0.0f, 0.0f, 1.0f};
   display::time_point last_frame_ = display::clock::now();
   bool minimized_ = false;
+  bool has_system_decorations_ = false;
 
   void init_vulkan_surface();
   void dispatch_resize(const uvec2 &);
@@ -192,6 +207,7 @@ class window {
   xcb_window_t window_, parent_;
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
   friend void handle_xdg_configure(void*, xdg_surface*, uint32_t);
+  friend void handle_toplevel_decoration_configure(void*, zxdg_toplevel_decoration_v1*, uint32_t);
   friend void handle_toplevel_configure(void*, xdg_toplevel*, int32_t, int32_t, wl_array*);
   friend void handle_toplevel_close(void*, xdg_toplevel*);
   friend void pointer_handle_enter(void*, wl_pointer*, uint32_t, wl_surface*, wl_fixed_t, wl_fixed_t);
@@ -205,11 +221,12 @@ class window {
   xdg_surface *window_;
   xdg_toplevel *toplevel_;
   wl_data_source *current_selection_ = nullptr;
-  send_clipboard_data current_clipboard_sender_;
+  zxdg_toplevel_decoration_v1 *decoration_ = nullptr;
 
   std::atomic_bool invalidated_ = true;
   vec2 mouse_lastmove_ = {0, 0};
   cursor_type current_cursor_type_ = CDEFAULT;
+  send_clipboard_data current_clipboard_sender_;
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
   friend LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
 

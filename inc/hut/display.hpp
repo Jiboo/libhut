@@ -50,6 +50,7 @@
 #include <wayland-cursor.h>
 #include <xkbcommon/xkbcommon.h>
 #include "xdg-shell-client-protocol.h"
+#include "xdg-decoration-client-protocol-v1.h"
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
 #include <windows.h>
 #else
@@ -132,6 +133,7 @@ using modifiers = flagged<modifier, MODIFIER_LAST_VALUE>;
   void registry_handler(void*, wl_registry*, uint32_t, const char*, uint32_t);
   void seat_handler(void*, wl_seat*, uint32_t);
   void handle_xdg_configure(void*, xdg_surface*, uint32_t);
+  void handle_toplevel_decoration_configure(void*, zxdg_toplevel_decoration_v1*, uint32_t);
   void handle_toplevel_configure(void*, xdg_toplevel*, int32_t, int32_t, wl_array*);
   void handle_toplevel_close(void*, xdg_toplevel*);
   void pointer_handle_enter(void*, wl_pointer*, uint32_t, wl_surface*, wl_fixed_t, wl_fixed_t);
@@ -335,6 +337,7 @@ class display {
   wl_data_device_manager *data_device_manager_ = nullptr;
   wl_data_device *data_device_ = nullptr;
   wl_data_offer *current_data_offer_ = nullptr;
+  zxdg_decoration_manager_v1 *decoration_manager_ = nullptr;
 
   xkb_context *xkb_context_ = nullptr;
   xkb_state *xkb_state_ = nullptr;
@@ -361,7 +364,8 @@ class display {
   UINT format_win32(clipboard_format _format);
   std::optional<clipboard_format> win32_format(UINT _format);
 
-  #define HUT_WIN32_CLASSNAME "Hut Window Class"
+  #define HUT_WIN32_CLASSNAME_CSD "hut_csd"
+  #define HUT_WIN32_CLASSNAME_SSD "hut_ssd"
   HINSTANCE hinstance_;
   std::unordered_map<HWND, window *> windows_;
   UINT html_clipboard_format_;

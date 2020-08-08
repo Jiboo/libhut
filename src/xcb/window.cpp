@@ -33,12 +33,15 @@
 #define XK_LATIN1
 #include <X11/keysymdef.h>
 
+#include <xcb/xcb_icccm.h>
+
 #include "hut/display.hpp"
 #include "hut/window.hpp"
 
 using namespace hut;
 
-window::window(display &_display) : display_(_display), size_(800, 600), parent_(_display.screen_->root) {
+window::window(display &_display, const window_params &_init_params)
+  : display_(_display), size_(bbox_size(_init_params.position_)), parent_(_display.screen_->root) {
   window_ = xcb_generate_id(_display.connection_);
 
   uint32_t mask = XCB_CW_EVENT_MASK;
@@ -47,7 +50,8 @@ window::window(display &_display) : display_(_display), size_(800, 600), parent_
                         | XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_VISIBILITY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE
                         | XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_STRUCTURE_NOTIFY};
 
-  xcb_create_window(_display.connection_, XCB_COPY_FROM_PARENT, window_, parent_, 0, 0, 800, 600, 0,
+  xcb_create_window(_display.connection_, XCB_COPY_FROM_PARENT, window_, parent_,
+                    _init_params.position_.x, _init_params.position_.y, size_.x, size_.y, 0,
                     XCB_WINDOW_CLASS_INPUT_OUTPUT, _display.screen_->root_visual, mask, values);
 
   xcb_change_property(_display.connection_, XCB_PROP_MODE_REPLACE, window_, _display.atom_wm_, 4, 32, 1,
@@ -67,16 +71,25 @@ window::window(display &_display) : display_(_display), size_(800, 600), parent_
 
   init_vulkan_surface();
 
-  // borderless window
-  struct {
-    uint32_t   flags = 2;
-    uint32_t   functions = 0;
-    uint32_t   decorations = 0;
-    int32_t    input_mode = 0;
-    uint32_t   status = 0;
-  } hints;
-  xcb_change_property(_display.connection_, XCB_PROP_MODE_REPLACE, window_, _display.atom_window_hints_,
-                      XCB_ATOM_ATOM, 32, 5, &hints);
+  has_system_decorations_ = true;
+  if ((_init_params.flags_ & window_params::SYSTEM_DECORATIONS) == 0) {
+    struct {
+      uint32_t flags = 2;
+      uint32_t functions = 0;
+      uint32_t decorations = 0;
+      int32_t input_mode = 0;
+      uint32_t status = 0;
+    } hints;
+    xcb_change_property(_display.connection_, XCB_PROP_MODE_REPLACE, window_, _display.atom_window_hints_,
+                        XCB_ATOM_ATOM, 32, 5, &hints);
+    has_system_decorations_ = false;
+  }
+  xcb_size_hints_t hints;
+  if (_init_params.min_size_ != uvec2{0, 0})
+    xcb_icccm_size_hints_set_min_size(&hints, _init_params.min_size_.x, _init_params.min_size_.y);
+  if (_init_params.max_size_ != uvec2{0, 0})
+    xcb_icccm_size_hints_set_max_size(&hints, _init_params.max_size_.x, _init_params.max_size_.y);
+  xcb_icccm_set_wm_size_hints(display_.connection_, window_, XCB_ATOM_WM_NORMAL_HINTS, &hints);
 
   xcb_map_window(_display.connection_, window_);
   xcb_flush(_display.connection_);
@@ -128,7 +141,7 @@ void window::maximize(bool _set) {
   xcb_flush(display_.connection_);
 }
 
-void window::title(const std::string &_title) {
+void window::set_title(const std::string &_title) {
   xcb_change_property(display_.connection_, XCB_PROP_MODE_REPLACE, window_, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8,
                       (uint32_t)_title.size(), _title.data());
   xcb_change_property(display_.connection_, XCB_PROP_MODE_REPLACE, window_, XCB_ATOM_WM_ICON_NAME, XCB_ATOM_STRING, 8,

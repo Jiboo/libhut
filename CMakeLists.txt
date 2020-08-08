@@ -73,7 +73,7 @@ if(GTEST_FOUND)
 endif()
 
 find_package(Wayland COMPONENTS wayland-client wayland-cursor)
-find_package(XCB COMPONENTS xcb xcb-keysyms xcb-util xcb-cursor)
+find_package(XCB COMPONENTS xcb xcb-keysyms xcb-util xcb-cursor xcb-icccm)
 
 if(Wayland_FOUND AND NOT HUT_PREFER_XCB)
   message("Using Wayland as backend, checking for other dependencies..")
@@ -96,9 +96,12 @@ if(Wayland_FOUND AND NOT HUT_PREFER_XCB)
   else()
     message("Found wayland-scanner: ${WAYLAND_SCANNER}")
   endif()
-  set(XDG_SHELL_PROTOCOL ${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml)
+
   set(WAYLAND_GEN_DIR ${CMAKE_BINARY_DIR}/wayland)
   file(MAKE_DIRECTORY ${WAYLAND_GEN_DIR})
+  set(WAYLAND_GENERATED "")
+
+  set(XDG_SHELL_PROTOCOL ${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml)
   set(XDG_SHELL_CLIENT_INCLUDE ${WAYLAND_GEN_DIR}/xdg-shell-client-protocol.h)
   set(XDG_SHELL_SOURCE ${WAYLAND_GEN_DIR}/xdg-shell-protocol.c)
   add_custom_command(
@@ -109,12 +112,26 @@ if(Wayland_FOUND AND NOT HUT_PREFER_XCB)
     OUTPUT ${XDG_SHELL_SOURCE}
     COMMAND ${WAYLAND_SCANNER} private-code ${XDG_SHELL_PROTOCOL} ${XDG_SHELL_SOURCE}
     DEPENDS ${XDG_SHELL_PROTOCOL})
-  set(HUT_INCLUDES ${HUT_INCLUDES} ${WAYLAND_GEN_DIR})
+  list(APPEND WAYLAND_GENERATED ${XDG_SHELL_CLIENT_INCLUDE} ${XDG_SHELL_SOURCE})
 
+  set(XDG_DECORATION_PROTOCOL ${WAYLAND_PROTOCOLS_DIR}/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml)
+  set(XDG_DECORATION_CLIENT_INCLUDE ${WAYLAND_GEN_DIR}/xdg-decoration-client-protocol-v1.h)
+  set(XDG_DECORATION_SOURCE ${WAYLAND_GEN_DIR}/xdg-decoration-protocol-v1.c)
+  add_custom_command(
+      OUTPUT ${XDG_DECORATION_CLIENT_INCLUDE}
+      COMMAND ${WAYLAND_SCANNER} client-header ${XDG_DECORATION_PROTOCOL} ${XDG_DECORATION_CLIENT_INCLUDE}
+      DEPENDS ${XDG_DECORATION_PROTOCOL})
+  add_custom_command(
+      OUTPUT ${XDG_DECORATION_SOURCE}
+      COMMAND ${WAYLAND_SCANNER} private-code ${XDG_DECORATION_PROTOCOL} ${XDG_DECORATION_SOURCE}
+      DEPENDS ${XDG_DECORATION_PROTOCOL})
+  list(APPEND WAYLAND_GENERATED ${XDG_DECORATION_CLIENT_INCLUDE} ${XDG_DECORATION_SOURCE})
+
+  set(HUT_INCLUDES ${HUT_INCLUDES} ${WAYLAND_GEN_DIR})
   set(HUT_INCLUDES ${HUT_INCLUDES} ${WAYLAND_INCLUDE_DIRS})
   set(HUT_LIBS ${HUT_LIBS} ${WAYLAND_LIBRARIES})
   file(GLOB HUT_WAYLAND_SOURCES src/wayland/*.cpp)
-  set(HUT_SOURCES ${HUT_SOURCES} ${HUT_WAYLAND_SOURCES} ${XDG_SHELL_CLIENT_INCLUDE} ${XDG_SHELL_SOURCE})
+  set(HUT_SOURCES ${HUT_SOURCES} ${HUT_WAYLAND_SOURCES} ${WAYLAND_GENERATED})
   set(HUT_PLATFORM WAYLAND)
 elseif(XCB_FOUND)
   message("Using XCB as backend")

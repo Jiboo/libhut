@@ -1,6 +1,7 @@
 fix:
 - [w32] ctrl/shift KEYUP event sent two times
 - [w32] delayed clipboard rendering not always working
+- [wl] test xdg-decorations (not available on fedora 31 desktop/weston)
 
 refactor:
 - have the staging buffer always mapped?
@@ -13,7 +14,6 @@ refactor:
 features:
 - window resize/move
 - fullscreen
-- client/server side decorations
 - multisampling
 - clipboard image
 - [xcb] clipboard

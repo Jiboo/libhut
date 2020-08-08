@@ -36,9 +36,21 @@
 
 using namespace hut;
 
-window::window(display &_display) : display_(_display), size_(800, 600) {
-  window_ = CreateWindowExA(WS_EX_APPWINDOW, HUT_WIN32_CLASSNAME, "hut", WS_POPUP,
-    0, 0, 800, 600, nullptr, nullptr, display_.hinstance_, &display_);
+window::window(display &_display, const window_params &_init_params)
+  : display_(_display), size_(bbox_size(_init_params.position_)) {
+
+  DWORD winExStyle = WS_EX_APPWINDOW;
+  DWORD winStyle = WS_POPUP;
+  LPCSTR className = HUT_WIN32_CLASSNAME_CSD;
+  if (_init_params.flags_ & window_params::SYSTEM_DECORATIONS) {
+    winExStyle = WS_EX_CLIENTEDGE;
+    winStyle = WS_OVERLAPPEDWINDOW;
+    className = HUT_WIN32_CLASSNAME_SSD;
+  }
+
+  window_ = CreateWindowExA(winExStyle, className, "hut", winStyle,
+          _init_params.position_.x, _init_params.position_.x, size_.x, size_.y,
+          nullptr, nullptr, display_.hinstance_, &display_);
   if (!window_) {
     throw std::runtime_error("couldn't create window");
   }
@@ -84,7 +96,7 @@ void window::maximize(bool _set) {
   ShowWindow(window_, _set ? SW_MAXIMIZE : SW_RESTORE);
 }
 
-void window::title(const std::string &_title) {
+void window::set_title(const std::string &_title) {
   SetWindowTextA(window_, _title.c_str());
 }
 

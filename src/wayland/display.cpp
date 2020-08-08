@@ -332,6 +332,9 @@ void hut::registry_handler(void *_data, wl_registry *_registry, uint32_t _id,
   else if (strcmp(_interface, wl_data_device_manager_interface.name) == 0) {
     d->data_device_manager_ = static_cast<wl_data_device_manager*>(wl_registry_bind(_registry, _id, &wl_data_device_manager_interface, 1));
   }
+  else if (strcmp(_interface, zxdg_decoration_manager_v1_interface.name) == 0) {
+    d->decoration_manager_ = static_cast<zxdg_decoration_manager_v1*>(wl_registry_bind(_registry, _id, &zxdg_decoration_manager_v1_interface, 1));
+  }
 }
 
 void registry_remove(void *, wl_registry *, uint32_t) {
@@ -443,6 +446,7 @@ display::~display() {
   if (xkb_state_) xkb_state_unref(xkb_state_);
   if (xkb_context_) xkb_context_unref(xkb_context_);
 
+  if (decoration_manager_) zxdg_decoration_manager_v1_destroy(decoration_manager_);
   if (current_data_offer_) wl_data_offer_destroy(current_data_offer_);
   if (data_device_) wl_data_device_destroy(data_device_);
   if (data_device_manager_) wl_data_device_manager_destroy(data_device_manager_);

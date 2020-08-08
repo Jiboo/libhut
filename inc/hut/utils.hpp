@@ -107,10 +107,15 @@ inline char32_t to_utf32(char16_t c) {
   return codepoint;
 }
 
-inline vec2 bbox_center(const vec4 &_input) {
-  const float width = _input[2] - _input[0];
-  const float height = _input[3] - _input[1];
-  return vec2{_input[0] + width / 2, _input[1] + height / 2};
+template<typename T, qualifier Q = defaultp>
+inline vec<2, T, Q> bbox_size(const vec<4, T, Q> &_input) {
+  return vec<2, T, Q>{_input[2] - _input[0], _input[3] - _input[1]};
+}
+
+template<typename T, qualifier Q = defaultp>
+inline vec<2, T, Q> bbox_center(const vec<4, T, Q> &_input) {
+  const auto size = bbox_size(_input);
+  return vec<2, T, Q>{_input[0] + size.x / 2, _input[1] + size.y / 2};
 }
 
 template<typename T>
@@ -224,6 +229,10 @@ struct flagged {
   static constexpr TUnderlying enum_end = TEnd;
 
   TUnderlying active_ = 0;
+
+  flagged() = default;
+  flagged(TUnderlying _init) : active_(_init) {}
+  flagged(TEnum _init) { set(_init); }
 
   [[nodiscard]] bool query(TEnum _flag)      const { return active_ & mask(_flag); }
   [[nodiscard]] bool operator[](TEnum _flag) const { return query(_flag); }
