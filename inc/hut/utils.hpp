@@ -219,13 +219,19 @@ struct flagged {
   static constexpr TUnderlying mask(TEnum _flag) { return 1U << _flag; }
   static_assert(bit_width(mask(TEnd)) <= underlying_bits, "underlying type too small to hold values to end");
 
+  using enum_type = TEnum;
+  using underlying_type = TUnderlying;
+  static constexpr TUnderlying enum_end = TEnd;
+
   TUnderlying active_ = 0;
 
-  operator bool() { return active_ != 0; }
+  [[nodiscard]] bool query(TEnum _flag)      const { return active_ & mask(_flag); }
+  [[nodiscard]] bool operator[](TEnum _flag) const { return query(_flag); }
+  [[nodiscard]] bool operator&(TEnum _flag)  const { return query(_flag); }
 
-  bool query(TEnum _flag)       const { return active_ & mask(_flag); }
-  bool operator[](TEnum _flag) const { return query(_flag); }
-  bool operator&(TEnum _flag)  const { return query(_flag); }
+  [[nodiscard]] size_t   count()             const { return std::popcount(active_); }
+  [[nodiscard]] bool     empty()             const { return active_ == 0; }
+  [[nodiscard]] operator bool()              const { return active_ != 0; }
 
   void reset(TUnderlying _underlying) { active_ = _underlying; }
   flagged &operator=(TUnderlying _underlying) { reset(_underlying); return *this; }

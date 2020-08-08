@@ -92,7 +92,7 @@ const char* hut::cursor_css_name(cursor_type _c) {
   }
 }
 
-const char *hut::format_mime_type(file_format _f) {
+const char *hut::format_mime_type(clipboard_format _f) {
   switch(_f) {
     case FTEXT_PLAIN: return "text/plain";
     case FTEXT_HTML: return "text/html";
@@ -104,7 +104,7 @@ const char *hut::format_mime_type(file_format _f) {
   return nullptr;
 }
 
-std::optional<file_format> hut::mime_type_format(const char * _mime_type) {
+std::optional<clipboard_format> hut::mime_type_format(const char * _mime_type) {
   if (strcmp(_mime_type, "text/plain;charset=utf-8") == 0) return FTEXT_PLAIN;
   if (strcmp(_mime_type, "text/html") == 0) return FTEXT_HTML;
   if (strcmp(_mime_type, "text/uri-list") == 0) return FTEXT_URI_LIST;

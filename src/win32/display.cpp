@@ -40,6 +40,38 @@
 
 using namespace hut;
 
+std::string display::utf8_wstr(const WCHAR *_input) {
+  size_t size = WideCharToMultiByte(CP_UTF8, 0, _input, -1, NULL, 0, NULL, NULL);
+  if (!size) return "";
+
+  std::string result;
+  result.resize(size);
+
+  if (!WideCharToMultiByte(CP_UTF8, 0, _input, -1, result.data(), size, NULL, NULL))
+    return "";
+
+  return result;
+}
+
+UINT display::format_win32(clipboard_format _format) {
+  switch (_format) {
+    case FTEXT_PLAIN: return CF_UNICODETEXT;
+    case FIMAGE_BMP: return CF_BITMAP;
+    case FTEXT_HTML: return html_clipboard_format_;
+  }
+  return 0;
+}
+
+std::optional<clipboard_format> display::win32_format(UINT _format) {
+  switch(_format) {
+    case CF_UNICODETEXT: return FTEXT_PLAIN;
+    case CF_BITMAP: return FIMAGE_BMP;
+  }
+  if (_format == html_clipboard_format_)
+    return FTEXT_HTML;
+  return {};
+}
+
 display::display(const char *_app_name, uint32_t _app_version, const char *) {
   std::vector<const char *> extensions = {VK_KHR_WIN32_SURFACE_EXTENSION_NAME};
   init_vulkan_instance(_app_name, _app_version, extensions);
@@ -82,6 +114,8 @@ display::display(const char *_app_name, uint32_t _app_version, const char *) {
   DestroyWindow(dummy);
 
   FT_Init_FreeType(&ft_library_);
+
+  html_clipboard_format_ = RegisterClipboardFormatA("HTML Format");
 }
 
 display::~display() {
@@ -310,6 +344,21 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
         w->set_cursor(w->current_cursor_type_);
       }
       return 0;
+    }
+
+    case WM_RENDERFORMAT: {
+      if (w) {
+        auto format = d->win32_format(_wparam);
+        if (format)
+          w->clipboard_write(*format, _wparam);
+      }
+    }
+
+    case WM_RENDERALLFORMATS: {
+      if (w) {
+        for (auto format : w->current_clipboard_formats_)
+          w->clipboard_write(format, d->format_win32((format)));
+      }
     }
 
     default:

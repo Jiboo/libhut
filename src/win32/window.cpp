@@ -26,6 +26,7 @@
  */
 #include <cstring>
 
+#include <charconv>
 #include <iostream>
 
 #include <windows.h>
@@ -99,19 +100,6 @@ void window::invalidate(const uvec4 &_coords, bool _redraw) {
   rect.bottom = _coords.w;
   RedrawWindow(window_, &rect, nullptr, RDW_INTERNALPAINT);
 }
-
-#define AFX_IDC_CONTEXTHELP             30977       // context sensitive help
-#define AFX_IDC_MAGNIFY                 30978       // print preview zoom
-#define AFX_IDC_SMALLARROWS             30979       // splitter
-#define AFX_IDC_HSPLITBAR               30980       // splitter
-#define AFX_IDC_VSPLITBAR               30981       // splitter
-#define AFX_IDC_NODROPCRSR              30982       // No Drop Cursor
-#define AFX_IDC_TRACKNWSE               30983       // tracker
-#define AFX_IDC_TRACKNESW               30984       // tracker
-#define AFX_IDC_TRACKNS                 30985       // tracker
-#define AFX_IDC_TRACKWE                 30986       // tracker
-#define AFX_IDC_TRACK4WAY               30987       // tracker
-#define AFX_IDC_MOVE4WAY                30988       // resize bar (server only)
 
 HCURSOR load_cursor(cursor_type _c) {
   switch (_c) {
@@ -193,15 +181,197 @@ void window::set_cursor(cursor_type _c) {
 }
 
 size_t window::clipboard_sender::write(span<uint8_t> _data) {
-  return 0;
+  buffer_.insert(buffer_.cend(), _data.begin(), _data.end());
+  return _data.size_bytes();
 }
 size_t window::clipboard_receiver::read(span<uint8_t> _data) {
-  return 0;
+  size_t remaining = buffer_.size() - offset_;
+  size_t reading = std::min(remaining, _data.size());
+  memcpy(_data.data(), buffer_.data() + offset_, reading);
+  offset_ += reading;
+  return reading;
 }
 
-void window::clipboard_offer(file_formats _supported_formats, const send_clipboard_data &_callback) {
+int parse_html_header(std::string_view _input, const char *_name) {
+  auto offset = _input.find(_name);
+  if (offset == std::string_view::npos)
+    return -1;
+  auto eol = _input.find('\n', offset);
+  if (eol == std::string_view::npos)
+    return -1;
+
+  auto valueStart = offset + strlen(_name) + 1;
+  auto substr = _input.substr(valueStart, eol - valueStart);
+
+  int result = -1;
+  std::from_chars(substr.begin(), substr.end(), result);
+  return result;
 }
 
-bool window::clipboard_receive(file_formats _supported_formats, const receive_clipboard_data &_callback) {
+span<uint8_t> window::parse_html_clipboard(std::string_view _input) {
+  if (!_input.starts_with("Version:0.9"))
+    return {};
+
+  auto start = parse_html_header(_input, "StartFragment");
+  auto end = parse_html_header(_input, "EndFragment");
+  if (start <= 0 || end <= 0)
+    return {};
+
+  return span<uint8_t>((uint8_t*)_input.data() + start, (uint8_t*)_input.data() + end);
+}
+
+std::vector<uint8_t> window::format_html_clipboard(span<uint8_t> _input) {
+  constexpr std::string_view header = "Version:0.9\n"
+                                      "StartHTML:00000000\n"
+                                      "EndHTML:00000000\n"
+                                      "StartFragment:00000000\n"
+                                      "EndFragment:00000000\n"
+                                      "<html><body>\n"
+                                      "<!--StartFragment -->\n";
+  constexpr std::string_view footer = "<!--EndFragment-->\n"
+                                      "</body>\n"
+                                      "</html>";
+
+  std::vector<uint8_t> result;
+  result.resize(header.size() + _input.size() + footer.size() + 1);
+  memcpy(result.data(), header.data(), header.size());
+  memcpy(result.data() + header.size(), _input.data(), _input.size());
+  memcpy(result.data() + header.size() + _input.size(), footer.data(), footer.size());
+  result.back() = 0;
+
+  constexpr auto startHtml = header.find("StartHTML:") + strlen("StartHTML:");
+  constexpr auto endHTML = header.find("EndHTML:") + strlen("EndHTML:");
+  constexpr auto startFrag = header.find("StartFragment:") + strlen("StartFragment:");
+  constexpr auto endFrag = header.find("EndFragment:") + strlen("EndFragment:");
+
+  constexpr auto htmlOpenTagPos = header.find("<html>");
+  constexpr auto htmlCloseTagPos = footer.find("</html>") + strlen("</html>");
+  constexpr auto htmlOpenFragPos = header.find("<!--StartFragment -->");
+  constexpr auto htmlCloseFragPos = footer.find("<!--EndFragment-->") + strlen("<!--EndFragment-->");
+
+  char buff[9];
+  sprintf(buff, "%08u", htmlOpenTagPos);
+  memcpy(result.data() + startHtml, buff, 8);
+
+  sprintf(buff, "%08u", header.size() + _input.size() + htmlCloseTagPos);
+  memcpy(result.data() + endHTML, buff, 8);
+
+  sprintf(buff, "%08u", htmlOpenFragPos);
+  memcpy(result.data() + startFrag, buff, 8);
+
+  sprintf(buff, "%08u", header.size() + _input.size() + htmlCloseFragPos);
+  memcpy(result.data() + endFrag, buff, 8);
+
+  return result;
+}
+
+void window::clipboard_offer(clipboard_formats _supported_formats, const send_clipboard_data &_callback) {
+  current_clipboard_formats_ = _supported_formats;
+  current_clipboard_sender_ = _callback;
+
+  assert(OpenClipboard(window_));
+  assert(EmptyClipboard());
+  for (auto format : _supported_formats) {
+    switch (format) {
+      case FIMAGE_PNG: [[fallthrough]]; case FIMAGE_JPEG: break; // TODO JBL: Convert to DIB
+      case FIMAGE_BMP:
+        SetClipboardData(CF_DIB, nullptr);
+        break;
+      case FTEXT_URI_LIST: [[fallthrough]];
+      case FTEXT_PLAIN:
+        SetClipboardData(CF_UNICODETEXT, nullptr);
+        break;
+      case FTEXT_HTML:
+        SetClipboardData(display_.html_clipboard_format_, nullptr);
+        break;
+    }
+  }
+  assert(CloseClipboard());
+}
+
+void window::clipboard_write(clipboard_format _format, UINT _win_format) {
+  window::clipboard_sender sender{};
+  current_clipboard_sender_(_format, sender);
+
+  switch(_win_format) {
+    case CF_UNICODETEXT: {
+      auto characterCount = MultiByteToWideChar(CP_UTF8, 0, (char*)sender.buffer_.data(), -1, nullptr, 0);
+      if (!characterCount)
+        return;
+      HANDLE object = GlobalAlloc(GMEM_MOVEABLE, characterCount * sizeof(WCHAR));
+      if (!object)
+        return;
+      auto *buffer = (WCHAR*)GlobalLock(object);
+      if (!buffer) {
+        GlobalFree(object);
+        return;
+      }
+      MultiByteToWideChar(CP_UTF8, 0, (char*)sender.buffer_.data(), -1, buffer, characterCount);
+      GlobalUnlock(object);
+      SetClipboardData(_win_format, object);
+    } break;
+    case CF_DIB: {
+      HANDLE object = GlobalAlloc(GMEM_MOVEABLE, sender.buffer_.size());
+      if (!object)
+        return;
+      auto *buffer = (uint8_t*)GlobalLock(object);
+      if (!buffer) {
+        GlobalFree(object);
+        return;
+      }
+      memcpy(buffer, sender.buffer_.data(), sender.buffer_.size());
+      GlobalUnlock(object);
+      SetClipboardData(_win_format, object);
+    } break;
+  }
+  if (_win_format == display_.html_clipboard_format_) {
+    auto formatted = format_html_clipboard(sender.buffer_);
+    HANDLE object = GlobalAlloc(GMEM_MOVEABLE, formatted.size());
+    if (!object)
+      return;
+    auto *buffer = (uint8_t*)GlobalLock(object);
+    if (!buffer) {
+      GlobalFree(object);
+      return;
+    }
+    memcpy(buffer, formatted.data(), formatted.size());
+    GlobalUnlock(object);
+    SetClipboardData(_win_format, object);
+  }
+}
+
+bool window::clipboard_receive(clipboard_formats _supported_formats, const receive_clipboard_data &_callback) {
+  if (!OpenClipboard(window_))
+    return false;
+  for (auto format : _supported_formats) {
+    auto wformat = display_.format_win32(format);
+    if (wformat) {
+      HANDLE object = GetClipboardData(wformat);
+      auto *locked = GlobalLock(object);
+      if (!locked) {
+        CloseClipboard();
+        return false;
+      }
+      switch(wformat) {
+        case CF_UNICODETEXT: {
+          auto *buffer = (WCHAR*)locked;
+          auto utf8 = display::utf8_wstr(buffer);
+          utf8.erase(std::remove(utf8.begin(), utf8.end(), '\r'), utf8.end());
+          clipboard_receiver receiver{span<uint8_t>((uint8_t*)utf8.data(), utf8.size())};
+          _callback(format, receiver);
+        };
+        case CF_DIB: {
+
+        } break;
+      }
+      if (wformat == display_.html_clipboard_format_) {
+        clipboard_receiver receiver{parse_html_clipboard((char*)locked)};
+        _callback(format, receiver);
+      }
+      GlobalUnlock(object);
+      CloseClipboard();
+      return true;
+    }
+  }
   return false;
 }

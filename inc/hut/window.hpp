@@ -133,20 +133,25 @@ class window {
   struct clipboard_sender {
 #if defined(VK_USE_PLATFORM_WAYLAND_KHR)
     int fd_;
+#elif defined(VK_USE_PLATFORM_WIN32_KHR)
+    std::vector<uint8_t> buffer_;
 #endif
     size_t write(span<uint8_t>);
   };
-  using send_clipboard_data = std::function<void(file_format /*_selected_format*/, clipboard_sender&)>;
-  void clipboard_offer(file_formats _supported_formats, const send_clipboard_data &_callback);
+  using send_clipboard_data = std::function<void(clipboard_format /*_selected_format*/, clipboard_sender &)>;
+  void clipboard_offer(clipboard_formats _supported_formats, const send_clipboard_data &_callback);
 
   struct clipboard_receiver {
 #if defined(VK_USE_PLATFORM_WAYLAND_KHR)
     int fd_;
+#elif defined(VK_USE_PLATFORM_WIN32_KHR)
+    span<uint8_t> buffer_;
+    size_t offset_ = 0;
 #endif
     size_t read(span<uint8_t>);
   };
-  using receive_clipboard_data = std::function<void(file_format /*selected_format*/, clipboard_receiver&)>;
-  bool clipboard_receive(file_formats _supported_formats, const receive_clipboard_data &_callback);
+  using receive_clipboard_data = std::function<void(clipboard_format /*selected_format*/, clipboard_receiver &)>;
+  bool clipboard_receive(clipboard_formats _supported_formats, const receive_clipboard_data &_callback);
 
  protected:
   display &display_;
@@ -207,9 +212,16 @@ class window {
   cursor_type current_cursor_type_ = CDEFAULT;
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
   friend LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
+
+  void clipboard_write(clipboard_format _format, UINT _win_format);
+  span<uint8_t> parse_html_clipboard(std::string_view _input);
+  std::vector<uint8_t> format_html_clipboard(span<uint8_t> _input);
+
   HWND window_;
   vec2 mouse_lastmove_ = {0, 0};
   cursor_type current_cursor_type_ = CDEFAULT;
+  send_clipboard_data current_clipboard_sender_;
+  clipboard_formats current_clipboard_formats_;
 #endif
 };
 

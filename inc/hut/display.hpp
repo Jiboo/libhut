@@ -106,24 +106,26 @@ enum cursor_type {
 };
 const char *cursor_css_name(cursor_type _c);
 
-enum file_format {
+enum clipboard_format {
   FIMAGE_PNG,
   FIMAGE_JPEG,
   FIMAGE_BMP,
   FTEXT_HTML,
   FTEXT_URI_LIST,
   FTEXT_PLAIN,
+  CLIPBOARD_FORMAT_LAST_VALUE = FTEXT_PLAIN,
 };
-using file_formats = flagged<file_format, FTEXT_PLAIN>;
-const char *format_mime_type(file_format _f);
-std::optional<file_format> mime_type_format(const char * _mime_type);
+using clipboard_formats = flagged<clipboard_format, CLIPBOARD_FORMAT_LAST_VALUE>;
+const char *format_mime_type(clipboard_format _f);
+std::optional<clipboard_format> mime_type_format(const char * _mime_type);
 
 enum modifier {
   KMOD_ALT,
   KMOD_CTRL,
   KMOD_SHIFT,
+  MODIFIER_LAST_VALUE = KMOD_SHIFT,
 };
-using modifiers = flagged<modifier, KMOD_SHIFT>;
+using modifiers = flagged<modifier, MODIFIER_LAST_VALUE>;
 
 #if defined(VK_USE_PLATFORM_XCB_KHR)
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
@@ -341,7 +343,7 @@ class display {
   std::unordered_map<wl_surface*, window*> windows_;
   std::pair<wl_surface*, window*> pointer_current_ {nullptr, nullptr};
   std::pair<wl_surface*, window*> keyboard_current_ {nullptr, nullptr};
-  file_formats current_data_offer_formats_;
+  clipboard_formats current_data_offer_formats_;
 
   bool loop_ = true;
   modifiers kb_mod_mask_;
@@ -353,10 +355,16 @@ class display {
   uint32_t last_keyboard_enter_serial_ = 0;
   animate_cursor_context animate_cursor_ctx_;
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
+  static std::string utf8_wstr(const WCHAR *_input);
   friend LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
+
+  UINT format_win32(clipboard_format _format);
+  std::optional<clipboard_format> win32_format(UINT _format);
+
   #define HUT_WIN32_CLASSNAME "Hut Window Class"
   HINSTANCE hinstance_;
   std::unordered_map<HWND, window *> windows_;
+  UINT html_clipboard_format_;
 #endif
 };
 

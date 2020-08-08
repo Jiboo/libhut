@@ -182,7 +182,7 @@ void hut::data_source_handle_cancelled(void *_data, wl_data_source *_source) {
 
 void data_source_handle_target(void *data, struct wl_data_source *wl_data_source, const char *mime_type) {}
 
-void window::clipboard_offer(file_formats _supported_formats, const send_clipboard_data &_callback) {
+void window::clipboard_offer(clipboard_formats _supported_formats, const send_clipboard_data &_callback) {
   static const wl_data_source_listener wl_data_source_listeners = {
     data_source_handle_target,
     data_source_handle_send,
@@ -203,7 +203,7 @@ void window::clipboard_offer(file_formats _supported_formats, const send_clipboa
   current_clipboard_sender_ = _callback;
   current_selection_ = wl_data_device_manager_create_data_source(display_.data_device_manager_);
   wl_data_source_add_listener(current_selection_, &wl_data_source_listeners, this);
-  for (const file_format mime : std::as_const(_supported_formats)) {
+  for (auto mime : _supported_formats) {
     wl_data_source_offer(current_selection_, format_mime_type(mime));
     switch(mime) {
       default: break;
@@ -222,11 +222,11 @@ void window::clipboard_offer(file_formats _supported_formats, const send_clipboa
   wl_data_device_set_selection(display_.data_device_, current_selection_, display_.last_serial_);
 }
 
-bool window::clipboard_receive(file_formats _supported_formats, const receive_clipboard_data &_callback) {
+bool window::clipboard_receive(clipboard_formats _supported_formats, const receive_clipboard_data &_callback) {
   if (display_.current_data_offer_ == nullptr)
     return false;
 
-  for (file_format mime : std::as_const(_supported_formats)) {
+  for (auto mime : _supported_formats) {
     if (display_.current_data_offer_formats_ & mime) {
       int fds[2];
       if (pipe(fds) != 0)

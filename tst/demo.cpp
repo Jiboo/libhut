@@ -447,20 +447,20 @@ int main(int, char **) {
 
       static const char text_html[] = R"(<meta http-equiv="content-type" content="text/html; charset=UTF-8"><html><body><b>Hello</b> from <i>libhut</i></body></html>)";
       static const char text_plain[] = "Hello from libhut";
-      w.clipboard_offer(file_formats{} | FTEXT_HTML | FTEXT_PLAIN, [](file_format _mime, window::clipboard_sender &_sender) {
+      w.clipboard_offer(clipboard_formats{} | FTEXT_HTML | FTEXT_PLAIN, [](clipboard_format _mime, window::clipboard_sender &_sender) {
         std::cout << "Writing to clipboard in " << format_mime_type(_mime) << std::endl;
         if (_mime == FTEXT_HTML) {
-          _sender.write({(uint8_t*)text_html, strlen(text_html)});
+          _sender.write({(uint8_t*)text_html, sizeof(text_html)});
         }
         else if (_mime == FTEXT_PLAIN) {
-          _sender.write({(uint8_t*)text_plain, strlen(text_plain)});
+          _sender.write({(uint8_t*)text_plain, sizeof(text_plain)});
         }
       });
     }
     if ((_keysym == 'v' || _keysym == 'V') && (_mods == KMOD_CTRL) && _pressed) {
       std::cout << "Receiving from clipboard" << std::endl;
 
-      w.clipboard_receive(file_formats{} | FTEXT_HTML | FTEXT_PLAIN, [](file_format _mime, window::clipboard_receiver &_receiver) {
+      w.clipboard_receive(clipboard_formats{} | FTEXT_HTML | FTEXT_PLAIN, [](clipboard_format _mime, window::clipboard_receiver &_receiver) {
         std::cout << "Clipboard contents in " << format_mime_type(_mime) << ": ";
         uint8_t buffer[2048];
         size_t read_bytes;

@@ -194,11 +194,11 @@ size_t window::clipboard_receiver::read(span<uint8_t> _data) {
   return 0;
 }
 
-void window::clipboard_offer(file_formats _supported_formats, const send_clipboard_data &_callback) {
+void window::clipboard_offer(clipboard_formats _supported_formats, const send_clipboard_data &_callback) {
   //TODO
   //xcb_set_selection_owner(display_.connection_, window_, display_.atom_clipboard_, XCB_CURRENT_TIME);
 }
 
-bool window::clipboard_receive(file_formats _supported_formats, const receive_clipboard_data &_callback) {
+bool window::clipboard_receive(clipboard_formats _supported_formats, const receive_clipboard_data &_callback) {
   return false;
 }

@@ -1,5 +1,6 @@
 fix:
 - [w32] ctrl/shift KEYUP event sent two times
+- [w32] delayed clipboard rendering not always working
 
 refactor:
 - have the staging buffer always mapped?
@@ -10,6 +11,10 @@ refactor:
 - [wl] async clipboard read/write
 
 features:
+- window resize/move
+- fullscreen
+- client/server side decorations
 - multisampling
-- [xcb][w32] clipboard
+- clipboard image
+- [xcb] clipboard
 - [wl][xcb][w32] drap&drop URI/text
