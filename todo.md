@@ -2,7 +2,7 @@ fix:
 - [w32] ctrl/shift KEYUP event sent two times
 - [w32] delayed clipboard rendering not always working
 - [wl] test xdg-decorations (not available on fedora 31 desktop/weston)
-- homogenize button indexes for mouse events
+- [wl] fix a bug where the next configure after an unset_maximize would be [0, 0] instead of size prior to maximize
 
 refactor:
 - have the staging buffer always mapped?

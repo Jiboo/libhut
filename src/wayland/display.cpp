@@ -262,7 +262,7 @@ void hut::keyboard_handle_modifiers(void *_data, wl_keyboard *, uint32_t _serial
   d->last_serial_ =  _serial;
   xkb_state_update_mask(d->xkb_state_, _mods_depressed, _mods_latched, _mods_locked, 0, 0, _group);
 
-  uint32_t mod_mask = 0;
+  modifiers mod_mask = 0;
   if (xkb_state_mod_index_is_active(d->xkb_state_, d->mod_index_alt_, XKB_STATE_MODS_EFFECTIVE))
     mod_mask |= KMOD_ALT;
   if (xkb_state_mod_index_is_active(d->xkb_state_, d->mod_index_ctrl_, XKB_STATE_MODS_EFFECTIVE))

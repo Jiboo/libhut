@@ -252,7 +252,10 @@ void dispatch_keysym(window *w, uint16_t _mask, xcb_keysym_t _ks, bool press) {
   const bool alt = _mask & XCB_MOD_MASK_1;
   const bool ctrl = _mask & XCB_MOD_MASK_CONTROL;
   const bool shift = _mask & XCB_MOD_MASK_SHIFT;
-  auto mods = modifiers((alt ? KMOD_ALT : 0U) | (ctrl ? KMOD_CTRL : 0U) | (shift ? KMOD_SHIFT : 0U));
+  modifiers mods;
+  if (alt) mods.set(KMOD_ALT);
+  if (ctrl) mods.set(KMOD_CTRL);
+  if (shift) mods.set(KMOD_SHIFT);
 
   w->on_key.fire(mapped, mods, press);
   if (!remapped && !ctrl && !alt && mapped != 0xfe03 && press)
