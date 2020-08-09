@@ -252,7 +252,9 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
         }
         uvec2 s{LOWORD(_lparam), HIWORD(_lparam)};
         if (s != w->size_) {
-          w->dispatch_resize(s);
+          w->size_ = s;
+          w->init_vulkan_surface();
+          w->on_resize.fire(s);
         }
       }
       return 0;
@@ -266,30 +268,45 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
       return 0;
     }
 
+    case WM_MOUSEWHEEL: {
+      if (w) {
+        vec2 pos{LOWORD(_lparam), HIWORD(_lparam)};
+        auto speed = static_cast<int16_t>(HIWORD(_wparam));
+        w->on_mouse.fire(0, speed >= 0 ? MWHEEL_UP : MWHEEL_DOWN, pos);
+      }
+      return 0;
+    }
+
+    case WM_XBUTTONDOWN:
     case WM_LBUTTONDOWN:
     case WM_RBUTTONDOWN:
-    case WM_MBUTTONDOWN: {
+    case WM_MBUTTONDOWN:{
       if (w) {
-        uint8_t button = 0;
-        if (_umsg == WM_RBUTTONDOWN)
-          button = 1;
-        else if (_umsg == WM_MBUTTONDOWN)
-          button = 2;
+        uint8_t button = 1;
+        switch(_umsg) {
+          case WM_LBUTTONDOWN: w->button_pressed_ = true; break;
+          case WM_RBUTTONDOWN: button = 2; break;
+          case WM_MBUTTONDOWN: button = 3; break;
+          case WM_XBUTTONDOWN: button = (HIWORD(_wparam) == XBUTTON1 ? 4 : 5); break;
+        }
         vec2 pos{LOWORD(_lparam), HIWORD(_lparam)};
         w->on_mouse.fire(button, MDOWN, pos);
       }
       return 0;
     }
 
+    case WM_XBUTTONUP:
     case WM_LBUTTONUP:
     case WM_RBUTTONUP:
     case WM_MBUTTONUP: {
       if (w) {
-        uint8_t button = 0;
-        if (_umsg == WM_RBUTTONUP)
-          button = 1;
-        else if (_umsg == WM_MBUTTONUP)
-          button = 2;
+        uint8_t button = 1;
+        switch(_umsg) {
+          case WM_LBUTTONUP: w->button_pressed_ = false; break;
+          case WM_RBUTTONUP: button = 2; break;
+          case WM_MBUTTONUP: button = 3; break;
+          case WM_XBUTTONUP: button = (HIWORD(_wparam) == XBUTTON1 ? 4 : 5); break;
+        }
         vec2 pos{LOWORD(_lparam), HIWORD(_lparam)};
         w->on_mouse.fire(button, MUP, pos);
       }

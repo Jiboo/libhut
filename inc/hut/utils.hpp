@@ -108,6 +108,11 @@ inline char32_t to_utf32(char16_t c) {
 }
 
 template<typename T, qualifier Q = defaultp>
+inline vec<2, T, Q> bbox_origin(const vec<4, T, Q> &_input) {
+  return vec<2, T, Q>{_input[0], _input[1]};
+}
+
+template<typename T, qualifier Q = defaultp>
 inline vec<2, T, Q> bbox_size(const vec<4, T, Q> &_input) {
   return vec<2, T, Q>{_input[2] - _input[0], _input[3] - _input[1]};
 }
@@ -230,32 +235,35 @@ struct flagged {
 
   TUnderlying active_ = 0;
 
-  flagged() = default;
-  flagged(TUnderlying _init) : active_(_init) {}
-  flagged(TEnum _init) { set(_init); }
+  constexpr flagged() = default;
+  constexpr flagged(TUnderlying _init) : active_(_init) {}
+  constexpr flagged(TEnum _init) { set(_init); }
+  constexpr flagged(std::initializer_list<TEnum> _inits) { for (auto flag : _inits) set(flag); }
 
-  [[nodiscard]] bool query(TEnum _flag)      const { return active_ & mask(_flag); }
-  [[nodiscard]] bool operator[](TEnum _flag) const { return query(_flag); }
-  [[nodiscard]] bool operator&(TEnum _flag)  const { return query(_flag); }
+  [[nodiscard]] constexpr bool query(TEnum _flag)      const { return active_ & mask(_flag); }
+  [[nodiscard]] constexpr bool operator[](TEnum _flag) const { return query(_flag); }
+  [[nodiscard]] constexpr bool operator&(TEnum _flag)  const { return query(_flag); }
 
-  [[nodiscard]] size_t   count()             const { return std::popcount(active_); }
-  [[nodiscard]] bool     empty()             const { return active_ == 0; }
-  [[nodiscard]] operator bool()              const { return active_ != 0; }
+  [[nodiscard]] constexpr size_t   count()             const { return std::popcount(active_); }
+  [[nodiscard]] constexpr bool     empty()             const { return active_ == 0; }
+  [[nodiscard]] constexpr operator bool()              const { return active_ != 0; }
 
-  void reset(TUnderlying _underlying) { active_ = _underlying; }
-  flagged &operator=(TUnderlying _underlying) { reset(_underlying); return *this; }
+  constexpr void reset(TUnderlying _underlying) { active_ = _underlying; }
+  constexpr flagged &operator=(TUnderlying _underlying) { reset(_underlying); return *this; }
 
-  void flip(TEnum _flag)  { active_ ^= mask(_flag); }
-  void set(TEnum _flag)   { active_ |= mask(_flag); }
+  constexpr void flip(TEnum _flag)  { active_ ^= mask(_flag); }
+  constexpr void set(TEnum _flag)   { active_ |= mask(_flag); }
 
-  flagged operator|(TEnum _flag) const { flagged result{active_}; result.set(_flag); return result; }
-  flagged &operator|=(TEnum _flag) { set(_flag); return *this; }
+  constexpr flagged operator|(TEnum _flag) const { flagged result{active_}; result.set(_flag); return result; }
+  constexpr flagged &operator|=(TEnum _flag) { set(_flag); return *this; }
+
+  constexpr bool operator==(TEnum _flag) const { return active_ == mask(_flag); }
 
   struct const_iterator {
     TUnderlying shifted_;
     TUnderlying current_;
 
-    const_iterator &operator++() {
+    constexpr const_iterator &operator++() {
       shifted_ = shifted_ >> 1U;
       current_++;
       auto to_skip = std::countr_zero(shifted_);
@@ -263,14 +271,14 @@ struct flagged {
       current_ = std::min(TUnderlying(underlying_bits), TUnderlying(current_ + to_skip));
       return *this;
     }
-    bool operator!=(const const_iterator &_other) const { return current_ != _other.current_; }
-    TEnum operator*() const { return static_cast<TEnum>(current_); }
+    constexpr bool operator!=(const const_iterator &_other) const { return current_ != _other.current_; }
+    constexpr TEnum operator*() const { return static_cast<TEnum>(current_); }
   };
 
-  const_iterator cbegin() const { TUnderlying to_skip = std::countr_zero(active_); return const_iterator{active_ >> to_skip, to_skip}; }
-  const_iterator begin() const { return cbegin(); }
-  const_iterator cend() const { return const_iterator{0, underlying_bits}; }
-  const_iterator end() const { return cend(); }
+  constexpr const_iterator cbegin() const { TUnderlying to_skip = std::countr_zero(active_); return const_iterator{active_ >> to_skip, to_skip}; }
+  constexpr const_iterator begin() const { return cbegin(); }
+  constexpr const_iterator cend() const { return const_iterator{0, underlying_bits}; }
+  constexpr const_iterator end() const { return cend(); }
 };
 
 }  // namespace hut

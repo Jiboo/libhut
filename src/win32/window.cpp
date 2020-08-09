@@ -387,3 +387,31 @@ bool window::clipboard_receive(clipboard_formats _supported_formats, const recei
   }
   return false;
 }
+
+void window::interactive_resize(edge _edge) {
+  if (!button_pressed_)
+    return;
+
+  WPARAM wparam = SC_SIZE;
+  switch (_edge.active_) {
+    case edge(TOP).active_: wparam += 3; break;
+    case edge(BOTTOM).active_: wparam += 6; break;
+    case edge(LEFT).active_: wparam += 1; break;
+    case edge(RIGHT).active_: wparam += 2; break;
+
+    case edge({TOP, LEFT}).active_: wparam += 4; break;
+    case edge({TOP, RIGHT}).active_: wparam += 5; break;
+    case edge({BOTTOM, LEFT}).active_: wparam += 7; break;
+    case edge({BOTTOM, RIGHT}).active_: wparam += 8; break;
+  }
+  PostMessageA(window_, WM_SYSCOMMAND, wparam, 0);
+}
+
+void window::interactive_move() {
+  if (!button_pressed_)
+    return;
+
+  constexpr WPARAM SC_DRAGMOVE = 0xf012;
+  PostMessageA(window_, WM_SYSCOMMAND, SC_DRAGMOVE, 0);
+  std::cout << "move" << std::endl;
+}

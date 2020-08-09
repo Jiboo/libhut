@@ -44,8 +44,11 @@ void hut::handle_toplevel_configure(void *_data, xdg_toplevel *, int32_t _width,
   auto *w = static_cast<window*>(_data);
   if (_width > 0 && _height > 0) {
     uvec2 new_size{_width, _height};
-    if (new_size != w->size_)
-      w->dispatch_resize(new_size);
+    if (new_size != w->size_) {
+      w->size_ = new_size;
+      w->init_vulkan_surface();
+      w->on_resize.fire(new_size);
+    }
   }
   span<xdg_toplevel_state> states {
       reinterpret_cast<xdg_toplevel_state*>(_states->data),
@@ -131,6 +134,7 @@ window::~window() {
 void window::close() {
   if (window_ != nullptr) {
     display_.windows_.erase(wayland_surface_);
+    display_.pointer_current_ = {nullptr, nullptr};
 
     destroy_vulkan();
     if (decoration_) zxdg_toplevel_decoration_v1_destroy(decoration_);
@@ -266,4 +270,14 @@ bool window::clipboard_receive(clipboard_formats _supported_formats, const recei
   }
 
   return false;
+}
+
+void window::interactive_resize(edge _edge) {
+  // TODO Assert called from on_mouse (move) event
+  xdg_toplevel_resize(toplevel_, display_.seat_, display_.last_serial_, _edge.active_);
+}
+
+void window::interactive_move() {
+  // TODO Assert called from on_mouse (move) event
+  xdg_toplevel_move(toplevel_, display_.seat_, display_.last_serial_);
 }

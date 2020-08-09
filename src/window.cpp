@@ -36,6 +36,21 @@
 
 using namespace hut;
 
+cursor_type hut::edge_cursor(edge _edge) {
+  switch (_edge.active_) {
+    case edge(TOP).active_: return CRESIZE_N;
+    case edge(RIGHT).active_: return CRESIZE_E;
+    case edge(LEFT).active_: return CRESIZE_W;
+    case edge(BOTTOM).active_: return CRESIZE_S;
+
+    case edge({TOP, RIGHT}).active_: return CRESIZE_NE;
+    case edge({TOP, LEFT}).active_: return CRESIZE_NW;
+    case edge({BOTTOM, RIGHT}).active_: return CRESIZE_SE;
+    case edge({BOTTOM, LEFT}).active_: return CRESIZE_SW;
+  }
+  return CDEFAULT;
+}
+
 void window::invalidate(bool _redraw) {
   invalidate(uvec4{uvec2{0, 0}, size_}, _redraw);
 }
@@ -79,15 +94,10 @@ void window::destroy_vulkan() {
 VkPresentModeKHR select_best_mode(const span<VkPresentModeKHR> &_modes)
 {
   VkPresentModeKHR preferred_modes[] = {
-#ifdef VK_USE_PLATFORM_WAYLAND_KHR
-      VK_PRESENT_MODE_FIFO_KHR,
-#endif
-      VK_PRESENT_MODE_FIFO_RELAXED_KHR,
       VK_PRESENT_MODE_MAILBOX_KHR,
       VK_PRESENT_MODE_IMMEDIATE_KHR,
-#ifdef VK_USE_PLATFORM_XCB_KHR
+      VK_PRESENT_MODE_FIFO_RELAXED_KHR,
       VK_PRESENT_MODE_FIFO_KHR,
-#endif
   };
 
   for (const auto &preferred_mode : preferred_modes) {
@@ -105,6 +115,8 @@ VkPresentModeKHR select_best_mode(const span<VkPresentModeKHR> &_modes)
 void window::init_vulkan_surface() {
   if (surface_ == VK_NULL_HANDLE)
     return;
+
+  auto before_formats = display::clock::now();
 
   const VkPhysicalDevice &pdevice = display_.pdevice_;
 
@@ -154,7 +166,7 @@ void window::init_vulkan_surface() {
   vkGetPhysicalDeviceSurfacePresentModesKHR(pdevice, surface_, &modes_count, nullptr);
   std::vector<VkPresentModeKHR> modes(modes_count);
   vkGetPhysicalDeviceSurfacePresentModesKHR(pdevice, surface_, &modes_count, modes.data());
-  present_mode_ = select_best_mode(modes);
+  present_mode_ = params_.flags_ & window_params::VSYNC ? VK_PRESENT_MODE_FIFO_KHR : select_best_mode(modes);
 
   if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
     swapchain_extents_ = capabilities.currentExtent;
@@ -171,6 +183,8 @@ void window::init_vulkan_surface() {
   if (capabilities.maxImageCount > 0 && images_count > capabilities.maxImageCount) {
     images_count = capabilities.maxImageCount;
   }
+
+  auto before_swapchain = display::clock::now();
 
   VkSwapchainCreateInfoKHR swapchain_infos = {};
   swapchain_infos.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -204,11 +218,15 @@ void window::init_vulkan_surface() {
     throw std::runtime_error("failed to create swap chain!");
   }
 
+  auto before_wait = display::clock::now();
+
   vkDeviceWaitIdle(display_.device_);
 
   swapchain_ = new_swapchain;
   if (old_swapchain != VK_NULL_HANDLE)
     vkDestroySwapchainKHR(display_.device_, old_swapchain, nullptr);
+
+  auto before_images = display::clock::now();
 
   vkGetSwapchainImagesKHR(display_.device_, swapchain_, &images_count, nullptr);
   swapchain_images_.resize(images_count);
@@ -233,6 +251,8 @@ void window::init_vulkan_surface() {
     if (vkCreateImageView(display_.device_, &imagev_infos, nullptr, &swapchain_imageviews_[i]) != VK_SUCCESS)
       throw std::runtime_error("failed to create image views!");
   }
+
+  auto before_renderpass = display::clock::now();
 
   VkAttachmentDescription colorAttachment = {};
   colorAttachment.format = surface_format_.format;
@@ -301,6 +321,8 @@ void window::init_vulkan_surface() {
   if (vkCreateRenderPass(display_.device_, &renderPassInfo, nullptr, &renderpass_) != VK_SUCCESS)
     throw std::runtime_error("failed to create render pass!");
 
+  auto before_fbos = display::clock::now();
+
   for (auto &fbo : swapchain_fbos_) {
     if (fbo != VK_NULL_HANDLE)
       vkDestroyFramebuffer(display_.device_, fbo, nullptr);
@@ -327,6 +349,8 @@ void window::init_vulkan_surface() {
       throw std::runtime_error("failed to create framebuffer!");
   }
 
+  auto before_cmdbuf = display::clock::now();
+
   if (!primary_cbs_.empty())
     vkFreeCommandBuffers(display_.device_, display_.commandg_pool_, primary_cbs_.size(), primary_cbs_.data());
 
@@ -340,6 +364,8 @@ void window::init_vulkan_surface() {
   if (vkAllocateCommandBuffers(display_.device_, &allocInfo, primary_cbs_.data()) != VK_SUCCESS)
     throw std::runtime_error("failed to allocate command buffers!");
 
+  auto before_semaphores = display::clock::now();
+
   if (sem_available_ != VK_NULL_HANDLE)
     vkDestroySemaphore(display_.device_, sem_available_, nullptr);
   if (sem_rendered_ != VK_NULL_HANDLE)
@@ -352,9 +378,23 @@ void window::init_vulkan_surface() {
     throw std::runtime_error("failed to create semaphores!");
   }
 
-  for (size_t i = 0; i < dirty_.size(); i++)
-    dirty_[i] = true;
+  invalidate(true);
   dirty_.resize(images_count, true);
+
+  auto done = display::clock::now();
+  auto total = done - before_formats;
+  if (total > 20ms) {
+    std::cout << "init_vulkan_surface: " << dur_t(done - before_formats) << " ("
+              << "formats: " << dur_t(before_swapchain - before_formats) << ", "
+              << "swapchain: " << dur_t(before_wait - before_swapchain) << ", "
+              << "wait: " << dur_t(before_images - before_wait) << ", "
+              << "images: " << dur_t(before_renderpass - before_images) << ", "
+              << "renderpass: " << dur_t(before_fbos - before_renderpass) << ", "
+              << "fbos: " << dur_t(before_cmdbuf - before_fbos) << ", "
+              << "cmdbuf: " << dur_t(before_semaphores - before_cmdbuf) << ", "
+              << "semaphores: " << dur_t(done - before_semaphores)
+              << ")" << std::endl;
+  }
 }
 
 void window::redraw(display::time_point _tp) {
@@ -430,10 +470,11 @@ void window::redraw(display::time_point _tp) {
   cbs_.clear();
 
   auto done = display::clock::now();
-  auto diff = done - last_frame_;
+  auto diff_frame = done - last_frame_;
+  auto diff_render = done - before_acquire;
   constexpr auto budget = 1000.ms/60.;
-  if (diff > budget) {
-    std::cout << "frame overbudget: " << dur_t(diff) << " ("
+  if (diff_render > budget) {
+    std::cout << "frame overbudget: " << dur_t(diff_render) << "/" << dur_t(diff_frame) << " ("
       << "acquire: " << dur_t(before_rebuild - before_acquire) << ", "
       << "draw: " << dur_t(before_on_frame - before_rebuild) << ", "
       << "frame: " << dur_t(before_staging - before_on_frame) << ", "
@@ -442,18 +483,7 @@ void window::redraw(display::time_point _tp) {
       << "present: " << dur_t(done - before_present)
       << ")" << std::endl;
   }
-  else if (present_mode_ != VK_PRESENT_MODE_FIFO_KHR && diff < budget) {
-    std::this_thread::sleep_for(budget - diff);
-  }
-  last_frame_ = display::clock::now();
-}
-
-void window::dispatch_resize(const uvec2 &_size) {
-  if (_size.x > 0 && _size.y > 0) {
-    size_ = _size;
-    init_vulkan_surface();
-    on_resize.fire(_size);
-  }
+  last_frame_ = done;
 }
 
 void window::rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {

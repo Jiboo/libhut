@@ -2,6 +2,7 @@ fix:
 - [w32] ctrl/shift KEYUP event sent two times
 - [w32] delayed clipboard rendering not always working
 - [wl] test xdg-decorations (not available on fedora 31 desktop/weston)
+- homogenize button indexes for mouse events
 
 refactor:
 - have the staging buffer always mapped?
@@ -12,7 +13,6 @@ refactor:
 - [wl] async clipboard read/write
 
 features:
-- window resize/move
 - fullscreen
 - multisampling
 - clipboard image

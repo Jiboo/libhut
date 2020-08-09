@@ -41,63 +41,66 @@ using namespace hut;
 
 void hut::pointer_handle_enter(void *_data, wl_pointer *_pointer, uint32_t _serial, wl_surface *_surface, wl_fixed_t _sx, wl_fixed_t _sy) {
   //std::cout << "pointer_handle_enter " << _pointer << ", " << _surface << ", " << wl_fixed_to_double(_sx) << ", " << wl_fixed_to_double(_sy) << std::endl;
-  auto d = static_cast<display*>(_data);
-  auto w = d->windows_.find(_surface);
-  if (_pointer == d->pointer_ && w != d->windows_.cend()) {
-    d->last_serial_ = _serial;
-    d->pointer_current_.first = _surface;
-    d->pointer_current_.second = w->second;
-    assert(d->pointer_current_.second);
+  auto *d = static_cast<display*>(_data);
+  auto wit = d->windows_.find(_surface);
+  if (_pointer == d->pointer_ && wit != d->windows_.cend()) {
     vec2 coords {wl_fixed_to_int(_sx), wl_fixed_to_int(_sy)};
-    d->pointer_current_.second->mouse_lastmove_ = coords;
-    d->set_cursor(w->second->current_cursor_type_);
-    d->pointer_current_.second->on_mouse.fire(0, MMOVE, coords);
+    auto *w = wit->second;
+    assert(w);
+    d->last_serial_ = _serial;
+    d->pointer_current_ = {_surface, w};
+    w->mouse_lastmove_ = coords;
+    d->set_cursor(w->current_cursor_type_);
+    w->on_mouse.fire(0, MMOVE, coords);
   }
 }
 
 void hut::pointer_handle_leave(void *_data, wl_pointer *_pointer, uint32_t _serial, [[maybe_unused]] wl_surface *_surface) {
   //std::cout << "pointer_handle_leave " << _pointer << ", " << _surface << std::endl;
-  auto d = static_cast<display*>(_data);
+  auto *d = static_cast<display*>(_data);
   if (_pointer == d->pointer_) {
     d->last_serial_ =  _serial;
-    d->pointer_current_.first = nullptr;
-    d->pointer_current_.second = nullptr;
+    d->pointer_current_ = {nullptr, nullptr};
   }
 }
 
 void hut::pointer_handle_motion(void *_data, wl_pointer *_pointer, uint32_t, wl_fixed_t _sx, wl_fixed_t _sy) {
   //std::cout << "pointer_handle_motion " << _pointer << ", " << wl_fixed_to_double(_sx) << ", " << wl_fixed_to_double(_sy) << std::endl;
-  auto d = static_cast<display*>(_data);
+  auto *d = static_cast<display*>(_data);
   if (_pointer == d->pointer_) {
-    vec2 coords {wl_fixed_to_int(_sx), wl_fixed_to_int(_sy)};
-    assert(d->pointer_current_.second);
-    d->pointer_current_.second->mouse_lastmove_ = coords;
-    d->pointer_current_.second->on_mouse.fire(0, MMOVE, coords);
+    auto *w = d->pointer_current_.second;
+    if (w) {
+      vec2 coords {wl_fixed_to_int(_sx), wl_fixed_to_int(_sy)};
+      w->mouse_lastmove_ = coords;
+      w->on_mouse.fire(0, MMOVE, coords);
+    }
   }
 }
 
 void hut::pointer_handle_button(void *_data, wl_pointer *_pointer, uint32_t _serial, uint32_t, uint32_t _button, uint32_t _state) {
   //std::cout << "pointer_handle_button " << _pointer << ", " << _button << ", " << _state << std::endl;
-  auto d = static_cast<display*>(_data);
+  auto *d = static_cast<display*>(_data);
   if (_pointer == d->pointer_) {
+    auto *w = d->pointer_current_.second;
+    assert(w);
     d->last_serial_ =  _serial;
-    assert(d->pointer_current_.second);
-    d->pointer_current_.second->on_mouse.fire(_button - BTN_MOUSE + 1, _state ? MDOWN : MUP, d->pointer_current_.second->mouse_lastmove_);
+    w->on_mouse.fire(_button - BTN_MOUSE + 1, _state ? MDOWN : MUP, w->mouse_lastmove_);
   }
 }
 
 void hut::pointer_handle_axis(void *_data, wl_pointer *_pointer, uint32_t, uint32_t, wl_fixed_t _value) {
   //std::cout << "pointer_handle_axis " << _pointer << ", " << _axis << ", " << wl_fixed_to_double(_value) << std::endl;
-  auto d = static_cast<display*>(_data);
+  auto *d = static_cast<display*>(_data);
   if (_pointer == d->pointer_) {
-    assert(d->pointer_current_.second);
-    d->pointer_current_.second->on_mouse.fire(0, wl_fixed_to_int(_value) > 0 ? MWHEEL_UP : MWHEEL_DOWN, d->pointer_current_.second->mouse_lastmove_);
+    auto *w = d->pointer_current_.second;
+    assert(w);
+    w->on_mouse.fire(0, wl_fixed_to_int(_value) > 0 ? MWHEEL_DOWN : MWHEEL_UP, w->mouse_lastmove_);
   }
 }
 
 void hut::keyboard_handle_keymap(void *_data, wl_keyboard *_keyboard, uint32_t _format, int _fd, uint32_t _size) {
   //std::cout << "keyboard_handle_keymap " << _keyboard << ", " << _format << ", " << _fd << ", " << _size << std::endl;
-  auto d = static_cast<display*>(_data);
+  auto *d = static_cast<display*>(_data);
   if (_keyboard != d->keyboard_)
     return;
 
@@ -125,27 +128,27 @@ void hut::keyboard_handle_keymap(void *_data, wl_keyboard *_keyboard, uint32_t _
 
 void hut::keyboard_handle_enter(void *_data, wl_keyboard *_keyboard, uint32_t _serial, wl_surface *_surface, wl_array *) {
   //std::cout << "keyboard_handle_enter " << _keyboard << ", " << _surface << std::endl;
-  auto d = static_cast<display*>(_data);
-  auto w = d->windows_.find(_surface);
-  if (_keyboard == d->keyboard_ && w != d->windows_.cend()) {
+  auto *d = static_cast<display*>(_data);
+  auto wit = d->windows_.find(_surface);
+  if (_keyboard == d->keyboard_ && wit != d->windows_.cend()) {
+    auto *w = wit->second;
+    assert(w);
     d->last_serial_ =  _serial;
     d->last_keyboard_enter_serial_ = _serial;
-    d->keyboard_current_.first = _surface;
-    d->keyboard_current_.second = w->second;
-    w->second->on_focus.fire();
+    d->keyboard_current_ = {_surface, w};
+    w->on_focus.fire();
   }
 }
 
 void hut::keyboard_handle_leave(void *_data, wl_keyboard *_keyboard, uint32_t _serial, wl_surface *_surface) {
   //std::cout << "keyboard_handle_enter " << _keyboard << ", " << _surface << std::endl;
-  auto d = static_cast<display*>(_data);
-  auto w = d->windows_.find(_surface);
+  auto *d = static_cast<display*>(_data);
+  auto wit = d->windows_.find(_surface);
   if (_keyboard == d->keyboard_) {
     d->last_serial_ =  _serial;
-    d->keyboard_current_.first = nullptr;
-    d->keyboard_current_.second = nullptr;
-    if (w != d->windows_.end())
-      w->second->on_blur.fire();
+    d->keyboard_current_ = {nullptr, nullptr};
+    if (wit != d->windows_.end())
+      wit->second->on_blur.fire();
   }
 }
 
@@ -233,10 +236,10 @@ keysym map_keysym(xkb_keysym_t _keysym) {
 
 void hut::keyboard_handle_key(void *_data, wl_keyboard *_keyboard, uint32_t _serial, uint32_t, uint32_t _key, uint32_t _state) {
   //std::cout << "keyboard_handle_key " << _keyboard << ", " << _key << ", " << _state << std::endl;
-  auto d = static_cast<display*>(_data);
+  auto *d = static_cast<display*>(_data);
   if (_keyboard == d->keyboard_) {
-    assert(d->keyboard_current_.second);
     auto *w = d->keyboard_current_.second;
+    assert(w);
     const auto keycode = xkb_keycode_t(_key + 8); // +8 for evdev scancode to XCB scancode
     const auto ks = xkb_state_key_get_one_sym(d->xkb_state_, keycode);
     const auto cleaned = clean_kp_keysyms(ks);
@@ -255,7 +258,7 @@ void hut::keyboard_handle_key(void *_data, wl_keyboard *_keyboard, uint32_t _ser
 
 void hut::keyboard_handle_modifiers(void *_data, wl_keyboard *, uint32_t _serial, uint32_t _mods_depressed, uint32_t _mods_latched, uint32_t _mods_locked, uint32_t _group) {
   //std::cout << "keyboard_handle_modifiers " << _keyboard << ", " << _mods_depressed << ", " << _mods_latched << ", " << _mods_locked << std::endl;
-  auto d = static_cast<display*>(_data);
+  auto *d = static_cast<display*>(_data);
   d->last_serial_ =  _serial;
   xkb_state_update_mask(d->xkb_state_, _mods_depressed, _mods_latched, _mods_locked, 0, 0, _group);
 
@@ -279,7 +282,7 @@ void hut::seat_handler(void *_data, wl_seat *_seat, uint32_t _caps) {
       pointer_handle_enter, pointer_handle_leave, pointer_handle_motion, pointer_handle_button, pointer_handle_axis, nullptr, nullptr, nullptr, nullptr
   };
 
-  auto d = static_cast<display*>(_data);
+  auto *d = static_cast<display*>(_data);
   if ((_caps & WL_SEAT_CAPABILITY_POINTER) && !d->pointer_) {
     d->pointer_ = wl_seat_get_pointer(_seat);
     wl_pointer_add_listener(d->pointer_, &wl_pointer_listeners, _data);
@@ -314,7 +317,7 @@ void hut::registry_handler(void *_data, wl_registry *_registry, uint32_t _id,
       handle_xdg_ping,
   };
 
-  auto d = static_cast<display*>(_data);
+  auto *d = static_cast<display*>(_data);
   if (strcmp(_interface, wl_compositor_interface.name) == 0) {
     d->compositor_ = static_cast<wl_compositor*>(wl_registry_bind(_registry, _id, &wl_compositor_interface, 1));
   }
@@ -342,7 +345,7 @@ void registry_remove(void *, wl_registry *, uint32_t) {
 }
 
 void hut::data_offer_handle_offer(void *_data, wl_data_offer *_offer, const char *_mime_type) {
-  auto d = static_cast<display*>(_data);
+  auto *d = static_cast<display*>(_data);
   auto format = mime_type_format(_mime_type);
   if (format)
     d->current_data_offer_formats_ |= *format;
@@ -352,7 +355,7 @@ void hut::data_device_handle_data_offer(void *_data, wl_data_device *_device, wl
   static const struct wl_data_offer_listener data_offer_listeners = {
       .offer = data_offer_handle_offer,
   };
-  auto d = static_cast<display*>(_data);
+  auto *d = static_cast<display*>(_data);
   d->current_data_offer_ = _offer;
   d->current_data_offer_formats_ = 0;
   wl_data_offer_add_listener(_offer, &data_offer_listeners, _data);
@@ -392,7 +395,7 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
     wl_data_device_add_listener(data_device_, &data_device_listeners, this);
   }
 
-  auto dummy = wl_compositor_create_surface(compositor_);
+  auto *dummy = wl_compositor_create_surface(compositor_);
   if (!dummy)
     throw std::runtime_error("couldn't create dummy surface");
 
@@ -401,7 +404,7 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
   info.display = display_;
   info.surface = dummy;
 
-  auto func = get_proc<PFN_vkCreateWaylandSurfaceKHR>("vkCreateWaylandSurfaceKHR");
+  auto *func = get_proc<PFN_vkCreateWaylandSurfaceKHR>("vkCreateWaylandSurfaceKHR");
   VkSurfaceKHR dummy_surface;
   VkResult vkr;
   if ((vkr = func(instance_, &info, nullptr, &dummy_surface)) != VK_SUCCESS)

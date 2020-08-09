@@ -27,6 +27,7 @@
 
 #include <cstring>
 
+#include <iostream>
 #include <unordered_set>
 
 #define XK_MISCELLANY
@@ -149,49 +150,21 @@ void window::set_title(const std::string &_title) {
 }
 
 void window::invalidate(const uvec4 &_coords, bool _redraw) {
-  struct cmd_t {
-    uvec4 coords_;
-    bool redraw_;
-    bool operator==(const cmd_t&) const = default;
-  };
-  struct cmd_hasher {
-    std::size_t operator()(const cmd_t& _node) const {
-      std::size_t seed = 0;
-      hash_combine(seed, _node.coords_, _node.redraw_);
-      return seed;
-    }
-  };
-  static std::mutex mutex;
-  static std::unordered_set<cmd_t, cmd_hasher> posted_this_frame;
-
   if (_redraw) {
     for (auto &d : dirty_)
       d = true;
   }
 
-  cmd_t thiz {_coords, _redraw};
-  {
-    std::scoped_lock sl(mutex);
-    if (!posted_this_frame.emplace(thiz).second)
-      return;
+  if (!invalidated_) {
+    invalidated_ = _coords;
   }
-
-  xcb_expose_event_t event = {};
-  event.window = window_;
-  event.x = (uint16_t)_coords.x;
-  event.y = (uint16_t)_coords.y;
-  event.width = (uint16_t)(_coords.z - _coords.x);
-  event.height = (uint16_t)(_coords.w - _coords.y);
-  event.count = 1;
-  event.response_type = XCB_EXPOSE;
-  uint32_t mask = XCB_EVENT_MASK_EXPOSURE;
-  xcb_send_event(display_.connection_, 0, window_, mask, (const char *)&event);
-  xcb_flush(display_.connection_);
-
-  display_.post([&](display::time_point) {
-    std::scoped_lock sl(mutex);
-    posted_this_frame.clear();
-  });
+  else {
+    uvec4 &rect = invalidated_.value();
+    rect.x = std::min(rect.x, _coords.x);
+    rect.y = std::max(rect.y, _coords.y);
+    rect.z = std::min(rect.z, _coords.z);
+    rect.w = std::max(rect.w, _coords.w);
+  }
 }
 
 void window::set_cursor(cursor_type _c) {
@@ -214,4 +187,32 @@ void window::clipboard_offer(clipboard_formats _supported_formats, const send_cl
 
 bool window::clipboard_receive(clipboard_formats _supported_formats, const receive_clipboard_data &_callback) {
   return false;
+}
+
+void window::interactive_move() {
+  if (!mouse_pressed_)
+    return;
+
+  xcb_ewmh_request_wm_moveresize(&display_.ewmh_, 0, window_, current_mouse_root_.x, current_mouse_root_.y,
+                                 XCB_EWMH_WM_MOVERESIZE_MOVE, xcb_button_index_t(1), XCB_EWMH_CLIENT_SOURCE_TYPE_NORMAL);
+}
+
+void window::interactive_resize(edge _edge) {
+  if (!mouse_pressed_)
+    return;
+
+  xcb_ewmh_moveresize_direction_t dir = XCB_EWMH_WM_MOVERESIZE_CANCEL;
+  switch (_edge.active_) {
+    case edge(TOP).active_: dir = XCB_EWMH_WM_MOVERESIZE_SIZE_TOP; break;
+    case edge(BOTTOM).active_: dir = XCB_EWMH_WM_MOVERESIZE_SIZE_BOTTOM; break;
+    case edge(LEFT).active_: dir = XCB_EWMH_WM_MOVERESIZE_SIZE_LEFT; break;
+    case edge(RIGHT).active_: dir = XCB_EWMH_WM_MOVERESIZE_SIZE_RIGHT; break;
+
+    case edge({TOP, LEFT}).active_: dir = XCB_EWMH_WM_MOVERESIZE_SIZE_TOPLEFT; break;
+    case edge({TOP, RIGHT}).active_: dir = XCB_EWMH_WM_MOVERESIZE_SIZE_TOPRIGHT; break;
+    case edge({BOTTOM, LEFT}).active_: dir = XCB_EWMH_WM_MOVERESIZE_SIZE_TOPLEFT; break;
+    case edge({BOTTOM, RIGHT}).active_: dir = XCB_EWMH_WM_MOVERESIZE_SIZE_BOTTOMRIGHT; break;
+  }
+  xcb_ewmh_request_wm_moveresize(&display_.ewmh_, 0, window_, current_mouse_root_.x, current_mouse_root_.y,
+                                 dir, xcb_button_index_t(1), XCB_EWMH_CLIENT_SOURCE_TYPE_NORMAL);
 }

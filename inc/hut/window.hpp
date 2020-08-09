@@ -47,6 +47,16 @@
 
 namespace hut {
 
+enum side {
+  TOP,
+  BOTTOM,
+  LEFT,
+  RIGHT,
+  LAST_SIDE = RIGHT,
+};
+using edge = flagged<side, LAST_SIDE>;
+cursor_type edge_cursor(edge);
+
 enum touch_event_type { TDOWN, TUP, TMOVE };
 
 enum mouse_event_type { MDOWN, MUP, MMOVE, MWHEEL_UP, MWHEEL_DOWN };
@@ -93,11 +103,12 @@ class display;
 struct window_params {
   enum flag {
     SYSTEM_DECORATIONS,
+    VSYNC,
     FLAG_LAST_VALUE = SYSTEM_DECORATIONS,
   };
   using flags = flagged<flag, flag::FLAG_LAST_VALUE>;
 
-  flags flags_ {SYSTEM_DECORATIONS};
+  flags flags_ {VSYNC, SYSTEM_DECORATIONS};
   uvec4 position_ = {0, 0, 800, 600};
   uvec2 min_size_ = {0, 0}, max_size_ = {0, 0};
 };
@@ -136,6 +147,8 @@ class window {
   uvec2 size() {
     return size_;
   }
+  void interactive_resize(edge);
+  void interactive_move();
 
   void set_title(const std::string &);
   void set_cursor(cursor_type _c);
@@ -169,6 +182,8 @@ class window {
 
  protected:
   display &display_;
+  window_params params_;
+
   VkSurfaceKHR surface_ = VK_NULL_HANDLE;
 
   VkPresentModeKHR present_mode_;
@@ -197,7 +212,6 @@ class window {
   bool has_system_decorations_ = false;
 
   void init_vulkan_surface();
-  void dispatch_resize(const uvec2 &);
   void rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb);
   void destroy_vulkan();
   void redraw(display::time_point);
@@ -205,6 +219,10 @@ class window {
  protected:
 #if defined(VK_USE_PLATFORM_XCB_KHR)
   xcb_window_t window_, parent_;
+  vec2 current_mouse_root_ = {0, 0};
+  bool mouse_pressed_ = false;
+  std::optional<uvec4> new_configuration_;
+  std::optional<uvec4> invalidated_;
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
   friend void handle_xdg_configure(void*, xdg_surface*, uint32_t);
   friend void handle_toplevel_decoration_configure(void*, zxdg_toplevel_decoration_v1*, uint32_t);
@@ -236,6 +254,7 @@ class window {
 
   HWND window_;
   vec2 mouse_lastmove_ = {0, 0};
+  bool button_pressed_ = false;
   cursor_type current_cursor_type_ = CDEFAULT;
   send_clipboard_data current_clipboard_sender_;
   clipboard_formats current_clipboard_formats_;

@@ -45,6 +45,7 @@
 #if defined(VK_USE_PLATFORM_XCB_KHR)
 #include <xcb/xcb_keysyms.h>
 #include <xcb/xcb_cursor.h>
+#include <xcb/xcb_ewmh.h>
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
 #include <wayland-client.h>
 #include <wayland-cursor.h>
@@ -287,11 +288,13 @@ class display {
   xcb_connection_t *connection_ = nullptr;
   xcb_screen_t *screen_ = nullptr;
   xcb_key_symbols_t *keysyms_ = nullptr;
+  xcb_cursor_context_t *cursor_context_ = nullptr;
+  xcb_ewmh_connection_t ewmh_;
+
   std::unordered_map<xcb_window_t, window *> windows_;
   xcb_atom_t atom_wm_, atom_close_, atom_change_state_, atom_state_, atom_hstate_, atom_rstate_;
   xcb_atom_t atom_maximizeh_, atom_maximizev_, atom_window_hints_;
   xcb_atom_t atom_clipboard_, atom_utf8_string_;
-  xcb_cursor_context_t *cursor_context_ = nullptr;
 
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
   friend void registry_handler(void*, wl_registry*, uint32_t, const char*, uint32_t);

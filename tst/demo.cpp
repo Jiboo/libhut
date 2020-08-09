@@ -356,7 +356,7 @@ int main(int, char **) {
   });
 
   w.on_resize.connect([&](const uvec2 &_size) {
-    std::cout << "resize " << to_string(_size) << std::endl;
+    //std::cout << "resize " << to_string(_size) << std::endl;
     proj_ubo new_ubo;
     new_ubo.proj_ = ortho<float>(0, _size.x, 0, _size.y);
 
@@ -470,6 +470,24 @@ int main(int, char **) {
         std::cout << std::endl;
       });
     }
+    return true;
+  });
+
+  w2.on_mouse.connect([&w2](uint8_t _button, mouse_event_type _type, vec2 _coords) {
+    edge coords_edge;
+    if (_coords.x < 50)
+      coords_edge |= LEFT;
+    if (_coords.y < 50)
+      coords_edge |= TOP;
+    if (w2.size().x - _coords.x < 50)
+      coords_edge |= RIGHT;
+    if (w2.size().y - _coords.y < 50)
+      coords_edge |= BOTTOM;
+    w2.set_cursor(edge_cursor(coords_edge));
+    if (!coords_edge)
+      w2.interactive_move();
+    else
+      w2.interactive_resize(coords_edge);
     return true;
   });
 

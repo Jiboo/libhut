@@ -73,7 +73,7 @@ if(GTEST_FOUND)
 endif()
 
 find_package(Wayland COMPONENTS wayland-client wayland-cursor)
-find_package(XCB COMPONENTS xcb xcb-keysyms xcb-util xcb-cursor xcb-icccm)
+find_package(XCB COMPONENTS xcb xcb-keysyms xcb-util xcb-cursor xcb-icccm xcb-ewmh)
 
 if(Wayland_FOUND AND NOT HUT_PREFER_XCB)
   message("Using Wayland as backend, checking for other dependencies..")

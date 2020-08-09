@@ -140,11 +140,15 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
 
   if (int error = xcb_cursor_context_new(connection_, screen_, &cursor_context_) < 0)
     throw std::runtime_error(sstream("couldn't create cursor context: ") << error);
+
+  xcb_intern_atom_cookie_t *ewmh_cookie = xcb_ewmh_init_atoms(connection_, &ewmh_);
+  xcb_ewmh_init_atoms_replies(&ewmh_, ewmh_cookie, NULL);
 }
 
 display::~display() {
   destroy_vulkan();
 
+  xcb_ewmh_connection_wipe(&ewmh_);
   if (ft_library_) FT_Done_FreeType(ft_library_);
   if (cursor_context_) xcb_cursor_context_free(cursor_context_);
   if (keysyms_) xcb_key_symbols_free(keysyms_);
@@ -309,7 +313,9 @@ int display::dispatch() {
               window *w = it->second;
               uvec2 s{e->width, e->height};
               if (s != w->size_) {
-                w->dispatch_resize(s);
+                w->size_ = s;
+                w->init_vulkan_surface();
+                w->on_resize.fire(s);
               }
             }
           } break;
@@ -367,21 +373,35 @@ int display::dispatch() {
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
               window *w = it->second;
-              uint8_t b = e->detail;
-              auto c = vec2{e->event_x, e->event_y};
               mouse_event_type t;
+              bool wheel = false;
               switch (e->detail) {
               case 4:
                 t = mouse_event_type::MWHEEL_UP;
+                wheel = true;
                 break;
               case 5:
                 t = mouse_event_type::MWHEEL_DOWN;
+                wheel = true;
                 break;
               default:
                 t = mouse_event_type::MDOWN;
                 break;
               }
-              w->on_mouse.fire(b, t, c);
+
+              uint8_t b = e->detail;
+              switch (b) {
+                case 1: w->mouse_pressed_ = true; break;
+                case 2: b = 3; break;
+                case 3: b = 2; break;
+
+                case 8: b = 4; break;
+                case 9: b = 5; break;
+              }
+
+              auto c = vec2{e->event_x, e->event_y};
+              w->current_mouse_root_ = vec2{e->root_x, e->root_y};
+              w->on_mouse.fire(wheel ? 0 : b, t, c);
             }
           } break;
 
@@ -394,6 +414,16 @@ int display::dispatch() {
               uint8_t b = e->detail;
               if (b < 4 || b > 5) {  // ignore wheel events
                 auto c = vec2{e->event_x, e->event_y};
+                w->current_mouse_root_ = vec2{e->root_x, e->root_y};
+
+                switch (b) {
+                  case 1: w->mouse_pressed_ = false; break;
+                  case 2: b = 3; break;
+                  case 3: b = 2; break;
+
+                  case 8: b = 4; break;
+                  case 9: b = 5; break;
+                }
                 w->on_mouse.fire(b, mouse_event_type::MUP, c);
               }
             }
@@ -405,8 +435,10 @@ int display::dispatch() {
             auto it = windows_.find(e->event);
             if (it != windows_.end()) {
               window *w = it->second;
-              auto c = vec2{e->event_x, e->event_y};
               uint8_t b = e->detail;
+
+              auto c = vec2{e->event_x, e->event_y};
+              w->current_mouse_root_ = vec2{e->root_x, e->root_y};
               w->on_mouse.fire(b, mouse_event_type::MMOVE, c);
             }
           } break;
@@ -497,16 +529,47 @@ int display::dispatch() {
           } break;
 
           default:
-            //std::cout << "ingored even of type: " << xcb_event_get_label(event->response_type) << std::endl;
+            //std::cout << "ingored event of type: " << xcb_event_get_label(event->response_type) << std::endl;
             break;
           }
         }
         free(event);
         event = xcb_poll_for_event(connection_);
     } while (event != nullptr);
+
     process_posts(clock::now());
+
+    for (auto win : windows_) {
+      auto *w = win.second;
+      auto &new_conf = w->new_configuration_;
+      if (new_conf) {
+        constexpr auto mask = XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
+        xcb_configure_window(connection_, win.first, mask, (uint32_t*)&new_conf.value());
+        w->invalidate(false);
+        new_conf.reset();
+      }
+
+      auto &invalidate = w->invalidated_;
+      if (invalidate) {
+        uvec4 &rect = invalidate.value();
+        xcb_expose_event_t invalidate_event = {};
+        invalidate_event.window = win.first;
+        invalidate_event.x = (uint16_t)rect.x;
+        invalidate_event.y = (uint16_t)rect.y;
+        invalidate_event.width = (uint16_t)(rect.z - rect.x);
+        invalidate_event.height = (uint16_t)(rect.w - rect.y);
+        invalidate_event.count = 1;
+        invalidate_event.response_type = XCB_EXPOSE;
+        uint32_t mask = XCB_EVENT_MASK_EXPOSURE;
+        xcb_send_event(connection_, 0, win.first, mask, (const char *)&invalidate_event);
+        invalidate.reset();
+      }
+    }
+
     if (windows_.empty())
       loop = false;
+
+    xcb_flush(connection_);
   }
 
   return EXIT_SUCCESS;
