@@ -96,7 +96,10 @@ void window::maximize(bool _set) {
   ShowWindow(window_, _set ? SW_MAXIMIZE : SW_RESTORE);
 }
 
-void window::set_title(const std::string &_title) {
+void window::fullscreen(bool _set) {
+}
+
+void window::title(const std::string &_title) {
   SetWindowTextA(window_, _title.c_str());
 }
 
@@ -187,7 +190,7 @@ HCURSOR load_cursor(cursor_type _c) {
   return LoadCursorA(nullptr, IDC_ARROW);
 }
 
-void window::set_cursor(cursor_type _c) {
+void window::cursor(cursor_type _c) {
   SetCursor(load_cursor(_c));
   current_cursor_type_ = _c;
 }

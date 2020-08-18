@@ -142,7 +142,11 @@ void window::maximize(bool _set) {
   xcb_flush(display_.connection_);
 }
 
-void window::set_title(const std::string &_title) {
+void window::fullscreen(bool _set) {
+
+}
+
+void window::title(const std::string &_title) {
   xcb_change_property(display_.connection_, XCB_PROP_MODE_REPLACE, window_, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8,
                       (uint32_t)_title.size(), _title.data());
   xcb_change_property(display_.connection_, XCB_PROP_MODE_REPLACE, window_, XCB_ATOM_WM_ICON_NAME, XCB_ATOM_STRING, 8,
@@ -167,7 +171,7 @@ void window::invalidate(const uvec4 &_coords, bool _redraw) {
   }
 }
 
-void window::set_cursor(cursor_type _c) {
+void window::cursor(cursor_type _c) {
   xcb_cursor_t cursor = xcb_cursor_load_cursor(display_.cursor_context_, cursor_css_name(_c));
   if (cursor != XCB_CURSOR_NONE)
     xcb_change_window_attributes(display_.connection_, window_, XCB_CW_CURSOR, &cursor);

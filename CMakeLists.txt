@@ -22,6 +22,7 @@ set(HUT_COMPILE_DEMOS 1)
 #set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(NOT WIN32)
+#set(HUT_ENABLE_PROFILING TRUE)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION_DEBUG)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_DEBUG_STAGING)
@@ -66,6 +67,28 @@ endif()
 ###########################################################
 message("Checking for optional dependencies...")
 ###########################################################
+
+if (NOT WIN32 AND HUT_ENABLE_PROFILING)
+  find_package(fmt) #TODO Replace with std::format
+  find_package(Boost)
+  find_package(Backtrace)
+
+  if (fmt_FOUND AND Boost_FOUND)
+    set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_PROFILING)
+    set(HUT_INCLUDES ${HUT_INCLUDES} ${Boost_INCLUDE_DIRS})
+    set(HUT_LIBS ${HUT_LIBS} fmt::fmt-header-only)
+    set(HUT_LIBS ${HUT_LIBS} dl) # Dependency of boost-stacktrace
+
+    if (Backtrace_FOUND)
+      set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DBOOST_STACKTRACE_USE_BACKTRACE)
+      set(HUT_INCLUDES ${HUT_INCLUDES} ${BACKTRACE_INCLUDE_DIRS})
+      set(HUT_LIBS ${HUT_LIBS} ${BACKTRACE_LIBRARIES})
+    else()
+      message(WARNING "Defaulting to addr2line, which is slow to generate backtraces, please install https://github.com/ianlancetaylor/libbacktrace")
+      set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DBOOST_STACKTRACE_USE_ADDR2LINE)
+    endif()
+  endif()
+endif()
 
 find_package(GTest)
 if(GTEST_FOUND)

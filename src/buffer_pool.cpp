@@ -36,6 +36,7 @@ using namespace hut;
 
 buffer_pool::buffer_pool(display &_display, uint _size, VkMemoryPropertyFlags _type, uint _usage)
     : display_(_display), type_(_type), usage_(_usage) {
+  HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::buffer_pool");
   grow(_size);
 }
 
@@ -45,13 +46,14 @@ buffer_pool::~buffer_pool() {
 }
 
 void buffer_pool::do_update(VkBuffer _buf, uint _offset, uint _size, const void *_data) {
+  HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::do_update {}", _size);
   std::lock_guard lk(display_.staging_mutex_);
   auto staging = display_.staging_->do_alloc(_size, 4);
 
   void *target;
-  vkMapMemory(display_.device_, staging.memory_, staging.offset_, _size, 0, &target);
+  HUT_PVK(vkMapMemory, display_.device_, staging.memory_, staging.offset_, _size, 0, &target);
   memcpy(target, _data, _size);
-  vkUnmapMemory(display_.device_, staging.memory_);
+  HUT_PVK(vkUnmapMemory, display_.device_, staging.memory_);
 
   display::buffer_copy copy = {};
   copy.size = _size;
@@ -68,15 +70,17 @@ void buffer_pool::do_update(VkBuffer _buf, uint _offset, uint _size, const void 
 }
 
 buffer_pool::updator buffer_pool::prepare_update(VkBuffer _buf, uint _offset, uint _size) {
+  HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::prepare_update {}", _size);
   std::lock_guard lk(display_.staging_mutex_);
   auto staging = display_.staging_->do_alloc(_size, 4);
   void *target;
-  vkMapMemory(display_.device_, staging.memory_, staging.offset_, _size, 0, &target);
+  HUT_PVK(vkMapMemory, display_.device_, staging.memory_, staging.offset_, _size, 0, &target);
   return updator(*this, _buf, staging, span<uint8_t>{(uint8_t*)target, _size}, _offset);
 }
 
 void buffer_pool::finalize_update(updator &_update) {
-  vkUnmapMemory(display_.device_, _update.staging_.memory_);
+  HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::finalize_update {}", _update.size_bytes());
+  HUT_PVK(vkUnmapMemory, display_.device_, _update.staging_.memory_);
 
   display::buffer_copy copy = {};
   copy.size = _update.data_.size_bytes();
@@ -94,6 +98,7 @@ void buffer_pool::finalize_update(updator &_update) {
 }
 
 void buffer_pool::do_zero(VkBuffer _buf, uint _offset, uint _size) {
+  HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::do_zero {}", _size);
   display::buffer_zero zero = {};
   zero.size = _size;
   zero.offset = _offset;
@@ -107,6 +112,7 @@ void buffer_pool::do_zero(VkBuffer _buf, uint _offset, uint _size) {
 }
 
 buffer_pool::buffer *buffer_pool::grow(uint _size) {
+  HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::grow {} total {}", _size, total_size_);
   buffers_.resize(buffers_.size() + 1);
   buffer &result = buffers_.back();
   result.size_ = _size;
@@ -123,7 +129,7 @@ buffer_pool::buffer *buffer_pool::grow(uint _size) {
   }
 
   VkMemoryRequirements requirements;
-  vkGetBufferMemoryRequirements(display_.device_, result.buffer_, &requirements);
+  HUT_PVK(vkGetBufferMemoryRequirements, display_.device_, result.buffer_, &requirements);
 
   auto type = display_.find_memory_type(requirements.memoryTypeBits, type_);
   type_ = type.second;
@@ -133,12 +139,12 @@ buffer_pool::buffer *buffer_pool::grow(uint _size) {
   alloc_info.allocationSize = requirements.size;
   alloc_info.memoryTypeIndex = type.first;
 
-  auto aresult = vkAllocateMemory(display_.device_, &alloc_info, nullptr, &result.memory_);
+  auto aresult = HUT_PVK(vkAllocateMemory, display_.device_, &alloc_info, nullptr, &result.memory_);
   if (aresult != VK_SUCCESS) {
-    vkDestroyBuffer(display_.device_, result.buffer_, nullptr);
+    HUT_PVK(vkDestroyBuffer, display_.device_, result.buffer_, nullptr);
     throw std::runtime_error("failed to allocate buffer memory!");
   }
-  vkBindBufferMemory(display_.device_, result.buffer_, result.memory_, 0);
+  HUT_PVK(vkBindBufferMemory, display_.device_, result.buffer_, result.memory_, 0);
 
   result.root_ = new range;
   result.root_->offset_ = 0;
@@ -151,6 +157,7 @@ buffer_pool::buffer *buffer_pool::grow(uint _size) {
 }
 
 buffer_pool::alloc buffer_pool::do_alloc(uint _size, uint _align) {
+  HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::do_alloc {}", _size);
   uint aligned = 0, align_bytes = 0, aligned_size = _size;
   range *fit = nullptr;
   const buffer *container = nullptr;
@@ -214,6 +221,7 @@ buffer_pool::alloc buffer_pool::do_alloc(uint _size, uint _align) {
 }
 
 void buffer_pool::do_free(range *_range) {
+  HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::do_free {}", _range->size_);
   range *prev = _range->prev_, *next = _range->next_;
   const bool prev_free = prev != nullptr && !prev->allocated_;
   const bool next_free = next != nullptr && !next->allocated_;
@@ -267,10 +275,11 @@ void buffer_pool::clear_ranges() {
 }
 
 void buffer_pool::free_buffer(buffer_pool::buffer &_buff) {
+  HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::free_buffer");
   if (_buff.buffer_)
-    vkDestroyBuffer(display_.device_, _buff.buffer_, nullptr);
+    HUT_PVK(vkDestroyBuffer, display_.device_, _buff.buffer_, nullptr);
   if (_buff.memory_)
-    vkFreeMemory(display_.device_, _buff.memory_, nullptr);
+    HUT_PVK(vkFreeMemory, display_.device_, _buff.memory_, nullptr);
 
   if (_buff.root_) {
     range *cur = _buff.root_;

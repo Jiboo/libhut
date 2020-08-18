@@ -52,6 +52,7 @@ void png_mem_read(png_structp _png_ptr, png_bytep _target, png_size_t _size) {
 }
 
 std::shared_ptr<image> image::load_png(display &_display, span<const uint8_t> _data) {
+  HUT_PROFILE_SCOPE(PIMAGE, "image::load_png");
   if (png_sig_cmp((png_bytep)_data.data(), 0, 8))
     throw std::runtime_error("load_png: invalid data, can't validate PNG signature");
 
@@ -147,14 +148,14 @@ std::shared_ptr<image> image::load_png(display &_display, span<const uint8_t> _d
     buffer_pool::alloc alloc = _display.staging_->do_alloc(byte_size, offsetAlignment);
 
     void *data;
-    vkMapMemory(_display.device_, alloc.memory_, alloc.offset_, byte_size, 0, &data);
+    HUT_PVK(vkMapMemory, _display.device_, alloc.memory_, alloc.offset_, byte_size, 0, &data);
     auto dataBytes = reinterpret_cast<uint8_t *>(data);
     png_bytep rows[height];
     for (uint y = 0; y < height; y++) {
       rows[y] = dataBytes + y * row_byte_size;
     }
     png_read_image(png_ptr, rows);
-    vkUnmapMemory(_display.device_, alloc.memory_);
+    HUT_PVK(vkUnmapMemory, _display.device_, alloc.memory_);
 
     display::buffer2image_copy copy = {};
     copy.imageExtent = {width, height, 1};
@@ -191,6 +192,7 @@ std::shared_ptr<image> image::load_png(display &_display, span<const uint8_t> _d
 
 std::shared_ptr<image> image::load_raw(display &_display, uvec2 _extent,
     span<const uint8_t> _data, VkFormat _format, VkImageTiling _tiling, VkImageUsageFlags _flags) {
+  HUT_PROFILE_SCOPE(PIMAGE, "image::load_raw");
   auto dst = std::make_shared<image>(_display, _extent, _format, _tiling, _flags);
 
   uint offsetAlignment = std::max(VkDeviceSize(4), _display.device_props_.limits.optimalBufferCopyOffsetAlignment);
@@ -199,10 +201,10 @@ std::shared_ptr<image> image::load_raw(display &_display, uvec2 _extent,
     buffer_pool::alloc alloc = _display.staging_->do_alloc(_data.size_bytes(), offsetAlignment);
 
     void *data;
-    vkMapMemory(_display.device_, alloc.memory_, alloc.offset_, _data.size_bytes(), 0, &data);
+    HUT_PVK(vkMapMemory, _display.device_, alloc.memory_, alloc.offset_, _data.size_bytes(), 0, &data);
     auto dataBytes = reinterpret_cast<uint8_t *>(data);
     memcpy(dataBytes, _data.data(), _data.size_bytes());
-    vkUnmapMemory(_display.device_, alloc.memory_);
+    HUT_PVK(vkUnmapMemory, _display.device_, alloc.memory_);
 
     VkImageSubresourceLayers subResource = {};
     subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -242,14 +244,15 @@ std::shared_ptr<image> image::load_raw(display &_display, uvec2 _extent,
 }
 
 image::~image() {
-  vkDestroyImageView(display_.device_, view_, nullptr);
-  vkDestroyImage(display_.device_, image_, nullptr);
-  vkFreeMemory(display_.device_, memory_, nullptr);
+  HUT_PVK(vkDestroyImageView, display_.device_, view_, nullptr);
+  HUT_PVK(vkDestroyImage, display_.device_, image_, nullptr);
+  HUT_PVK(vkFreeMemory, display_.device_, memory_, nullptr);
 }
 
 image::image(display &_display, uvec2 _size, VkFormat _format, VkImageTiling _tiling, VkImageUsageFlags _flags,
              VkImageAspectFlags _aspect)
     : display_(_display), size_(_size), format_(_format) {
+  HUT_PROFILE_SCOPE(PIMAGE, "image::image");
   pixel_size_ = format_size(_format);
   mem_reqs_ = create(_display, _size.x, _size.y, _format, _tiling, _flags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
       &image_, &memory_);
@@ -318,7 +321,7 @@ VkMemoryRequirements image::create(display &_display, uint32_t _width, uint32_t 
   }
 
   VkMemoryRequirements memReq;
-  vkGetImageMemoryRequirements(_display.device_, *_image, &memReq);
+  HUT_PVK(vkGetImageMemoryRequirements, _display.device_, *_image, &memReq);
 
   VkMemoryAllocateInfo allocInfo = {};
   allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -330,7 +333,7 @@ VkMemoryRequirements image::create(display &_display, uint32_t _width, uint32_t 
     throw std::runtime_error("failed to allocate image memory!");
   }
 
-  vkBindImageMemory(_display.device_, *_image, *_imageMemory, 0);
+  HUT_PVK(vkBindImageMemory, _display.device_, *_image, *_imageMemory, 0);
 
   return memReq;
 }
@@ -348,13 +351,13 @@ void image::update(ivec4 coords, uint8_t *_data, uint _src_row_pitch) {
   std::lock_guard lk(display_.staging_mutex_);
   buffer_pool::alloc alloc = display_.staging_->do_alloc(byte_size, offset_align);
   void *target;
-  vkMapMemory(display_.device_, alloc.memory_, alloc.offset_, byte_size, 0, &target);
+  HUT_PVK(vkMapMemory, display_.device_, alloc.memory_, alloc.offset_, byte_size, 0, &target);
   for (uint i = 0; i < height; i++) {
     uint8_t *src = _data + _src_row_pitch * i;
     uint8_t *dst = (uint8_t*)target + buffer_row_pitch * i;
     memcpy(dst, src, row_byte_size);
   }
-  vkUnmapMemory(display_.device_, alloc.memory_);
+  HUT_PVK(vkUnmapMemory, display_.device_, alloc.memory_);
 
   VkImageSubresourceLayers subResource = {};
   subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -421,6 +424,6 @@ sampler::sampler(display &_display, bool _hiquality) : device_(_display.device_)
 }
 
 sampler::~sampler() {
-  vkDeviceWaitIdle(device_);
-  vkDestroySampler(device_, sampler_, nullptr);
+  HUT_PVK(vkDeviceWaitIdle, device_);
+  HUT_PVK(vkDestroySampler, device_, sampler_, nullptr);
 }

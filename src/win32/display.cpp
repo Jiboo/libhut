@@ -121,7 +121,7 @@ display::display(const char *_app_name, uint32_t _app_version, const char *) {
 
   init_vulkan_device(dummy_surface);
 
-  vkDestroySurfaceKHR(instance_, dummy_surface, nullptr);
+  HUT_PVK(vkDestroySurfaceKHR, instance_, dummy_surface, nullptr);
   DestroyWindow(dummy);
 
   FT_Init_FreeType(&ft_library_);
@@ -375,7 +375,7 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
 
     case WM_SETCURSOR: {
       if (w) {
-        w->set_cursor(w->current_cursor_type_);
+        w->cursor(w->current_cursor_type_);
       }
       return 0;
     }

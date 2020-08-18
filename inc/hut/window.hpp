@@ -97,6 +97,8 @@ enum keysym : char32_t {
   KF12,
   KENUM_END
 };
+std::string name_key(keysym c);
+inline std::ostream &operator<<(std::ostream &_os, keysym _keysym) { return _os << name_key(_keysym); }
 
 class display;
 
@@ -130,7 +132,6 @@ class window {
 
   event<keysym /*key*/, modifiers /*mods*/, bool /*down*/> on_key;
   event<char32_t /*utf32_char*/> on_char;
-  static std::string name_key(keysym c);
 
   explicit window(display &_display, const window_params &_init_params = {});
   ~window();
@@ -144,14 +145,15 @@ class window {
   void invalidate(bool _redraw);
 
   void maximize(bool _set = true);
+  void fullscreen(bool _set = true);
   uvec2 size() {
     return size_;
   }
   void interactive_resize(edge);
   void interactive_move();
 
-  void set_title(const std::string &);
-  void set_cursor(cursor_type _c);
+  void title(const std::string &);
+  void cursor(cursor_type _c);
   void clear_color(const vec4 &_color) {
     clear_color_ = _color;
     invalidate(true);

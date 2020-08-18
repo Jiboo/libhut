@@ -322,8 +322,8 @@ class display {
     size_t frame_ = 0;
     bool stop_request_ = false;
   };
-  void set_cursor(cursor_type _c);
-  void set_cursor_frame(wl_cursor *_cursor, size_t _frame);
+  void cursor(cursor_type _c);
+  void cursor_frame(wl_cursor *_cursor, size_t _frame);
   void animate_cursor(wl_cursor *_cursor);
   static void animate_cursor_thread(animate_cursor_context *_ctx);
 

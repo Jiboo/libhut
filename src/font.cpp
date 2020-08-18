@@ -34,6 +34,7 @@ using namespace hut;
 constexpr size_t font_scale = 64;
 
 font::font(display &_display, const uint8_t *_addr, size_t _size, uvec2 _atlas_size, bool _hinting) {
+  HUT_PROFILE_SCOPE(PFONT, "font::font");
   load_flags_ = FT_LOAD_NO_BITMAP | (_hinting ? FT_LOAD_FORCE_AUTOHINT : FT_LOAD_NO_HINTING);
   FT_New_Memory_Face(_display.ft_library_, _addr, _size, 0, &face_);
 
@@ -105,6 +106,7 @@ font::glyph &font::load_glyph(glyph_cache_t &_cache, uint _char_index) {
   if (g)
     return g;
 
+  HUT_PROFILE_SCOPE(PFONT, "font::load_glyph");
   if(FT_Load_Glyph(face_, _char_index, load_flags_))
     throw std::runtime_error("couldn't load char");
 
@@ -155,6 +157,7 @@ shaper::~shaper() {
 }
 
 bool shaper::bake(shared_buffer &_buff, result &_dst, const shared_font &_font, uint8_t _size, const std::string_view &_text) {
+  HUT_PROFILE_SCOPE_NAMED(PFONT, "shaper::bake {}", ("text"), make_fixed<40>(_text));
   assert(!_text.empty());
 
   std::lock_guard lk(_font->baking_mutex_);
@@ -260,7 +263,5 @@ bool shaper::bake(shared_buffer &_buff, result &_dst, const shared_font &_font, 
   }
   _dst.vertices_count_ = vertices_count;
 
-  if (indices_diff > 0 || vertices_diff > 0)
-    std::cout << "baking bufer grow requires redraw" << std::endl;
   return indices_diff > 0 || vertices_diff > 0;
 }

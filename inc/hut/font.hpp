@@ -37,7 +37,7 @@
 
 #include "hut/image.hpp"
 #include "hut/drawable.hpp"
-#include "buffer_pool.hpp"
+#include "hut/buffer_pool.hpp"
 
 namespace hut {
 

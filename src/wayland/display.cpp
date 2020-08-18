@@ -50,8 +50,9 @@ void hut::pointer_handle_enter(void *_data, wl_pointer *_pointer, uint32_t _seri
     d->last_serial_ = _serial;
     d->pointer_current_ = {_surface, w};
     w->mouse_lastmove_ = coords;
-    d->set_cursor(w->current_cursor_type_);
-    w->on_mouse.fire(0, MMOVE, coords);
+    d->cursor(w->current_cursor_type_);
+
+    HUT_PROFILE_EVENT_NAMED(w, on_mouse, ("button", "mouse_event_type", "coords"), 0, MMOVE, coords);
   }
 }
 
@@ -72,7 +73,8 @@ void hut::pointer_handle_motion(void *_data, wl_pointer *_pointer, uint32_t, wl_
     if (w) {
       vec2 coords {wl_fixed_to_int(_sx), wl_fixed_to_int(_sy)};
       w->mouse_lastmove_ = coords;
-      w->on_mouse.fire(0, MMOVE, coords);
+
+      HUT_PROFILE_EVENT_NAMED(w, on_mouse, ("button", "mouse_event_type", "coords"), 0, MMOVE, coords);
     }
   }
 }
@@ -84,7 +86,8 @@ void hut::pointer_handle_button(void *_data, wl_pointer *_pointer, uint32_t _ser
     auto *w = d->pointer_current_.second;
     assert(w);
     d->last_serial_ =  _serial;
-    w->on_mouse.fire(_button - BTN_MOUSE + 1, _state ? MDOWN : MUP, w->mouse_lastmove_);
+
+    HUT_PROFILE_EVENT_NAMED(w, on_mouse, ("button", "mouse_event_type", "coords"), _button - BTN_MOUSE + 1, _state ? MDOWN : MUP, w->mouse_lastmove_);
   }
 }
 
@@ -94,7 +97,8 @@ void hut::pointer_handle_axis(void *_data, wl_pointer *_pointer, uint32_t, uint3
   if (_pointer == d->pointer_) {
     auto *w = d->pointer_current_.second;
     assert(w);
-    w->on_mouse.fire(0, wl_fixed_to_int(_value) > 0 ? MWHEEL_DOWN : MWHEEL_UP, w->mouse_lastmove_);
+
+    HUT_PROFILE_EVENT_NAMED(w, on_mouse, ("button", "mouse_event_type", "coords"), 0, wl_fixed_to_int(_value) > 0 ? MWHEEL_DOWN : MWHEEL_UP, w->mouse_lastmove_);
   }
 }
 
@@ -136,7 +140,8 @@ void hut::keyboard_handle_enter(void *_data, wl_keyboard *_keyboard, uint32_t _s
     d->last_serial_ =  _serial;
     d->last_keyboard_enter_serial_ = _serial;
     d->keyboard_current_ = {_surface, w};
-    w->on_focus.fire();
+
+    HUT_PROFILE_EVENT(w, on_focus);
   }
 }
 
@@ -148,7 +153,7 @@ void hut::keyboard_handle_leave(void *_data, wl_keyboard *_keyboard, uint32_t _s
     d->last_serial_ =  _serial;
     d->keyboard_current_ = {nullptr, nullptr};
     if (wit != d->windows_.end())
-      wit->second->on_blur.fire();
+      HUT_PROFILE_EVENT(wit->second, on_blur);
   }
 }
 
@@ -250,9 +255,9 @@ void hut::keyboard_handle_key(void *_data, wl_keyboard *_keyboard, uint32_t _ser
     const bool ctrl = mods & KMOD_CTRL;
 
     d->last_serial_ =  _serial;
-    w->on_key.fire(mapped, mods, _state != 0);
+    HUT_PROFILE_EVENT_NAMED(w, on_key, ("key", "mods", "down"), mapped, mods, _state != 0);
     if (!remapped && !ctrl && !alt && _state != 0)
-      w->on_char.fire(mapped);
+      HUT_PROFILE_EVENT_NAMED_ALIASED(w, on_char, ("utf32_char"), ((uint32_t)mapped), mapped);
   }
 }
 
@@ -309,7 +314,7 @@ void handle_xdg_ping(void *, struct xdg_wm_base *_shell, uint32_t _serial) {
 
 void hut::registry_handler(void *_data, wl_registry *_registry, uint32_t _id,
                                   const char *_interface, [[maybe_unused]] uint32_t _version) {
-  std::cout << "[hut] wayland registry item " << _id << ", " << _interface << ", " << _version << std::endl;
+  //std::cout << "[hut] wayland registry item " << _id << ", " << _interface << ", " << _version << std::endl;
   static const wl_seat_listener wl_seat_listeners = {
       seat_handler, seat_name
   };
@@ -365,6 +370,7 @@ void hut::data_device_handle_selection(void *_data, wl_data_device *_device, wl_
 
 display::display(const char *_app_name, uint32_t _app_version, const char *_name)
   : animate_cursor_ctx_{*this} {
+  HUT_PROFILE_SCOPE(PDISPLAY, "display::display");
   std::vector<const char *> extensions = {VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME};
   init_vulkan_instance(_app_name, _app_version, extensions);
 
@@ -412,7 +418,7 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
 
   init_vulkan_device(dummy_surface);
 
-  vkDestroySurfaceKHR(instance_, dummy_surface, nullptr);
+  HUT_PVK(vkDestroySurfaceKHR, instance_, dummy_surface, nullptr);
   wl_surface_destroy(dummy);
 
   FT_Init_FreeType(&ft_library_);
@@ -478,23 +484,30 @@ int display::dispatch() {
     throw std::runtime_error("dispatch called without any window");
 
   while (loop_) {
-    wl_display_dispatch(display_);
-    process_posts(display::clock::now());
-    if (windows_.empty())
-      loop_ = false;
-    for (auto wpair : windows_) {
-      window *w = wpair.second;
-      if (w->invalidated_) {
-        w->redraw(display::clock::now());
-        w->invalidated_ = false;
+    {
+      HUT_PROFILE_SCOPE(PDISPLAY, "Main loop");
+      {
+        HUT_PROFILE_SCOPE(PDISPLAY, "Wayland dispatch");
+        wl_display_dispatch(display_);
+      }
+      process_posts(display::clock::now());
+      if (windows_.empty())
+        loop_ = false;
+      for (auto wpair : windows_) {
+        window *w = wpair.second;
+        if (w->invalidated_) {
+          w->redraw(display::clock::now());
+          w->invalidated_ = false;
+        }
       }
     }
+    profiling::threads_data::next_frame();
   }
 
   return EXIT_SUCCESS;
 }
 
-void display::set_cursor_frame(wl_cursor *_cursor, size_t _frame) {
+void display::cursor_frame(wl_cursor *_cursor, size_t _frame) {
   assert(_frame < _cursor->image_count);
   wl_cursor_image* image = _cursor->images[_frame];
   wl_buffer *buffer = wl_cursor_image_get_buffer(image);
@@ -505,7 +518,7 @@ void display::set_cursor_frame(wl_cursor *_cursor, size_t _frame) {
   wl_pointer_set_cursor(pointer_, last_serial_, cursor_surface_, image->hotspot_x, image->hotspot_y);
 }
 
-void display::set_cursor(cursor_type _c) {
+void display::cursor(cursor_type _c) {
   if (cursor_theme_ == nullptr || pointer_ == nullptr)
     return;
 
@@ -513,7 +526,7 @@ void display::set_cursor(cursor_type _c) {
   if (result) {
     if (result->image_count == 1) {
       animate_cursor(nullptr);
-      set_cursor_frame(result, 0);
+      cursor_frame(result, 0);
     }
     else {
       animate_cursor(result);
@@ -539,7 +552,7 @@ void display::animate_cursor_thread(animate_cursor_context *_ctx) {
       _ctx->cv_.wait(lock);
     if (_ctx->cursor_) {
       auto *cur_frame = _ctx->cursor_->images[_ctx->frame_];
-      _ctx->display_.set_cursor_frame(_ctx->cursor_, _ctx->frame_++);
+      _ctx->display_.cursor_frame(_ctx->cursor_, _ctx->frame_++);
       if (_ctx->frame_ >= _ctx->cursor_->image_count)
         _ctx->frame_ = 0;
       _ctx->cv_.wait_for(lock, std::chrono::milliseconds(cur_frame->delay));

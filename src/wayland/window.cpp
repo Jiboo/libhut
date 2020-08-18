@@ -47,7 +47,7 @@ void hut::handle_toplevel_configure(void *_data, xdg_toplevel *, int32_t _width,
     if (new_size != w->size_) {
       w->size_ = new_size;
       w->init_vulkan_surface();
-      w->on_resize.fire(new_size);
+      HUT_PROFILE_EVENT(w, on_resize, new_size);
     }
   }
   span<xdg_toplevel_state> states {
@@ -58,17 +58,17 @@ void hut::handle_toplevel_configure(void *_data, xdg_toplevel *, int32_t _width,
   // FIXME: This doesn't really represent minimized state, loosing focus also lose this state
   if (!minimized && w->minimized_) {
     w->minimized_ = false;
-    w->on_resume.fire();
+    HUT_PROFILE_EVENT(w, on_resume);
   }
   else if (minimized && !w->minimized_) {
     w->minimized_ = true;
-    w->on_pause.fire();
+    HUT_PROFILE_EVENT(w, on_pause);
   }
 }
 
 void hut::handle_toplevel_close(void *_data, xdg_toplevel *) {
   auto *w = static_cast<window*>(_data);
-  if (!w->on_close.fire())
+  if (!HUT_PROFILE_EVENT(w, on_close))
     w->close();
 }
 
@@ -147,7 +147,7 @@ void window::close() {
   }
 }
 
-void window::set_title(const std::string &_title) {
+void window::title(const std::string &_title) {
   xdg_toplevel_set_title(toplevel_, _title.c_str());
 }
 
@@ -162,6 +162,13 @@ void window::maximize(bool _set) {
     xdg_toplevel_unset_maximized(toplevel_);
 }
 
+void window::fullscreen(bool _set) {
+  if (_set)
+    xdg_toplevel_set_fullscreen(toplevel_, nullptr);
+  else
+    xdg_toplevel_unset_fullscreen(toplevel_);
+}
+
 void window::invalidate(const uvec4 &, bool _redraw) {
   if (_redraw) {
     for (auto &d : dirty_)
@@ -171,9 +178,9 @@ void window::invalidate(const uvec4 &, bool _redraw) {
   display_.post_empty_event();
 }
 
-void window::set_cursor(cursor_type _c) {
+void window::cursor(cursor_type _c) {
   current_cursor_type_ = _c;
-  display_.set_cursor(_c);
+  display_.cursor(_c);
 }
 
 void hut::data_source_handle_send(void *_data, wl_data_source *_source, const char *_mime, int32_t _fd) {

@@ -123,6 +123,7 @@ void display::post(const display::callback &_callback) {
 }
 
 void display::process_posts(time_point _now) {
+  HUT_PROFILE_SCOPE(PDISPLAY, "display::process_posts {}", posted_jobs_.size());
   decltype(posted_jobs_) tmp;
   {
     std::lock_guard lock(posted_mutex_);
@@ -148,8 +149,8 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
 
   VkPhysicalDeviceProperties properties;
   VkPhysicalDeviceFeatures features;
-  vkGetPhysicalDeviceProperties(_device, &properties);
-  vkGetPhysicalDeviceFeatures(_device, &features);
+  HUT_PVK(vkGetPhysicalDeviceProperties, _device, &properties);
+  HUT_PVK(vkGetPhysicalDeviceFeatures, _device, &features);
 
   result.score_ = properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? 1000 : 100;
 #ifdef HUT_PREFER_NONDESCRETE_DEVICES
@@ -159,9 +160,9 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
   result.score_ += properties.limits.maxImageDimension2D;
 
   uint32_t extension_count;
-  vkEnumerateDeviceExtensionProperties(_device, nullptr, &extension_count, nullptr);
+  HUT_PVK(vkEnumerateDeviceExtensionProperties, _device, nullptr, &extension_count, nullptr);
   std::vector<VkExtensionProperties> available_extensions(extension_count);
-  vkEnumerateDeviceExtensionProperties(_device, nullptr, &extension_count, available_extensions.data());
+  HUT_PVK(vkEnumerateDeviceExtensionProperties, _device, nullptr, &extension_count, available_extensions.data());
   bool has_swapchhain_ext = false;
   for (const auto &extension : available_extensions) {
     if (strcmp(extension.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0)
@@ -170,14 +171,14 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
 
   if (has_swapchhain_ext) {
     uint32_t famillies_count;
-    vkGetPhysicalDeviceQueueFamilyProperties(_device, &famillies_count, nullptr);
+    HUT_PVK(vkGetPhysicalDeviceQueueFamilyProperties, _device, &famillies_count, nullptr);
     std::vector<VkQueueFamilyProperties> famillies(famillies_count);
-    vkGetPhysicalDeviceQueueFamilyProperties(_device, &famillies_count, famillies.data());
+    HUT_PVK(vkGetPhysicalDeviceQueueFamilyProperties, _device, &famillies_count, famillies.data());
 
     for (uint32_t i = 0; i < famillies_count; i++) {
       const VkQueueFamilyProperties &props = famillies[i];
       VkBool32 present;
-      vkGetPhysicalDeviceSurfaceSupportKHR(_device, i, _dummy, &present);
+      HUT_PVK(vkGetPhysicalDeviceSurfaceSupportKHR, _device, i, _dummy, &present);
 
       if (props.queueCount > 0) {
         // prioritise dedicated queues
@@ -200,11 +201,11 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
     }
 
     VkSurfaceCapabilitiesKHR capabilities = {};
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_device, _dummy, &capabilities);
+    HUT_PVK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR, _device, _dummy, &capabilities);
 
     uint32_t formats_count, modes_count;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(_device, _dummy, &formats_count, nullptr);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(_device, _dummy, &modes_count, nullptr);
+    HUT_PVK(vkGetPhysicalDeviceSurfaceFormatsKHR, _device, _dummy, &formats_count, nullptr);
+    HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, _device, _dummy, &modes_count, nullptr);
 
     if (formats_count == 0)
       result.score_ = 0;
@@ -234,12 +235,13 @@ const std::vector<const char *> layers = {
 
 void display::init_vulkan_instance(const char *_app_name, uint32_t _app_version,
                                    std::vector<const char *> &extensions) {
+  HUT_PROFILE_SCOPE(PDISPLAY, "display::init_vulkan_instance");
   extensions.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);
 
   uint32_t extension_count;
-  vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr);
+  HUT_PVK(vkEnumerateInstanceExtensionProperties, nullptr, &extension_count, nullptr);
   std::vector<VkExtensionProperties> available_extensions(extension_count);
-  vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, available_extensions.data());
+  HUT_PVK(vkEnumerateInstanceExtensionProperties, nullptr, &extension_count, available_extensions.data());
 #ifdef HUT_ENABLE_VALIDATION
   bool has_debug_ext = false;
   for (const auto &extension : available_extensions) {
@@ -267,7 +269,7 @@ void display::init_vulkan_instance(const char *_app_name, uint32_t _app_version,
   info.ppEnabledLayerNames = layers.data();
   info.pApplicationInfo = &appInfo;
 
-  VkResult result = vkCreateInstance(&info, nullptr, &instance_);
+  VkResult result = HUT_PVK(vkCreateInstance, &info, nullptr, &instance_);
   if (result != VK_SUCCESS)
     throw std::runtime_error(sstream("Couldn't create a vulkan instance, code: ") << result);
 
@@ -291,10 +293,11 @@ void display::init_vulkan_instance(const char *_app_name, uint32_t _app_version,
 }
 
 void display::init_vulkan_device(VkSurfaceKHR _dummy) {
+  HUT_PROFILE_SCOPE(PDISPLAY, "display::init_vulkan_device");
   uint32_t device_count;
-  vkEnumeratePhysicalDevices(instance_, &device_count, nullptr);
+  HUT_PVK(vkEnumeratePhysicalDevices, instance_, &device_count, nullptr);
   std::vector<VkPhysicalDevice> physical_devices(device_count);
-  vkEnumeratePhysicalDevices(instance_, &device_count, physical_devices.data());
+  HUT_PVK(vkEnumeratePhysicalDevices, instance_, &device_count, physical_devices.data());
 
   VkPhysicalDevice prefered_device = VK_NULL_HANDLE;
   score_t prefered_rate;
@@ -308,8 +311,8 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   if (prefered_device == VK_NULL_HANDLE)
     throw std::runtime_error("No suitable vulkan devices");
 
-  vkGetPhysicalDeviceProperties(prefered_device, &device_props_);
-  vkGetPhysicalDeviceFeatures(prefered_device, &device_features_);
+  HUT_PVK(vkGetPhysicalDeviceProperties, prefered_device, &device_props_);
+  HUT_PVK(vkGetPhysicalDeviceFeatures, prefered_device, &device_features_);
 
   std::cout << "[hut] selected device " << device_props_.deviceName << " using Vulkan "
     << VK_VERSION_MAJOR(device_props_.apiVersion) << '.'
@@ -321,7 +324,7 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   iqueuet_ = prefered_rate.iqueuet_;
   iqueuep_ = prefered_rate.iqueuep_;
 
-  vkGetPhysicalDeviceMemoryProperties(pdevice_, &mem_props_);
+  HUT_PVK(vkGetPhysicalDeviceMemoryProperties, pdevice_, &mem_props_);
 
   std::unordered_set<uint32_t> unique_indexes;
   unique_indexes.emplace(prefered_rate.iqueueg_);
@@ -357,21 +360,21 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   device_info.enabledLayerCount = (uint32_t)layers.size();
   device_info.ppEnabledLayerNames = layers.data();
 
-  VkResult result = vkCreateDevice(pdevice_, &device_info, nullptr, &device_);
+  VkResult result = HUT_PVK(vkCreateDevice, pdevice_, &device_info, nullptr, &device_);
   if (result != VK_SUCCESS)
     throw std::runtime_error(sstream("Couldn't create a vulkan device, code: ") << result);
 
-  vkGetDeviceQueue(device_, prefered_rate.iqueueg_, 0, &queueg_);
-  vkGetDeviceQueue(device_, prefered_rate.iqueuec_, 0, &queuec_);
-  vkGetDeviceQueue(device_, prefered_rate.iqueuet_, 0, &queuet_);
-  vkGetDeviceQueue(device_, prefered_rate.iqueuep_, 0, &queuep_);
+  HUT_PVK(vkGetDeviceQueue, device_, prefered_rate.iqueueg_, 0, &queueg_);
+  HUT_PVK(vkGetDeviceQueue, device_, prefered_rate.iqueuec_, 0, &queuec_);
+  HUT_PVK(vkGetDeviceQueue, device_, prefered_rate.iqueuet_, 0, &queuet_);
+  HUT_PVK(vkGetDeviceQueue, device_, prefered_rate.iqueuep_, 0, &queuep_);
 
   VkCommandPoolCreateInfo poolInfo = {};
   poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
   poolInfo.queueFamilyIndex = prefered_rate.iqueueg_;
   poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-  if (vkCreateCommandPool(device_, &poolInfo, nullptr, &commandg_pool_) != VK_SUCCESS) {
+  if (HUT_PVK(vkCreateCommandPool, device_, &poolInfo, nullptr, &commandg_pool_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create command pool!");
   }
 
@@ -385,26 +388,26 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   allocInfo.commandPool = commandg_pool_;
   allocInfo.commandBufferCount = 1;
 
-  vkAllocateCommandBuffers(device_, &allocInfo, &staging_cb_);
+  HUT_PVK(vkAllocateCommandBuffers, device_, &allocInfo, &staging_cb_);
 
   VkCommandBufferBeginInfo beginInfo = {};
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-  vkBeginCommandBuffer(staging_cb_, &beginInfo);
+  HUT_PVK(vkBeginCommandBuffer, staging_cb_, &beginInfo);
 }
 
 void display::destroy_vulkan() {
-  vkDeviceWaitIdle(device_);
+  HUT_PVK(vkDeviceWaitIdle, device_);
 
   staging_.reset();
-  vkFreeCommandBuffers(device_, commandg_pool_, 1, &staging_cb_);
+  HUT_PVK(vkFreeCommandBuffers, device_, commandg_pool_, 1, &staging_cb_);
 
   if (commandg_pool_ != VK_NULL_HANDLE)
-    vkDestroyCommandPool(device_, commandg_pool_, nullptr);
+    HUT_PVK(vkDestroyCommandPool, device_, commandg_pool_, nullptr);
 
   if (device_ != VK_NULL_HANDLE)
-    vkDestroyDevice(device_, nullptr);
+    HUT_PVK(vkDestroyDevice, device_, nullptr);
 
   if (debug_cb_ != VK_NULL_HANDLE) {
     auto func = get_proc<PFN_vkDestroyDebugReportCallbackEXT>("vkDestroyDebugReportCallbackEXT");
@@ -413,7 +416,7 @@ void display::destroy_vulkan() {
   }
 
   if (instance_ != VK_NULL_HANDLE)
-    vkDestroyInstance(instance_, nullptr);
+    HUT_PVK(vkDestroyInstance, instance_, nullptr);
 }
 
 std::pair<uint32_t, VkMemoryPropertyFlags> display::find_memory_type(uint32_t typeFilter,
@@ -494,7 +497,7 @@ void display::stage_transition(const image_transition &_info) {
     throw std::invalid_argument("unsupported layout transition!");
   }
 
-  vkCmdPipelineBarrier(staging_cb_, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+  HUT_PVK(vkCmdPipelineBarrier, staging_cb_, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
 void display::stage_copy(const buffer_copy &_info) {
@@ -504,7 +507,7 @@ void display::stage_copy(const buffer_copy &_info) {
             << ']' << std::endl;
 #endif
 
-  vkCmdCopyBuffer(staging_cb_, _info.source, _info.destination, 1, &_info);
+  HUT_PVK(vkCmdCopyBuffer, staging_cb_, _info.source, _info.destination, 1, &_info);
 }
 
 void display::stage_zero(const display::buffer_zero &_info) {
@@ -513,11 +516,11 @@ void display::stage_zero(const display::buffer_zero &_info) {
             << "] zeroed" << std::endl;
 #endif
 
-  vkCmdFillBuffer(staging_cb_, _info.destination, _info.offset, _info.size, 0);
+  HUT_PVK(vkCmdFillBuffer, staging_cb_, _info.destination, _info.offset, _info.size, 0);
 }
 
 void display::stage_copy(const image_copy &_info) {
-  vkCmdCopyImage(staging_cb_, _info.source, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+  HUT_PVK(vkCmdCopyImage, staging_cb_, _info.source, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                  _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &_info);
 }
 
@@ -531,7 +534,7 @@ void display::stage_copy(const buffer2image_copy &_info) {
             << std::endl;
 #endif
 
-  vkCmdCopyBufferToImage(staging_cb_, _info.source, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &_info);
+  HUT_PVK(vkCmdCopyBufferToImage, staging_cb_, _info.source, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &_info);
 }
 
 void display::stage_clear(const image_clear &_info) {
@@ -546,10 +549,11 @@ void display::stage_clear(const image_clear &_info) {
   range.baseMipLevel = 0;
   range.levelCount = 1;
 
-  vkCmdClearColorImage(staging_cb_, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &_info.color, 1, &range);
+  HUT_PVK(vkCmdClearColorImage, staging_cb_, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &_info.color, 1, &range);
 }
 
 void display::flush_staged() {
+  HUT_PROFILE_SCOPE(PDISPLAY, "display::flush_staged");
   std::lock_guard lk(staging_mutex_);
   if (staging_jobs_ == 0)
     return;
@@ -564,7 +568,7 @@ void display::flush_staged() {
   if (staging_jobs_ > 0)
     return;
 
-  vkEndCommandBuffer(staging_cb_);
+  HUT_PVK(vkEndCommandBuffer, staging_cb_);
 
   VkSubmitInfo submitInfo = {};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -574,8 +578,8 @@ void display::flush_staged() {
 #ifdef HUT_DEBUG_STAGING
   std::cout << "[staging] submitting!" << std::endl;
 #endif
-  vkQueueSubmit(queueg_, 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(queueg_);
+  HUT_PVK(vkQueueSubmit, queueg_, 1, &submitInfo, VK_NULL_HANDLE);
+  HUT_PVK(vkQueueWaitIdle, queueg_);
 
   staging_->clear_ranges();
 
@@ -583,5 +587,5 @@ void display::flush_staged() {
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-  vkBeginCommandBuffer(staging_cb_, &beginInfo);
+  HUT_PVK(vkBeginCommandBuffer, staging_cb_, &beginInfo);
 }

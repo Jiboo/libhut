@@ -133,7 +133,7 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
 
   init_vulkan_device(dummy_surface);
 
-  vkDestroySurfaceKHR(instance_, dummy_surface, nullptr);
+  HUT_PVK(vkDestroySurfaceKHR, instance_, dummy_surface, nullptr);
   xcb_destroy_window(connection_, dummy);
 
   FT_Init_FreeType(&ft_library_);
@@ -289,8 +289,10 @@ int display::dispatch() {
   display::time_point now;
 
   while (loop) {
+    HUT_PROFILE_SCOPE(PDISPLAY, "Main loop");
     xcb_generic_event_t *event = xcb_wait_for_event(connection_);
     do {
+      HUT_PROFILE_SCOPE_NAMED(PDISPLAY, "XCB dispatch {}", ("event"), make_fixed<40>(xcb_event_get_label(event->response_type)));
         now = display::clock::now();
         if (event != nullptr) {
           switch (event->response_type & ~0x80U) {
@@ -573,6 +575,7 @@ int display::dispatch() {
       loop = false;
 
     xcb_flush(connection_);
+    profiling::threads_data::next_frame();
   }
 
   return EXIT_SUCCESS;

@@ -62,11 +62,11 @@ int main(int, char **) {
 
   window w(d);
   w.clear_color({1, 1, 1, 1});
-  w.set_title("hut demo win1");
+  w.title("hut demo win1");
 
   window w2(d);
   w2.clear_color({0, 0, 1, 1});
-  w2.set_title("hut demo win2");
+  w2.title("hut demo win2");
 
   auto b = d.alloc_buffer(1024*1024);
 
@@ -370,20 +370,27 @@ int main(int, char **) {
   });
 
   w.on_key.connect([&w](keysym c, modifiers _mods, bool _press) {
-    std::cout << "w keysym " << _press << '\t' << window::name_key(c) << std::endl;
+    std::cout << "w keysym " << _press << '\t' << name_key(c) << "\t" << _mods.active_ << std::endl;
     if (c == KESCAPE && !_press)
       w.close();
     else if (c == KUP && !_press)
       w.pause();
-    else if (c == KLEFT && !_press)
+
+    else if (!_mods.query(KMOD_CTRL) && c == KLEFT && !_press)
       w.maximize(false);
-    else if (c == KRIGHT && !_press)
+    else if (!_mods.query(KMOD_CTRL) && c == KRIGHT && !_press)
       w.maximize(true);
+
+    else if (_mods.query(KMOD_CTRL) && c == KLEFT && !_press)
+      w.fullscreen(false);
+    else if (_mods.query(KMOD_CTRL) && c == KRIGHT && !_press)
+      w.fullscreen(true);
+
     return true;
   });
 
   w2.on_key.connect([&w2](keysym c, modifiers _mods, bool _press) {
-    std::cout << "w2 keysym " << _press << '\t' << window::name_key(c) << std::endl;
+    std::cout << "w2 keysym " << _press << '\t' << name_key(c) << std::endl;
     if (c == KESCAPE && !_press)
       w2.close();
     else if (c == KUP && !_press)
@@ -436,7 +443,7 @@ int main(int, char **) {
       static int current_cursor = CDEFAULT;
       if (++current_cursor > CZOOM_OUT)
         current_cursor = CDEFAULT;
-      w.set_cursor(static_cast<cursor_type>(current_cursor));
+      w.cursor(static_cast<cursor_type>(current_cursor));
     }
     return true;
   });
@@ -470,6 +477,11 @@ int main(int, char **) {
         std::cout << std::endl;
       });
     }
+
+    if ((_keysym == 'p' || _keysym == 'P') && (_mods == KMOD_CTRL) && _pressed) {
+      profiling::threads_data::request_dump();
+    }
+
     return true;
   });
 
@@ -483,7 +495,7 @@ int main(int, char **) {
       coords_edge |= RIGHT;
     if (w2.size().y - _coords.y < 50)
       coords_edge |= BOTTOM;
-    w2.set_cursor(edge_cursor(coords_edge));
+    w2.cursor(edge_cursor(coords_edge));
     if (!coords_edge)
       w2.interactive_move();
     else

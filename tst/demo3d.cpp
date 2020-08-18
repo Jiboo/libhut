@@ -144,7 +144,7 @@ int main(int, char **) {
     return false;
   });
 
-  w.on_key.connect([&](keysym c, bool _press) {
+  w.on_key.connect([&](keysym c, modifiers _mods, bool _press) {
     if (c == KESCAPE && !_press)
       w.close();
     return true;

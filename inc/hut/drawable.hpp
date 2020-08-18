@@ -140,6 +140,7 @@ private:
       , VkCompareOp _depthCompare
 #endif
     ) {
+    HUT_PROFILE_SCOPE(PDRAWABLE, __PRETTY_FUNCTION__);
     VkPipelineShaderStageCreateInfo vert_stage_info = {};
     vert_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vert_stage_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -285,6 +286,7 @@ public:
 #endif
       )
       : window_(_window) {
+    HUT_PROFILE_SCOPE(PDRAWABLE, __PRETTY_FUNCTION__);
     init_pools();
     init_descriptor_layout();
     alloc_next_descriptors(1);
@@ -299,19 +301,19 @@ public:
 
   virtual ~drawable() {
     VkDevice device = window_.display_.device_;
-    vkDeviceWaitIdle(device);
+    HUT_PVK(vkDeviceWaitIdle, device);
     if (descriptor_layout_ != VK_NULL_HANDLE)
-      vkDestroyDescriptorSetLayout(device, descriptor_layout_, nullptr);
+      HUT_PVK(vkDestroyDescriptorSetLayout, device, descriptor_layout_, nullptr);
     if (descriptor_pool_ != VK_NULL_HANDLE)
-      vkDestroyDescriptorPool(device, descriptor_pool_, nullptr);
+      HUT_PVK(vkDestroyDescriptorPool, device, descriptor_pool_, nullptr);
     if (pipeline_ != VK_NULL_HANDLE)
-      vkDestroyPipeline(device, pipeline_, nullptr);
+      HUT_PVK(vkDestroyPipeline, device, pipeline_, nullptr);
     if (layout_ != VK_NULL_HANDLE)
-      vkDestroyPipelineLayout(device, layout_, nullptr);
+      HUT_PVK(vkDestroyPipelineLayout ,device, layout_, nullptr);
     if (vert_ != VK_NULL_HANDLE)
-      vkDestroyShaderModule(device, vert_, nullptr);
+      HUT_PVK(vkDestroyShaderModule, device, vert_, nullptr);
     if (frag_ != VK_NULL_HANDLE)
-      vkDestroyShaderModule(device, frag_, nullptr);
+      HUT_PVK(vkDestroyShaderModule, device, frag_, nullptr);
   }
 
   void alloc_next_descriptors(uint _count) {
@@ -375,6 +377,7 @@ public:
   };
 
   void bind(uint _descriptor_index, const shared_ubo<ubo> &_ubo, TExtraBindings... _bindings) {
+    HUT_PROFILE_SCOPE(PDRAWABLE, __PRETTY_FUNCTION__);
     assert(_descriptor_index < descriptors_.size());
     bindings_.emplace(_descriptor_index, bindings{_ubo, std::forward_as_tuple(_bindings...)});
 
@@ -383,7 +386,7 @@ public:
     filler.buffer(0, _ubo);
     TDetails::fill_extra_descriptor_writes(filler, std::forward<TExtraBindings>(_bindings)...);
 
-    vkUpdateDescriptorSets(window_.display_.device_, filler.writes_.size(), filler.writes_.data(), 0, nullptr);
+    HUT_PVK(vkUpdateDescriptorSets, window_.display_.device_, filler.writes_.size(), filler.writes_.data(), 0, nullptr);
   }
 
   bool descriptor_bound(uint _descriptor_index) {
@@ -394,25 +397,26 @@ public:
             const shared_indices &_indices, uint _indices_offset, uint _indices_count,
             const shared_instances &_instances, uint _instances_offset, uint _instances_count,
             const shared_vertices &_vertices, uint _vertex_offset) {
+    HUT_PROFILE_SCOPE(PDRAWABLE, __PRETTY_FUNCTION__);
     assert(descriptor_bound(_descriptor_index));
     assert(_indices && _instances && _vertices);
     assert(_indices_offset + _indices_count <= _indices->size());
     assert(_instances_offset + _instances_count <= _instances->size());
     assert(_vertex_offset <= _vertices->size());
 
-    vkCmdBindPipeline(_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
-    vkCmdBindDescriptorSets(_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout_, 0, 1, descriptors_.data() + _descriptor_index, 0, nullptr);
+    HUT_PVK(vkCmdBindPipeline, _buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+    HUT_PVK(vkCmdBindDescriptorSets, _buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout_, 0, 1, descriptors_.data() + _descriptor_index, 0, nullptr);
 
     VkBuffer verticesBuffers[] = {_vertices->buffer_};
     VkDeviceSize verticesOffsets[] = {_vertices->offset_};
-    vkCmdBindVertexBuffers(_buffer, 0, 1, verticesBuffers, verticesOffsets);
+    HUT_PVK(vkCmdBindVertexBuffers, _buffer, 0, 1, verticesBuffers, verticesOffsets);
 
     VkBuffer instancesBuffers[] = {_instances->buffer_};
     VkDeviceSize instancesOffsets[] = {_instances->offset_};
-    vkCmdBindVertexBuffers(_buffer, 1, 1, instancesBuffers, instancesOffsets);
+    HUT_PVK(vkCmdBindVertexBuffers, _buffer, 1, 1, instancesBuffers, instancesOffsets);
 
-    vkCmdBindIndexBuffer(_buffer, _indices->buffer_, _indices->offset_, VK_INDEX_TYPE_UINT16);
-    vkCmdDrawIndexed(_buffer, _indices_count, _instances_count, _indices_offset, _vertex_offset, _instances_offset);
+    HUT_PVK(vkCmdBindIndexBuffer, _buffer, _indices->buffer_, _indices->offset_, VK_INDEX_TYPE_UINT16);
+    HUT_PVK(vkCmdDrawIndexed, _buffer, _indices_count, _instances_count, _indices_offset, _vertex_offset, _instances_offset);
   }
 
   void draw(VkCommandBuffer _buffer, uint _descriptor_index,

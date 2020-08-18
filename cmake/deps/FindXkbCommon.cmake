@@ -1,4 +1,4 @@
-# https://github.com/glfw/glfw/blob/master/CMake/modules/FindXKBCommon.cmakehttps://github.com/glfw/glfw/blob/master/CMake/modules/FindXKBCommon.cmake
+# https://github.com/glfw/glfw/blob/master/CMake/modules/FindXKBCommon.cmake
 
 # - Try to find XkbCommon
 # Once done, this will define

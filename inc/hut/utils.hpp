@@ -51,33 +51,35 @@
 #include <glm/gtx/scalar_multiplication.hpp>
 #include <glm/gtx/hash.hpp>
 
+#include "hut/profiling.hpp"
+
 namespace hut {
 
-  class buffer_pool;
-  class display;
-  template<typename TDetails, typename... TExtraBindings> class drawable;
-  class font;
-  class shaper;
-  class image;
-  class sampler;
-  class window;
+class buffer_pool;
+class display;
+template<typename TDetails, typename... TExtraBindings> class drawable;
+class font;
+class shaper;
+class image;
+class sampler;
+class window;
 
   // FIXME JBL: Not in mingw64
 #if __has_include("span")
-  template<typename TType, size_t TExtent = std::dynamic_extent>
-  using span = std::span<TType, TExtent>;
+template<typename TType, size_t TExtent = std::dynamic_extent>
+using span = std::span<TType, TExtent>;
 #else
-  template<typename TType, size_t TExtent = TCB_SPAN_NAMESPACE_NAME::dynamic_extent>
-  using span = TCB_SPAN_NAMESPACE_NAME::span<TType, TExtent>;
+template<typename TType, size_t TExtent = TCB_SPAN_NAMESPACE_NAME::dynamic_extent>
+using span = TCB_SPAN_NAMESPACE_NAME::span<TType, TExtent>;
 #endif
 
-  using shared_buffer = std::shared_ptr<buffer_pool>;
-  using shared_font = std::shared_ptr<font>;
-  using shared_image = std::shared_ptr<image>;
-  using shared_sampler = std::shared_ptr<sampler>;
+using shared_buffer = std::shared_ptr<buffer_pool>;
+using shared_font = std::shared_ptr<font>;
+using shared_image = std::shared_ptr<image>;
+using shared_sampler = std::shared_ptr<sampler>;
 
-  using namespace std::chrono_literals;
-  using namespace glm;
+using namespace std::chrono_literals;
+using namespace glm;
 
 inline std::string to_utf8(char32_t ch) {
   // NOTE JBL: https://stackoverflow.com/questions/30765256/linker-error-using-vs-2015-rc-cant-find-symbol-related-to-stdcodecvt
@@ -189,24 +191,6 @@ class sstream {
     return str();
   }
 };
-
-struct dur_t {
-    std::chrono::nanoseconds time;
-
-    template <typename TRep, typename TPeriod>
-    explicit dur_t(std::chrono::duration<TRep, TPeriod> pTime)
-            : time(std::chrono::duration_cast<std::chrono::nanoseconds>(pTime)) {}
-};
-inline std::ostream &operator<<(std::ostream &pOS, const dur_t &pDur) {
-    auto lNano = pDur.time.count();
-    if (lNano < 1000)
-        return pOS << lNano << "ns";
-    else if (lNano < 1'000'000)
-        return pOS << lNano / 1000.0 << "µs";
-    else if (lNano < 1'000'000'000)
-        return pOS << lNano / 1'000'000.0 << "ms";
-    return pOS << lNano / 1'000'000'000.0 << "s";
-}
 
 inline void hash_combine(std::size_t&) { }
 
