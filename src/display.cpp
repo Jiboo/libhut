@@ -378,9 +378,7 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
     throw std::runtime_error("failed to create command pool!");
   }
 
-  staging_ = std::make_shared<buffer_pool>(*this, 1024 * 1024,
-                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                      VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+  staging_ = std::make_shared<buffer_pool>(*this, 1024 * 1024, buffer_pool::staging_type, buffer_pool::staging_usage);
 
   VkCommandBufferAllocateInfo allocInfo = {};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;

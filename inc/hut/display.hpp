@@ -159,6 +159,7 @@ using modifiers = flagged<modifier, MODIFIER_LAST_VALUE>;
 class display {
   friend class window;
   friend class buffer_pool;
+  friend class staging_pool;
   friend class image;
   friend class sampler;
   friend class font;

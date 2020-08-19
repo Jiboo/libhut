@@ -144,18 +144,18 @@ std::shared_ptr<image> image::load_png(display &_display, span<const uint8_t> _d
 
   auto dst = std::make_shared<image>(_display, uvec2{width, height}, format);
   {
-    std::lock_guard lk(_display.staging_mutex_);
-    buffer_pool::alloc alloc = _display.staging_->do_alloc(byte_size, offsetAlignment);
+    buffer_pool::alloc alloc;
+    {
+      std::lock_guard lk(_display.staging_mutex_);
+      alloc = _display.staging_->do_alloc(byte_size, offsetAlignment);
+    }
 
-    void *data;
-    HUT_PVK(vkMapMemory, _display.device_, alloc.memory_, alloc.offset_, byte_size, 0, &data);
-    auto dataBytes = reinterpret_cast<uint8_t *>(data);
+    auto dataBytes = alloc.buffer_->permanent_map_ + alloc.offset_;
     png_bytep rows[height];
     for (uint y = 0; y < height; y++) {
       rows[y] = dataBytes + y * row_byte_size;
     }
     png_read_image(png_ptr, rows);
-    HUT_PVK(vkUnmapMemory, _display.device_, alloc.memory_);
 
     display::buffer2image_copy copy = {};
     copy.imageExtent = {width, height, 1};
@@ -164,7 +164,7 @@ std::shared_ptr<image> image::load_png(display &_display, span<const uint8_t> _d
     copy.bufferImageHeight = height;
     copy.bufferOffset = alloc.offset_;
     copy.imageSubresource = subResource;
-    copy.source = alloc.buffer_;
+    copy.source = alloc.buffer_->buffer_;
     copy.destination = dst->image_;
     copy.pixelSize = channels;
 
@@ -177,6 +177,7 @@ std::shared_ptr<image> image::load_png(display &_display, span<const uint8_t> _d
     post.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     post.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+    std::lock_guard lk(_display.staging_mutex_);
     _display.staging_jobs_++;
     _display.preflush([&_display, pre, post, copy] {
       _display.stage_transition(pre);
@@ -197,14 +198,14 @@ std::shared_ptr<image> image::load_raw(display &_display, uvec2 _extent,
 
   uint offsetAlignment = std::max(VkDeviceSize(4), _display.device_props_.limits.optimalBufferCopyOffsetAlignment);
   {
-    std::lock_guard lk(_display.staging_mutex_);
-    buffer_pool::alloc alloc = _display.staging_->do_alloc(_data.size_bytes(), offsetAlignment);
+    buffer_pool::alloc alloc;
+    {
+      std::lock_guard lk(_display.staging_mutex_);
+      alloc = _display.staging_->do_alloc(_data.size_bytes(), offsetAlignment);
+    }
 
-    void *data;
-    HUT_PVK(vkMapMemory, _display.device_, alloc.memory_, alloc.offset_, _data.size_bytes(), 0, &data);
-    auto dataBytes = reinterpret_cast<uint8_t *>(data);
+    auto dataBytes = alloc.buffer_->permanent_map_ + alloc.offset_;
     memcpy(dataBytes, _data.data(), _data.size_bytes());
-    HUT_PVK(vkUnmapMemory, _display.device_, alloc.memory_);
 
     VkImageSubresourceLayers subResource = {};
     subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -219,7 +220,7 @@ std::shared_ptr<image> image::load_raw(display &_display, uvec2 _extent,
     copy.bufferImageHeight = _extent.y;
     copy.bufferOffset = alloc.offset_;
     copy.imageSubresource = subResource;
-    copy.source = alloc.buffer_;
+    copy.source = alloc.buffer_->buffer_;
     copy.destination = dst->image_;
     copy.pixelSize = dst->pixel_size_;
 
@@ -232,6 +233,7 @@ std::shared_ptr<image> image::load_raw(display &_display, uvec2 _extent,
     post.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     post.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+    std::lock_guard lk(_display.staging_mutex_);
     _display.staging_jobs_++;
     _display.preflush([&_display, pre, post, copy] {
       _display.stage_transition(pre);
@@ -348,16 +350,17 @@ void image::update(ivec4 coords, uint8_t *_data, uint _src_row_pitch) {
   uint buffer_row_pitch = align(row_byte_size, buffer_align);
   int byte_size = height * buffer_row_pitch;
 
-  std::lock_guard lk(display_.staging_mutex_);
-  buffer_pool::alloc alloc = display_.staging_->do_alloc(byte_size, offset_align);
-  void *target;
-  HUT_PVK(vkMapMemory, display_.device_, alloc.memory_, alloc.offset_, byte_size, 0, &target);
+  buffer_pool::alloc alloc;
+  {
+    std::lock_guard lk(display_.staging_mutex_);
+    alloc = display_.staging_->do_alloc(byte_size, offset_align);
+  }
+  auto dataBytes = alloc.buffer_->permanent_map_ + alloc.offset_;
   for (uint i = 0; i < height; i++) {
     uint8_t *src = _data + _src_row_pitch * i;
-    uint8_t *dst = (uint8_t*)target + buffer_row_pitch * i;
+    uint8_t *dst = dataBytes + buffer_row_pitch * i;
     memcpy(dst, src, row_byte_size);
   }
-  HUT_PVK(vkUnmapMemory, display_.device_, alloc.memory_);
 
   VkImageSubresourceLayers subResource = {};
   subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -380,10 +383,11 @@ void image::update(ivec4 coords, uint8_t *_data, uint _src_row_pitch) {
   copy.bufferImageHeight = height;
   copy.bufferOffset = alloc.offset_;
   copy.imageSubresource = subResource;
-  copy.source = alloc.buffer_;
+  copy.source = alloc.buffer_->buffer_;
   copy.destination = image_;
   copy.pixelSize = pixel_size_;
 
+  std::lock_guard lk(display_.staging_mutex_);
   display_.staging_jobs_++;
   display_.preflush([this, pre, post, copy]() {
     display_.stage_transition(pre);

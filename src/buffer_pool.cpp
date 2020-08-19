@@ -45,23 +45,24 @@ buffer_pool::~buffer_pool() {
     free_buffer(buffer);
 }
 
-void buffer_pool::do_update(VkBuffer _buf, uint _offset, uint _size, const void *_data) {
+void buffer_pool::do_update(buffer &_buf, uint _offset, uint _size, const void *_data) {
   HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::do_update {}", _size);
-  std::lock_guard lk(display_.staging_mutex_);
-  auto staging = display_.staging_->do_alloc(_size, 4);
+  alloc staging;
+  {
+    std::lock_guard lk(display_.staging_mutex_);
+    staging = display_.staging_->do_alloc(_size, 4);
+  }
 
-  void *target;
-  HUT_PVK(vkMapMemory, display_.device_, staging.memory_, staging.offset_, _size, 0, &target);
-  memcpy(target, _data, _size);
-  HUT_PVK(vkUnmapMemory, display_.device_, staging.memory_);
+  memcpy(staging.buffer_->permanent_map_ + staging.offset_, _data, _size);
 
   display::buffer_copy copy = {};
   copy.size = _size;
   copy.srcOffset = staging.offset_;
   copy.dstOffset = _offset;
-  copy.source = staging.buffer_;
-  copy.destination = _buf;
+  copy.source = staging.buffer_->buffer_;
+  copy.destination = _buf.buffer_;
 
+  std::lock_guard lk(display_.staging_mutex_);
   display_.staging_jobs_++;
   display_.preflush([this, copy]() {
     display_.stage_copy(copy);
@@ -69,25 +70,21 @@ void buffer_pool::do_update(VkBuffer _buf, uint _offset, uint _size, const void 
   });
 }
 
-buffer_pool::updator buffer_pool::prepare_update(VkBuffer _buf, uint _offset, uint _size) {
+buffer_pool::updator buffer_pool::prepare_update(buffer &_buf, uint _offset, uint _size) {
   HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::prepare_update {}", _size);
   std::lock_guard lk(display_.staging_mutex_);
   auto staging = display_.staging_->do_alloc(_size, 4);
-  void *target;
-  HUT_PVK(vkMapMemory, display_.device_, staging.memory_, staging.offset_, _size, 0, &target);
-  return updator(*this, _buf, staging, span<uint8_t>{(uint8_t*)target, _size}, _offset);
+  return updator(_buf, staging, span<uint8_t>{staging.buffer_->permanent_map_ + staging.offset_, _size}, _offset);
 }
 
 void buffer_pool::finalize_update(updator &_update) {
   HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::finalize_update {}", _update.size_bytes());
-  HUT_PVK(vkUnmapMemory, display_.device_, _update.staging_.memory_);
-
   display::buffer_copy copy = {};
   copy.size = _update.data_.size_bytes();
   copy.srcOffset = _update.staging_.offset_;
   copy.dstOffset = _update.offset_;
-  copy.source = _update.staging_.buffer_;
-  copy.destination = _update.target_;
+  copy.source = _update.staging_.buffer_->buffer_;
+  copy.destination = _update.target_.buffer_;
 
   std::lock_guard lk(display_.staging_mutex_);
   display_.staging_jobs_++;
@@ -97,12 +94,12 @@ void buffer_pool::finalize_update(updator &_update) {
   });
 }
 
-void buffer_pool::do_zero(VkBuffer _buf, uint _offset, uint _size) {
+void buffer_pool::do_zero(buffer &_buf, uint _offset, uint _size) {
   HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::do_zero {}", _size);
   display::buffer_zero zero = {};
   zero.size = _size;
   zero.offset = _offset;
-  zero.destination = _buf;
+  zero.destination = _buf.buffer_;
 
   display_.staging_jobs_++;
   display_.preflush([this, zero]() {
@@ -113,8 +110,8 @@ void buffer_pool::do_zero(VkBuffer _buf, uint _offset, uint _size) {
 
 buffer_pool::buffer *buffer_pool::grow(uint _size) {
   HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::grow {} total {}", _size, total_size_);
-  buffers_.resize(buffers_.size() + 1);
-  buffer &result = buffers_.back();
+
+  buffer result = {*this};
   result.size_ = _size;
   total_size_ += _size;
 
@@ -153,15 +150,20 @@ buffer_pool::buffer *buffer_pool::grow(uint _size) {
   result.root_->next_ = nullptr;
   result.root_->prev_ = nullptr;
 
-  return &result;
+  if (type_ == staging_type && usage_ == staging_usage)
+    HUT_PVK(vkMapMemory, display_.device_, result.memory_, 0, _size, 0, reinterpret_cast<void**>(&result.permanent_map_));
+  else
+    result.permanent_map_ = nullptr;
+
+  return &buffers_.emplace_back(result);
 }
 
 buffer_pool::alloc buffer_pool::do_alloc(uint _size, uint _align) {
   HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::do_alloc {}", _size);
   uint aligned = 0, align_bytes = 0, aligned_size = _size;
   range *fit = nullptr;
-  const buffer *container = nullptr;
-  for (const auto &buffer : buffers_) {
+  buffer *container = nullptr;
+  for (auto &buffer : buffers_) {
     if (fit != nullptr)
       break;
 
@@ -212,12 +214,7 @@ buffer_pool::alloc buffer_pool::do_alloc(uint _size, uint _align) {
     fit->allocated_ = true;
   }
 
-  alloc result;
-  result.offset_ = aligned;
-  result.memory_ = container->memory_;
-  result.buffer_ = container->buffer_;
-  result.node_   = fit;
-  return result;
+  return alloc{ container, fit, aligned, _size };
 }
 
 void buffer_pool::do_free(range *_range) {
@@ -257,7 +254,6 @@ void buffer_pool::do_free(range *_range) {
 }
 
 void buffer_pool::clear_ranges() {
-  std::lock_guard lk(mutex_);
   for (const auto &buffer : buffers_) {
     range *cur = buffer.root_;
     cur = cur->next_;
@@ -276,6 +272,8 @@ void buffer_pool::clear_ranges() {
 
 void buffer_pool::free_buffer(buffer_pool::buffer &_buff) {
   HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::free_buffer");
+  if (_buff.permanent_map_)
+    HUT_PVK(vkUnmapMemory, display_.device_, _buff.memory_);
   if (_buff.buffer_)
     HUT_PVK(vkDestroyBuffer, display_.device_, _buff.buffer_, nullptr);
   if (_buff.memory_)

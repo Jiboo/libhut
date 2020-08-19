@@ -41,18 +41,31 @@ namespace hut {
 class display;
 
 class buffer_pool {
+protected:
   friend class display;
   friend class shaper;
   friend class image;
   template<typename TDetails, typename... TExtraBindings> friend class drawable;
 
-  struct range;
+  struct range {
+    range *prev_, *next_;
+    uint offset_, size_;
+    bool allocated_;
+  };
 
-  struct alloc {
+  struct buffer {
+    buffer_pool &parent_;
     VkBuffer buffer_;
     VkDeviceMemory memory_;
-    uint offset_;
+    range *root_;
+    uint8_t *permanent_map_;
+    uint size_;
+  };
+
+  struct alloc {
+    buffer *buffer_;
     range *node_;
+    uint offset_, size_;
   };
 
  public:
@@ -60,18 +73,17 @@ class buffer_pool {
   class updator {
     friend buffer_pool;
 
-    buffer_pool &parent_;
-    VkBuffer target_;
-    buffer_pool::alloc staging_;
+    buffer &target_;
+    alloc staging_;
     uint offset_;
     span<uint8_t> data_;
 
-    updator(buffer_pool &_parent, VkBuffer _target, buffer_pool::alloc _staging, span<uint8_t> _data, uint _offset)
-      : parent_(_parent), target_(_target), staging_(_staging), offset_(_offset), data_(_data) {
+    updator(buffer &_target, alloc _staging, span<uint8_t> _data, uint _offset)
+      : target_(_target), staging_(_staging), offset_(_offset), data_(_data) {
     }
 
   public:
-    ~updator() { parent_.finalize_update(*this); }
+    ~updator() { target_.parent_.finalize_update(*this); }
 
     uint8_t *data() { return data_.data(); }
     size_t size_bytes() { return data_.size_bytes(); }
@@ -81,29 +93,28 @@ class buffer_pool {
   template <typename T>
   class ref {
     friend class buffer_pool;
-    range *range_;
+    template<typename TDetails, typename... TExtraBindings> friend class drawable;
 
-   public:
-    buffer_pool &pool_;
-    VkBuffer buffer_;
-    const uint offset_, byte_size_;
+    alloc alloc_;
 
-    ref(range *_range, buffer_pool &_pool, VkBuffer _buffer, uint _offset, uint _size)
-        : range_(_range), pool_(_pool), buffer_(_buffer), offset_(_offset), byte_size_(_size) {
-    }
+    buffer &buff() { return *alloc_.buffer_; };
+    buffer_pool &pool() { return alloc_.buffer_->parent_; };
+
+  public:
+    explicit ref(alloc &_alloc) : alloc_(_alloc) {}
 
     ~ref() {
-      pool_.do_free(range_);
+      pool().do_free(alloc_.node_);
     }
 
     void update_raw(uint _byte_offset, uint _byte_size, void *_data) {
-      assert(_byte_offset + _byte_size <= byte_size_);
-      pool_.do_update(buffer_, offset_ + _byte_offset, _byte_size, (void *)_data);
+      assert(_byte_offset + _byte_size <= size_bytes());
+      pool().do_update(buff(), alloc_.offset_ + _byte_offset, _byte_size, (void *)_data);
     }
 
     updator update_raw_indirect(uint _byte_offset, uint _byte_size) {
-      assert(_byte_offset + _byte_size <= byte_size_);
-      return pool_.prepare_update(buffer_, offset_ + _byte_offset, _byte_size);
+      assert(_byte_offset + _byte_size <= size_bytes());
+      return pool().prepare_update(buff(), alloc_.offset_ + _byte_offset, _byte_size);
     }
 
     void update_some(uint _index_offset, uint _count, const T *_src) {
@@ -123,12 +134,12 @@ class buffer_pool {
     }
 
     void set(const T &_data) {
-      assert(byte_size_ == sizeof(T));
+      assert(size_bytes() == sizeof(T));
       update_one(0, _data);
     }
 
     void set(const std::initializer_list<T> &_data) {
-      assert(_data.size() * sizeof(T) == byte_size_);
+      assert(_data.size() * sizeof(T) == size_bytes());
       update_some(0, _data.size(), _data.begin());
     }
 
@@ -137,16 +148,16 @@ class buffer_pool {
       size_t byte_size = _count * sizeof(T);
       assert(byte_offset % 4U == 0);
       assert(byte_size % 4U == 0);
-      assert(byte_offset + byte_size <= byte_size_);
-      pool_.do_zero(buffer_, offset_ + byte_offset, byte_size);
+      assert(byte_offset + byte_size <= size_bytes());
+      pool().do_zero(buff(), alloc_.offset_ + byte_offset, byte_size);
     }
 
-    uint size() const {
-      return byte_size_ / sizeof(T);
+    [[nodiscard]] uint size() const {
+      return size_bytes() / sizeof(T);
     }
 
-    uint size_bytes() const {
-      return byte_size_;
+    [[nodiscard]] uint size_bytes() const {
+      return alloc_.size_;
     }
   };
 
@@ -157,41 +168,30 @@ class buffer_pool {
   std::shared_ptr<ref<T>> allocate(uint _count, uint _align = 4) {
     uint size = sizeof(T) * _count;
     auto alloc = do_alloc(size, _align);
-    return std::make_shared<ref<T>>(alloc.node_, *this, alloc.buffer_, alloc.offset_, size);
+    return std::make_shared<ref<T>>(alloc);
   }
 
   void debug();
 
- private:
+ protected:
+  static constexpr VkMemoryPropertyFlags staging_type = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+  static constexpr uint staging_usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
   display &display_;
   uint total_size_ = 0;
   VkMemoryPropertyFlags type_;
   uint usage_; // see VkBufferUsageFlagBits
 
-  struct range {
-    range *prev_, *next_;
-    bool allocated_;
-    uint offset_, size_;
-  };
-
-  struct buffer {
-    uint size_;
-    VkBuffer buffer_;
-    VkDeviceMemory memory_;
-    range *root_;
-  };
-
-  std::mutex mutex_;
   std::vector<buffer> buffers_;
 
   buffer *grow(uint new_size);
   void free_buffer(buffer &_buff);
   alloc do_alloc(uint _size, uint _align = 4);
   void do_free(range *_ref);
-  void do_update(VkBuffer _buf, uint _offset, uint _size, const void *_data);
-  updator prepare_update(VkBuffer _buf, uint _offset, uint _size);
+  void do_update(buffer &_buf, uint _offset, uint _size, const void *_data);
+  updator prepare_update(buffer &_buf, uint _offset, uint _size);
   void finalize_update(updator &_update);
-  void do_zero(VkBuffer _buf, uint _offset, uint _size);
+  void do_zero(buffer &_buf, uint _offset, uint _size);
   void clear_ranges();
 };
 

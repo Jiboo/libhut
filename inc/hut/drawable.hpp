@@ -341,9 +341,9 @@ public:
 
     void buffer(uint _binding, const shared_ubo<ubo> &_ubo) {
       VkDescriptorBufferInfo info = {};
-      info.buffer = _ubo->buffer_;
-      info.offset = _ubo->offset_;
-      info.range = _ubo->byte_size_;
+      info.buffer = _ubo->alloc_.buffer_->buffer_;
+      info.offset = _ubo->alloc_.offset_;
+      info.range = _ubo->alloc_.size_;
       buffers_.emplace_back(info);
 
       VkWriteDescriptorSet write = {};
@@ -407,15 +407,15 @@ public:
     HUT_PVK(vkCmdBindPipeline, _buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     HUT_PVK(vkCmdBindDescriptorSets, _buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout_, 0, 1, descriptors_.data() + _descriptor_index, 0, nullptr);
 
-    VkBuffer verticesBuffers[] = {_vertices->buffer_};
-    VkDeviceSize verticesOffsets[] = {_vertices->offset_};
+    VkBuffer verticesBuffers[] = {_vertices->buff().buffer_};
+    VkDeviceSize verticesOffsets[] = {_vertices->alloc_.offset_};
     HUT_PVK(vkCmdBindVertexBuffers, _buffer, 0, 1, verticesBuffers, verticesOffsets);
 
-    VkBuffer instancesBuffers[] = {_instances->buffer_};
-    VkDeviceSize instancesOffsets[] = {_instances->offset_};
+    VkBuffer instancesBuffers[] = {_instances->buff().buffer_};
+    VkDeviceSize instancesOffsets[] = {_instances->alloc_.offset_};
     HUT_PVK(vkCmdBindVertexBuffers, _buffer, 1, 1, instancesBuffers, instancesOffsets);
 
-    HUT_PVK(vkCmdBindIndexBuffer, _buffer, _indices->buffer_, _indices->offset_, VK_INDEX_TYPE_UINT16);
+    HUT_PVK(vkCmdBindIndexBuffer, _buffer, _indices->buff().buffer_, _indices->alloc_.offset_, VK_INDEX_TYPE_UINT16);
     HUT_PVK(vkCmdDrawIndexed, _buffer, _indices_count, _instances_count, _indices_offset, _vertex_offset, _instances_offset);
   }
 

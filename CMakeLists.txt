@@ -248,6 +248,9 @@ target_link_libraries(hut ${HUT_LIBS})
 target_compile_definitions(hut PUBLIC ${HUT_DEFINITIONS})
 target_include_directories(hut PUBLIC ${HUT_INCLUDES})
 add_dependencies(hut gen_hut_shaders)
+message("HUT_DEFINITIONS: ${HUT_DEFINITIONS}")
+message("HUT_INCLUDES: ${HUT_INCLUDES}")
+message("HUT_LIBS: ${HUT_LIBS}")
 
 ###########################################################
 message("Configuring demo build targets...")

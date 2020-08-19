@@ -389,7 +389,7 @@ void window::redraw(display::time_point _tp) {
     rebuild_cb(swapchain_fbos_[imageIndex], primary_cbs_[imageIndex]);
   }
 
-  HUT_PROFILE_EVENT(this, on_frame, last_frame_ - _tp);
+  HUT_PROFILE_EVENT(this, on_frame, _tp - last_frame_);
   display_.flush_staged();
   cbs_.emplace_back(primary_cbs_[imageIndex]);
 
