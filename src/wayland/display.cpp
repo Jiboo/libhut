@@ -430,9 +430,12 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
     int cursor_size = 24;
     if (env_cursor_size_length > 0)
       std::from_chars(env_cursor_size, env_cursor_size + env_cursor_size_length, cursor_size);
-    cursor_theme_ = wl_cursor_theme_load(env_cursor_theme, cursor_size, shm_);
-    cursor_surface_ = wl_compositor_create_surface(compositor_);
 
+    {
+      HUT_PROFILE_SCOPE(PDISPLAY, "wl_cursor_theme_load");
+      cursor_theme_ = wl_cursor_theme_load(env_cursor_theme, cursor_size, shm_);
+    }
+    cursor_surface_ = wl_compositor_create_surface(compositor_);
     animate_cursor_ctx_.thread_ = std::thread(animate_cursor_thread, &animate_cursor_ctx_);
   }
 }

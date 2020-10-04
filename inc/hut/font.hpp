@@ -35,9 +35,10 @@
 #include <harfbuzz/hb.h>
 #include <harfbuzz/hb-ft.h>
 
-#include "hut/image.hpp"
-#include "hut/drawable.hpp"
+#include "hut/atlas.hpp"
 #include "hut/buffer_pool.hpp"
+#include "hut/drawable.hpp"
+#include "hut/image.hpp"
 
 namespace hut {
 
@@ -45,24 +46,10 @@ class font {
   friend class shaper;
 
  public:
-  font(display &_display, const uint8_t *_addr, size_t _size, uvec2 _atlas_size = {512, 512}, bool _hinting = true);
+  font(display &_display, const uint8_t *_addr, size_t _size, shared_atlas _atlas, bool _hinting = true);
   ~font();
 
-  inline shared_image atlas() {
-    return atlas_;
-  }
-
  private:
-  // http://blackpawn.com/texts/lightmaps/default.html
-  struct node {
-    node *children_[2] {nullptr, nullptr};
-    uvec4 coords_ {};
-
-    ~node();
-
-    inline bool leaf() { return children_[0] == nullptr && children_[1] == nullptr; }
-  };
-
   struct glyph {
     vec4 texcoords_ {0, 0, 0, 0};
     vec2 bearing_ {0, 0};
@@ -80,13 +67,11 @@ class font {
   };
 
   FT_Face face_;
-  shared_image atlas_;
+  shared_atlas atlas_;
   uint load_flags_;
-  node root_;
   std::unordered_map<uint8_t, cache> caches_;
   std::mutex baking_mutex_;
 
-  static node *binpack(node *_cur_node, const uvec2 &_bounds);
   glyph &load_glyph(glyph_cache_t &_cache, uint _char_index);
   cache &load_cache(uint8_t _size);
 };

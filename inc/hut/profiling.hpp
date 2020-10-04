@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include <cstring>
+
 #ifdef HUT_ENABLE_PROFILING
   #include <cstdint>
 
@@ -37,6 +39,7 @@
   #include <filesystem>
   #include <fstream>
   #include <iomanip>
+  #include <iostream>
   #include <mutex>
   #include <sstream>
   #include <thread>
@@ -193,6 +196,7 @@ namespace hut::profiling {
 using hut::operator<<;
 
 #ifdef HUT_ENABLE_PROFILING
+
 struct noop_component {
   template<typename... TNextCtorArgs>
   noop_component(TNextCtorArgs&&... _rest) {
@@ -246,6 +250,7 @@ struct type_component : TNextParent {
 template<typename TInternalClock, typename TRep>
 class diff_clock_wrapper {
 public:
+  using internal = TInternalClock;
   using rep = TRep;
   using period = std::micro;
   using duration = std::chrono::duration<rep, period>;
@@ -258,7 +263,7 @@ public:
     return time_point{ std::chrono::duration_cast<duration>(TInternalClock::now() - epoch) };
   }
 };
-using clock_f32 = diff_clock_wrapper<std::chrono::high_resolution_clock, float>;
+using clock_f32 = diff_clock_wrapper<std::chrono::steady_clock, float>;
 
 template<typename TNextParent>
 struct timestamp_component : TNextParent {
@@ -309,7 +314,7 @@ static TRep this_thread() {
   return rehash<TRep>(std::this_thread::get_id());
 }
 
-template< typename TNextParent>
+template<typename TNextParent>
 struct threadid_component : TNextParent {
   uint16_t thread_;
 
@@ -323,6 +328,19 @@ struct threadid_component : TNextParent {
 
   void dump(std::ostream &_os) {
     _os << ",\"tid\":\"" << thread_ << '\"';
+    TNextParent::dump(_os);
+  }
+};
+
+
+template<fixed_string TName, typename TNextParent>
+struct static_threadid_component : TNextParent {
+  template<typename... TNextCtorArgs>
+  static_threadid_component(TNextCtorArgs&&... _rest)
+      : TNextParent{ std::forward<TNextCtorArgs>(_rest)... } {}
+
+  void dump(std::ostream &_os) {
+    _os << ",\"tid\":\"" << TName << '\"';
     TNextParent::dump(_os);
   }
 };
@@ -445,7 +463,7 @@ public:
   template<typename... TEventArgs, typename... TParentsCtorArgs>
   basic_event(const dispatcher &_dispatcher, std::tuple<TEventArgs...> &&_event_args, TParentsCtorArgs&&... _parent_args)
       : TFirstParent{ std::forward<TParentsCtorArgs>(_parent_args)... }, dispatcher_{_dispatcher} {
-    //static_assert(data_size >= sizeof(_event_args), "Not enough args storage");
+    static_assert(data_size >= sizeof(_event_args), "Not enough args storage");
     new(&args_as<TEventArgs...>()) args_tuple<TEventArgs...>(std::move(_event_args));
   }
 
@@ -484,37 +502,40 @@ namespace size_tests {
   static_assert(complete_event::data_size == 40);
 }
 
+using cpu_frames = std::vector<std::vector<complete_event>>;
+
 constexpr size_t frame_history = 20;
 struct thread_data {
-  std::vector<std::vector<complete_event>> completed_{frame_history};
+  cpu_frames completed_{frame_history};
 
   std::mutex stacktrace_cache_mutex_;
   std::unordered_map<uint32_t, stacktrace> stacktrace_cache_;
 };
 
-thread_local inline thread_data* thread_data_ = nullptr;
+thread_local inline thread_data* tls_data_ = nullptr;
 
 struct threads_data {
   static inline std::mutex mapping_mutex_;
-  static inline std::unordered_map<std::thread::id, thread_data> threads_mapping_;
+  static inline std::unordered_map<std::thread::id, std::unique_ptr<thread_data>> threads_mapping_;
   static inline std::atomic_uint frame_index_;
 
   static inline bool dump_requested_ = false;
   static inline std::atomic_bool dump_in_progress_ = false;
 
-  static thread_data &my_data() {
-    if (thread_data_ != nullptr)
-      return *thread_data_;
+  static thread_data &get(std::thread::id _id = std::this_thread::get_id()) {
+    if (tls_data_ != nullptr)
+      return *tls_data_;
+
+    auto allocated = std::make_unique<thread_data>();
+    tls_data_ = allocated.get();
 
     std::scoped_lock lock{ mapping_mutex_ };
-    auto &thread_data = threads_mapping_[std::this_thread::get_id()];
-    thread_data_ = &thread_data;
-    return thread_data;
+    threads_mapping_.emplace(_id, std::move(allocated));
+    return *tls_data_;
   }
 
   static std::vector<complete_event> &my_queue() {
-    auto &data = my_data();
-    return data.completed_[frame_index_];
+    return get().completed_[frame_index_];
   }
 
   static void next_frame() {
@@ -527,10 +548,8 @@ struct threads_data {
 
     auto prev = frame_index_.load();
     auto next = (prev + 1) % frame_history;
-    {
-      for (auto &thread : threads_mapping_) {
-        thread.second.completed_[next].clear();
-      }
+    for (auto &thread : threads_mapping_) {
+      thread.second->completed_[next].clear();
     }
     frame_index_.store(next);
   }
@@ -549,7 +568,7 @@ struct threads_data {
     std::unordered_map<const void*, frame_cache> cache;
 
     for (auto &thread_data : threads_mapping_) {
-      for (const auto &entry : thread_data.second.stacktrace_cache_) {
+      for (const auto &entry : thread_data.second->stacktrace_cache_) {
         if (!done.emplace(entry.first).second)
           continue;
         const auto &vec = entry.second.as_vector();
@@ -584,18 +603,21 @@ struct threads_data {
     }
   }
 
-  using frame_list = std::vector<std::vector<complete_event>>;
-  static frame_list collect_frames() {
+  struct frames
+  {
+    cpu_frames cpu_frames_;
+  };
+
+  static frames collect_frames() {
     assert(mapping_mutex_.try_lock() == false);
 
-    std::vector<std::vector<complete_event>> frames;
+    frames result;
     for (auto &thread : threads_mapping_) {
-      for (auto &frame : thread.second.completed_) {
-        frames.emplace_back(std::move(frame));
+      for (auto &frame : thread.second->completed_) {
+        result.cpu_frames_.emplace_back(std::move(frame));
       }
     }
-
-    return frames;
+    return result;
   }
 
   static std::filesystem::path unique_profiline_path() {
@@ -619,13 +641,13 @@ struct threads_data {
     return filename.str();
   }
 
-  static void background_dump(frame_list &&_frames) {
+  static void background_dump(frames &&_frames) {
     auto filename = unique_profiline_path();
     std::cout << "[hut] Starting background profiling dump to: " << filename << "..." << std::endl;
     std::ofstream os {filename};
 
     os << std::fixed << "{\"traceEvents\":[{}";
-    for (auto &frame : _frames) {
+    for (auto &frame : _frames.cpu_frames_) {
       for (auto &event : frame) {
         os << "," << std::endl;
         event.dump(os);
@@ -645,7 +667,7 @@ template<typename... TNextCtorArgs>
 stacktrace_component<TNextParent>::stacktrace_component(stacktrace &&_stacktrace, TNextCtorArgs&&... _rest) : TNextParent{ std::forward<TNextCtorArgs>(_rest)... } {
   stacktrace_hash_ = rehash<uint32_t>(boost::stacktrace::hash_value(_stacktrace));
   {
-    auto &thread_data = threads_data::my_data();
+    auto &thread_data = threads_data::get();
     thread_data.stacktrace_cache_.try_emplace(stacktrace_hash_, std::move(_stacktrace));
   }
 }
@@ -711,6 +733,13 @@ auto make_complete_event_scope(std::vector<TEventType> &_buffer, profiling_categ
     HUT_PROFILE_SCOPE(PVULKAN, BOOST_PP_STRINGIZE(MName)); \
     return MName(__VA_ARGS__); \
   }()
+
+#define HUT_PVK_NAMED_ALIASED(MName, MArgNames, MArgValues, ...) \
+  [&]() { \
+    HUT_PROFILE_SCOPE_NAMED(PVULKAN, BOOST_PP_STRINGIZE(MName), MArgNames, BOOST_PP_TUPLE_ENUM(MArgValues)); \
+    return MName(__VA_ARGS__); \
+  }()
+
 #else // HUT_ENABLE_PROFILING
 
 #define HUT_PROFILE_SCOPE(MCat, MFormat, ...)
@@ -722,10 +751,13 @@ auto make_complete_event_scope(std::vector<TEventType> &_buffer, profiling_categ
 
 #define HUT_PVK(MName, ...) MName(__VA_ARGS__)
 
+#define HUT_PVK_NAMED_ALIASED(MName, MArgNames, MArgValues, ...) MName(__VA_ARGS__);
+
 struct threads_data {
   static void next_frame() {}
   static void request_dump() {}
 };
 
-#endif
+#endif // HUT_ENABLE_PROFILING
+
 } //namespace hut profiling

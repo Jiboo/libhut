@@ -37,6 +37,7 @@ using namespace hut;
 buffer_pool::buffer_pool(display &_display, uint _size, VkMemoryPropertyFlags _type, uint _usage)
     : display_(_display), type_(_type), usage_(_usage) {
   HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::buffer_pool");
+  buffers_.reserve(16);
   grow(_size);
 }
 
@@ -47,24 +48,24 @@ buffer_pool::~buffer_pool() {
 
 void buffer_pool::do_update(buffer &_buf, uint _offset, uint _size, const void *_data) {
   HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::do_update {}", _size);
-  alloc staging;
+  shared_ref<u8> staging;
   {
     std::lock_guard lk(display_.staging_mutex_);
-    staging = display_.staging_->do_alloc(_size, 4);
+    staging = display_.staging_->allocate<u8>(_size, 4);
   }
 
-  memcpy(staging.buffer_->permanent_map_ + staging.offset_, _data, _size);
+  memcpy(staging->buff().permanent_map_ + staging->offset_bytes(), _data, _size);
 
   display::buffer_copy copy = {};
   copy.size = _size;
-  copy.srcOffset = staging.offset_;
+  copy.srcOffset = staging->offset_bytes();
   copy.dstOffset = _offset;
-  copy.source = staging.buffer_->buffer_;
+  copy.source = staging->vkBuffer();
   copy.destination = _buf.buffer_;
 
   std::lock_guard lk(display_.staging_mutex_);
   display_.staging_jobs_++;
-  display_.preflush([this, copy]() {
+  display_.preflush([this, copy, staging = std::move(staging)]() {
     display_.stage_copy(copy);
     display_.staging_jobs_--;
   });
@@ -88,8 +89,9 @@ void buffer_pool::finalize_update(updator &_update) {
 
   std::lock_guard lk(display_.staging_mutex_);
   display_.staging_jobs_++;
-  display_.preflush([this, copy]() {
+  display_.preflush([this, copy, staging = _update.staging_]() {
     display_.stage_copy(copy);
+    do_free(staging.node_);
     display_.staging_jobs_--;
   });
 }
@@ -110,6 +112,8 @@ void buffer_pool::do_zero(buffer &_buf, uint _offset, uint _size) {
 
 buffer_pool::buffer *buffer_pool::grow(uint _size) {
   HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::grow {} total {}", _size, total_size_);
+
+  assert(buffers_.size() < buffers_.capacity()); // NOTE JBL: If you hit this, you would invalidate all pointers to elements in this array, increase initial buffer size, or fix a potential leak
 
   buffer result = {*this};
   result.size_ = _size;
@@ -160,6 +164,12 @@ buffer_pool::buffer *buffer_pool::grow(uint _size) {
 
 buffer_pool::alloc buffer_pool::do_alloc(uint _size, uint _align) {
   HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::do_alloc {}", _size);
+
+#ifdef HUT_DEBUG_ALLOCATIONS
+  std::cout << "[alloc] pre-do_alloc" << std::endl;
+  debug();
+#endif
+
   uint aligned = 0, align_bytes = 0, aligned_size = _size;
   range *fit = nullptr;
   buffer *container = nullptr;
@@ -212,13 +222,30 @@ buffer_pool::alloc buffer_pool::do_alloc(uint _size, uint _align) {
     fit->next_ = new_range;
     fit->size_ = aligned_size;
     fit->allocated_ = true;
+
+    if (new_range->next_ != nullptr) {
+      new_range->next_->prev_ = new_range;
+    }
   }
+
+#ifdef HUT_DEBUG_ALLOCATIONS
+  std::cout << "[alloc] post-do_alloc " << fit->offset_ << " - " << (fit->offset_ + fit->size_)
+                << ": " << fit->allocated_ << std::endl;
+  debug();
+#endif
 
   return alloc{ container, fit, aligned, _size };
 }
 
 void buffer_pool::do_free(range *_range) {
   HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::do_free {}", _range->size_);
+
+#ifdef HUT_DEBUG_ALLOCATIONS
+  std::cout << "[alloc] pre-do_free" << _range->offset_ << " - " << (_range->offset_ + _range->size_)
+                                     << ": " << _range->allocated_ << std::endl;
+  debug();
+#endif
+
   range *prev = _range->prev_, *next = _range->next_;
   const bool prev_free = prev != nullptr && !prev->allocated_;
   const bool next_free = next != nullptr && !next->allocated_;
@@ -251,6 +278,11 @@ void buffer_pool::do_free(range *_range) {
   else {
     _range->allocated_ = false;
   }
+
+#ifdef HUT_DEBUG_ALLOCATIONS
+  std::cout << "[alloc] post-do_free" << std::endl;
+  debug();
+#endif
 }
 
 void buffer_pool::clear_ranges() {
@@ -296,8 +328,10 @@ void buffer_pool::debug() {
 
     range *cur = buffer.root_;
     while (cur != nullptr) {
-      std::cout << "\t\trange " << cur->offset_ << " - " << (cur->offset_ + cur->size_)
-                << ": " << cur->allocated_ << std::endl;
+      std::cout << "\t\trange " << cur << " " << cur->offset_ << " - " << (cur->offset_ + cur->size_)
+                << ": " << cur->allocated_
+                << " (p: " << cur->prev_ << ", n: " << cur->next_ << ")"
+                << std::endl;
       cur = cur->next_;
     }
   }

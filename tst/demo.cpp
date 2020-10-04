@@ -68,6 +68,8 @@ int main(int, char **) {
   w2.clear_color({0, 0, 1, 1});
   w2.title("hut demo win2");
 
+  shared_sampler samp = std::make_shared<sampler>(d);
+
   auto b = d.alloc_buffer(1024*1024);
 
   auto indices = b->allocate<uint16_t>(6);
@@ -162,8 +164,10 @@ int main(int, char **) {
     tex_rgba::instance{make_mat({  0, 500}, {100,100,1})},
   });
 
+  shared_atlas r8_atlas = std::make_shared<atlas>(d, VK_FORMAT_R8_UNORM);
   auto tmask_pipeline = std::make_unique<tex_mask>(w);
-  tmask_pipeline->alloc_next_descriptors(1);
+  tmask_pipeline->bind(0, ubo, r8_atlas->image(), samp);
+
   auto text_instances = b->allocate<tex_mask::instance>(2);
   auto icons_instances = b->allocate<tex_mask::instance>(2);
   auto fps_instances = b->allocate<tex_mask::instance>(2);
@@ -187,6 +191,7 @@ int main(int, char **) {
     tex_mask::vertex{{1, 0}, {1, 0}},
     tex_mask::vertex{{1, 1}, {1, 1}},
   });
+  atlas_instances->set(tex_mask::instance{make_mat({200, 0}, {r8_atlas->image()->size(), 1}), {1, 0, 0, 1}});
 
   auto box_rgba_pipeline = std::make_unique<box_rgba>(w);
   auto box_rgba_vertices = b->allocate<box_rgba::vertex>(4);
@@ -215,7 +220,6 @@ int main(int, char **) {
 
   shared_image tex1, tex2;
   shared_font roboto, material_icons;
-  shared_sampler samp = std::make_shared<sampler>(d);
 
   shaper s;
   // in this context to keep a ref on buffers
@@ -238,7 +242,10 @@ int main(int, char **) {
     w.invalidate(true);  // will force to call on_draw on the next frame
 
     uint8_t data[tex1->pixel_size() * 100 * 100];
-    memset(data, 0x90, sizeof(data));
+    uint32_t *pix_data = (uint32_t*)data;
+    for (int x = 0; x < 100; x++)
+      for (int y = 0; y < 100; y++)
+        pix_data[y*100+x] = 0xFF0000FF;
     tex1->update({100, 100, 200, 200}, data, tex1->pixel_size() * 100);
     w.invalidate(true);  // will force to call on_draw on the next frame
 
@@ -253,20 +260,14 @@ int main(int, char **) {
     tex2_ready = true;
     w.invalidate(true);  // will force to call on_draw on the next frame
 
-    roboto = std::make_shared<font>(d, demo_ttf::Roboto_Regular_ttf.data(), demo_ttf::Roboto_Regular_ttf.size(), uvec2{512, 512}, true);
-    tmask_pipeline->bind(0, ubo, roboto->atlas(), samp);
-    atlas_instances->set(tex_mask::instance{make_mat({256, 0}, {512, 512, 1}), {1, 0, 0, 1}});
-    w.invalidate(true);  // will force to call on_draw on the next frame
-
-    material_icons = std::make_shared<font>(d, demo_ttf::MaterialIcons_Regular_ttf.data(), demo_ttf::MaterialIcons_Regular_ttf.size(), uvec2{256, 256}, false);
-    tmask_pipeline->bind(1, ubo, material_icons->atlas(), samp);
+    roboto = std::make_shared<font>(d, demo_ttf::Roboto_Regular_ttf.data(), demo_ttf::Roboto_Regular_ttf.size(), r8_atlas, true);
+    material_icons = std::make_shared<font>(d, demo_ttf::MaterialIcons_Regular_ttf.data(), demo_ttf::MaterialIcons_Regular_ttf.size(), r8_atlas, false);
     s.bake(b, icons_test, material_icons, 16, "\uE834\uE835\uE836\uE837");
     w.invalidate(true);  // will force to call on_draw on the next frame
   });
 
   w.on_draw.connect([&](VkCommandBuffer _buffer) {
-    if (roboto)
-      tmask_pipeline->draw(_buffer, 0, indices, atlas_instances, atlas_vertices);
+    tmask_pipeline->draw(_buffer, 0, indices, atlas_instances, atlas_vertices);
 
     rgb_pipeline->draw(_buffer, 0, indices, rgb_instances, rgb_vertices);
     rgba_pipeline->draw(_buffer, 0, indices, rgba_instances, rgba_vertices);
@@ -286,7 +287,7 @@ int main(int, char **) {
     if (hello_world)
       tmask_pipeline->draw(_buffer, 0, hello_world.indices_, hello_world.indices_count_, text_instances, hello_world.vertices_);
     if (icons_test)
-      tmask_pipeline->draw(_buffer, 1, icons_test.indices_, icons_test.indices_count_, icons_instances, icons_test.vertices_);
+      tmask_pipeline->draw(_buffer, 0, icons_test.indices_, icons_test.indices_count_, icons_instances, icons_test.vertices_);
     if (fps_counter)
       tmask_pipeline->draw(_buffer, 0, fps_counter.indices_, fps_counter.indices_count_, fps_instances, fps_counter.vertices_);
 
@@ -438,7 +439,7 @@ int main(int, char **) {
     return false;
   });
 
-  w.on_mouse.connect([&w, &w2](uint8_t _button, mouse_event_type _type, vec2 _pos) {
+  w.on_mouse.connect([&w](uint8_t _button, mouse_event_type _type, vec2 _pos) {
     if (_type == MUP) {
       static int current_cursor = CDEFAULT;
       if (++current_cursor > CZOOM_OUT)

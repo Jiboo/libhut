@@ -47,9 +47,17 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT /*fla
     return VK_FALSE;
 
   std::cout << '[' << layerPrefix << "] " << msg << std::endl;
+#ifdef HUT_ENABLE_VALIDATION_DEBUG
+  boost::stacktrace::stacktrace st;
+  if (st) {
+    for (const auto &frame : st.as_vector()) {
+      std::cout << "\t[" << layerPrefix << "] callstack: " << frame << std::endl;
+    }
+  }
+#endif //HUT_ENABLE_VALIDATION_DEBUG
   return VK_FALSE;
 }
-#endif
+#endif //HUT_ENABLE_VALIDATION
 
 const char* hut::cursor_css_name(cursor_type _c) {
   using namespace hut;
@@ -242,16 +250,13 @@ void display::init_vulkan_instance(const char *_app_name, uint32_t _app_version,
   HUT_PVK(vkEnumerateInstanceExtensionProperties, nullptr, &extension_count, nullptr);
   std::vector<VkExtensionProperties> available_extensions(extension_count);
   HUT_PVK(vkEnumerateInstanceExtensionProperties, nullptr, &extension_count, available_extensions.data());
-#ifdef HUT_ENABLE_VALIDATION
-  bool has_debug_ext = false;
-  for (const auto &extension : available_extensions) {
-    if (strcmp(extension.extensionName, VK_EXT_DEBUG_REPORT_EXTENSION_NAME) == 0)
-      has_debug_ext = true;
-  }
 
-  if (has_debug_ext)
-    extensions.emplace_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+  for (const auto &extension : available_extensions) {
+#ifdef HUT_ENABLE_VALIDATION
+    if (strcmp(extension.extensionName, VK_EXT_DEBUG_REPORT_EXTENSION_NAME) == 0)
+      extensions.emplace_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 #endif
+  }
 
   VkApplicationInfo appInfo = {};
   appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -274,7 +279,7 @@ void display::init_vulkan_instance(const char *_app_name, uint32_t _app_version,
     throw std::runtime_error(sstream("Couldn't create a vulkan instance, code: ") << result);
 
 #ifdef HUT_ENABLE_VALIDATION
-  if (has_debug_ext) {
+  if (std::find(extensions.cbegin(), extensions.cend(), VK_EXT_DEBUG_REPORT_EXTENSION_NAME) != extensions.cend()) {
     VkDebugReportCallbackCreateInfoEXT dinfo = {};
     dinfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
     dinfo.flags = VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT
@@ -343,9 +348,21 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
     queue_create_infos.emplace_back(queue_create_info);
   }
 
-  const std::vector<const char *> device_extensions = {
+  uint32_t extension_count;
+  HUT_PVK(vkEnumerateDeviceExtensionProperties, prefered_device, nullptr, &extension_count, nullptr);
+  std::vector<VkExtensionProperties> available_extensions(extension_count);
+  HUT_PVK(vkEnumerateDeviceExtensionProperties, prefered_device, nullptr, &extension_count, available_extensions.data());
+
+  std::vector<const char *> extensions = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
   };
+
+  for (const auto &extension : available_extensions) {
+#ifdef HUT_ENABLE_PROFILING
+    if (strcmp(extension.extensionName, VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME) == 0)
+      extensions.emplace_back(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
+#endif
+  }
 
   VkPhysicalDeviceFeatures enabled_features = {};
   enabled_features.samplerAnisotropy = device_features_.samplerAnisotropy;
@@ -355,8 +372,8 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   device_info.pQueueCreateInfos = queue_create_infos.data();
   device_info.queueCreateInfoCount = (uint32_t)queue_create_infos.size();
   device_info.pEnabledFeatures = &enabled_features;
-  device_info.enabledExtensionCount = (uint32_t)device_extensions.size();
-  device_info.ppEnabledExtensionNames = device_extensions.data();
+  device_info.enabledExtensionCount = (uint32_t)extensions.size();
+  device_info.ppEnabledExtensionNames = extensions.data();
   device_info.enabledLayerCount = (uint32_t)layers.size();
   device_info.ppEnabledLayerNames = layers.data();
 
@@ -430,24 +447,25 @@ std::pair<uint32_t, VkMemoryPropertyFlags> display::find_memory_type(uint32_t ty
   throw std::runtime_error("failed to find suitable memory type!");
 }
 
-#ifdef HUT_DEBUG_STAGING
-const char *transition_name(const VkImageLayout _layout) {
+std::ostream &operator<<(std::ostream &_os, const VkImageLayout _layout) {
   switch (_layout) {
-    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL: return "READ";
-    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL: return "SRC";
-    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL: return "DST";
-    case VK_IMAGE_LAYOUT_PREINITIALIZED: return "PREINIT";
-    default: return "???";
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL: return _os << "READ";
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL: return _os << "SRC";
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL: return _os << "DST";
+    case VK_IMAGE_LAYOUT_PREINITIALIZED: return _os << "PREINIT";
+    default: return _os << "???";
   }
 }
-#endif
+
+std::ostream &operator<<(std::ostream &_os, const VkOffset3D _offset) {
+  return _os << "offset " << glm::ivec3{_offset.x, _offset.y, _offset.z};
+}
+
+std::ostream &operator<<(std::ostream &_os, const VkExtent3D _extent) {
+  return _os << "extent " << glm::uvec3{_extent.width, _extent.height, _extent.depth};
+}
 
 void display::stage_transition(const image_transition &_info) {
-#ifdef HUT_DEBUG_STAGING
-  std::cout << "[staging] transition " << _info.destination << " from " << transition_name(_info.oldLayout) << " to "
-            <<  transition_name(_info.newLayout) << std::endl;
-#endif
-
   VkImageMemoryBarrier barrier = {};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
   barrier.oldLayout = _info.oldLayout;
@@ -495,49 +513,78 @@ void display::stage_transition(const image_transition &_info) {
     throw std::invalid_argument("unsupported layout transition!");
   }
 
-  HUT_PVK(vkCmdPipelineBarrier, staging_cb_, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+#ifdef HUT_DEBUG_STAGING
+  std::cout << "[staging] transition " << _info.destination << " from " << _info.oldLayout << " to "
+            <<  _info.newLayout << std::endl;
+#endif
+
+  HUT_PVK_NAMED_ALIASED(vkCmdPipelineBarrier,
+                        ("dest", "from", "to"),
+                        ((void*)_info.destination, _info.oldLayout, _info.newLayout),
+                        staging_cb_, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
 void display::stage_copy(const buffer_copy &_info) {
 #ifdef HUT_DEBUG_STAGING
-  std::cout << "[staging] buffer " << _info.source << '[' << _info.srcOffset << "-" << (_info.srcOffset+_info.size)
+  std::cout << "[staging] buffer_copy " << _info.source << '[' << _info.srcOffset << "-" << (_info.srcOffset+_info.size)
             << "] to " << _info.destination << '[' << _info.dstOffset << "-" << (_info.dstOffset+_info.size)
             << ']' << std::endl;
 #endif
 
-  HUT_PVK(vkCmdCopyBuffer, staging_cb_, _info.source, _info.destination, 1, &_info);
+  HUT_PVK_NAMED_ALIASED(vkCmdCopyBuffer,
+                        ("src", "srcOffset", "size", "dst", "dstOffset"),
+                        ((void*)_info.source, _info.srcOffset, _info.size, (void*)_info.destination, _info.dstOffset),
+                        staging_cb_, _info.source, _info.destination, 1, &_info);
 }
 
 void display::stage_zero(const display::buffer_zero &_info) {
 #ifdef HUT_DEBUG_STAGING
-  std::cout << "[staging] buffer " << _info.destination << '[' << _info.offset << "-" << (_info.offset+_info.size)
-            << "] zeroed" << std::endl;
+  std::cout << "[staging] buffer_zero " << _info.destination << '[' << _info.offset << "-" << (_info.offset+_info.size)
+            << "]" << std::endl;
 #endif
 
-  HUT_PVK(vkCmdFillBuffer, staging_cb_, _info.destination, _info.offset, _info.size, 0);
+  HUT_PVK_NAMED_ALIASED(vkCmdFillBuffer,
+                        ("dst", "dstOffset", "size", "data"),
+                        ((void*)_info.destination, _info.offset, _info.size, 0),
+                        staging_cb_, _info.destination, _info.offset, _info.size, 0);
 }
 
 void display::stage_copy(const image_copy &_info) {
-  HUT_PVK(vkCmdCopyImage, staging_cb_, _info.source, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                 _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &_info);
+#ifdef HUT_DEBUG_STAGING
+  std::cout << "[staging] image_copy " << _info.source << '['
+            << _info.srcOffset.x << "," << _info.srcOffset.y
+            << "] to image " << _info.destination
+            << "[" << _info.dstOffset.x << ", " << _info.dstOffset.y << "] size "
+            << _info.extent.width << ", " << _info.extent.height << "]"
+            << std::endl;
+#endif
+
+  HUT_PVK_NAMED_ALIASED(vkCmdCopyImage,
+                        ("src", "dst", "srcOffset", "dstOffset", "extent"),
+                        ((void*)_info.source, (void*)_info.destination, offset3_16(_info.srcOffset), offset3_16(_info.dstOffset), extent3_16(_info.extent)),
+                        staging_cb_, _info.source, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &_info);
 }
 
 void display::stage_copy(const buffer2image_copy &_info) {
-#ifdef HUT_DEBUG_STAGING
   uint size = _info.bufferRowLength * _info.bufferImageHeight * _info.pixelSize;
-  std::cout << "[staging] buffer " << _info.source << '[' << _info.bufferOffset << "-" << (_info.bufferOffset+size)
+#ifdef HUT_DEBUG_STAGING
+  std::cout << "[staging] buffer2image_copy " << _info.source << '[' << _info.bufferOffset << "-" << (_info.bufferOffset+size)
             << "] to image " << _info.destination
             << "[" << _info.imageOffset.x << ", " << _info.imageOffset.y << ", "
             << _info.imageExtent.width << ", " << _info.imageExtent.height << "]"
             << std::endl;
 #endif
 
-  HUT_PVK(vkCmdCopyBufferToImage, staging_cb_, _info.source, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &_info);
+  HUT_PVK_NAMED_ALIASED(vkCmdCopyBufferToImage,
+                        ("src", "dst", "srcOffset", "srcSize", "dstOffset", "dstExtent"),
+                        ((void*)_info.source, (void*)_info.destination, _info.bufferOffset, size, offset3_16(_info.imageOffset), extent3_16(_info.imageExtent)),
+                        staging_cb_, _info.source, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &_info);
 }
 
 void display::stage_clear(const image_clear &_info) {
 #ifdef HUT_DEBUG_STAGING
-  std::cout << "[staging] clear image " << _info.destination << std::endl;
+  std::cout << "[staging] image_clear " << _info.destination << std::endl;
 #endif
 
   VkImageSubresourceRange range = {};
@@ -547,7 +594,10 @@ void display::stage_clear(const image_clear &_info) {
   range.baseMipLevel = 0;
   range.levelCount = 1;
 
-  HUT_PVK(vkCmdClearColorImage, staging_cb_, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &_info.color, 1, &range);
+  HUT_PVK_NAMED_ALIASED(vkCmdClearColorImage,
+                        ("dst", "color"),
+                        ((void*)_info.destination, color3_32(_info.color)),
+                        staging_cb_, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &_info.color, 1, &range);
 }
 
 void display::flush_staged() {
@@ -579,11 +629,14 @@ void display::flush_staged() {
   HUT_PVK(vkQueueSubmit, queueg_, 1, &submitInfo, VK_NULL_HANDLE);
   HUT_PVK(vkQueueWaitIdle, queueg_);
 
-  staging_->clear_ranges();
-
   VkCommandBufferBeginInfo beginInfo = {};
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
   HUT_PVK(vkBeginCommandBuffer, staging_cb_, &beginInfo);
+
+#ifdef HUT_DEBUG_STAGING
+  std::cout << "[staging] done, staging pool status:" << std::endl;
+  staging_->debug();
+#endif
 }

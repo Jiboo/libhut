@@ -51,6 +51,8 @@
 #include <glm/gtx/scalar_multiplication.hpp>
 #include <glm/gtx/hash.hpp>
 
+#include <vulkan/vulkan.h>
+
 #include "hut/profiling.hpp"
 
 namespace hut {
@@ -264,5 +266,11 @@ struct flagged {
   constexpr const_iterator cend() const { return const_iterator{0, underlying_bits}; }
   constexpr const_iterator end() const { return cend(); }
 };
+
+inline glm::i16vec2 offset2_16(VkOffset2D _in) { return glm::i16vec2{_in.x, _in.y}; }
+inline glm::i16vec3 offset3_16(VkOffset3D _in) { return glm::i16vec3{_in.x, _in.y, _in.z}; }
+inline glm::i16vec2 extent2_16(VkExtent2D _in) { return glm::u16vec2{_in.width, _in.height}; }
+inline glm::i16vec3 extent3_16(VkExtent3D _in) { return glm::u16vec3{_in.width, _in.height, _in.depth}; }
+inline glm::vec4 color3_32(VkClearColorValue _in) { return glm::vec4{_in.float32[0], _in.float32[1], _in.float32[2], _in.float32[3]}; }
 
 }  // namespace hut

@@ -27,20 +27,37 @@
 
 #pragma once
 
-#include "hut/utils.hpp"
+#include "hut/image.hpp"
 
 namespace hut {
 
-inline uint format_size(VkFormat _format) {
-  switch (_format) {
-    case VK_FORMAT_R8_UNORM: return 1;
-    case VK_FORMAT_R8G8_UNORM: return 2;
-    case VK_FORMAT_R8G8B8_UNORM: return 3;
-    case VK_FORMAT_R8G8B8A8_UNORM: return 4;
+class atlas {
+ public:
+  atlas(display &_display, VkFormat _format, uvec2 _size = {0, 0});
 
-    default:
-      return 0;
+  inline shared_image image() {
+    return atlas_;
   }
-}
+
+  vec4 pack(const uvec2 &_bounds, uint8_t *_data, uint _src_row_pitch);
+
+ private:
+  // http://blackpawn.com/texts/lightmaps/default.html
+  struct node {
+    node *children_[2] {nullptr, nullptr};
+    uvec4 coords_ {};
+
+    ~node();
+
+    inline bool leaf() { return children_[0] == nullptr && children_[1] == nullptr; }
+  };
+
+  shared_image atlas_;
+  node root_;
+
+  static node *binpack(node *_cur_node, const uvec2 &_bounds);
+};
+
+using shared_atlas = std::shared_ptr<atlas>;
 
 }  // namespace hut

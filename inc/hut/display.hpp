@@ -40,8 +40,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include <vulkan/vulkan.h>
-
 #if defined(VK_USE_PLATFORM_XCB_KHR)
 #include <xcb/xcb_keysyms.h>
 #include <xcb/xcb_cursor.h>

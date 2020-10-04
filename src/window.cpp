@@ -169,13 +169,10 @@ void window::init_vulkan_surface() {
   if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
     swapchain_extents_ = capabilities.currentExtent;
   } else {
-    VkExtent2D tmp = {size_.x, size_.y};
-
-    tmp.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, tmp.width));
-    tmp.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, tmp.height));
-
-    swapchain_extents_ = tmp;
+    swapchain_extents_ = {size_.x, size_.y};
   }
+  swapchain_extents_.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, swapchain_extents_.width));
+  swapchain_extents_.height = std::max(capabilities.minImageExtent.height,std::min(capabilities.maxImageExtent.height, swapchain_extents_.height));
 
   uint32_t images_count = capabilities.minImageCount + 1;
   if (capabilities.maxImageCount > 0 && images_count > capabilities.maxImageCount) {

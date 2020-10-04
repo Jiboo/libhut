@@ -5,7 +5,6 @@ fix:
 - [wl] next configure after an unset_maximize would be [0, 0] instead of size prior to maximize
 
 refactor:
-- texture atlas (decouple from font code)
 - [wl] async clipboard read/write
 
 features:

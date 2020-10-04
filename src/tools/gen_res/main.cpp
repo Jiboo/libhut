@@ -86,6 +86,9 @@ int main(int argc, char **argv) {
   output_h << "}  // namespace " << argv[1] << '\n';
   output_h << "}  // namespace hut" << std::endl;
 
+  output_c.flush();
+  output_h.flush();
+
   std::cout << "Generated " << argv[1] << " at " << output_path << " in "
             << duration<double, std::milli>(steady_clock::now() - start).count() << "ms." << std::endl;
 }

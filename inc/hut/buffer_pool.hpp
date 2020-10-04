@@ -32,8 +32,6 @@
 #include <mutex>
 #include <set>
 
-#include <vulkan/vulkan.h>
-
 #include "hut/utils.hpp"
 
 namespace hut {
@@ -66,6 +64,12 @@ protected:
     buffer *buffer_;
     range *node_;
     uint offset_, size_;
+
+    void reset() {
+      buffer_ = nullptr;
+      node_ = nullptr;
+      size_ = 0;
+    }
   };
 
  public:
@@ -79,7 +83,7 @@ protected:
     span<uint8_t> data_;
 
     updator(buffer &_target, alloc _staging, span<uint8_t> _data, uint _offset)
-      : target_(_target), staging_(_staging), offset_(_offset), data_(_data) {
+        : target_(_target), staging_(_staging), offset_(_offset), data_(_data) {
     }
 
   public:
@@ -92,6 +96,7 @@ protected:
   /** Holds a reference to a zone in a buffer. */
   template <typename T>
   class ref {
+    friend class image;
     friend class buffer_pool;
     template<typename TDetails, typename... TExtraBindings> friend class drawable;
 
@@ -101,10 +106,22 @@ protected:
     buffer_pool &pool() { return alloc_.buffer_->parent_; };
 
   public:
+    ref() = delete;
+    ref(const ref&) = delete;
     explicit ref(alloc &_alloc) : alloc_(_alloc) {}
-
+    ref(ref &&_other) noexcept {
+      alloc_ = _other.alloc_;
+      _other.alloc_.reset();
+    }
     ~ref() {
       pool().do_free(alloc_.node_);
+    }
+
+    ref &operator=(const ref&) = delete;
+    ref &operator=(ref &&_other) {
+      alloc_ = _other.alloc_;
+      _other.alloc_.reset();
+      return *this;
     }
 
     void update_raw(uint _byte_offset, uint _byte_size, void *_data) {
@@ -152,13 +169,10 @@ protected:
       pool().do_zero(buff(), alloc_.offset_ + byte_offset, byte_size);
     }
 
-    [[nodiscard]] uint size() const {
-      return size_bytes() / sizeof(T);
-    }
-
-    [[nodiscard]] uint size_bytes() const {
-      return alloc_.size_;
-    }
+    [[nodiscard]] uint offset_bytes() const { return alloc_.offset_; }
+    [[nodiscard]] uint size_bytes() const { return alloc_.size_; }
+    [[nodiscard]] uint size() const { return size_bytes() / sizeof(T); }
+    [[nodiscard]] VkBuffer vkBuffer() { return alloc_.buffer_->buffer_; }
   };
 
   buffer_pool(display &_display, uint _size, VkMemoryPropertyFlags _type, uint _usage);

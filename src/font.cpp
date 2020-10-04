@@ -33,72 +33,17 @@ using namespace hut;
 
 constexpr size_t font_scale = 64;
 
-font::font(display &_display, const uint8_t *_addr, size_t _size, uvec2 _atlas_size, bool _hinting) {
+font::font(display &_display, const uint8_t *_addr, size_t _size, shared_atlas _atlas, bool _hinting) : atlas_(_atlas) {
   HUT_PROFILE_SCOPE(PFONT, "font::font");
+  assert(atlas_->image()->format_ == VK_FORMAT_R8_UNORM);
   load_flags_ = FT_LOAD_NO_BITMAP | (_hinting ? FT_LOAD_FORCE_AUTOHINT : FT_LOAD_NO_HINTING);
   FT_New_Memory_Face(_display.ft_library_, _addr, _size, 0, &face_);
-
-  atlas_ = std::make_shared<image>(_display, _atlas_size, VK_FORMAT_R8_UNORM);
-  root_.coords_ = {0, 0, _atlas_size};
 }
 
 font::~font() {
   for (auto &cache : caches_)
     hb_font_destroy(cache.second.font_);
   FT_Done_Face(face_);
-}
-
-font::node::~node() {
-  for (auto & i : children_) {
-    delete i;
-  }
-}
-
-font::node *font::binpack(node *_cur_node, const uvec2 &_bounds) {
-  if (!_cur_node->leaf()) {
-    for (auto & i : _cur_node->children_) {
-      node *new_node = binpack(i, _bounds);
-      if (new_node)
-        return new_node;
-    }
-    return nullptr;
-  }
-
-  uint node_w = _cur_node->coords_[2] - _cur_node->coords_[0];
-  uint node_h = _cur_node->coords_[3] - _cur_node->coords_[1];
-  if (_bounds.x > node_w || _bounds.y > node_h)
-    return nullptr;
-
-  uint new_node_w = node_w - _bounds.x;
-  uint new_node_h = node_h - _bounds.y;
-  node *left = _cur_node->children_[0] = new node;
-  node *right = _cur_node->children_[1] = new node;
-  if (new_node_w <= new_node_h) {
-    left->coords_[0] = _cur_node->coords_[0] + _bounds.x;
-    left->coords_[1] = _cur_node->coords_[1];
-    left->coords_[2] = left->coords_[0] + new_node_w;
-    left->coords_[3] = left->coords_[1] + _bounds.y;
-
-    right->coords_[0] = _cur_node->coords_[0];
-    right->coords_[1] = _cur_node->coords_[1] + _bounds.y;
-    right->coords_[2] = right->coords_[0] + node_w;
-    right->coords_[3] = right->coords_[1] + new_node_h;
-  }
-  else {
-    left->coords_[0] = _cur_node->coords_[0];
-    left->coords_[1] = _cur_node->coords_[1] + _bounds.y;
-    left->coords_[2] = left->coords_[0] + _bounds.x;
-    left->coords_[3] = left->coords_[1] + new_node_h;
-
-    right->coords_[0] = _cur_node->coords_[0] + _bounds.x;
-    right->coords_[1] = _cur_node->coords_[1];
-    right->coords_[2] = right->coords_[0] + new_node_w;
-    right->coords_[3] = right->coords_[1] + node_h;
-  }
-
-  _cur_node->coords_[2] = _cur_node->coords_[0] + _bounds.x;
-  _cur_node->coords_[3] = _cur_node->coords_[1] + _bounds.y;
-  return _cur_node;
 }
 
 font::glyph &font::load_glyph(glyph_cache_t &_cache, uint _char_index) {
@@ -121,18 +66,7 @@ font::glyph &font::load_glyph(glyph_cache_t &_cache, uint _char_index) {
     g.bounds_ = {render.width, render.rows};
     if (g.bounds_.x == 0 && g.bounds_.y == 0)
         return g;
-
-    const uvec2 padding = {2, 2};
-    node *packed = binpack(&root_, g.bounds_ + padding);
-    if (packed == nullptr) {
-        // Can't pack, return same bitmap than for '\0'
-        throw std::runtime_error("font altas overflow");
-    }
-    g.texcoords_[0] = float(packed->coords_[0]) / atlas_->size().x;
-    g.texcoords_[1] = float(packed->coords_[1]) / atlas_->size().y;
-    g.texcoords_[2] = float(packed->coords_[2] - padding.x) / atlas_->size().x;
-    g.texcoords_[3] = float(packed->coords_[3] - padding.y) / atlas_->size().y;
-    atlas_->update(packed->coords_ - uvec4{0, 0, padding}, render.buffer, render.pitch);
+    g.texcoords_ = atlas_->pack(g.bounds_, render.buffer, render.pitch);
   }
 
   return g;

@@ -30,8 +30,6 @@
 #include <chrono>
 #include <string>
 
-#include <vulkan/vulkan.h>
-
 #if defined(VK_USE_PLATFORM_XCB_KHR)
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>

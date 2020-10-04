@@ -30,8 +30,6 @@
 #include <memory>
 #include <set>
 
-#include <vulkan/vulkan.h>
-
 #include "hut/utils.hpp"
 #include "hut/display.hpp"
 #include "hut/buffer_pool.hpp"

@@ -143,49 +143,47 @@ std::shared_ptr<image> image::load_png(display &_display, span<const uint8_t> _d
   subResource.layerCount = 1;
 
   auto dst = std::make_shared<image>(_display, uvec2{width, height}, format);
+  shared_ref<u8> staging;
   {
-    buffer_pool::alloc alloc;
-    {
-      std::lock_guard lk(_display.staging_mutex_);
-      alloc = _display.staging_->do_alloc(byte_size, offsetAlignment);
-    }
-
-    auto dataBytes = alloc.buffer_->permanent_map_ + alloc.offset_;
-    png_bytep rows[height];
-    for (uint y = 0; y < height; y++) {
-      rows[y] = dataBytes + y * row_byte_size;
-    }
-    png_read_image(png_ptr, rows);
-
-    display::buffer2image_copy copy = {};
-    copy.imageExtent = {width, height, 1};
-    copy.imageOffset = {0, 0, 0};
-    copy.bufferRowLength = stride;
-    copy.bufferImageHeight = height;
-    copy.bufferOffset = alloc.offset_;
-    copy.imageSubresource = subResource;
-    copy.source = alloc.buffer_->buffer_;
-    copy.destination = dst->image_;
-    copy.pixelSize = channels;
-
-    display::image_transition pre = {};
-    pre.destination = dst->image_;
-    pre.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    pre.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    display::image_transition post = {};
-    post.destination = dst->image_;
-    post.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    post.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
     std::lock_guard lk(_display.staging_mutex_);
-    _display.staging_jobs_++;
-    _display.preflush([&_display, pre, post, copy] {
-      _display.stage_transition(pre);
-      _display.stage_copy(copy);
-      _display.stage_transition(post);
-      _display.staging_jobs_--;
-    });
+    staging = _display.staging_->allocate<u8>(byte_size, offsetAlignment);
   }
+
+  auto dataBytes = staging->buff().permanent_map_ + staging->offset_bytes();
+  png_bytep rows[height];
+  for (uint y = 0; y < height; y++) {
+    rows[y] = dataBytes + y * row_byte_size;
+  }
+  png_read_image(png_ptr, rows);
+
+  display::buffer2image_copy copy = {};
+  copy.imageExtent = {width, height, 1};
+  copy.imageOffset = {0, 0, 0};
+  copy.bufferRowLength = stride;
+  copy.bufferImageHeight = height;
+  copy.bufferOffset = staging->offset_bytes();
+  copy.imageSubresource = subResource;
+  copy.source = staging->vkBuffer();
+  copy.destination = dst->image_;
+  copy.pixelSize = channels;
+
+  display::image_transition pre = {};
+  pre.destination = dst->image_;
+  pre.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  pre.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  display::image_transition post = {};
+  post.destination = dst->image_;
+  post.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  post.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+  std::lock_guard lk(_display.staging_mutex_);
+  _display.staging_jobs_++;
+  _display.preflush([&_display, pre, post, copy, staging = std::move(staging)] {
+    _display.stage_transition(pre);
+    _display.stage_copy(copy);
+    _display.stage_transition(post);
+    _display.staging_jobs_--;
+  });
   png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
 
   return dst;
@@ -198,13 +196,13 @@ std::shared_ptr<image> image::load_raw(display &_display, uvec2 _extent,
 
   uint offsetAlignment = std::max(VkDeviceSize(4), _display.device_props_.limits.optimalBufferCopyOffsetAlignment);
   {
-    buffer_pool::alloc alloc;
+    shared_ref<u8> staging;
     {
       std::lock_guard lk(_display.staging_mutex_);
-      alloc = _display.staging_->do_alloc(_data.size_bytes(), offsetAlignment);
+      staging = _display.staging_->allocate<u8>(_data.size_bytes(), offsetAlignment);
     }
 
-    auto dataBytes = alloc.buffer_->permanent_map_ + alloc.offset_;
+    auto dataBytes = staging->buff().permanent_map_ + staging->offset_bytes();
     memcpy(dataBytes, _data.data(), _data.size_bytes());
 
     VkImageSubresourceLayers subResource = {};
@@ -218,9 +216,9 @@ std::shared_ptr<image> image::load_raw(display &_display, uvec2 _extent,
     copy.imageOffset = {0, 0, 0};
     copy.bufferRowLength = _extent.x;
     copy.bufferImageHeight = _extent.y;
-    copy.bufferOffset = alloc.offset_;
+    copy.bufferOffset = staging->offset_bytes();
     copy.imageSubresource = subResource;
-    copy.source = alloc.buffer_->buffer_;
+    copy.source = staging->vkBuffer();
     copy.destination = dst->image_;
     copy.pixelSize = dst->pixel_size_;
 
@@ -235,7 +233,7 @@ std::shared_ptr<image> image::load_raw(display &_display, uvec2 _extent,
 
     std::lock_guard lk(_display.staging_mutex_);
     _display.staging_jobs_++;
-    _display.preflush([&_display, pre, post, copy] {
+    _display.preflush([&_display, pre, post, copy, staging = std::move(staging)] {
       _display.stage_transition(pre);
       _display.stage_copy(copy);
       _display.stage_transition(post);
@@ -350,12 +348,12 @@ void image::update(ivec4 coords, uint8_t *_data, uint _src_row_pitch) {
   uint buffer_row_pitch = align(row_byte_size, buffer_align);
   int byte_size = height * buffer_row_pitch;
 
-  buffer_pool::alloc alloc;
+  shared_ref<u8> staging;
   {
     std::lock_guard lk(display_.staging_mutex_);
-    alloc = display_.staging_->do_alloc(byte_size, offset_align);
+    staging = display_.staging_->allocate<u8>(byte_size, offset_align);
   }
-  auto dataBytes = alloc.buffer_->permanent_map_ + alloc.offset_;
+  auto dataBytes = staging->buff().permanent_map_ + staging->offset_bytes();
   for (uint i = 0; i < height; i++) {
     uint8_t *src = _data + _src_row_pitch * i;
     uint8_t *dst = dataBytes + buffer_row_pitch * i;
@@ -381,15 +379,15 @@ void image::update(ivec4 coords, uint8_t *_data, uint _src_row_pitch) {
   copy.imageOffset = {coords[0], coords[1], 0};
   copy.bufferRowLength = buffer_row_pitch / pixel_size_;
   copy.bufferImageHeight = height;
-  copy.bufferOffset = alloc.offset_;
+  copy.bufferOffset = staging->offset_bytes();
   copy.imageSubresource = subResource;
-  copy.source = alloc.buffer_->buffer_;
+  copy.source = staging->vkBuffer();
   copy.destination = image_;
   copy.pixelSize = pixel_size_;
 
   std::lock_guard lk(display_.staging_mutex_);
   display_.staging_jobs_++;
-  display_.preflush([this, pre, post, copy]() {
+  display_.preflush([this, pre, post, copy, staging = std::move(staging)]() {
     display_.stage_transition(pre);
     display_.stage_copy(copy);
     display_.stage_transition(post);

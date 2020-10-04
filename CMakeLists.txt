@@ -1,7 +1,9 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.16)
 project(hut)
 
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_COMPILE_WARNING_MODE HIGH)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/deps/")
 
@@ -26,6 +28,7 @@ if(NOT WIN32)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION_DEBUG)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_DEBUG_STAGING)
+#set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_DEBUG_ALLOCATIONS)
 endif()
 
 ###########################################################
@@ -122,7 +125,7 @@ if(Wayland_FOUND AND NOT HUT_PREFER_XCB)
 
   set(WAYLAND_GEN_DIR ${CMAKE_BINARY_DIR}/wayland)
   file(MAKE_DIRECTORY ${WAYLAND_GEN_DIR})
-  set(WAYLAND_GENERATED "")
+  set(HUT_WAYLAND_GENERATED "")
 
   set(XDG_SHELL_PROTOCOL ${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml)
   set(XDG_SHELL_CLIENT_INCLUDE ${WAYLAND_GEN_DIR}/xdg-shell-client-protocol.h)
@@ -135,7 +138,7 @@ if(Wayland_FOUND AND NOT HUT_PREFER_XCB)
     OUTPUT ${XDG_SHELL_SOURCE}
     COMMAND ${WAYLAND_SCANNER} private-code ${XDG_SHELL_PROTOCOL} ${XDG_SHELL_SOURCE}
     DEPENDS ${XDG_SHELL_PROTOCOL})
-  list(APPEND WAYLAND_GENERATED ${XDG_SHELL_CLIENT_INCLUDE} ${XDG_SHELL_SOURCE})
+  list(APPEND HUT_WAYLAND_GENERATED ${XDG_SHELL_CLIENT_INCLUDE} ${XDG_SHELL_SOURCE})
 
   set(XDG_DECORATION_PROTOCOL ${WAYLAND_PROTOCOLS_DIR}/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml)
   set(XDG_DECORATION_CLIENT_INCLUDE ${WAYLAND_GEN_DIR}/xdg-decoration-client-protocol-v1.h)
@@ -148,13 +151,13 @@ if(Wayland_FOUND AND NOT HUT_PREFER_XCB)
       OUTPUT ${XDG_DECORATION_SOURCE}
       COMMAND ${WAYLAND_SCANNER} private-code ${XDG_DECORATION_PROTOCOL} ${XDG_DECORATION_SOURCE}
       DEPENDS ${XDG_DECORATION_PROTOCOL})
-  list(APPEND WAYLAND_GENERATED ${XDG_DECORATION_CLIENT_INCLUDE} ${XDG_DECORATION_SOURCE})
+  list(APPEND HUT_WAYLAND_GENERATED ${XDG_DECORATION_CLIENT_INCLUDE} ${XDG_DECORATION_SOURCE})
 
   set(HUT_INCLUDES ${HUT_INCLUDES} ${WAYLAND_GEN_DIR})
   set(HUT_INCLUDES ${HUT_INCLUDES} ${WAYLAND_INCLUDE_DIRS})
   set(HUT_LIBS ${HUT_LIBS} ${WAYLAND_LIBRARIES})
   file(GLOB HUT_WAYLAND_SOURCES src/wayland/*.cpp)
-  set(HUT_SOURCES ${HUT_SOURCES} ${HUT_WAYLAND_SOURCES} ${WAYLAND_GENERATED})
+  set(HUT_SOURCES ${HUT_SOURCES} ${HUT_WAYLAND_SOURCES} ${HUT_WAYLAND_GENERATED})
   set(HUT_PLATFORM WAYLAND)
 elseif(XCB_FOUND)
   message("Using XCB as backend")
@@ -230,7 +233,7 @@ set(HUT_INCLUDES ${HUT_INCLUDES} ${HUT_GEN_DIR})
 file(GLOB HUT_SHADER_SOURCES res/spv/*.frag res/spv/*.vert)
 
 gen_spv_bundle(NAMESPACE hut_shaders OUTDIR ${HUT_GEN_DIR} SHADER_SOURCES ${HUT_SHADER_SOURCES})
-set(hut_shaders_cpp ${HUT_GEN_DIR}/hut_shaders.cpp)
+set(HUT_SOURCES ${HUT_SOURCES} ${HUT_GEN_DIR}/hut_shaders.cpp)
 
 ###########################################################
 message("Configuring library build targets...")
@@ -242,15 +245,16 @@ file(GLOB HUT_COMMON_SOURCES src/*.cpp ${HUT_GEN_DIR}/*.cpp)
 set(HUT_SOURCES ${HUT_SOURCES} ${HUT_COMMON_SOURCES})
 
 set(HUT_INCLUDES ${HUT_INCLUDES} inc)
-add_library(hut ${HUT_HEADERS} ${HUT_SOURCES} ${hut_shaders_cpp})
-#message("Done configuring hut, includes: ${HUT_INCLUDES}, libs: ${HUT_LIBS}, defs: ${HUT_DEFINITIONS}")
+add_library(hut ${HUT_HEADERS} ${HUT_SOURCES})
 target_link_libraries(hut ${HUT_LIBS})
 target_compile_definitions(hut PUBLIC ${HUT_DEFINITIONS})
 target_include_directories(hut PUBLIC ${HUT_INCLUDES})
+target_precompile_headers(hut PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/inc/hut/utils.hpp>")
 add_dependencies(hut gen_hut_shaders)
 message("HUT_DEFINITIONS: ${HUT_DEFINITIONS}")
 message("HUT_INCLUDES: ${HUT_INCLUDES}")
 message("HUT_LIBS: ${HUT_LIBS}")
+message("HUT_SOURCES: ${HUT_SOURCES}")
 
 ###########################################################
 message("Configuring demo build targets...")
@@ -269,20 +273,14 @@ if(HUT_COMPILE_DEMOS)
       DEPENDS gen_res ${HUT_DEMO_TTF}
       COMMENT "Generating demo_ttf.cpp")
 
-  add_custom_target(gen_demo_cpp DEPENDS
-      ${HUT_GEN_DIR}/demo_png.cpp
-      ${HUT_GEN_DIR}/demo_ttf.cpp
-      COMMENT "Checked if resources need regeneration")
-
   file(GLOB HUT_DEMO_SHADERS_SOURCE tst/spv/*.vert tst/spv/*.frag)
   gen_spv_bundle(NAMESPACE demo_shaders OUTDIR ${HUT_GEN_DIR} SHADER_SOURCES ${HUT_DEMO_SHADERS_SOURCE})
-  set(demo_shaders_cpp ${HUT_GEN_DIR}/demo_shaders.cpp)
 
-  add_executable(demo tst/demo.cpp ${HUT_GEN_DIR}/demo_png.cpp ${HUT_GEN_DIR}/demo_ttf.cpp ${demo_shaders_cpp})
+  add_executable(demo tst/demo.cpp ${HUT_GEN_DIR}/demo_png.cpp ${HUT_GEN_DIR}/demo_ttf.cpp ${HUT_GEN_DIR}/demo_shaders.cpp)
   target_link_libraries(demo hut)
-  add_dependencies(demo gen_demo_cpp gen_demo_shaders)
+  add_dependencies(demo gen_demo_shaders)
 
-  add_executable(demo3d tst/demo3d.cpp ${demo_shaders_cpp})
+  add_executable(demo3d tst/demo3d.cpp ${HUT_GEN_DIR}/demo_shaders.cpp)
   target_link_libraries(demo3d hut)
   add_dependencies(demo3d gen_demo_shaders)
 endif()

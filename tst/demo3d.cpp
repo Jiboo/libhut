@@ -26,6 +26,7 @@
  */
 
 #include <iostream>
+#include <numbers>
 
 #include "hut/display.hpp"
 #include "hut/drawable.hpp"
@@ -172,8 +173,8 @@ int main(int, char **) {
       vec2 offset {_pos - down_pos};
 
       mat4 m(1);
-      m = rotate(m, float(M_PI) / 400 * offset.x, vec3{0, 1, 0});
-      m = rotate(m, float(M_PI) / 400 * offset.y, vec3{1, 0, 0});
+      m = rotate(m, std::numbers::pi_v<float> / 400 * offset.x, vec3{0, 1, 0});
+      m = rotate(m, std::numbers::pi_v<float> / 400 * offset.y, vec3{1, 0, 0});
       rgb3d_instances->update_one(0, rgb3d::instance{m});
 
       w.invalidate(false);
