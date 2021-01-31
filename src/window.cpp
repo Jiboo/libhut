@@ -430,10 +430,16 @@ void window::redraw(display::time_point _tp) {
 
   cbs_.clear();
 
+  constexpr auto min_frame_time = 1000ms / 144.f;
+  constexpr auto max_frame_time = 1000ms / 10.f;
   auto done = display::clock::now();
   auto diff_frame = done - last_frame_;
-  if (diff_frame > 20ms) {
+  if (diff_frame > max_frame_time) {
     profiling::threads_data::request_dump();
+  }
+  else if (diff_frame < min_frame_time) {
+    std::this_thread::sleep_for(min_frame_time - diff_frame);
+    done = display::clock::now();
   }
   last_frame_ = done;
 }
@@ -486,48 +492,4 @@ void window::rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
   HUT_PVK(vkCmdEndRenderPass, _cb);
   if (HUT_PVK(vkEndCommandBuffer, _cb) != VK_SUCCESS)
     throw std::runtime_error("failed to record command buffer!");
-}
-
-std::string hut::name_key(keysym c) {
-  if (c > KENUM_START && c < KENUM_END) {
-    switch (c) {
-#define HUT_NAME_KEY(CASE) case CASE: return #CASE;
-      HUT_NAME_KEY(KTAB)
-      HUT_NAME_KEY(KALT_LEFT)
-      HUT_NAME_KEY(KALT_RIGHT)
-      HUT_NAME_KEY(KCTRL_LEFT)
-      HUT_NAME_KEY(KCTRL_RIGHT)
-      HUT_NAME_KEY(KSHIFT_LEFT)
-      HUT_NAME_KEY(KSHIFT_RIGHT)
-      HUT_NAME_KEY(KPAGE_DOWN)
-      HUT_NAME_KEY(KPAGE_UP)
-      HUT_NAME_KEY(KUP)
-      HUT_NAME_KEY(KRIGHT)
-      HUT_NAME_KEY(KDOWN)
-      HUT_NAME_KEY(KLEFT)
-      HUT_NAME_KEY(KHOME)
-      HUT_NAME_KEY(KEND)
-      HUT_NAME_KEY(KRETURN)
-      HUT_NAME_KEY(KBACKSPACE)
-      HUT_NAME_KEY(KDELETE)
-      HUT_NAME_KEY(KINSER)
-      HUT_NAME_KEY(KESCAPE)
-      HUT_NAME_KEY(KF1)
-      HUT_NAME_KEY(KF2)
-      HUT_NAME_KEY(KF3)
-      HUT_NAME_KEY(KF4)
-      HUT_NAME_KEY(KF5)
-      HUT_NAME_KEY(KF6)
-      HUT_NAME_KEY(KF7)
-      HUT_NAME_KEY(KF8)
-      HUT_NAME_KEY(KF9)
-      HUT_NAME_KEY(KF10)
-      HUT_NAME_KEY(KF11)
-      HUT_NAME_KEY(KF12)
-#undef HUT_NAME_KEY
-      case KENUM_START: break;
-      case KENUM_END: break;
-    }
-  }
-  return to_utf8(c);
 }

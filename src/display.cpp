@@ -47,7 +47,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT /*fla
     return VK_FALSE;
 
   std::cout << '[' << layerPrefix << "] " << msg << std::endl;
-#ifdef HUT_ENABLE_VALIDATION_DEBUG
+#if defined(HUT_ENABLE_VALIDATION_DEBUG) && defined(HUT_ENABLE_PROFILING)
   boost::stacktrace::stacktrace st;
   if (st) {
     for (const auto &frame : st.as_vector()) {
@@ -58,6 +58,15 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT /*fla
   return VK_FALSE;
 }
 #endif //HUT_ENABLE_VALIDATION
+
+const char *hut::keysym_name(keysym _keysym) {
+  switch(_keysym) {
+#define HUT_MAP_KEYSYM(KEYSYM) case KSYM_##KEYSYM: return "KSYM_" #KEYSYM;
+#include "hut/keysyms.inc"
+#undef HUT_MAP_KEYSYM
+    default: return "KSYM_INVALID";
+  }
+}
 
 const char* hut::cursor_css_name(cursor_type _c) {
   using namespace hut;
@@ -113,7 +122,7 @@ const char *hut::format_mime_type(clipboard_format _f) {
 }
 
 std::optional<clipboard_format> hut::mime_type_format(const char * _mime_type) {
-  if (strcmp(_mime_type, "text/plain;charset=utf-8") == 0) return FTEXT_PLAIN;
+  if (strcmp(_mime_type, "text/plain") == 0) return FTEXT_PLAIN;
   if (strcmp(_mime_type, "text/html") == 0) return FTEXT_HTML;
   if (strcmp(_mime_type, "text/uri-list") == 0) return FTEXT_URI_LIST;
   if (strcmp(_mime_type, "image/bmp") == 0) return FIMAGE_BMP;
@@ -231,6 +240,12 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
     result.score_ = 0;
   if (result.iqueuep_ == score_t::bad_id)
     result.score_ = 0;
+
+#ifdef HUT_ENABLE_VALIDATION_DEBUG
+  std::cout << "[hut] device " << properties.deviceName << " using Vulkan "
+            << VK_VERSION_MAJOR(properties.apiVersion) << '.'
+            << VK_VERSION_MINOR(properties.apiVersion) << " scored " << result.score_ << std::endl;
+#endif
 
   return result;
 }

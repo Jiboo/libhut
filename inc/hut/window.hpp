@@ -30,10 +30,7 @@
 #include <chrono>
 #include <string>
 
-#if defined(VK_USE_PLATFORM_XCB_KHR)
-#include <xcb/xcb.h>
-#include <xcb/xcb_keysyms.h>
-#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
 #include <wayland-client.h>
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
 #include <windows.h>
@@ -41,6 +38,7 @@
 #error "can't find a suitable VK_USE_PLATFORM macro"
 #endif
 
+#include "hut/display.hpp"
 #include "hut/utils.hpp"
 
 namespace hut {
@@ -58,45 +56,6 @@ cursor_type edge_cursor(edge);
 enum touch_event_type { TDOWN, TUP, TMOVE };
 
 enum mouse_event_type { MDOWN, MUP, MMOVE, MWHEEL_UP, MWHEEL_DOWN };
-
-enum keysym : char32_t {
-  KENUM_START = 0xffffff00,
-  KTAB,
-  KALT_LEFT,
-  KALT_RIGHT,
-  KCTRL_LEFT,
-  KCTRL_RIGHT,
-  KSHIFT_LEFT,
-  KSHIFT_RIGHT,
-  KPAGE_UP,
-  KPAGE_DOWN,
-  KUP,
-  KRIGHT,
-  KDOWN,
-  KLEFT,
-  KHOME,
-  KEND,
-  KRETURN,
-  KBACKSPACE,
-  KDELETE,
-  KINSER,
-  KESCAPE,
-  KF1,
-  KF2,
-  KF3,
-  KF4,
-  KF5,
-  KF6,
-  KF7,
-  KF8,
-  KF9,
-  KF10,
-  KF11,
-  KF12,
-  KENUM_END
-};
-std::string name_key(keysym c);
-inline std::ostream &operator<<(std::ostream &_os, keysym _keysym) { return _os << name_key(_keysym); }
 
 class display;
 
@@ -128,7 +87,8 @@ class window {
   event<uint8_t /*finger*/, touch_event_type, vec2 /*pos*/> on_touch;
   event<uint8_t /*button*/, mouse_event_type, vec2 /*pos*/> on_mouse;
 
-  event<keysym /*key*/, modifiers /*mods*/, bool /*down*/> on_key;
+  event<modifiers /*mods*/> on_kmods;
+  event<keycode, keysym, bool /*down*/> on_key;
   event<char32_t /*utf32_char*/> on_char;
 
   explicit window(display &_display, const window_params &_init_params = {});
@@ -217,13 +177,7 @@ class window {
   void redraw(display::time_point);
 
  protected:
-#if defined(VK_USE_PLATFORM_XCB_KHR)
-  xcb_window_t window_, parent_;
-  vec2 current_mouse_root_ = {0, 0};
-  bool mouse_pressed_ = false;
-  std::optional<uvec4> new_configuration_;
-  std::optional<uvec4> invalidated_;
-#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
   friend void handle_xdg_configure(void*, xdg_surface*, uint32_t);
   friend void handle_toplevel_decoration_configure(void*, zxdg_toplevel_decoration_v1*, uint32_t);
   friend void handle_toplevel_configure(void*, xdg_toplevel*, int32_t, int32_t, wl_array*);

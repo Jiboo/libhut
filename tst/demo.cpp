@@ -245,7 +245,7 @@ int main(int, char **) {
     uint32_t *pix_data = (uint32_t*)data;
     for (int x = 0; x < 100; x++)
       for (int y = 0; y < 100; y++)
-        pix_data[y*100+x] = 0xFF0000FF;
+        pix_data[y*100+x] = 0x80808080;
     tex1->update({100, 100, 200, 200}, data, tex1->pixel_size() * 100);
     w.invalidate(true);  // will force to call on_draw on the next frame
 
@@ -370,41 +370,34 @@ int main(int, char **) {
     return false;
   });
 
-  w.on_key.connect([&w](keysym c, modifiers _mods, bool _press) {
-    std::cout << "w keysym " << _press << '\t' << name_key(c) << "\t" << _mods.active_ << std::endl;
-    if (c == KESCAPE && !_press)
+  w.on_key.connect([&](keycode, keysym _key, bool _press) {
+    std::cout << "w keysym " << _press << '\t' << keysym_name(_key) << std::endl;
+    if (_key == KSYM_ESC && !_press)
       w.close();
-    else if (c == KUP && !_press)
+    else if (_key == KSYM_UP && !_press)
       w.pause();
-
-    else if (!_mods.query(KMOD_CTRL) && c == KLEFT && !_press)
+    else if (_key == KSYM_LEFT && !_press)
       w.maximize(false);
-    else if (!_mods.query(KMOD_CTRL) && c == KRIGHT && !_press)
+    else if (_key == KSYM_RIGHT && !_press)
       w.maximize(true);
-
-    else if (_mods.query(KMOD_CTRL) && c == KLEFT && !_press)
-      w.fullscreen(false);
-    else if (_mods.query(KMOD_CTRL) && c == KRIGHT && !_press)
-      w.fullscreen(true);
-
     return true;
   });
 
-  w2.on_key.connect([&w2](keysym c, modifiers _mods, bool _press) {
-    std::cout << "w2 keysym " << _press << '\t' << name_key(c) << std::endl;
-    if (c == KESCAPE && !_press)
+  w2.on_key.connect([&w2, &d](keycode, keysym _key, bool _press) {
+    std::cout << "w2 keysym " << _press << '\t' << keysym_name(_key) << std::endl;
+    if (_key == KSYM_ESC && !_press)
       w2.close();
-    else if (c == KUP && !_press)
+    else if (_key == KSYM_UP && !_press)
       w2.pause();
-    else if (c == KLEFT && !_press)
+    else if (_key == KSYM_LEFT && !_press)
       w2.maximize(false);
-    else if (c == KRIGHT && !_press)
+    else if (_key == KSYM_RIGHT && !_press)
       w2.maximize(true);
     return true;
   });
 
   w.on_char.connect([](char32_t c) {
-    std::cout << "char '" << to_utf8(c) << "' (0x" << std::hex << uint32_t(c) << std::dec << ')' << std::endl;
+    std::cout << "char '" << (char*)to_utf8(c).data() << "' (0x" << std::hex << uint32_t(c) << std::dec << ')' << std::endl;
     return true;
   });
 
@@ -445,12 +438,13 @@ int main(int, char **) {
       if (++current_cursor > CZOOM_OUT)
         current_cursor = CDEFAULT;
       w.cursor(static_cast<cursor_type>(current_cursor));
+      std::cout << "current cursor " << cursor_css_name(static_cast<cursor_type>(current_cursor)) << std::endl;
     }
     return true;
   });
 
-  w.on_key.connect([&w](keysym _keysym, modifiers _mods, bool _pressed) {
-    if ((_keysym == 'c' || _keysym == 'C') && (_mods == KMOD_CTRL) && _pressed) {
+  w.on_key.connect([&w](keycode, keysym _key, bool _pressed) {
+    if (_key == KSYM_C && _pressed) {
       std::cout << "Offering to clipboard" << std::endl;
 
       static const char text_html[] = R"(<meta http-equiv="content-type" content="text/html; charset=UTF-8"><html><body><b>Hello</b> from <i>libhut</i></body></html>)";
@@ -465,7 +459,7 @@ int main(int, char **) {
         }
       });
     }
-    if ((_keysym == 'v' || _keysym == 'V') && (_mods == KMOD_CTRL) && _pressed) {
+    if (_key == KSYM_V && _pressed) {
       std::cout << "Receiving from clipboard" << std::endl;
 
       w.clipboard_receive(clipboard_formats{} | FTEXT_HTML | FTEXT_PLAIN, [](clipboard_format _mime, window::clipboard_receiver &_receiver) {
@@ -479,7 +473,7 @@ int main(int, char **) {
       });
     }
 
-    if ((_keysym == 'p' || _keysym == 'P') && (_mods == KMOD_CTRL) && _pressed) {
+    if (_key == KSYM_P && _pressed) {
       profiling::threads_data::request_dump();
     }
 

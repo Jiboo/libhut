@@ -29,15 +29,17 @@
 
 #include "hut/font.hpp"
 
+#include FT_BITMAP_H
+
 using namespace hut;
 
-constexpr size_t font_scale = 64;
-
-font::font(display &_display, const uint8_t *_addr, size_t _size, shared_atlas _atlas, bool _hinting) : atlas_(_atlas) {
+font::font(display &_display, const uint8_t *_addr, size_t _size, shared_atlas _atlas, bool _hinting)
+  : library_(_display.ft_library_), atlas_(_atlas) {
   HUT_PROFILE_SCOPE(PFONT, "font::font");
-  assert(atlas_->image()->format_ == VK_FORMAT_R8_UNORM);
-  load_flags_ = FT_LOAD_NO_BITMAP | (_hinting ? FT_LOAD_FORCE_AUTOHINT : FT_LOAD_NO_HINTING);
-  FT_New_Memory_Face(_display.ft_library_, _addr, _size, 0, &face_);
+  load_flags_ = FT_LOAD_COLOR | (_hinting ? FT_LOAD_FORCE_AUTOHINT : FT_LOAD_NO_HINTING);
+  FT_New_Memory_Face(library_, _addr, _size, 0, &face_);
+  if (FT_HAS_COLOR(face_))
+    assert(_atlas->image()->format_ == VK_FORMAT_B8G8R8A8_UNORM);
 }
 
 font::~font() {
@@ -57,16 +59,31 @@ font::glyph &font::load_glyph(glyph_cache_t &_cache, uint _char_index) {
 
   FT_GlyphSlot &ftg = face_->glyph;
 
-  if (ftg->outline.n_contours > 0) {
-    if (FT_Render_Glyph(ftg, FT_RENDER_MODE_NORMAL))
-      throw std::runtime_error("couldn't render char");
+  if (FT_Render_Glyph(ftg, FT_RENDER_MODE_NORMAL))
+    throw std::runtime_error("couldn't render char");
 
-    FT_Bitmap render = ftg->bitmap;
-    g.bearing_ = {ftg->bitmap_left, ftg->bitmap_top};
-    g.bounds_ = {render.width, render.rows};
-    if (g.bounds_.x == 0 && g.bounds_.y == 0)
-        return g;
+  FT_Bitmap render = ftg->bitmap;
+  g.bearing_ = {ftg->bitmap_left, ftg->bitmap_top};
+  g.bounds_ = {render.width, render.rows};
+  if (g.bounds_.x == 0 && g.bounds_.y == 0)
+      return g;
+
+  auto atlas_format = atlas_->image()->format_;
+  if ((render.pixel_mode == FT_PIXEL_MODE_BGRA && atlas_format == VK_FORMAT_B8G8R8A8_UNORM)
+    || (render.pixel_mode == FT_PIXEL_MODE_GRAY && atlas_format == VK_FORMAT_R8_UNORM)) {
+    // same format as atlas, nothing to do
     g.texcoords_ = atlas_->pack(g.bounds_, render.buffer, render.pitch);
+  }
+  else if (render.pixel_mode == FT_PIXEL_MODE_GRAY && atlas_format == VK_FORMAT_B8G8R8A8_UNORM) {
+    FT_Bitmap converted = render;
+    converted.pixel_mode = FT_PIXEL_MODE_BGRA;
+    FT_Bitmap_Init(&converted);
+    FT_Bitmap_Convert(library_, &render, &converted, 4);
+    g.texcoords_ = atlas_->pack(g.bounds_, converted.buffer, converted.pitch);
+    FT_Bitmap_Done(library_, &converted);
+  }
+  else {
+    throw std::runtime_error("unexpected glyph format");
   }
 
   return g;
@@ -94,6 +111,7 @@ bool shaper::bake(shared_buffer &_buff, result &_dst, const shared_font &_font, 
   HUT_PROFILE_SCOPE_NAMED(PFONT, "shaper::bake {}", ("text"), make_fixed<40>(_text));
   assert(!_text.empty());
 
+  constexpr size_t font_scale = 64;
   std::lock_guard lk(_font->baking_mutex_);
   FT_Set_Char_Size(_font->face_, _size * font_scale, _size * font_scale, 0, 0);
 

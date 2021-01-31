@@ -41,13 +41,19 @@
 using namespace hut;
 
 std::string display::utf8_wstr(const WCHAR *_input) {
-  size_t size = WideCharToMultiByte(CP_UTF8, 0, _input, -1, NULL, 0, NULL, NULL);
+#ifdef WC_ERR_INVALID_CHARS
+  DWORD flags = WC_ERR_INVALID_CHARS;
+#else
+  DWORD flags = 0;
+#endif
+
+  size_t size = WideCharToMultiByte(CP_UTF8, flags, _input, -1, NULL, 0, NULL, NULL);
   if (!size) return "";
 
   std::string result;
   result.resize(size);
 
-  if (!WideCharToMultiByte(CP_UTF8, 0, _input, -1, result.data(), size, NULL, NULL))
+  if (!WideCharToMultiByte(CP_UTF8, flags, _input, -1, result.data(), size, NULL, NULL))
     return "";
 
   return result;
@@ -58,8 +64,8 @@ UINT display::format_win32(clipboard_format _format) {
     case FTEXT_PLAIN: return CF_UNICODETEXT;
     case FIMAGE_BMP: return CF_BITMAP;
     case FTEXT_HTML: return html_clipboard_format_;
+    default: return 0;
   }
-  return 0;
 }
 
 std::optional<clipboard_format> display::win32_format(UINT _format) {
@@ -146,60 +152,130 @@ void display::post_empty_event() {
   PostMessage(windows_.begin()->first, WM_NULL, 0, 0);
 }
 
-keysym map_key(WPARAM _c) {
-  switch (_c) {
-    case VK_TAB: return KTAB;
-    case VK_LMENU: return KALT_LEFT;
-    case VK_RMENU: return KALT_RIGHT;
-    case VK_LCONTROL: return KCTRL_LEFT;
-    case VK_RCONTROL: return KCTRL_RIGHT;
-    case VK_LSHIFT: return KSHIFT_LEFT;
-    case VK_RSHIFT: return KSHIFT_RIGHT;
-    case VK_PRIOR: return KPAGE_UP;
-    case VK_NEXT: return KPAGE_DOWN;
-    case VK_UP: return KUP;
-    case VK_RIGHT: return KRIGHT;
-    case VK_DOWN: return KDOWN;
-    case VK_LEFT: return KLEFT;
-    case VK_HOME: return KHOME;
-    case VK_END: return KEND;
-    case VK_RETURN: return KRETURN;
-    case VK_BACK: return KBACKSPACE;
-    case VK_DELETE: return KDELETE;
-    case VK_INSERT: return KINSER;
-    case VK_ESCAPE: return KESCAPE;
-#define HUT_MAPFUNCKEY(NUM) case VK_F##NUM: return KF##NUM
-    HUT_MAPFUNCKEY(1);
-    HUT_MAPFUNCKEY(2);
-    HUT_MAPFUNCKEY(3);
-    HUT_MAPFUNCKEY(4);
-    HUT_MAPFUNCKEY(5);
-    HUT_MAPFUNCKEY(6);
-    HUT_MAPFUNCKEY(7);
-    HUT_MAPFUNCKEY(8);
-    HUT_MAPFUNCKEY(9);
-    HUT_MAPFUNCKEY(10);
-    HUT_MAPFUNCKEY(11);
-    HUT_MAPFUNCKEY(12);
-#undef HUT_MAPFUNCKEY
+keysym get_keysym(WPARAM _wparam, LPARAM _lparam) {
+  const bool extended = (_lparam & 0x100) == 0x100;
+  switch (_wparam) {
+    case VK_ESCAPE: return KSYM_ESC;
+    case '1': return KSYM_1;
+    case '2': return KSYM_2;
+    case '3': return KSYM_3;
+    case '4': return KSYM_4;
+    case '5': return KSYM_5;
+    case '6': return KSYM_6;
+    case '7': return KSYM_7;
+    case '8': return KSYM_8;
+    case '9': return KSYM_9;
+    case '0': return KSYM_0;
+    case VK_SUBTRACT: return KSYM_MINUS;
+    //case VK_EQUAL: return KSYM_EQUAL;
+    case VK_BACK: return KSYM_BACKSPACE;
+    case VK_TAB: return KSYM_TAB;
+    case 'Q': return KSYM_Q;
+    case 'W': return KSYM_W;
+    case 'E': return KSYM_E;
+    case 'R': return KSYM_R;
+    case 'T': return KSYM_T;
+    case 'Y': return KSYM_Y;
+    case 'U': return KSYM_U;
+    case 'I': return KSYM_I;
+    case 'O': return KSYM_O;
+    case 'P': return KSYM_P;
+    /*case XKB_KEY_braceleft: return KSYM_LEFTBRACE;
+    case XKB_KEY_braceright: return KSYM_RIGHTBRACE;*/
+    case VK_RETURN: return KSYM_ENTER;
+    case VK_CONTROL: return extended ? KSYM_RIGHTCTRL : KSYM_LEFTCTRL;
+    case 'A': return KSYM_A;
+    case 'S': return KSYM_S;
+    case 'D': return KSYM_D;
+    case 'F': return KSYM_F;
+    case 'G': return KSYM_G;
+    case 'H': return KSYM_H;
+    case 'J': return KSYM_J;
+    case 'K': return KSYM_K;
+    case 'L': return KSYM_L;
+    /*case XKB_KEY_semicolon: return KSYM_SEMICOLON;
+    case XKB_KEY_apostrophe: return KSYM_APOSTROPHE;
+    case XKB_KEY_grave: return KSYM_GRAVE;*/
+    case VK_SHIFT: return extended ? KSYM_RIGHTSHIFT : KSYM_LEFTSHIFT;
+    //case XKB_KEY_backslash: return KSYM_BACKSLASH;
+    case 'Z': return KSYM_Z;
+    case 'X': return KSYM_X;
+    case 'C': return KSYM_C;
+    case 'V': return KSYM_V;
+    case 'B': return KSYM_B;
+    case 'N': return KSYM_N;
+    case 'M': return KSYM_M;
+    /*case XKB_KEY_comma: return KSYM_COMMA;
+    case XKB_KEY_period: return KSYM_DOT;
+    case XKB_KEY_slash: return KSYM_SLASH;
+    case XKB_KEY_KP_Multiply: return KSYM_KPASTERISK;*/
+    case VK_MENU: return extended ? KSYM_RIGHTALT : KSYM_LEFTALT;
+    case VK_SPACE: return KSYM_SPACE;
+    case VK_CAPITAL: return KSYM_CAPSLOCK;
+    case VK_F1: return KSYM_F1;
+    case VK_F2: return KSYM_F2;
+    case VK_F3: return KSYM_F3;
+    case VK_F4: return KSYM_F4;
+    case VK_F5: return KSYM_F5;
+    case VK_F6: return KSYM_F6;
+    case VK_F7: return KSYM_F7;
+    case VK_F8: return KSYM_F8;
+    case VK_F9: return KSYM_F9;
+    case VK_F10: return KSYM_F10;
+    case VK_F11: return KSYM_F11;
+    case VK_F12: return KSYM_F12;
+    case VK_NUMLOCK: return KSYM_NUMLOCK;
+    case VK_SCROLL: return KSYM_SCROLLLOCK;
+    /*case XKB_KEY_KP_7: return KSYM_KP7;
+    case XKB_KEY_KP_8: return KSYM_KP8;
+    case XKB_KEY_KP_9: return KSYM_KP9;
+    case XKB_KEY_KP_Subtract: return KSYM_KPMINUS;
+    case XKB_KEY_KP_4: return KSYM_KP4;
+    case XKB_KEY_KP_5: return KSYM_KP5;
+    case XKB_KEY_KP_6: return KSYM_KP6;
+    case XKB_KEY_KP_Add: return KSYM_KPPLUS;
+    case XKB_KEY_KP_1: return KSYM_KP1;
+    case XKB_KEY_KP_2: return KSYM_KP2;
+    case XKB_KEY_KP_3: return KSYM_KP3;
+    case XKB_KEY_KP_0: return KSYM_KP0;
+    case XKB_KEY_KP_Decimal: return KSYM_KPDOT;
+    case XKB_KEY_KP_Enter: return KSYM_KPENTER;
+    case XKB_KEY_KP_Divide: return KSYM_KPSLASH;*/
+    case VK_SNAPSHOT: return KSYM_SYSRQ;
+    //case XKB_KEY_Linefeed: return KSYM_LINEFEED;
+    case VK_HOME: return KSYM_HOME;
+    case VK_UP: return KSYM_UP;
+    case VK_PRIOR: return KSYM_PAGEUP;
+    case VK_LEFT: return KSYM_LEFT;
+    case VK_RIGHT: return KSYM_RIGHT;
+    case VK_END: return KSYM_END;
+    case VK_DOWN: return KSYM_DOWN;
+    case VK_NEXT: return KSYM_PAGEDOWN;
+    case VK_INSERT: return KSYM_INSERT;
+    case VK_DELETE: return KSYM_DELETE;
+    //case XKB_KEY_KP_Equal: return KSYM_KPEQUAL;
+    case VK_PAUSE: return KSYM_PAUSE;
+    case VK_LWIN: return KSYM_LEFTMETA;
+    case VK_RWIN: return KSYM_RIGHTMETA;
     default:
-      return keysym(char32_t(MapVirtualKeyA(_c, MAPVK_VK_TO_CHAR)));
+      //std::cout << "Invalid char in get_keysym: " << _wparam << ", " << (int)_wparam << std::endl;
+      return KSYM_INVALID;
   }
 }
 
-// https://stackoverflow.com/questions/15966642/how-do-you-tell-lshift-apart-from-rshift-in-wm-keydown-events
-WPARAM map_controlkeys(WPARAM _vk, LPARAM _lparam) {
+keycode get_keycode(LPARAM _lparam) {
   const UINT ulparam = _lparam;
-  const UINT scancode = (ulparam & 0x00ff0000U) >> 16U;
-  const int extended = (ulparam & 0x01000000U) != 0;
+  const UINT scancode = (ulparam & 0x01ff0000U) >> 16U;
+  return scancode;
+}
 
-  switch (_vk) {
-    case VK_SHIFT: return MapVirtualKey(scancode, MAPVK_VSC_TO_VK_EX);
-    case VK_CONTROL: return extended ? VK_RCONTROL : VK_LCONTROL;
-    case VK_MENU: return extended ? VK_RMENU : VK_LMENU;
-    default:
-      return _vk;
-  }
+char32_t display::keycode_idle_char(keycode _in) const {
+  const auto vsc = MapVirtualKeyA(_in, MAPVK_VSC_TO_VK_EX);
+  return to_utf32(MapVirtualKeyA(vsc, MAPVK_VK_TO_CHAR));
+}
+
+char *display::keycode_name(span<char> _out, keycode _in) const {
+  return _out.data() + GetKeyNameTextA(_in << 16U, _out.data(), _out.size());
 }
 
 LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam) {
@@ -345,20 +421,31 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
     case WM_KEYUP:
     case WM_KEYDOWN: {
       if (w) {
-        keysym k = map_key(map_controlkeys(_wparam, _lparam));
+        keysym ksym = get_keysym(_wparam, _lparam);
+        if (ksym == KSYM_INVALID)
+          return 0;
+
+        keycode kcode = get_keycode(_lparam);
         bool pressed = _umsg == WM_KEYDOWN || _umsg == WM_SYSKEYDOWN;
-        if ((k == KALT_LEFT || k == KALT_RIGHT) && _umsg == WM_SYSKEYUP)
+        if ((ksym == KSYM_LEFTALT || ksym == KSYM_RIGHTALT) && _umsg == WM_SYSKEYUP)
           return 0; // Alt up would send both WM_SYSKEYUP and WM_KEYUP
 
-        auto is_pressed = [](int _vkey) {
-          return static_cast<uint16_t>(GetAsyncKeyState(_vkey)) & 0x8000U;
-        };
-        modifiers mods;
-        if (is_pressed(VK_MENU)) mods.set(KMOD_ALT);
-        if (is_pressed(VK_CONTROL)) mods.set(KMOD_CTRL);
-        if (is_pressed(VK_SHIFT)) mods.set(KMOD_SHIFT);
+        w->on_key.fire(kcode, ksym, pressed);
 
-        w->on_key.fire(k, mods, pressed);
+        const bool alt = ksym == KSYM_LEFTALT || ksym == KSYM_RIGHTALT;
+        const bool ctrl = ksym == KSYM_LEFTCTRL || ksym == KSYM_RIGHTCTRL;
+        const bool shift = ksym == KSYM_LEFTSHIFT || ksym == KSYM_RIGHTSHIFT;
+        if (alt || ctrl || shift) {
+          modifiers mods;
+          auto is_pressed = [](int _vkey) {
+            return static_cast<uint16_t>(GetAsyncKeyState(_vkey)) & 0x8000U;
+          };
+          if (is_pressed(VK_MENU)) mods.set(KMOD_ALT);
+          if (is_pressed(VK_CONTROL)) mods.set(KMOD_CTRL);
+          if (is_pressed(VK_SHIFT)) mods.set(KMOD_SHIFT);
+          w->on_kmods.fire(mods);
+        }
+
         return 0;
       }
       return 1;

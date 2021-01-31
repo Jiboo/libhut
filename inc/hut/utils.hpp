@@ -28,20 +28,14 @@
 #pragma once
 
 #include <chrono>
-#include <codecvt>
 #include <functional>
 #include <locale>
 #include <memory>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
-
-#if __has_include("span")
-#include <span>
-#else
-#include "span.hpp"
-#endif
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -66,14 +60,8 @@ class image;
 class sampler;
 class window;
 
-  // FIXME JBL: Not in mingw64
-#if __has_include("span")
 template<typename TType, size_t TExtent = std::dynamic_extent>
 using span = std::span<TType, TExtent>;
-#else
-template<typename TType, size_t TExtent = TCB_SPAN_NAMESPACE_NAME::dynamic_extent>
-using span = TCB_SPAN_NAMESPACE_NAME::span<TType, TExtent>;
-#endif
 
 using shared_buffer = std::shared_ptr<buffer_pool>;
 using shared_font = std::shared_ptr<font>;
@@ -83,19 +71,75 @@ using shared_sampler = std::shared_ptr<sampler>;
 using namespace std::chrono_literals;
 using namespace glm;
 
-inline std::string to_utf8(char32_t ch) {
-  // NOTE JBL: https://stackoverflow.com/questions/30765256/linker-error-using-vs-2015-rc-cant-find-symbol-related-to-stdcodecvt
-#ifdef _MSC_VER
-  static std::wstring_convert<std::codecvt_utf8<__int32>, __int32> convert;
-#else
-  static std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> convert;
-#endif
-  try {
-    return convert.to_bytes(ch);
+inline size_t utf8codepointsize(char32_t _c) {
+  // https://github.com/sheredom/utf8.h/blob/master/utf8.h
+  if (0 == (0xffffff80u & _c)) {
+    return 1;
+  } else if (0 == (0xfffff800u & _c)) {
+    return 2;
+  } else if (0 == (0xffff0000u & _c)) {
+    return 3;
+  } else { // if (0 == ((int)0xffe00000 & chr)) {
+    return 4;
   }
-  catch (std::range_error& _e) {
-    return std::string{};
+}
+
+inline char8_t *utf8catcodepoint(char8_t *_s, char32_t _c, size_t _n) {
+  // https://github.com/sheredom/utf8.h/blob/master/utf8.h
+
+  if (0 == (0xffffff80u & _c)) {
+    // 1-byte/7-bit ascii
+    // (0b0xxxxxxx)
+    if (_n < 1) {
+      return _s;
+    }
+    _s[0] = (char8_t)_c;
+    _s += 1;
+  } else if (0 == (0xfffff800u & _c)) {
+    // 2-byte/11-bit utf8 code point
+    // (0b110xxxxx 0b10xxxxxx)
+    if (_n < 2) {
+      return _s;
+    }
+    _s[0] = 0xc0 | (char)(_c >> 6);
+    _s[1] = 0x80 | (char)(_c & 0x3f);
+    _s += 2;
+  } else if (0 == (0xffff0000u & _c)) {
+    // 3-byte/16-bit utf8 code point
+    // (0b1110xxxx 0b10xxxxxx 0b10xxxxxx)
+    if (_n < 3) {
+      return _s;
+    }
+    _s[0] = 0xe0 | (char)(_c >> 12);
+    _s[1] = 0x80 | (char)((_c >> 6) & 0x3f);
+    _s[2] = 0x80 | (char)(_c & 0x3f);
+    _s += 3;
+  } else { // if (0 == ((int)0xffe00000 & chr)) {
+    // 4-byte/21-bit utf8 code point
+    // (0b11110xxx 0b10xxxxxx 0b10xxxxxx 0b10xxxxxx)
+    if (_n < 4) {
+      return _s;
+    }
+    _s[0] = 0xf0 | (char)(_c >> 18);
+    _s[1] = 0x80 | (char)((_c >> 12) & 0x3f);
+    _s[2] = 0x80 | (char)((_c >> 6) & 0x3f);
+    _s[3] = 0x80 | (char)(_c & 0x3f);
+    _s += 4;
   }
+
+  return _s;
+}
+
+inline char8_t *to_utf8(span<char8_t> _dst, char32_t _src) {
+  return static_cast<char8_t *>(utf8catcodepoint(_dst.data(), _src, _dst.size()));
+}
+
+inline std::u8string to_utf8(char32_t _src) {
+  std::u8string result;
+  auto size = utf8codepointsize(_src);
+  result.resize(size);
+  utf8catcodepoint(result.data(), _src, size);
+  return result;
 }
 
 inline char32_t to_utf32(char16_t c) {
@@ -272,5 +316,24 @@ inline glm::i16vec3 offset3_16(VkOffset3D _in) { return glm::i16vec3{_in.x, _in.
 inline glm::i16vec2 extent2_16(VkExtent2D _in) { return glm::u16vec2{_in.width, _in.height}; }
 inline glm::i16vec3 extent3_16(VkExtent3D _in) { return glm::u16vec3{_in.width, _in.height, _in.depth}; }
 inline glm::vec4 color3_32(VkClearColorValue _in) { return glm::vec4{_in.float32[0], _in.float32[1], _in.float32[2], _in.float32[3]}; }
+
+inline void hexdump(void *ptr, int buflen) {
+  // https://stackoverflow.com/questions/29242/off-the-shelf-c-hex-dump-code
+  auto *buf = (unsigned char*)ptr;
+  int i, j;
+  for (i=0; i<buflen; i+=16) {
+    printf("%06x: ", i);
+    for (j=0; j<16; j++)
+      if (i+j < buflen)
+        printf("%02x ", buf[i+j]);
+      else
+        printf("   ");
+    printf(" ");
+    for (j=0; j<16; j++)
+      if (i+j < buflen)
+        printf("%c", isprint(buf[i+j]) ? buf[i+j] : '.');
+    printf("\n");
+  }
+}
 
 }  // namespace hut

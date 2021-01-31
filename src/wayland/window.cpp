@@ -196,8 +196,8 @@ void hut::data_source_handle_send(void *_data, wl_data_source *_source, const ch
   if (format) {
     window::clipboard_sender sender{_fd};
     w->current_clipboard_sender_(*format, sender);
-    ::close(_fd);
   }
+  ::close(_fd);
 }
 
 size_t window::clipboard_sender::write(span<uint8_t> _data) {

@@ -310,10 +310,10 @@ void window::clipboard_write(clipboard_format _format, UINT _win_format) {
 
   switch(_win_format) {
     case CF_UNICODETEXT: {
-      auto characterCount = MultiByteToWideChar(CP_UTF8, 0, (char*)sender.buffer_.data(), -1, nullptr, 0);
+      auto characterCount = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, (char*)sender.buffer_.data(), sender.buffer_.size(), nullptr, 0);
       if (!characterCount)
         return;
-      HANDLE object = GlobalAlloc(GMEM_MOVEABLE, characterCount * sizeof(WCHAR));
+      HANDLE object = GlobalAlloc(GMEM_MOVEABLE, (characterCount + 1) * sizeof(WCHAR));
       if (!object)
         return;
       auto *buffer = (WCHAR*)GlobalLock(object);
@@ -321,7 +321,8 @@ void window::clipboard_write(clipboard_format _format, UINT _win_format) {
         GlobalFree(object);
         return;
       }
-      MultiByteToWideChar(CP_UTF8, 0, (char*)sender.buffer_.data(), -1, buffer, characterCount);
+      MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, (char*)sender.buffer_.data(), sender.buffer_.size(), buffer, characterCount);
+      buffer[characterCount] = 0;
       GlobalUnlock(object);
       SetClipboardData(_win_format, object);
     } break;
@@ -416,5 +417,4 @@ void window::interactive_move() {
 
   constexpr WPARAM SC_DRAGMOVE = 0xf012;
   PostMessageA(window_, WM_SYSCOMMAND, SC_DRAGMOVE, 0);
-  std::cout << "move" << std::endl;
 }

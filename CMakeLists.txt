@@ -14,16 +14,17 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/de
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_WINDOW_DEPTH_BUFFER)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_PREFER_NONDESCRETE_DEVICES)
 
-#set(HUT_PREFER_XCB 1)
 set(HUT_COMPILE_DEMOS 1)
+set(HUT_ENABLE_IMGUI TRUE)
 
 ###########################################################
 # Debug
 ###########################################################
 
-#set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(NOT WIN32)
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -v")
 #set(HUT_ENABLE_PROFILING TRUE)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION_DEBUG)
@@ -93,15 +94,18 @@ if (NOT WIN32 AND HUT_ENABLE_PROFILING)
   endif()
 endif()
 
+if (HUT_ENABLE_IMGUI)
+  include(dep/imgui.cmake)
+endif()
+
 find_package(GTest)
 if(GTEST_FOUND)
   set(HUT_INCLUDES_TEST ${HUT_INCLUDES} ${GTEST_INCLUDE_DIR})
 endif()
 
 find_package(Wayland COMPONENTS wayland-client wayland-cursor)
-find_package(XCB COMPONENTS xcb xcb-keysyms xcb-util xcb-cursor xcb-icccm xcb-ewmh)
 
-if(Wayland_FOUND AND NOT HUT_PREFER_XCB)
+if(Wayland_FOUND)
   message("Using Wayland as backend, checking for other dependencies..")
 
   find_package(XkbCommon REQUIRED)
@@ -159,13 +163,6 @@ if(Wayland_FOUND AND NOT HUT_PREFER_XCB)
   file(GLOB HUT_WAYLAND_SOURCES src/wayland/*.cpp)
   set(HUT_SOURCES ${HUT_SOURCES} ${HUT_WAYLAND_SOURCES} ${HUT_WAYLAND_GENERATED})
   set(HUT_PLATFORM WAYLAND)
-elseif(XCB_FOUND)
-  message("Using XCB as backend")
-  set(HUT_INCLUDES ${HUT_INCLUDES} ${XCB_INCLUDE_DIRS})
-  set(HUT_LIBS ${HUT_LIBS} ${XCB_LIBRARIES})
-  file(GLOB HUT_XCB_SOURCES src/xcb/*.cpp)
-  set(HUT_SOURCES ${HUT_SOURCES} ${HUT_XCB_SOURCES})
-  set(HUT_PLATFORM XCB)
 elseif(WIN32)
   message("Using WIN32 as backend")
   set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -D_CRT_SECURE_NO_WARNINGS=1 -DNOMINMAX=1) # glm related
@@ -240,12 +237,12 @@ message("Configuring library build targets...")
 ###########################################################
 
 set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DVK_USE_PLATFORM_${HUT_PLATFORM}_KHR)
-file(GLOB_RECURSE HUT_HEADERS inc/hut/*.hpp inc/hut/drawables/*.hpp ${HUT_GEN_DIR}/*.hpp)
+file(GLOB_RECURSE HUT_HEADERS inc/hut/*.hpp ${HUT_GEN_DIR}/*.hpp)
 file(GLOB HUT_COMMON_SOURCES src/*.cpp ${HUT_GEN_DIR}/*.cpp)
 set(HUT_SOURCES ${HUT_SOURCES} ${HUT_COMMON_SOURCES})
 
 set(HUT_INCLUDES ${HUT_INCLUDES} inc)
-add_library(hut ${HUT_HEADERS} ${HUT_SOURCES})
+add_library(hut STATIC ${HUT_HEADERS} ${HUT_SOURCES})
 target_link_libraries(hut ${HUT_LIBS})
 target_compile_definitions(hut PUBLIC ${HUT_DEFINITIONS})
 target_include_directories(hut PUBLIC ${HUT_INCLUDES})
@@ -255,6 +252,8 @@ message("HUT_DEFINITIONS: ${HUT_DEFINITIONS}")
 message("HUT_INCLUDES: ${HUT_INCLUDES}")
 message("HUT_LIBS: ${HUT_LIBS}")
 message("HUT_SOURCES: ${HUT_SOURCES}")
+
+add_subdirectory(ext)
 
 ###########################################################
 message("Configuring demo build targets...")
@@ -283,6 +282,11 @@ if(HUT_COMPILE_DEMOS)
   add_executable(demo3d tst/demo3d.cpp ${HUT_GEN_DIR}/demo_shaders.cpp)
   target_link_libraries(demo3d hut)
   add_dependencies(demo3d gen_demo_shaders)
+
+  if (HUT_ENABLE_IMGUI)
+    add_executable(imgui_demo tst/imgui_demo.cpp)
+    target_link_libraries(imgui_demo hut_imgui_impl)
+  endif()
 endif()
 
 if(GTEST_FOUND)

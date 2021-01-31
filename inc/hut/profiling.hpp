@@ -119,13 +119,26 @@ constexpr T max() {
   return result;
 }
 
+template<typename T, T... TValues>
+constexpr T sum() {
+  T values[] = {TValues...};
+  T result = 0;
+  for (size_t i = 0; i < sizeof...(TValues); i++)
+    result += values[i];
+  return result;
+}
+
 template<size_t TSize>
 struct fixed_string {
   static constexpr size_t size = TSize;
   static constexpr size_t str_size = TSize - 1;
   using data_type = char[size];
 
-  data_type data_;
+  data_type data_ = {};
+
+  fixed_string() = default;
+  fixed_string(const fixed_string&) = default;
+  fixed_string(fixed_string&&) = default;
 
   constexpr fixed_string(const char *_in, size_t _byte_size) {
     auto min = std::min(str_size, _byte_size);
@@ -157,37 +170,39 @@ inline std::ostream &operator<<(std::ostream &_os, const fixed_string<TSize> &_i
   return _os << _in.data_;
 }
 
-template<size_t TCount, size_t TMaxSize>
+template<size_t... TSizes>
 struct fixed_string_array {
-  static constexpr size_t size = TMaxSize; // max<size_t, TSizes...>()
-  static constexpr size_t count = TCount;
-  using data_type = char[count][size];
+  static constexpr size_t count = sizeof...(TSizes);
+  static constexpr size_t data_size = sum<size_t, TSizes...>();
+  using data_type = char[data_size];
+  using offsets_type = size_t[count];
 
-  data_type data_;
+  data_type data_ = {};
+  offsets_type offsets_ = {};
+
+  fixed_string_array(const fixed_string_array&) = default;
+  fixed_string_array(fixed_string_array&&) = default;
+
+  constexpr fixed_string_array(const char (&... _in)[TSizes]) {
+    init(0, 0, _in...);
+  }
 
   template<size_t TFirstSize, size_t... TRestSizes>
-  constexpr void init(size_t _index, const char (&_first)[TFirstSize], const char (&... _rest)[TRestSizes]) {
+  constexpr void init(size_t _index, size_t _byte_offset, const char (&_first)[TFirstSize], const char (&... _rest)[TRestSizes]) {
+    offsets_[_index] = _byte_offset;
     for (size_t i = 0; i != TFirstSize; ++i)
-      data_[_index][i] = _first[i];
+      data_[i + _byte_offset] = _first[i];
     if constexpr (sizeof...(TRestSizes) > 0)
-      init(_index + 1, _rest...);
+      init(_index + 1, _byte_offset + TFirstSize, _rest...);
   }
 
-  template<size_t... TSizes>
-  constexpr fixed_string_array(const char (&... _in)[TSizes]) {
-    init(0, _in...);
-  }
+  constexpr void init(size_t _index, size_t _byte_offset) {}
 
-  constexpr fixed_string_array(const char _in[TCount][TMaxSize]) {
-    for (size_t i = 0; i != TCount; ++i)
-      for (size_t j = 0; j != TMaxSize; ++j)
-        data_[i][j] = _in[i][j];
+  constexpr const char *at(size_t _index) const {
+    assert(_index < count);
+    return data_ + offsets_[_index];
   }
-
-  constexpr fixed_string_array() {}
 };
-template<size_t... TSizes> fixed_string_array(const char (&... _in)[TSizes]) -> fixed_string_array<sizeof...(TSizes), max<size_t, TSizes...>()>;
-fixed_string_array() -> fixed_string_array<0, 0>;
 
 }
 
@@ -332,7 +347,6 @@ struct threadid_component : TNextParent {
   }
 };
 
-
 template<fixed_string TName, typename TNextParent>
 struct static_threadid_component : TNextParent {
   template<typename... TNextCtorArgs>
@@ -368,17 +382,17 @@ using args_tuple = std::tuple<std::decay_t<TArgs>...>;
 
 enum dispatch_op { DUMP, DESTROY };
 
-template<size_t TFormatSize, fixed_string<TFormatSize> TFormat, size_t TArgCount, size_t TMaxArgNameSize, fixed_string_array<TArgCount, TMaxArgNameSize> TArgNames, typename TEventType, typename... TEventArgs>
+template<fixed_string TFormat, fixed_string_array TArgNames, typename TEventType, typename... TEventArgs>
 void dispatcher_impl(TEventType &_thiz, dispatch_op _op, void* _data) {
   switch (_op) {
     case DUMP:
-      _thiz.template dump_impl<TFormatSize, TFormat, TArgCount, TMaxArgNameSize, TArgNames, TEventArgs...>(*static_cast<std::ostream*>(_data));
+      _thiz.template dump_impl<TFormat, TArgNames, TEventArgs...>(*static_cast<std::ostream*>(_data));
     break;
     case DESTROY:
       _thiz.template destroy_impl<TEventArgs...>();
     break;
   }
-};
+}
 
 template<size_t TTotalByteSize, typename TFirstParent>
 class basic_event : public TFirstParent {
@@ -414,25 +428,25 @@ public:
     args_as<TArgs...>().~tuple();
   }
 
-  static void dump_impl_rec(std::ostream &_os, const std::string_view* _names) {
+  static void dump_impl_rec(std::ostream &_os, size_t _index) {
   }
 
-  template<size_t TArgMaxSize, typename TLast>
-  static void dump_impl_rec(std::ostream &_os, const char (*_names)[TArgMaxSize], TLast &&_last) {
+  template<fixed_string_array TArgNames, typename TLast>
+  static void dump_impl_rec(std::ostream &_os, size_t _index, TLast &&_last) {
     _os << '"';
-    escape_json(_os, *_names);
+    escape_json(_os, TArgNames.at(_index));
     _os << "\":\"" << _last << '"';
   }
 
-  template<size_t TArgMaxSize, typename TFirst, typename... TArgs>
-  static void dump_impl_rec(std::ostream &_os, const char (*_names)[TArgMaxSize] , TFirst &&_first, TArgs&&... _rest) {
+  template<fixed_string_array TArgNames, typename TFirst, typename... TArgs>
+  static void dump_impl_rec(std::ostream &_os, size_t _index, TFirst &&_first, TArgs&&... _rest) {
     _os << '"';
-    escape_json(_os, *_names);
+    escape_json(_os, TArgNames.at(_index));
     _os << "\":\"" << _first << "\",";
-    basic_event::dump_impl_rec(_os, ++_names, std::forward<TArgs>(_rest)...);
+    basic_event::dump_impl_rec<TArgNames>(_os, _index + 1, std::forward<TArgs>(_rest)...);
   }
 
-  template<size_t TFormatSize, fixed_string<TFormatSize> TFormat, size_t TArgCount, size_t TMaxArgNameSize, fixed_string_array<TArgCount, TMaxArgNameSize> TArgNames, typename... TArgs>
+  template<fixed_string TFormat, fixed_string_array TArgNames, typename... TArgs>
   void dump_impl(std::ostream &_os) {
     _os << "{\"name\":\"";
 
@@ -451,7 +465,7 @@ public:
       _os << ",\"args\":{";
 
       std::apply([&_os](auto&&... _args) {
-        basic_event::dump_impl_rec<TMaxArgNameSize>(_os, TArgNames.data_, std::forward<decltype(_args)>(_args)...);
+        basic_event::dump_impl_rec<TArgNames>(_os, 0, std::forward<decltype(_args)>(_args)...);
       }, args_as<TArgs...>());
 
       _os << "}";
@@ -481,15 +495,21 @@ public:
 };
 
 using complete_components =
-timestamp_component< //4
-    duration_component< // 4
-        stacktrace_component< //4
-            threadid_component< //2
-                type_component< //1
-                    category_component< //1
-                        noop_component>>>>>>;
+        timestamp_component< //4
+            duration_component< // 4
+                stacktrace_component< //4
+                    threadid_component< //2
+                        type_component< //1
+                            category_component< //1
+                                noop_component>>>>>>;
 
-using complete_event = basic_event<64, complete_components>;
+#ifdef __cpp_lib_hardware_interference_size
+    constexpr size_t cache_line_byte_size = std::hardware_constructive_interference_size;
+#else
+    constexpr size_t cache_line_byte_size = 2 * sizeof(std::max_align_t);
+#endif
+
+using complete_event = basic_event<cache_line_byte_size, complete_components>;
 
 namespace size_tests {
   static_assert(sizeof(timestamp_component<noop_component>) == 4);
@@ -672,7 +692,7 @@ stacktrace_component<TNextParent>::stacktrace_component(stacktrace &&_stacktrace
   }
 }
 
-template<size_t TFormatSize, fixed_string<TFormatSize> TFormat, size_t TArgCount, size_t TMaxArgNameSize, fixed_string_array<TArgCount, TMaxArgNameSize> TArgNames, typename TEventType, typename... TEventArgs>
+template<fixed_string TFormat, fixed_string_array TArgNames, typename TEventType, typename... TEventArgs>
 struct complete_event_scope {
   using dispatcher = typename TEventType::dispatcher;
 
@@ -685,7 +705,7 @@ struct complete_event_scope {
 
   complete_event_scope(std::vector<TEventType> &_buffer, profiling_category _cat, clock_f32::time_point _start, stacktrace &&_stacktrace, std::tuple<TEventArgs...> &&_event_args)
       : buffer_{_buffer}, cat_{_cat}, start_{_start}, stacktrace_{std::move(_stacktrace)}
-      , args_{std::move(_event_args)} , dispatcher_{dispatcher_impl<TFormatSize, TFormat, TArgCount, TMaxArgNameSize, TArgNames, TEventType, TEventArgs...>} {}
+      , args_{std::move(_event_args)} , dispatcher_{dispatcher_impl<TFormat, TArgNames, TEventType, TEventArgs...>} {}
 
   ~complete_event_scope() {
     buffer_.emplace_back(dispatcher_, std::move(args_), start_, (clock_f32::now() - start_), std::move(stacktrace_), type::COMPLETE, cat_);
@@ -694,7 +714,7 @@ struct complete_event_scope {
 
 template<fixed_string TFormat, fixed_string_array TArgNames, typename TEventType, typename... TEventArgs>
 auto make_complete_event_scope(std::vector<TEventType> &_buffer, profiling_category _cat, clock_f32::time_point _start, stacktrace &&_stacktrace, std::tuple<TEventArgs...> &&_event_args) {
-  return complete_event_scope<TFormat.size, TFormat, TArgNames.count, TArgNames.size, TArgNames, TEventType, TEventArgs...>{_buffer, _cat, _start, std::move(_stacktrace), std::move(_event_args)};
+  return complete_event_scope<TFormat, TArgNames, TEventType, TEventArgs...>{_buffer, _cat, _start, std::move(_stacktrace), std::move(_event_args)};
 }
 
 #define HUT_PROFILE_TRANSFORM_STRINGIFY(MR, MData, MElement) BOOST_PP_STRINGIZE(MElement)
@@ -705,7 +725,7 @@ auto make_complete_event_scope(std::vector<TEventType> &_buffer, profiling_categ
 #define HUT_PROFILE_UNIQUE_SYMBOL(MPrefix) BOOST_PP_CAT(MPrefix ## _scope, __COUNTER__)
 
 #define HUT_PROFILE_SCOPE_IMPL_DATANAMED(MCat, MFormat, MArgNames, MArgNamesVar, MDataVar, ...) \
-    auto HUT_PROFILE_UNIQUE_SYMBOL(_scope) = ::hut::profiling::make_complete_event_scope<MFormat, {BOOST_PP_TUPLE_ENUM(MArgNames)}>(::hut::profiling::threads_data::my_queue(), MCat, ::hut::profiling::clock_f32::now(), ::hut::profiling::stacktrace{1, 8}, std::make_tuple(__VA_ARGS__))
+    auto HUT_PROFILE_UNIQUE_SYMBOL(_scope) = ::hut::profiling::make_complete_event_scope<MFormat, ::hut::fixed_string_array{BOOST_PP_TUPLE_ENUM(MArgNames)}>(::hut::profiling::threads_data::my_queue(), MCat, ::hut::profiling::clock_f32::now(), ::hut::profiling::stacktrace{1, 8}, std::make_tuple(__VA_ARGS__))
 
 #define HUT_PROFILE_SCOPE_IMPL(MCat, MFormat, MArgNames, ...) HUT_PROFILE_SCOPE_IMPL_DATANAMED(MCat, MFormat, MArgNames, HUT_PROFILE_UNIQUE_SYMBOL(_names), HUT_PROFILE_UNIQUE_SYMBOL(_data), __VA_ARGS__)
 
@@ -730,7 +750,7 @@ auto make_complete_event_scope(std::vector<TEventType> &_buffer, profiling_categ
 
 #define HUT_PVK(MName, ...) \
   [&]() { \
-    HUT_PROFILE_SCOPE(PVULKAN, BOOST_PP_STRINGIZE(MName)); \
+    HUT_PROFILE_SCOPE(::hut::PVULKAN, BOOST_PP_STRINGIZE(MName)); \
     return MName(__VA_ARGS__); \
   }()
 

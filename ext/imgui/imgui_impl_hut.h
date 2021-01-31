@@ -27,27 +27,26 @@
 
 #pragma once
 
-#include <cassert>
+#include <cstdint>
 
-#include "hut/utils.hpp"
+#include <glm/glm.hpp>
+#include "imgui.h"
+#include "hut/window.hpp"
+#include "hut/display.hpp"
 
-namespace hut {
+IMGUI_IMPL_API bool     ImGui_ImplHut_Init(hut::display *_d, hut::window* _w, bool _install_callbacks);
+IMGUI_IMPL_API void     ImGui_ImplHut_Shutdown();
+IMGUI_IMPL_API void     ImGui_ImplHut_NewFrame();
+IMGUI_IMPL_API void     ImGui_ImplHut_RenderDrawData(VkCommandBuffer _buffer, ImDrawData* _draw_data);
 
-inline uint format_size(VkFormat _format) {
-  switch (_format) {
-    case VK_FORMAT_R8_UNORM: return 1;
+// Use if you want to reset your rendering device without losing Dear ImGui state.
+IMGUI_IMPL_API bool     ImGui_ImplHut_CreateDeviceObjects();
+IMGUI_IMPL_API void     ImGui_ImplHut_InvalidateDeviceObjects();
 
-    case VK_FORMAT_R8G8_UNORM: return 2;
-
-    case VK_FORMAT_R8G8B8_UNORM: return 3;
-
-    case VK_FORMAT_R8G8B8A8_UNORM:
-    case VK_FORMAT_B8G8R8A8_UNORM:
-    case VK_FORMAT_D32_SFLOAT: return 4;
-    default:
-      assert(false);
-      return 0;
-  }
-}
-
-}  // namespace hut
+// Callbacks (installed by default if you enable 'install_callbacks' during initialization)
+// You can also handle inputs yourself and use those as a reference.
+IMGUI_IMPL_API bool     ImGui_ImplHut_HandleOnResize(hut::uvec2 _size);
+IMGUI_IMPL_API bool     ImGui_ImplHut_HandleOnMouse(uint8_t _button, hut::mouse_event_type _type, hut::vec2 _pos);
+IMGUI_IMPL_API bool     ImGui_ImplHut_HandleOnKey(hut::keycode _kcode, hut::keysym _ksym, bool _down);
+IMGUI_IMPL_API bool     ImGui_ImplHut_HandleOnKMods(hut::modifiers _mods);
+IMGUI_IMPL_API bool     ImGui_ImplHut_HandleOnChar(char32_t _utf32_char);

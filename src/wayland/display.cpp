@@ -102,6 +102,132 @@ void hut::pointer_handle_axis(void *_data, wl_pointer *_pointer, uint32_t, uint3
   }
 }
 
+keysym display::map_xkb_keysym(xkb_keysym_t _in) {
+  switch(_in) {
+    case XKB_KEY_Escape: return KSYM_ESC;
+    case XKB_KEY_1: return KSYM_1;
+    case XKB_KEY_2: return KSYM_2;
+    case XKB_KEY_3: return KSYM_3;
+    case XKB_KEY_4: return KSYM_4;
+    case XKB_KEY_5: return KSYM_5;
+    case XKB_KEY_6: return KSYM_6;
+    case XKB_KEY_7: return KSYM_7;
+    case XKB_KEY_8: return KSYM_8;
+    case XKB_KEY_9: return KSYM_9;
+    case XKB_KEY_0: return KSYM_0;
+    case XKB_KEY_minus: return KSYM_MINUS;
+    case XKB_KEY_equal: return KSYM_EQUAL;
+    case XKB_KEY_BackSpace: return KSYM_BACKSPACE;
+    case XKB_KEY_Tab: return KSYM_TAB;
+    case XKB_KEY_Q: return KSYM_Q;
+    case XKB_KEY_W: return KSYM_W;
+    case XKB_KEY_E: return KSYM_E;
+    case XKB_KEY_R: return KSYM_R;
+    case XKB_KEY_T: return KSYM_T;
+    case XKB_KEY_Y: return KSYM_Y;
+    case XKB_KEY_U: return KSYM_U;
+    case XKB_KEY_I: return KSYM_I;
+    case XKB_KEY_O: return KSYM_O;
+    case XKB_KEY_P: return KSYM_P;
+    case XKB_KEY_braceleft: return KSYM_LEFTBRACE;
+    case XKB_KEY_braceright: return KSYM_RIGHTBRACE;
+    case XKB_KEY_Return: return KSYM_ENTER;
+    case XKB_KEY_Control_L: return KSYM_LEFTCTRL;
+    case XKB_KEY_A: return KSYM_A;
+    case XKB_KEY_S: return KSYM_S;
+    case XKB_KEY_D: return KSYM_D;
+    case XKB_KEY_F: return KSYM_F;
+    case XKB_KEY_G: return KSYM_G;
+    case XKB_KEY_H: return KSYM_H;
+    case XKB_KEY_J: return KSYM_J;
+    case XKB_KEY_K: return KSYM_K;
+    case XKB_KEY_L: return KSYM_L;
+    case XKB_KEY_semicolon: return KSYM_SEMICOLON;
+    case XKB_KEY_apostrophe: return KSYM_APOSTROPHE;
+    case XKB_KEY_grave: return KSYM_GRAVE;
+    case XKB_KEY_Shift_L: return KSYM_LEFTSHIFT;
+    case XKB_KEY_backslash: return KSYM_BACKSLASH;
+    case XKB_KEY_Z: return KSYM_Z;
+    case XKB_KEY_X: return KSYM_X;
+    case XKB_KEY_C: return KSYM_C;
+    case XKB_KEY_V: return KSYM_V;
+    case XKB_KEY_B: return KSYM_B;
+    case XKB_KEY_N: return KSYM_N;
+    case XKB_KEY_M: return KSYM_M;
+    case XKB_KEY_comma: return KSYM_COMMA;
+    case XKB_KEY_period: return KSYM_DOT;
+    case XKB_KEY_slash: return KSYM_SLASH;
+    case XKB_KEY_Shift_R: return KSYM_RIGHTSHIFT;
+    case XKB_KEY_KP_Multiply: return KSYM_KPASTERISK;
+    case XKB_KEY_Alt_L: return KSYM_LEFTALT;
+    case XKB_KEY_space: return KSYM_SPACE;
+    case XKB_KEY_Caps_Lock: return KSYM_CAPSLOCK;
+    case XKB_KEY_F1: return KSYM_F1;
+    case XKB_KEY_F2: return KSYM_F2;
+    case XKB_KEY_F3: return KSYM_F3;
+    case XKB_KEY_F4: return KSYM_F4;
+    case XKB_KEY_F5: return KSYM_F5;
+    case XKB_KEY_F6: return KSYM_F6;
+    case XKB_KEY_F7: return KSYM_F7;
+    case XKB_KEY_F8: return KSYM_F8;
+    case XKB_KEY_F9: return KSYM_F9;
+    case XKB_KEY_F10: return KSYM_F10;
+    case XKB_KEY_Num_Lock: return KSYM_NUMLOCK;
+    case XKB_KEY_Scroll_Lock: return KSYM_SCROLLLOCK;
+    case XKB_KEY_KP_7: return KSYM_KP7;
+    case XKB_KEY_KP_8: return KSYM_KP8;
+    case XKB_KEY_KP_9: return KSYM_KP9;
+    case XKB_KEY_KP_Subtract: return KSYM_KPMINUS;
+    case XKB_KEY_KP_4: return KSYM_KP4;
+    case XKB_KEY_KP_5: return KSYM_KP5;
+    case XKB_KEY_KP_6: return KSYM_KP6;
+    case XKB_KEY_KP_Add: return KSYM_KPPLUS;
+    case XKB_KEY_KP_1: return KSYM_KP1;
+    case XKB_KEY_KP_2: return KSYM_KP2;
+    case XKB_KEY_KP_3: return KSYM_KP3;
+    case XKB_KEY_KP_0: return KSYM_KP0;
+    case XKB_KEY_KP_Decimal: return KSYM_KPDOT;
+    case XKB_KEY_F11: return KSYM_F11;
+    case XKB_KEY_F12: return KSYM_F12;
+    case XKB_KEY_KP_Enter: return KSYM_KPENTER;
+    case XKB_KEY_Control_R: return KSYM_RIGHTCTRL;
+    case XKB_KEY_KP_Divide: return KSYM_KPSLASH;
+    case XKB_KEY_Sys_Req: return KSYM_SYSRQ;
+    case XKB_KEY_Alt_R: return KSYM_RIGHTALT;
+    case XKB_KEY_Linefeed: return KSYM_LINEFEED;
+    case XKB_KEY_Home: return KSYM_HOME;
+    case XKB_KEY_Up: return KSYM_UP;
+    case XKB_KEY_Page_Up: return KSYM_PAGEUP;
+    case XKB_KEY_Left: return KSYM_LEFT;
+    case XKB_KEY_Right: return KSYM_RIGHT;
+    case XKB_KEY_End: return KSYM_END;
+    case XKB_KEY_Down: return KSYM_DOWN;
+    case XKB_KEY_Page_Down: return KSYM_PAGEDOWN;
+    case XKB_KEY_Insert: return KSYM_INSERT;
+    case XKB_KEY_Delete: return KSYM_DELETE;
+    case XKB_KEY_KP_Equal: return KSYM_KPEQUAL;
+    case XKB_KEY_Pause: return KSYM_PAUSE;
+    case XKB_KEY_Meta_L: return KSYM_LEFTMETA;
+    case XKB_KEY_Meta_R: return KSYM_RIGHTMETA;
+    default: return KSYM_INVALID;
+  }
+}
+
+char32_t display::keycode_idle_char(keycode _in) const {
+  char buffer[64];
+  const auto xkb_keysym = xkb_state_key_get_one_sym(xkb_state_empty_, _in);
+  const auto xkb_upper = xkb_keysym_to_upper(xkb_keysym);
+  return xkb_keysym_to_utf32(xkb_upper);
+}
+
+char *display::keycode_name(span<char> _out, keycode _in) const {
+  char buffer[64];
+  const auto xkb_keysym = xkb_state_key_get_one_sym(xkb_state_empty_, _in);
+  const auto xkb_upper = xkb_keysym_to_upper(xkb_keysym);
+  auto result = xkb_keysym_get_name(xkb_upper, _out.data(), _out.size());
+  return _out.data() + std::max(0, result);
+}
+
 void hut::keyboard_handle_keymap(void *_data, wl_keyboard *_keyboard, uint32_t _format, int _fd, uint32_t _size) {
   //std::cout << "keyboard_handle_keymap " << _keyboard << ", " << _format << ", " << _fd << ", " << _size << std::endl;
   auto *d = static_cast<display*>(_data);
@@ -122,8 +248,9 @@ void hut::keyboard_handle_keymap(void *_data, wl_keyboard *_keyboard, uint32_t _
     throw std::runtime_error("Failed to compile keymap");
 
   d->xkb_state_ = xkb_state_new(d->keymap_);
-  if (!d->xkb_state_)
-    throw std::runtime_error("Failed to create XKB state");
+  d->xkb_state_empty_ = xkb_state_new(d->keymap_);
+  if (!d->xkb_state_ || !d->xkb_state_empty_)
+    throw std::runtime_error("Failed to create XKB states");
 
   d->mod_index_alt_ = xkb_keymap_mod_get_index(d->keymap_, XKB_MOD_NAME_ALT);
   d->mod_index_ctrl_ = xkb_keymap_mod_get_index(d->keymap_, XKB_MOD_NAME_CTRL);
@@ -157,112 +284,31 @@ void hut::keyboard_handle_leave(void *_data, wl_keyboard *_keyboard, uint32_t _s
   }
 }
 
-xkb_keysym_t clean_kp_keysyms(xkb_keysym_t _input) {
-  switch(_input) {
-#define HUT_CLEAN_KP(KEY) case XKB_KEY_KP_##KEY: return XKB_KEY_##KEY;
-  case XKB_KEY_KP_Space: return XKB_KEY_space;
-  HUT_CLEAN_KP(Tab)
-  case XKB_KEY_KP_Enter: return XKB_KEY_Return;
-  HUT_CLEAN_KP(F1)
-  HUT_CLEAN_KP(F2)
-  HUT_CLEAN_KP(F3)
-  HUT_CLEAN_KP(F4)
-  HUT_CLEAN_KP(Home)
-  HUT_CLEAN_KP(Left)
-  HUT_CLEAN_KP(Up)
-  HUT_CLEAN_KP(Right)
-  HUT_CLEAN_KP(Down)
-  HUT_CLEAN_KP(Page_Up)
-  HUT_CLEAN_KP(Page_Down)
-  HUT_CLEAN_KP(End)
-  HUT_CLEAN_KP(Begin)
-  HUT_CLEAN_KP(Insert)
-  HUT_CLEAN_KP(Delete)
-  case XKB_KEY_KP_Equal: return XKB_KEY_equal;
-  case XKB_KEY_KP_Multiply: return XKB_KEY_asterisk;
-  case XKB_KEY_KP_Add: return XKB_KEY_plus;
-  case XKB_KEY_KP_Separator: return XKB_KEY_comma;
-  case XKB_KEY_KP_Subtract: return XKB_KEY_minus;
-  case XKB_KEY_KP_Decimal: return XKB_KEY_period;
-  case XKB_KEY_KP_Divide: return XKB_KEY_slash;
-  HUT_CLEAN_KP(0)
-  HUT_CLEAN_KP(1)
-  HUT_CLEAN_KP(2)
-  HUT_CLEAN_KP(3)
-  HUT_CLEAN_KP(4)
-  HUT_CLEAN_KP(5)
-  HUT_CLEAN_KP(6)
-  HUT_CLEAN_KP(7)
-  HUT_CLEAN_KP(8)
-  HUT_CLEAN_KP(9)
-#undef HUT_CLEAN_KP
-    default: return _input;
-  }
-}
-
-keysym map_keysym(xkb_keysym_t _keysym) {
-  switch(_keysym) {
-    case XKB_KEY_Tab: return KTAB;
-    case XKB_KEY_Alt_L: return KALT_LEFT;
-    case XKB_KEY_Alt_R: [[fallthrough]];
-    case XKB_KEY_ISO_Level3_Shift: return KALT_RIGHT;
-    case XKB_KEY_Control_L: return KCTRL_LEFT;
-    case XKB_KEY_Control_R: return KCTRL_RIGHT;
-    case XKB_KEY_Shift_L: return KSHIFT_LEFT;
-    case XKB_KEY_Shift_R: return KSHIFT_RIGHT;
-    case XKB_KEY_Page_Up: return KPAGE_UP;
-    case XKB_KEY_Page_Down: return KPAGE_DOWN;
-    case XKB_KEY_Up: return KUP;
-    case XKB_KEY_Right: return KRIGHT;
-    case XKB_KEY_Down: return KDOWN;
-    case XKB_KEY_Left: return KLEFT;
-    case XKB_KEY_Home: return KHOME;
-    case XKB_KEY_End: return KEND;
-    case XKB_KEY_Return: return KRETURN;
-    case XKB_KEY_BackSpace: return KBACKSPACE;
-    case XKB_KEY_Delete: return KDELETE;
-    case XKB_KEY_Insert: return KINSER;
-    case XKB_KEY_Escape: return KESCAPE;
-    case XKB_KEY_F1: return KF1;
-    case XKB_KEY_F2: return KF2;
-    case XKB_KEY_F3: return KF3;
-    case XKB_KEY_F4: return KF4;
-    case XKB_KEY_F5: return KF5;
-    case XKB_KEY_F6: return KF6;
-    case XKB_KEY_F7: return KF7;
-    case XKB_KEY_F8: return KF8;
-    case XKB_KEY_F9: return KF9;
-    case XKB_KEY_F10: return KF10;
-    case XKB_KEY_F11: return KF11;
-    case XKB_KEY_F12: return KF12;
-    default: return static_cast<keysym>(_keysym);
-  }
-}
-
 void hut::keyboard_handle_key(void *_data, wl_keyboard *_keyboard, uint32_t _serial, uint32_t, uint32_t _key, uint32_t _state) {
   //std::cout << "keyboard_handle_key " << _keyboard << ", " << _key << ", " << _state << std::endl;
   auto *d = static_cast<display*>(_data);
   if (_keyboard == d->keyboard_) {
     auto *w = d->keyboard_current_.second;
     assert(w);
-    const auto keycode = xkb_keycode_t(_key + 8); // +8 for evdev scancode to XCB scancode
-    const auto ks = xkb_state_key_get_one_sym(d->xkb_state_, keycode);
-    const auto cleaned = clean_kp_keysyms(ks);
-    const auto mapped = map_keysym(cleaned);
-    const bool remapped =  mapped != cleaned && mapped != KENUM_END;
-    const auto mods = d->kb_mod_mask_;
-    const bool alt = mods & KMOD_ALT;
-    const bool ctrl = mods & KMOD_CTRL;
+    const auto kcode = xkb_keycode_t(_key + 8);
+    const auto ksym = xkb_state_key_get_one_sym(d->xkb_state_, kcode);
+    const auto upper_ksym = xkb_keysym_to_upper(ksym);
+    const auto hut_ksym = display::map_xkb_keysym(upper_ksym);
 
     d->last_serial_ =  _serial;
-    HUT_PROFILE_EVENT_NAMED(w, on_key, ("key", "mods", "down"), mapped, mods, _state != 0);
-    if (!remapped && !ctrl && !alt && _state != 0)
-      HUT_PROFILE_EVENT_NAMED_ALIASED(w, on_char, ("utf32_char"), ((uint32_t)mapped), mapped);
+    HUT_PROFILE_EVENT_NAMED(w, on_key, ("kcode", "ksym", "down"), kcode, hut_ksym, _state != 0);
+    if (_state != 0) {
+      const auto utf32 = xkb_keysym_to_utf32(ksym);
+      const auto valid = utf32 != 0;
+      const auto printable = utf32 > 0x7f || isprint(utf32);
+      if (valid && printable)
+        HUT_PROFILE_EVENT(w, on_char, utf32);
+    }
   }
 }
 
-void hut::keyboard_handle_modifiers(void *_data, wl_keyboard *, uint32_t _serial, uint32_t _mods_depressed, uint32_t _mods_latched, uint32_t _mods_locked, uint32_t _group) {
-  //std::cout << "keyboard_handle_modifiers " << _keyboard << ", " << _mods_depressed << ", " << _mods_latched << ", " << _mods_locked << std::endl;
+void hut::keyboard_handle_modifiers(void *_data, wl_keyboard *_keyboard, uint32_t _serial, uint32_t _mods_depressed, uint32_t _mods_latched, uint32_t _mods_locked, uint32_t _group) {
+  //std::cout << "keyboard_handle_modifiers " << _mods_depressed << ", " << _mods_latched << ", " << _mods_locked << std::endl;
   auto *d = static_cast<display*>(_data);
   d->last_serial_ =  _serial;
   xkb_state_update_mask(d->xkb_state_, _mods_depressed, _mods_latched, _mods_locked, 0, 0, _group);
@@ -274,7 +320,11 @@ void hut::keyboard_handle_modifiers(void *_data, wl_keyboard *, uint32_t _serial
     mod_mask |= KMOD_CTRL;
   if (xkb_state_mod_index_is_active(d->xkb_state_, d->mod_index_shift_, XKB_STATE_MODS_EFFECTIVE))
     mod_mask |= KMOD_SHIFT;
-  d->kb_mod_mask_ = mod_mask;
+
+  auto *w = d->keyboard_current_.second;
+  if (_keyboard == d->keyboard_ && w) {
+    HUT_PROFILE_EVENT(w, on_kmods, mod_mask);
+  }
 }
 
 void hut::seat_handler(void *_data, wl_seat *_seat, uint32_t _caps) {
@@ -314,7 +364,10 @@ void handle_xdg_ping(void *, struct xdg_wm_base *_shell, uint32_t _serial) {
 
 void hut::registry_handler(void *_data, wl_registry *_registry, uint32_t _id,
                                   const char *_interface, [[maybe_unused]] uint32_t _version) {
-  //std::cout << "[hut] wayland registry item " << _id << ", " << _interface << ", " << _version << std::endl;
+#ifdef HUT_ENABLE_VALIDATION_DEBUG
+  std::cout << "[hut] wayland registry item " << _id << ", " << _interface << ", " << _version << std::endl;
+#endif
+
   static const wl_seat_listener wl_seat_listeners = {
       seat_handler, seat_name
   };
@@ -390,7 +443,10 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
 
   registry_ = wl_display_get_registry(display_);
   wl_registry_add_listener(registry_, &reg_listeners, this);
-  wl_display_roundtrip(display_);
+
+  while(keymap_ == nullptr) {
+    wl_display_roundtrip(display_);
+  }
 
   if (!compositor_) throw std::runtime_error("couldn't retrieve a wl_compositor in the wayland registry");
   if (!xdg_wm_base_) throw std::runtime_error("couldn't retrieve a xdg_wm_base in the wayland registry");
@@ -456,6 +512,7 @@ display::~display() {
 
   if (keymap_) xkb_keymap_unref(keymap_);
   if (xkb_state_) xkb_state_unref(xkb_state_);
+  if (xkb_state_empty_) xkb_state_unref(xkb_state_empty_);
   if (xkb_context_) xkb_context_unref(xkb_context_);
 
   if (decoration_manager_) zxdg_decoration_manager_v1_destroy(decoration_manager_);

@@ -192,7 +192,7 @@ private:
     rasterizer_create_info.rasterizerDiscardEnable = VK_FALSE;
     rasterizer_create_info.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer_create_info.lineWidth = 1.0f;
-    rasterizer_create_info.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer_create_info.cullMode = VK_CULL_MODE_NONE;
     rasterizer_create_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer_create_info.depthBiasEnable = VK_FALSE;
     rasterizer_create_info.depthBiasConstantFactor = 0.0f;
@@ -399,9 +399,8 @@ public:
             const shared_vertices &_vertices, uint _vertex_offset) {
     HUT_PROFILE_SCOPE(PDRAWABLE, __PRETTY_FUNCTION__);
     assert(descriptor_bound(_descriptor_index));
-    assert(_indices && _instances && _vertices);
+    assert(_indices && _vertices);
     assert(_indices_offset + _indices_count <= _indices->size());
-    assert(_instances_offset + _instances_count <= _instances->size());
     assert(_vertex_offset <= _vertices->size());
 
     HUT_PVK(vkCmdBindPipeline, _buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
@@ -411,9 +410,13 @@ public:
     VkDeviceSize verticesOffsets[] = {_vertices->alloc_.offset_};
     HUT_PVK(vkCmdBindVertexBuffers, _buffer, 0, 1, verticesBuffers, verticesOffsets);
 
-    VkBuffer instancesBuffers[] = {_instances->buff().buffer_};
-    VkDeviceSize instancesOffsets[] = {_instances->alloc_.offset_};
-    HUT_PVK(vkCmdBindVertexBuffers, _buffer, 1, 1, instancesBuffers, instancesOffsets);
+    if constexpr (sizeof(instance) > 1) {
+      assert(_instances);
+      assert(_instances_offset + _instances_count <= _instances->size());
+      VkBuffer instancesBuffers[] = {_instances->buff().buffer_};
+      VkDeviceSize instancesOffsets[] = {_instances->alloc_.offset_};
+      HUT_PVK(vkCmdBindVertexBuffers, _buffer, 1, 1, instancesBuffers, instancesOffsets);
+    }
 
     HUT_PVK(vkCmdBindIndexBuffer, _buffer, _indices->buff().buffer_, _indices->alloc_.offset_, VK_INDEX_TYPE_UINT16);
     HUT_PVK(vkCmdDrawIndexed, _buffer, _indices_count, _instances_count, _indices_offset, _vertex_offset, _instances_offset);
@@ -423,10 +426,9 @@ public:
             const shared_indices &_indices,
             const shared_instances &_instances,
             const shared_vertices &_vertices) {
-    assert(_indices && _instances);
     draw(_buffer, _descriptor_index,
         _indices, 0, _indices->size(),
-        _instances, 0, _instances->size(),
+        _instances, 0, _instances ? _instances->size() : 1,
         _vertices, 0);
   }
 
@@ -434,10 +436,9 @@ public:
             const shared_indices &_indices, uint _indices_count,
             const shared_instances &_instances,
             const shared_vertices &_vertices) {
-    assert(_indices && _instances);
     draw(_buffer, _descriptor_index,
          _indices, 0, _indices_count,
-         _instances, 0, _instances->size(),
+         _instances, 0, _instances ? _instances->size() : 1,
          _vertices, 0);
   }
 };
@@ -493,8 +494,8 @@ namespace details {
         VkVertexInputAttributeDescription{.location = 5, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<rgb>(3)},
     };
 
-    constexpr static decltype(hut_shaders::rgb_frag_spv) &frag_bytecode_ = hut_shaders::rgb_frag_spv;
-    constexpr static decltype(hut_shaders::rgb_vert_spv) &vert_bytecode_ = hut_shaders::rgb_vert_spv;
+    constexpr static auto &frag_bytecode_ = hut_shaders::rgb_frag_spv;
+    constexpr static auto &vert_bytecode_ = hut_shaders::rgb_vert_spv;
   };
 
   struct rgba {
@@ -536,8 +537,8 @@ namespace details {
         VkVertexInputAttributeDescription{.location = 5, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<rgb>(3)},
     };
 
-    constexpr static decltype(hut_shaders::rgba_frag_spv) &frag_bytecode_ = hut_shaders::rgba_frag_spv;
-    constexpr static decltype(hut_shaders::rgba_vert_spv) &vert_bytecode_ = hut_shaders::rgba_vert_spv;
+    constexpr static auto &frag_bytecode_ = hut_shaders::rgba_frag_spv;
+    constexpr static auto &vert_bytecode_ = hut_shaders::rgba_vert_spv;
   };
 
   struct tex {
@@ -584,8 +585,8 @@ namespace details {
         VkVertexInputAttributeDescription{.location = 5, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(3)},
     };
 
-    constexpr static decltype(hut_shaders::tex_frag_spv) &frag_bytecode_ = hut_shaders::tex_frag_spv;
-    constexpr static decltype(hut_shaders::tex_vert_spv) &vert_bytecode_ = hut_shaders::tex_vert_spv;
+    constexpr static auto &frag_bytecode_ = hut_shaders::tex_frag_spv;
+    constexpr static auto &vert_bytecode_ = hut_shaders::tex_vert_spv;
   };
 
   struct tex_rgb {
@@ -634,8 +635,8 @@ namespace details {
         VkVertexInputAttributeDescription{.location = 6, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(3)},
     };
 
-    constexpr static decltype(hut_shaders::tex_rgb_frag_spv) &frag_bytecode_ = hut_shaders::tex_rgb_frag_spv;
-    constexpr static decltype(hut_shaders::tex_rgb_vert_spv) &vert_bytecode_ = hut_shaders::tex_rgb_vert_spv;
+    constexpr static auto &frag_bytecode_ = hut_shaders::tex_rgb_frag_spv;
+    constexpr static auto &vert_bytecode_ = hut_shaders::tex_rgb_vert_spv;
   };
 
   struct tex_rgba {
@@ -684,8 +685,8 @@ namespace details {
         VkVertexInputAttributeDescription{.location = 6, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(3)},
     };
 
-    constexpr static decltype(hut_shaders::tex_rgba_frag_spv) &frag_bytecode_ = hut_shaders::tex_rgba_frag_spv;
-    constexpr static decltype(hut_shaders::tex_rgba_vert_spv) &vert_bytecode_ = hut_shaders::tex_rgba_vert_spv;
+    constexpr static auto &frag_bytecode_ = hut_shaders::tex_rgba_frag_spv;
+    constexpr static auto &vert_bytecode_ = hut_shaders::tex_rgba_vert_spv;
   };
 
   struct tex_mask {
@@ -734,8 +735,8 @@ namespace details {
         VkVertexInputAttributeDescription{.location = 6, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(instance, color_)},
     };
 
-    constexpr static decltype(hut_shaders::tex_mask_frag_spv) &frag_bytecode_ = hut_shaders::tex_mask_frag_spv;
-    constexpr static decltype(hut_shaders::tex_mask_vert_spv) &vert_bytecode_ = hut_shaders::tex_mask_vert_spv;
+    constexpr static auto &frag_bytecode_ = hut_shaders::tex_mask_frag_spv;
+    constexpr static auto &vert_bytecode_ = hut_shaders::tex_mask_vert_spv;
   };
 
   struct box_rgba {
@@ -781,8 +782,8 @@ namespace details {
         VkVertexInputAttributeDescription{.location = 7, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(instance, box_bounds_)},
     };
 
-    constexpr static decltype(hut_shaders::box_rgba_frag_spv) &frag_bytecode_ = hut_shaders::box_rgba_frag_spv;
-    constexpr static decltype(hut_shaders::box_rgba_vert_spv) &vert_bytecode_ = hut_shaders::box_rgba_vert_spv;
+    constexpr static auto &frag_bytecode_ = hut_shaders::box_rgba_frag_spv;
+    constexpr static auto &vert_bytecode_ = hut_shaders::box_rgba_vert_spv;
   };
 }  // namespace details
 

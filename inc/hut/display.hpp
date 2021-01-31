@@ -40,11 +40,7 @@
 #include <unordered_set>
 #include <vector>
 
-#if defined(VK_USE_PLATFORM_XCB_KHR)
-#include <xcb/xcb_keysyms.h>
-#include <xcb/xcb_cursor.h>
-#include <xcb/xcb_ewmh.h>
-#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
 #include <wayland-client.h>
 #include <wayland-cursor.h>
 #include <xkbcommon/xkbcommon.h>
@@ -62,6 +58,19 @@
 #include "hut/utils.hpp"
 
 namespace hut {
+
+/** Unique ID of a physical keyboard key */
+using keycode = uint32_t;
+
+/** ID of function/character, which depends on keymap */
+enum keysym {
+  KSYM_INVALID,
+#define HUT_MAP_KEYSYM(KEYCODE) KSYM_##KEYCODE,
+#include "hut/keysyms.inc"
+#undef HUT_MAP_KEYSYM
+  KSYM_LAST_VALUE = KSYM_RIGHTMETA,
+};
+const char *keysym_name(keysym);
 
 enum cursor_type {
   CNONE,
@@ -103,8 +112,9 @@ enum cursor_type {
 
   CZOOM_IN,
   CZOOM_OUT,
+  CURSOR_TYPE_LAST_VALUE = CZOOM_OUT,
 };
-const char *cursor_css_name(cursor_type _c);
+const char *cursor_css_name(cursor_type);
 
 enum clipboard_format {
   FIMAGE_PNG,
@@ -127,8 +137,7 @@ enum modifier {
 };
 using modifiers = flagged<modifier, MODIFIER_LAST_VALUE>;
 
-#if defined(VK_USE_PLATFORM_XCB_KHR)
-#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
   void registry_handler(void*, wl_registry*, uint32_t, const char*, uint32_t);
   void seat_handler(void*, wl_seat*, uint32_t);
   void handle_xdg_configure(void*, xdg_surface*, uint32_t);
@@ -179,6 +188,9 @@ class display {
   int dispatch();
 
   void post(const callback &_callback);
+
+  char32_t keycode_idle_char(keycode _in) const;
+  char *keycode_name(span<char> _out, keycode _in) const;
 
   template <typename T>
   T get_proc(const std::string &_name) {
@@ -283,19 +295,7 @@ class display {
   void process_posts(time_point _now);
   void post_empty_event();
 
-#if defined(VK_USE_PLATFORM_XCB_KHR)
-  xcb_connection_t *connection_ = nullptr;
-  xcb_screen_t *screen_ = nullptr;
-  xcb_key_symbols_t *keysyms_ = nullptr;
-  xcb_cursor_context_t *cursor_context_ = nullptr;
-  xcb_ewmh_connection_t ewmh_;
-
-  std::unordered_map<xcb_window_t, window *> windows_;
-  xcb_atom_t atom_wm_, atom_close_, atom_change_state_, atom_state_, atom_hstate_, atom_rstate_;
-  xcb_atom_t atom_maximizeh_, atom_maximizev_, atom_window_hints_;
-  xcb_atom_t atom_clipboard_, atom_utf8_string_;
-
-#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
   friend void registry_handler(void*, wl_registry*, uint32_t, const char*, uint32_t);
   friend void seat_handler(void*, wl_seat*, uint32_t);
   friend void pointer_handle_enter(void*, wl_pointer*, uint32_t, wl_surface*, wl_fixed_t, wl_fixed_t);
@@ -326,6 +326,8 @@ class display {
   void animate_cursor(wl_cursor *_cursor);
   static void animate_cursor_thread(animate_cursor_context *_ctx);
 
+  static keysym map_xkb_keysym(xkb_keysym_t);
+
   wl_display *display_;
   wl_registry *registry_ = nullptr;
   wl_compositor *compositor_ = nullptr;
@@ -342,7 +344,7 @@ class display {
   zxdg_decoration_manager_v1 *decoration_manager_ = nullptr;
 
   xkb_context *xkb_context_ = nullptr;
-  xkb_state *xkb_state_ = nullptr;
+  xkb_state *xkb_state_ = nullptr, *xkb_state_empty_ = nullptr;
   xkb_keymap *keymap_ = nullptr;
 
   std::unordered_map<wl_surface*, window*> windows_;
@@ -351,7 +353,6 @@ class display {
   clipboard_formats current_data_offer_formats_;
 
   bool loop_ = true;
-  modifiers kb_mod_mask_;
   uint32_t mod_index_alt_ = 0;
   uint32_t mod_index_ctrl_ = 0;
   uint32_t mod_index_shift_ = 0;

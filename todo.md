@@ -1,17 +1,23 @@
 fix:
 - [w32] ctrl/shift KEYUP event sent two times
 - [w32] delayed clipboard rendering not always working
+- [w32] se/sw cursors are the same as ne/nw (in the sense that NESW looks more like a NE, than a NESW, might be https://github.com/wine-mirror/wine/blob/96a6053feda4e16480c21d01b3688a8d38e5ad6d/dlls/winex11.drv/mouse.c#L834)
 - [wl] test xdg-decorations (not available on fedora 31 desktop/weston)
 - [wl] next configure after an unset_maximize would be [0, 0] instead of size prior to maximize
+- [wl] we probably want a resize event at window creation, before any draw event
 
 refactor:
 - [wl] async clipboard read/write
+- all drawable should have color-per-instance and color-per-vertex variants
+- add ctor flag system for drawable (similar to window) and make blending optional, cull mode, etc
+- make depth a runtime feature (window & drawable ctor flag)
+- rename drawable into pipeline
+- move alloc_ubo as display member (coherency with alloc_buffer) 
 
 features:
-- fullscreen
-- multisampling
-- clipboard image
-- [xcb] clipboard
-- [wl][xcb][w32] drap&drop URI/text
-- gpu timestamps profiling for command buffer execution (https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/vkCmdWriteTimestamp.html)
-- instant and metadata profiling events
+- fullscreen: window creation flag + toggleable programmatically
+- multisampling: window creation flags (+ drawable creation flag)
+- transparent: window creation flag
+- clipboard image support
+- [wl][w32] drap&drop URI/text
+- [wl] xkb keyboard repeat
