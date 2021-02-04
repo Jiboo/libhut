@@ -93,10 +93,27 @@ void window::pause() {
 }
 
 void window::maximize(bool _set) {
+  if (_set) {
+    previous_pos_ = pos_;
+    previous_size_ = size_;
+  }
   ShowWindow(window_, _set ? SW_MAXIMIZE : SW_RESTORE);
 }
 
 void window::fullscreen(bool _set) {
+  if (_set) {
+    previous_pos_ = pos_;
+    previous_size_ = size_;
+    int w = GetSystemMetrics(SM_CXSCREEN);
+    int h = GetSystemMetrics(SM_CYSCREEN);
+    SetWindowLongPtr(window_, GWL_STYLE, WS_VISIBLE | WS_POPUP);
+    SetWindowPos(window_, HWND_TOP, 0, 0, w, h, SWP_FRAMECHANGED);
+  }
+  else {
+    if (params_.flags_ & window_params::SYSTEM_DECORATIONS)
+      SetWindowLongPtr(window_, GWL_STYLE, WS_VISIBLE | WS_OVERLAPPEDWINDOW);
+    SetWindowPos(window_, HWND_TOP, previous_pos_.x, previous_pos_.y, previous_size_.x, previous_size_.y, SWP_FRAMECHANGED);
+  }
 }
 
 void window::title(const std::string &_title) {

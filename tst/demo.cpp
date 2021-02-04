@@ -393,6 +393,10 @@ int main(int, char **) {
       w2.maximize(false);
     else if (_key == KSYM_RIGHT && !_press)
       w2.maximize(true);
+    else if (_key == KSYM_F11 && !_press)
+      w2.fullscreen(true);
+    else if (_key == KSYM_F12 && !_press)
+      w2.fullscreen(false);
     return true;
   });
 

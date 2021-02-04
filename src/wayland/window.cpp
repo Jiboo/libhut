@@ -156,17 +156,25 @@ void window::pause() {
 }
 
 void window::maximize(bool _set) {
-  if (_set)
+  if (_set) {
+    previous_pos_ = pos_;
+    previous_size_ = size_;
     xdg_toplevel_set_maximized(toplevel_);
-  else
+  }
+  else {
     xdg_toplevel_unset_maximized(toplevel_);
+  }
 }
 
 void window::fullscreen(bool _set) {
-  if (_set)
+  if (_set) {
+    previous_pos_ = pos_;
+    previous_size_ = size_;
     xdg_toplevel_set_fullscreen(toplevel_, nullptr);
-  else
+  }
+  else {
     xdg_toplevel_unset_fullscreen(toplevel_);
+  }
 }
 
 void window::invalidate(const uvec4 &, bool _redraw) {

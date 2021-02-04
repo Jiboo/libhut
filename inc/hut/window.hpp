@@ -64,7 +64,8 @@ struct window_params {
     SYSTEM_DECORATIONS,
     VSYNC,
     DEPTH,
-    FLAG_LAST_VALUE = DEPTH,
+    FULLSCREEN,
+    FLAG_LAST_VALUE = FULLSCREEN,
   };
   using flags = flagged<flag, flag::FLAG_LAST_VALUE>;
 
@@ -164,7 +165,8 @@ class window {
   VkSemaphore sem_available_ = VK_NULL_HANDLE;
   VkSemaphore sem_rendered_ = VK_NULL_HANDLE;
 
-  uvec2 size_;
+  uvec2 size_, pos_;
+  uvec2 previous_size_, previous_pos_; // used to save rect before maximize/fullscreen
   vec4 clear_color_ = {0.0f, 0.0f, 0.0f, 1.0f};
   display::time_point last_frame_ = display::clock::now();
   bool minimized_ = false;

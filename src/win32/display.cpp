@@ -310,6 +310,13 @@ LRESULT CALLBACK hut::WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM 
       return 0;
     }
 
+    case WM_MOVE: {
+      if (w) {
+        w->pos_ = {LOWORD(_lparam), HIWORD(_lparam)};
+      }
+      return 0;
+    }
+
     case WM_SIZE: {
       if (w) {
         switch (_wparam) {
