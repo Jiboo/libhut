@@ -39,14 +39,22 @@
 using namespace hut;
 
 #ifdef HUT_ENABLE_VALIDATION
-static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT /*flags*/,
+static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT flags,
                                                      VkDebugReportObjectTypeEXT /*objType*/, uint64_t /*obj*/,
                                                      size_t /*location*/, int32_t /*code*/, const char *layerPrefix,
                                                      const char *msg, void * /*userData*/) {
-  if (strcmp(layerPrefix, "Loader Message") == 0)
-    return VK_FALSE;
+  /*if (strcmp(layerPrefix, "Loader Message") == 0)
+    return VK_FALSE;*/
 
-  std::cout << '[' << layerPrefix << "] " << msg << std::endl;
+  char level = 'D';
+  switch (flags) {
+    case VK_DEBUG_REPORT_INFORMATION_BIT_EXT: level = 'I'; break;
+    case VK_DEBUG_REPORT_WARNING_BIT_EXT: level = 'W'; break;
+    case VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT: level = 'P'; break;
+    case VK_DEBUG_REPORT_ERROR_BIT_EXT: level = 'E'; break;
+  }
+
+  std::cout << '[' << level << ' ' << layerPrefix << "] " << msg << std::endl;
 #if defined(HUT_ENABLE_VALIDATION_DEBUG) && defined(HUT_ENABLE_PROFILING)
   boost::stacktrace::stacktrace st;
   if (st) {
@@ -275,7 +283,7 @@ void display::init_vulkan_instance(const char *_app_name, uint32_t _app_version,
 
   VkApplicationInfo appInfo = {};
   appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-  appInfo.apiVersion = VK_API_VERSION_1_0;
+  appInfo.apiVersion = VK_API_VERSION_1_2;
   appInfo.pEngineName = "hut";
   appInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0);
   appInfo.pApplicationName = _app_name;

@@ -29,7 +29,7 @@
 #include <iostream>
 
 #include "hut/display.hpp"
-#include "hut/drawable.hpp"
+#include "hut/pipeline.hpp"
 #include "hut/font.hpp"
 #include "hut/window.hpp"
 

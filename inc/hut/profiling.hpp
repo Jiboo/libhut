@@ -64,7 +64,7 @@
 #endif // HUT_ENABLE_PROFILING
 
 namespace hut {
-enum profiling_category : uint8_t { PDEFAULT, PDISPLAY, PWINDOW, PSTAGING, PBUFFER, PIMAGE, PFONT, PVULKAN, PGPU, PEVENT, PDRAWABLE };
+enum profiling_category : uint8_t { PDEFAULT, PDISPLAY, PWINDOW, PSTAGING, PBUFFER, PIMAGE, PFONT, PVULKAN, PGPU, PEVENT, PPIPELINE };
 
 inline std::ostream &operator<<(std::ostream &_os, const profiling_category &_in) {
   switch (_in) {
@@ -77,7 +77,7 @@ inline std::ostream &operator<<(std::ostream &_os, const profiling_category &_in
     case PGPU: return _os << "gpu";
     case PVULKAN: return _os << "vulkan";
     case PEVENT: return _os << "event";
-    case PDRAWABLE: return _os << "drawable";
+    case PPIPELINE: return _os << "pipeline";
     case PBUFFER: return _os << "buffer";
   }
   return _os;

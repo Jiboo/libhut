@@ -74,7 +74,7 @@ struct window_params {
 
 class window {
   friend class display;
-  template<typename TDetails, typename... TExtraBindings> friend class drawable;
+  template<typename TDetails, typename... TExtraBindings> friend class pipeline;
 
  public:
   event<> on_pause, on_resume, on_focus, on_blur, on_close;

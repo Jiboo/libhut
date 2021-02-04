@@ -33,13 +33,13 @@
 #include "hut/window.hpp"
 #include "hut/buffer_pool.hpp"
 #include "hut/image.hpp"
-#include "hut/drawable.hpp"
+#include "hut/pipeline.hpp"
 
 #include "hut_imgui_shaders.hpp"
 
 namespace hut::details {
   struct imgui_pipeline {
-    using impl = drawable<details::imgui_pipeline, const shared_image &, const shared_sampler &>;
+    using impl = pipeline<details::imgui_pipeline, const shared_image &, const shared_sampler &>;
     using ubo = proj_ubo;
     using vertex = ImDrawVert;
 

@@ -28,7 +28,7 @@
 #include "imgui_impl_hut.h"
 #include "hut/display.hpp"
 #include "hut/window.hpp"
-#include "hut/drawable.hpp"
+#include "hut/pipeline.hpp"
 
 using namespace hut;
 

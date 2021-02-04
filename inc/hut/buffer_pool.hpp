@@ -43,7 +43,7 @@ protected:
   friend class display;
   friend class shaper;
   friend class image;
-  template<typename TDetails, typename... TExtraBindings> friend class drawable;
+  template<typename TDetails, typename... TExtraBindings> friend class pipeline;
 
   struct range {
     range *prev_, *next_;
@@ -98,7 +98,7 @@ protected:
   class ref {
     friend class image;
     friend class buffer_pool;
-    template<typename TDetails, typename... TExtraBindings> friend class drawable;
+    template<typename TDetails, typename... TExtraBindings> friend class pipeline;
 
     alloc alloc_;
 

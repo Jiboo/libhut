@@ -53,7 +53,7 @@ namespace hut {
 
 class buffer_pool;
 class display;
-template<typename TDetails, typename... TExtraBindings> class drawable;
+template<typename TDetails, typename... TExtraBindings> class pipeline;
 class font;
 class shaper;
 class image;

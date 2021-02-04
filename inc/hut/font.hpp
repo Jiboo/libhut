@@ -37,7 +37,7 @@
 
 #include "hut/atlas.hpp"
 #include "hut/buffer_pool.hpp"
-#include "hut/drawable.hpp"
+#include "hut/pipeline.hpp"
 #include "hut/image.hpp"
 
 namespace hut {

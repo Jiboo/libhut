@@ -41,7 +41,7 @@ class display;
 class image {
   friend class display;
   friend class font;
-  template<typename TDetails, typename... TExtraBindings> friend class drawable;
+  template<typename TDetails, typename... TExtraBindings> friend class pipeline;
   friend class window;
 
  public:
@@ -82,7 +82,7 @@ class image {
 using shared_image = std::shared_ptr<image>;
 
 class sampler {
-  template<typename TDetails, typename... TExtraBindings> friend class drawable;
+  template<typename TDetails, typename... TExtraBindings> friend class pipeline;
 
   VkSampler sampler_;
   VkDevice device_;

@@ -52,7 +52,7 @@ static shared_ubo<T> alloc_ubo(const display &_display, shared_buffer &_buf, con
 }
 
 template<typename TDetails, typename... TExtraBindings>
-class drawable {
+class pipeline {
 public:
   using instance = typename TDetails::instance;
   using vertex = typename TDetails::vertex;
@@ -140,7 +140,7 @@ private:
       , VkCompareOp _depthCompare
 #endif
     ) {
-    HUT_PROFILE_SCOPE(PDRAWABLE, __PRETTY_FUNCTION__);
+    HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
     VkPipelineShaderStageCreateInfo vert_stage_info = {};
     vert_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vert_stage_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -280,13 +280,13 @@ private:
   }
 
 public:
-  explicit drawable(window &_window, VkPrimitiveTopology _topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+  explicit pipeline(window &_window, VkPrimitiveTopology _topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
 #ifdef HUT_ENABLE_WINDOW_DEPTH_BUFFER
     , VkCompareOp _depthCompare = VK_COMPARE_OP_LESS
 #endif
       )
       : window_(_window) {
-    HUT_PROFILE_SCOPE(PDRAWABLE, __PRETTY_FUNCTION__);
+    HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
     init_pools();
     init_descriptor_layout();
     alloc_next_descriptors(1);
@@ -299,7 +299,7 @@ public:
     );
   }
 
-  virtual ~drawable() {
+  virtual ~pipeline() {
     VkDevice device = window_.display_.device_;
     HUT_PVK(vkDeviceWaitIdle, device);
     if (descriptor_layout_ != VK_NULL_HANDLE)
@@ -377,7 +377,7 @@ public:
   };
 
   void bind(uint _descriptor_index, const shared_ubo<ubo> &_ubo, TExtraBindings... _bindings) {
-    HUT_PROFILE_SCOPE(PDRAWABLE, __PRETTY_FUNCTION__);
+    HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
     assert(_descriptor_index < descriptors_.size());
     bindings_.emplace(_descriptor_index, bindings{_ubo, std::forward_as_tuple(_bindings...)});
 
@@ -397,7 +397,7 @@ public:
             const shared_indices &_indices, uint _indices_offset, uint _indices_count,
             const shared_instances &_instances, uint _instances_offset, uint _instances_count,
             const shared_vertices &_vertices, uint _vertex_offset) {
-    HUT_PROFILE_SCOPE(PDRAWABLE, __PRETTY_FUNCTION__);
+    HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
     assert(descriptor_bound(_descriptor_index));
     assert(_indices && _vertices);
     assert(_indices_offset + _indices_count <= _indices->size());
@@ -455,7 +455,7 @@ namespace details {
   // TODO JBL: Generate this from reflection on shader code at compile time, and include generated .h
 
   struct rgb {
-    using impl = drawable<details::rgb>;
+    using impl = pipeline<details::rgb>;
     using ubo = proj_ubo;
 
     struct instance {
@@ -499,7 +499,7 @@ namespace details {
   };
 
   struct rgba {
-    using impl = drawable<details::rgba>;
+    using impl = pipeline<details::rgba>;
     using ubo = proj_ubo;
 
     struct instance {
@@ -542,7 +542,7 @@ namespace details {
   };
 
   struct tex {
-    using impl = drawable<details::tex, const shared_image &, const shared_sampler &>;
+    using impl = pipeline<details::tex, const shared_image &, const shared_sampler &>;
     using ubo = proj_ubo;
 
     struct instance {
@@ -590,7 +590,7 @@ namespace details {
   };
 
   struct tex_rgb {
-    using impl = drawable<details::tex_rgb, const shared_image &, const shared_sampler &>;
+    using impl = pipeline<details::tex_rgb, const shared_image &, const shared_sampler &>;
     using ubo = proj_ubo;
 
     struct instance {
@@ -640,7 +640,7 @@ namespace details {
   };
 
   struct tex_rgba {
-    using impl = drawable<details::tex_rgba, const shared_image &, const shared_sampler &>;
+    using impl = pipeline<details::tex_rgba, const shared_image &, const shared_sampler &>;
     using ubo = proj_ubo;
 
     struct instance {
@@ -690,7 +690,7 @@ namespace details {
   };
 
   struct tex_mask {
-    using impl = drawable<details::tex_mask, const shared_image &, const shared_sampler &>;
+    using impl = pipeline<details::tex_mask, const shared_image &, const shared_sampler &>;
     using ubo = proj_ubo;
 
     struct instance {
@@ -740,7 +740,7 @@ namespace details {
   };
 
   struct box_rgba {
-    using impl = drawable<details::box_rgba>;
+    using impl = pipeline<details::box_rgba>;
     using ubo = proj_ubo;
 
     struct instance {
