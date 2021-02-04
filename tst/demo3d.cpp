@@ -132,7 +132,7 @@ int main(int, char **) {
   rgb3d_instances->set({
     rgb3d::instance{glm::identity<mat4>()},
   });
-  rgb3d_pipeline->bind(0, ubo);
+  rgb3d_pipeline->write(0, ubo);
 
   w.on_draw.connect([&](VkCommandBuffer _buffer) {
     rgb3d_pipeline->draw(_buffer, 0, indices, rgb3d_instances, rgb3d_vertices);

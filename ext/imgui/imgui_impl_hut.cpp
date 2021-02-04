@@ -274,7 +274,7 @@ bool ImGui_ImplHut_CreateDeviceObjects() {
   io.Fonts->TexID = (ImTextureID)0;
 
   g_ctx.pipeline_ = std::make_unique<imgui_pipeline>(*g_ctx.window_);
-  g_ctx.pipeline_->bind(0, g_ctx.ubo_, g_ctx.images_[0], g_ctx.sampler_);
+  g_ctx.pipeline_->write(0, g_ctx.ubo_, g_ctx.images_[0], g_ctx.sampler_);
 
   g_ctx.window_->invalidate(true);
   return true;

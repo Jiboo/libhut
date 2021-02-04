@@ -8,7 +8,6 @@ fix:
 
 refactor:
 - [wl] async clipboard read/write
-- add ctor flag system for pipeline (similar to window) and make blending optional, cull mode, etc
 
 features:
 - fullscreen: window creation flag + toggleable programmatically

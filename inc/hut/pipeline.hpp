@@ -41,7 +41,14 @@ struct proj_ubo {
   mat4 proj_ {1};
 };
 
-template<typename TDetails, typename... TExtraBindings>
+struct pipeline_params {
+  VkPrimitiveTopology topology_ = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  VkCompareOp depthCompare_ = VK_COMPARE_OP_LESS_OR_EQUAL;
+  VkCullModeFlagBits cullMode_ = VK_CULL_MODE_NONE;
+  VkFrontFace frontFace_ = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+};
+
+template<typename TDetails, typename... TExtraAttachments>
 class pipeline {
 public:
   using instance = typename TDetails::instance;
@@ -54,11 +61,11 @@ public:
   using shared_indices = shared_ref<indice>;
 
 private:
-  using extra_bindings = std::tuple<TExtraBindings...>;
+  using extra_attachments = std::tuple<TExtraAttachments...>;
 
-  struct bindings {
+  struct attachments {
     shared_ref<ubo> ubo_buffer_;
-    extra_bindings extras_;
+    extra_attachments extras_;
   };
 
   window &window_;
@@ -71,7 +78,7 @@ private:
   VkDescriptorPool descriptor_pool_ = VK_NULL_HANDLE;
 
   std::vector<VkDescriptorSet> descriptors_;
-  std::unordered_map<uint, bindings> bindings_;
+  std::unordered_map<uint, attachments> attachments_;
 
   void init_pools() {
     VkDescriptorPoolCreateInfo create_info = {};
@@ -125,7 +132,7 @@ private:
       throw std::runtime_error("[sample] failed to create pipeline layout!");
   }
 
-  void init_pipeline(uvec2 _default_size, VkPrimitiveTopology _topology, VkCompareOp _depthCompare) {
+  void init_pipeline(uvec2 _default_size, const pipeline_params &_params) {
     HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
     VkPipelineShaderStageCreateInfo vert_stage_info = {};
     vert_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -150,7 +157,7 @@ private:
 
     VkPipelineInputAssemblyStateCreateInfo assembly_create_info = {};
     assembly_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    assembly_create_info.topology = _topology;
+    assembly_create_info.topology = _params.topology_;
     assembly_create_info.primitiveRestartEnable = VK_FALSE;
 
     VkViewport viewport = {};
@@ -178,8 +185,8 @@ private:
     rasterizer_create_info.rasterizerDiscardEnable = VK_FALSE;
     rasterizer_create_info.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer_create_info.lineWidth = 1.0f;
-    rasterizer_create_info.cullMode = VK_CULL_MODE_NONE;
-    rasterizer_create_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer_create_info.cullMode = _params.cullMode_;
+    rasterizer_create_info.frontFace = _params.frontFace_;
     rasterizer_create_info.depthBiasEnable = VK_FALSE;
     rasterizer_create_info.depthBiasConstantFactor = 0.0f;
     rasterizer_create_info.depthBiasClamp = 0.0f;
@@ -232,7 +239,7 @@ private:
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencil.depthTestEnable = VK_TRUE;
     depthStencil.depthWriteEnable = VK_TRUE;
-    depthStencil.depthCompareOp = _depthCompare;
+    depthStencil.depthCompareOp = _params.depthCompare_;
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.minDepthBounds = 0.0f; // Optional
     depthStencil.maxDepthBounds = 1.0f; // Optional
@@ -263,9 +270,7 @@ private:
   }
 
 public:
-  explicit pipeline(window &_window,
-                    VkPrimitiveTopology _topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-                    VkCompareOp _depthCompare = VK_COMPARE_OP_LESS_OR_EQUAL)
+  explicit pipeline(window &_window, const pipeline_params &_params = {})
       : window_(_window) {
     HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
     init_pools();
@@ -273,7 +278,7 @@ public:
     alloc_next_descriptors(1);
     init_shaders();
     init_pipeline_layout();
-    init_pipeline(_window.size(), _topology, _depthCompare);
+    init_pipeline(_window.size(), _params);
   }
 
   virtual ~pipeline() {
@@ -353,40 +358,41 @@ public:
     }
   };
 
-  void bind(uint _descriptor_index, const shared_ref<ubo> &_ubo, TExtraBindings... _bindings) {
+  void write(uint _descriptor_index, const shared_ref<ubo> &_ubo, TExtraAttachments... _attachments) {
     HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
     assert(_descriptor_index < descriptors_.size());
-    bindings_.emplace(_descriptor_index, bindings{_ubo, std::forward_as_tuple(_bindings...)});
+    attachments_.emplace(_descriptor_index, attachments{_ubo, std::forward_as_tuple(_attachments...)});
 
     descriptor_write_context filler;
     filler.dst_ = *(descriptors_.data() + _descriptor_index);
     filler.buffer(0, _ubo);
-    TDetails::fill_extra_descriptor_writes(filler, std::forward<TExtraBindings>(_bindings)...);
+    TDetails::fill_extra_descriptor_writes(filler, std::forward<TExtraAttachments>(_attachments)...);
 
     HUT_PVK(vkUpdateDescriptorSets, window_.display_.device_, filler.writes_.size(), filler.writes_.data(), 0, nullptr);
   }
 
-  bool descriptor_bound(uint _descriptor_index) {
-    return bindings_.find(_descriptor_index) != bindings_.end();
+  bool descriptor_attached(uint _descriptor_index) {
+    return attachments_.find(_descriptor_index) != attachments_.end();
   }
 
-  void draw(VkCommandBuffer _buffer, uint _descriptor_index,
-            const shared_indices &_indices, uint _indices_offset, uint _indices_count,
-            const shared_instances &_instances, uint _instances_offset, uint _instances_count,
-            const shared_vertices &_vertices, uint _vertex_offset) {
-    HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
-    assert(descriptor_bound(_descriptor_index));
-    assert(_indices && _vertices);
-    assert(_indices_offset + _indices_count <= _indices->size());
-    assert(_vertex_offset <= _vertices->size());
-
+  void bind_pipeline(VkCommandBuffer _buffer) {
     HUT_PVK(vkCmdBindPipeline, _buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
-    HUT_PVK(vkCmdBindDescriptorSets, _buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout_, 0, 1, descriptors_.data() + _descriptor_index, 0, nullptr);
+  }
 
+  void bind_descriptor(VkCommandBuffer _buffer, uint _descriptor_index) {
+    assert(descriptor_attached(_descriptor_index));
+    HUT_PVK(vkCmdBindDescriptorSets, _buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout_, 0, 1, descriptors_.data() + _descriptor_index, 0, nullptr);
+  }
+
+  void bind_vertices(VkCommandBuffer _buffer, const shared_vertices &_vertices, uint _vertex_offset) {
+    assert(_vertices);
+    assert(_vertex_offset <= _vertices->size());
     VkBuffer verticesBuffers[] = {_vertices->buff().buffer_};
     VkDeviceSize verticesOffsets[] = {_vertices->alloc_.offset_};
     HUT_PVK(vkCmdBindVertexBuffers, _buffer, 0, 1, verticesBuffers, verticesOffsets);
+  }
 
+  void bind_instances(VkCommandBuffer _buffer, const shared_instances &_instances, uint _instances_offset, uint _instances_count) {
     if constexpr (sizeof(instance) > 1) {
       assert(_instances);
       assert(_instances_offset + _instances_count <= _instances->size());
@@ -394,9 +400,30 @@ public:
       VkDeviceSize instancesOffsets[] = {_instances->alloc_.offset_};
       HUT_PVK(vkCmdBindVertexBuffers, _buffer, 1, 1, instancesBuffers, instancesOffsets);
     }
+  }
 
+  void bind_indices(VkCommandBuffer _buffer, const shared_indices &_indices, uint _indices_offset, uint _indices_count) {
+    assert(_indices);
+    assert(_indices_offset + _indices_count <= _indices->size());
     HUT_PVK(vkCmdBindIndexBuffer, _buffer, _indices->buff().buffer_, _indices->alloc_.offset_, VK_INDEX_TYPE_UINT16);
+  }
+
+  void draw_indexed(VkCommandBuffer _buffer, uint _indices_count, uint _instances_count, uint _indices_offset, uint _vertex_offset, uint _instances_offset)  {
     HUT_PVK(vkCmdDrawIndexed, _buffer, _indices_count, _instances_count, _indices_offset, _vertex_offset, _instances_offset);
+  }
+
+  void draw(VkCommandBuffer _buffer, uint _descriptor_index,
+            const shared_indices &_indices, uint _indices_offset, uint _indices_count,
+            const shared_instances &_instances, uint _instances_offset, uint _instances_count,
+            const shared_vertices &_vertices, uint _vertex_offset) {
+    HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
+
+    bind_pipeline(_buffer);
+    bind_descriptor(_buffer, _descriptor_index);
+    bind_vertices(_buffer, _vertices, _vertex_offset);
+    bind_instances(_buffer, _instances, _instances_offset, _instances_count);
+    bind_indices(_buffer, _indices, _indices_offset, _indices_count);
+    draw_indexed(_buffer, _indices_count, _instances_count, _indices_offset, _vertex_offset, _instances_offset);
   }
 
   void draw(VkCommandBuffer _buffer, uint _descriptor_index,

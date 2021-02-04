@@ -92,10 +92,10 @@ int main(int, char **) {
     rgb::instance{make_mat({  0, 100}, {1,1,1})},
     rgb::instance{make_mat({100,   0}, {1,1,1})}
   });
-  rgb_pipeline->bind(0, ubo);
+  rgb_pipeline->write(0, ubo);
 
   auto rgb_pipeline2 = std::make_unique<rgb>(w2);
-  rgb_pipeline2->bind(0, ubo);
+  rgb_pipeline2->write(0, ubo);
 
   auto rgba_pipeline = std::make_unique<rgba>(w);
   auto rgba_instances = b->allocate<rgba::instance>(2);
@@ -110,7 +110,7 @@ int main(int, char **) {
     rgba::instance{make_mat({  0,   0}, {1,1,1})},
     rgba::instance{make_mat({100, 100}, {1,1,1})}
   });
-  rgba_pipeline->bind(0, ubo);
+  rgba_pipeline->write(0, ubo);
 
   auto tex_pipeline = std::make_unique<tex>(w);
   tex_pipeline->alloc_next_descriptors(2);
@@ -166,7 +166,7 @@ int main(int, char **) {
 
   shared_atlas r8_atlas = std::make_shared<atlas>(d, VK_FORMAT_R8_UNORM);
   auto tmask_pipeline = std::make_unique<tex_mask>(w);
-  tmask_pipeline->bind(0, ubo, r8_atlas->image(), samp);
+  tmask_pipeline->write(0, ubo, r8_atlas->image(), samp);
 
   auto text_instances = b->allocate<tex_mask::instance>(2);
   auto icons_instances = b->allocate<tex_mask::instance>(2);
@@ -216,7 +216,7 @@ int main(int, char **) {
   shadow_instances->set({
     box_rgba::instance{make_mat({300, 400}, {1,1,1}), {8, 8}, {300, 400, 400, 500}},
   });
-  box_rgba_pipeline->bind(0, ubo);
+  box_rgba_pipeline->write(0, ubo);
 
   shared_image tex1, tex2;
   shared_font roboto, material_icons;
@@ -231,9 +231,9 @@ int main(int, char **) {
 
   std::thread load_res([&]() {
     tex1 = image::load_png(d, demo_png::tex1_png);
-    tex_pipeline->bind(0, ubo, tex1, samp);
-    tex_rgb_pipeline->bind(0, ubo, tex1, samp);
-    tex_rgba_pipeline->bind(0, ubo, tex1, samp);
+    tex_pipeline->write(0, ubo, tex1, samp);
+    tex_rgb_pipeline->write(0, ubo, tex1, samp);
+    tex_rgba_pipeline->write(0, ubo, tex1, samp);
     tex1_instances->set({
       tex::instance{make_mat({200,   0}, {tex1->size() / 2, 1})},
       tex::instance{make_mat({300, 100}, {tex1->size() / 2, 1})},
@@ -250,9 +250,9 @@ int main(int, char **) {
     w.invalidate(true);  // will force to call on_draw on the next frame
 
     tex2 = image::load_png(d, demo_png::tex2_png);
-    tex_pipeline->bind(1, ubo, tex2, samp);
-    tex_rgb_pipeline->bind(1, ubo, tex2, samp);
-    tex_rgba_pipeline->bind(1, ubo, tex2, samp);
+    tex_pipeline->write(1, ubo, tex2, samp);
+    tex_rgb_pipeline->write(1, ubo, tex2, samp);
+    tex_rgba_pipeline->write(1, ubo, tex2, samp);
     tex2_instances->set({
       tex::instance{make_mat({300,   0}, {tex2->size() / 2, 1})},
       tex::instance{make_mat({400, 100}, {tex2->size() / 2, 1})},
