@@ -125,11 +125,7 @@ private:
       throw std::runtime_error("[sample] failed to create pipeline layout!");
   }
 
-  void init_pipeline(uvec2 _default_size, VkPrimitiveTopology _topology
-#ifdef HUT_ENABLE_WINDOW_DEPTH_BUFFER
-      , VkCompareOp _depthCompare
-#endif
-    ) {
+  void init_pipeline(uvec2 _default_size, VkPrimitiveTopology _topology, VkCompareOp _depthCompare) {
     HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
     VkPipelineShaderStageCreateInfo vert_stage_info = {};
     vert_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -232,24 +228,6 @@ private:
     dynamic_states_create_info.dynamicStateCount = (uint32_t)dynamic_states.size();
     dynamic_states_create_info.pDynamicStates = dynamic_states.data();
 
-    VkGraphicsPipelineCreateInfo pipelineInfo = {};
-    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = shader_create_infos;
-    pipelineInfo.pVertexInputState = &vertex_create_info;
-    pipelineInfo.pInputAssemblyState = &assembly_create_info;
-    pipelineInfo.pViewportState = &viewport_create_info;
-    pipelineInfo.pRasterizationState = &rasterizer_create_info;
-    pipelineInfo.pMultisampleState = &msaa_create_info;
-    pipelineInfo.pColorBlendState = &blend_create_info;
-    pipelineInfo.pDynamicState = &dynamic_states_create_info;
-    pipelineInfo.layout = layout_;
-    pipelineInfo.renderPass = window_.renderpass_;
-    pipelineInfo.subpass = 0;
-    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-    pipelineInfo.basePipelineIndex = -1;  // Optional
-
-#ifdef HUT_ENABLE_WINDOW_DEPTH_BUFFER
     VkPipelineDepthStencilStateCreateInfo depthStencil = {};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencil.depthTestEnable = VK_TRUE;
@@ -262,19 +240,32 @@ private:
     depthStencil.front = {}; // Optional
     depthStencil.back = {}; // Optional
 
-    pipelineInfo.pDepthStencilState = _depthCompare == VK_COMPARE_OP_NEVER ? nullptr : &depthStencil;
-#endif
+    VkGraphicsPipelineCreateInfo pipelineInfo = {};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shader_create_infos;
+    pipelineInfo.pVertexInputState = &vertex_create_info;
+    pipelineInfo.pInputAssemblyState = &assembly_create_info;
+    pipelineInfo.pViewportState = &viewport_create_info;
+    pipelineInfo.pRasterizationState = &rasterizer_create_info;
+    pipelineInfo.pMultisampleState = &msaa_create_info;
+    pipelineInfo.pColorBlendState = &blend_create_info;
+    pipelineInfo.pDynamicState = &dynamic_states_create_info;
+    pipelineInfo.pDepthStencilState = &depthStencil;
+    pipelineInfo.layout = layout_;
+    pipelineInfo.renderPass = window_.renderpass_;
+    pipelineInfo.subpass = 0;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineInfo.basePipelineIndex = -1;  // Optional
 
     if (vkCreateGraphicsPipelines(window_.display_.device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_) != VK_SUCCESS)
       throw std::runtime_error("failed to create graphics pipeline!");
   }
 
 public:
-  explicit pipeline(window &_window, VkPrimitiveTopology _topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
-#ifdef HUT_ENABLE_WINDOW_DEPTH_BUFFER
-    , VkCompareOp _depthCompare = VK_COMPARE_OP_LESS
-#endif
-      )
+  explicit pipeline(window &_window,
+                    VkPrimitiveTopology _topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+                    VkCompareOp _depthCompare = VK_COMPARE_OP_LESS_OR_EQUAL)
       : window_(_window) {
     HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
     init_pools();
@@ -282,11 +273,7 @@ public:
     alloc_next_descriptors(1);
     init_shaders();
     init_pipeline_layout();
-    init_pipeline(_window.size(), _topology
-#ifdef HUT_ENABLE_WINDOW_DEPTH_BUFFER
-        , _depthCompare
-#endif
-    );
+    init_pipeline(_window.size(), _topology, _depthCompare);
   }
 
   virtual ~pipeline() {

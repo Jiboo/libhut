@@ -63,11 +63,12 @@ struct window_params {
   enum flag {
     SYSTEM_DECORATIONS,
     VSYNC,
-    FLAG_LAST_VALUE = SYSTEM_DECORATIONS,
+    DEPTH,
+    FLAG_LAST_VALUE = DEPTH,
   };
   using flags = flagged<flag, flag::FLAG_LAST_VALUE>;
 
-  flags flags_ {VSYNC, SYSTEM_DECORATIONS};
+  flags flags_ {VSYNC, DEPTH, SYSTEM_DECORATIONS};
   uvec4 position_ = {0, 0, 800, 600};
   uvec2 min_size_ = {0, 0}, max_size_ = {0, 0};
 };
@@ -154,9 +155,7 @@ class window {
   VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
   std::vector<VkImage> swapchain_images_;
   std::vector<VkImageView> swapchain_imageviews_;
-#ifdef HUT_ENABLE_WINDOW_DEPTH_BUFFER
   shared_image depth_;
-#endif
   std::vector<VkFramebuffer> swapchain_fbos_;
   std::vector<VkCommandBuffer> primary_cbs_;
   std::vector<VkCommandBuffer> cbs_;

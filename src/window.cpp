@@ -141,24 +141,25 @@ void window::init_vulkan_surface() {
       }
     }
   }
-#ifdef HUT_ENABLE_WINDOW_DEPTH_BUFFER
-  VkFormat depth_format = VK_FORMAT_UNDEFINED;
-  VkFormat depth_candidates[] = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
-  for (VkFormat format : depth_candidates) {
-    VkFormatProperties props;
-    HUT_PVK(vkGetPhysicalDeviceFormatProperties, pdevice, format, &props);
 
-    if (props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
-      depth_format = format;
-      break;
+  if (params_.flags_ & window_params::DEPTH) {
+    VkFormat depth_format = VK_FORMAT_UNDEFINED;
+    VkFormat depth_candidates[] = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
+    for (VkFormat format : depth_candidates) {
+      VkFormatProperties props;
+      HUT_PVK(vkGetPhysicalDeviceFormatProperties, pdevice, format, &props);
+
+      if (props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+        depth_format = format;
+        break;
+      }
     }
-  }
-  if (depth_format == VK_FORMAT_UNDEFINED)
-    throw std::runtime_error("failed to find compatible depth buffer!");
+    if (depth_format == VK_FORMAT_UNDEFINED)
+      throw std::runtime_error("failed to find compatible depth buffer!");
 
-  depth_ = std::make_shared<image>(display_, size_, depth_format, VK_IMAGE_TILING_OPTIMAL,
-      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
-#endif
+    depth_ = std::make_shared<image>(display_, size_, depth_format, VK_IMAGE_TILING_OPTIMAL,
+                                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
+  }
 
   uint32_t modes_count;
   HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, pdevice, surface_, &modes_count, nullptr);
@@ -255,29 +256,15 @@ void window::init_vulkan_surface() {
   colorAttachmentRef.attachment = 0;
   colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-#ifdef HUT_ENABLE_WINDOW_DEPTH_BUFFER
-  VkAttachmentDescription depthAttachment = {};
-  depthAttachment.format = depth_->format_;
-  depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-  depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
   VkAttachmentReference depthAttachmentRef = {};
   depthAttachmentRef.attachment = 1;
   depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-#endif
 
   VkSubpassDescription subpass = {};
   subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
   subpass.colorAttachmentCount = 1;
   subpass.pColorAttachments = &colorAttachmentRef;
-#ifdef HUT_ENABLE_WINDOW_DEPTH_BUFFER
-  subpass.pDepthStencilAttachment = &depthAttachmentRef;
-#endif
+  subpass.pDepthStencilAttachment = depth_ ? &depthAttachmentRef : nullptr;
 
   VkSubpassDependency dependency = {};
   dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -287,17 +274,26 @@ void window::init_vulkan_surface() {
   dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-  VkAttachmentDescription attachments[] = {
-    colorAttachment,
-#ifdef HUT_ENABLE_WINDOW_DEPTH_BUFFER
-    depthAttachment,
-#endif
-  };
+  std::vector<VkAttachmentDescription> passAttachments {colorAttachment};
+
+  if (depth_) {
+    VkAttachmentDescription depthAttachment = {};
+    depthAttachment.format = depth_->format_;
+    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    passAttachments.emplace_back(depthAttachment);
+  }
 
   VkRenderPassCreateInfo renderPassInfo = {};
   renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-  renderPassInfo.attachmentCount = sizeof(attachments) / sizeof(VkAttachmentDescription);
-  renderPassInfo.pAttachments = attachments;
+  renderPassInfo.attachmentCount = passAttachments.size();
+  renderPassInfo.pAttachments = passAttachments.data();
   renderPassInfo.subpassCount = 1;
   renderPassInfo.pSubpasses = &subpass;
   renderPassInfo.dependencyCount = 1;
@@ -313,19 +309,19 @@ void window::init_vulkan_surface() {
       HUT_PVK(vkDestroyFramebuffer, display_.device_, fbo, nullptr);
   }
   swapchain_fbos_.resize(swapchain_images_.size());
+
+  std::vector<VkImageView> fbAttachments;
   for (size_t i = 0; i < swapchain_fbos_.size(); i++) {
-    VkImageView attachments[] = {
-        swapchain_imageviews_[i],
-#ifdef HUT_ENABLE_WINDOW_DEPTH_BUFFER
-        depth_->view_,
-#endif
-    };
+    fbAttachments.clear();
+    fbAttachments.emplace_back(swapchain_imageviews_[i]);
+    if (depth_)
+      fbAttachments.emplace_back(depth_->view_);
 
     VkFramebufferCreateInfo framebufferInfo = {};
     framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     framebufferInfo.renderPass = renderpass_;
-    framebufferInfo.attachmentCount = sizeof(attachments) / sizeof(VkImageView);
-    framebufferInfo.pAttachments = attachments;
+    framebufferInfo.attachmentCount = fbAttachments.size();
+    framebufferInfo.pAttachments = fbAttachments.data();
     framebufferInfo.width = swapchain_extents_.width;
     framebufferInfo.height = swapchain_extents_.height;
     framebufferInfo.layers = 1;
@@ -460,14 +456,14 @@ void window::rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
   renderPassInfo.renderArea.offset = {0, 0};
   renderPassInfo.renderArea.extent = swapchain_extents_;
 
-  VkClearValue clearColors[] = {
-      {.color = {{clear_color_.r, clear_color_.g, clear_color_.b, clear_color_.a}}},
-#ifdef HUT_ENABLE_WINDOW_DEPTH_BUFFER
-      {.depthStencil = {1.f, 0}},
-#endif
+  std::vector<VkClearValue> clearColors = {
+      VkClearValue{.color = {{clear_color_.r, clear_color_.g, clear_color_.b, clear_color_.a}}}
   };
-  renderPassInfo.clearValueCount = sizeof(clearColors) / sizeof(VkClearValue);
-  renderPassInfo.pClearValues = clearColors;
+  if (depth_)
+    clearColors.emplace_back(VkClearValue{.depthStencil = {1.f, 0}});
+
+  renderPassInfo.clearValueCount = clearColors.size();
+  renderPassInfo.pClearValues = clearColors.data();
 
   HUT_PVK(vkCmdBeginRenderPass, _cb, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);  // FIXME
   // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS
