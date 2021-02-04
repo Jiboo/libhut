@@ -77,7 +77,7 @@ int main(int, char **) {
 
   proj_ubo default_ubo;
   default_ubo.proj_ = ortho<float>(0, w.size().x, 0, w.size().y);
-  shared_ubo<proj_ubo> ubo = alloc_ubo(d, b, default_ubo);
+  shared_ref<proj_ubo> ubo = d.alloc_ubo(b, default_ubo);
 
   auto rgb_pipeline = std::make_unique<rgb>(w);
   auto rgb_instances = b->allocate<rgb::instance>(2);

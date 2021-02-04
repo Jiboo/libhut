@@ -41,16 +41,6 @@ struct proj_ubo {
   mat4 proj_ {1};
 };
 
-template<typename T>
-using shared_ubo = shared_ref<T>;
-
-template<typename T>
-static shared_ubo<T> alloc_ubo(const display &_display, shared_buffer &_buf, const T &_default) {
-  auto ref = _buf->allocate<T>(1, _display.limits().minUniformBufferOffsetAlignment);
-  ref->set(_default);
-  return ref;
-}
-
 template<typename TDetails, typename... TExtraBindings>
 class pipeline {
 public:
@@ -67,7 +57,7 @@ private:
   using extra_bindings = std::tuple<TExtraBindings...>;
 
   struct bindings {
-    shared_ubo<ubo> ubo_buffer_;
+    shared_ref<ubo> ubo_buffer_;
     extra_bindings extras_;
   };
 
@@ -339,7 +329,7 @@ public:
     std::vector<VkDescriptorBufferInfo> buffers_;
     VkDescriptorSet dst_ = VK_NULL_HANDLE;
 
-    void buffer(uint _binding, const shared_ubo<ubo> &_ubo) {
+    void buffer(uint _binding, const shared_ref<ubo> &_ubo) {
       VkDescriptorBufferInfo info = {};
       info.buffer = _ubo->alloc_.buffer_->buffer_;
       info.offset = _ubo->alloc_.offset_;
@@ -376,7 +366,7 @@ public:
     }
   };
 
-  void bind(uint _descriptor_index, const shared_ubo<ubo> &_ubo, TExtraBindings... _bindings) {
+  void bind(uint _descriptor_index, const shared_ref<ubo> &_ubo, TExtraBindings... _bindings) {
     HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
     assert(_descriptor_index < descriptors_.size());
     bindings_.emplace(_descriptor_index, bindings{_ubo, std::forward_as_tuple(_bindings...)});

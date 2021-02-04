@@ -10,7 +10,6 @@ refactor:
 - [wl] async clipboard read/write
 - add ctor flag system for pipeline (similar to window) and make blending optional, cull mode, etc
 - make depth a runtime feature (window & pipeline ctor flag)
-- move alloc_ubo as display member (coherency with alloc_buffer)
 
 features:
 - fullscreen: window creation flag + toggleable programmatically

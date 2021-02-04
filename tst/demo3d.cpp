@@ -112,7 +112,7 @@ int main(int, char **) {
     perspective(glm::radians(45.0f), w.size().x / (float) w.size().y, 0.001f, 1000.0f),
     lookAt(vec3{0, 0, -5}, vec3{0, 0, 0}, vec3{0, 1, 0}),
   };
-  shared_ubo<vp_ubo> ubo = alloc_ubo(d, b, default_ubo);
+  shared_ref<vp_ubo> ubo = d.alloc_ubo(b, default_ubo);
 
   auto rgb3d_pipeline = std::make_unique<rgb3d>(w);
   auto rgb3d_instances = b->allocate<rgb3d::instance>(1);

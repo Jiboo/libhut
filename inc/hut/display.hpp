@@ -56,6 +56,7 @@
 #include FT_FREETYPE_H
 
 #include "hut/utils.hpp"
+#include "hut/buffer_pool.hpp"
 
 namespace hut {
 
@@ -219,6 +220,13 @@ class display {
   shared_buffer alloc_buffer(uint _byte_size,
       VkMemoryPropertyFlags _type = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
       VkBufferUsageFlagBits _flags = GENERAL_FLAGS);
+
+  template<typename T>
+  shared_ref<T> alloc_ubo(shared_buffer &_buf, const T &_default = {}) {
+    auto ref = _buf->allocate<T>(1, device_props_.limits.minUniformBufferOffsetAlignment);
+    ref->set(_default);
+    return ref;
+  }
 
  protected:
   FT_Library ft_library_ = nullptr;

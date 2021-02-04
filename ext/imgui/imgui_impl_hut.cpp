@@ -90,7 +90,7 @@ struct hut_imgui_impl_ctx {
   hut::shared_buffer buffer_;
   hut::shared_sampler sampler_;
   std::unique_ptr<imgui_pipeline> pipeline_;
-  hut::shared_ubo<hut::proj_ubo> ubo_;
+  hut::shared_ref<hut::proj_ubo> ubo_;
 
   hut::display::time_point last_frame_;
   std::vector<hut::shared_image> images_;
@@ -264,7 +264,7 @@ bool ImGui_ImplHut_CreateDeviceObjects() {
   hut::proj_ubo default_ubo;
   auto w_size = g_ctx.window_->size();
   default_ubo.proj_ = glm::ortho<float>(0, w_size.x, 0, w_size.y);
-  g_ctx.ubo_ = hut::alloc_ubo(*g_ctx.display_, g_ctx.buffer_, default_ubo);
+  g_ctx.ubo_ = g_ctx.display_->alloc_ubo(g_ctx.buffer_, default_ubo);
 
   g_ctx.images_.resize(1);
 
