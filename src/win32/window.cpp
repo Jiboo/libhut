@@ -37,12 +37,12 @@
 using namespace hut;
 
 window::window(display &_display, const window_params &_init_params)
-  : display_(_display), size_(bbox_size(_init_params.position_)) {
+  : display_(_display), params_(_init_params), size_(bbox_size(_init_params.position_)) {
 
   DWORD winExStyle = WS_EX_APPWINDOW;
   DWORD winStyle = WS_POPUP;
   LPCSTR className = HUT_WIN32_CLASSNAME_CSD;
-  if (_init_params.flags_ & window_params::SYSTEM_DECORATIONS) {
+  if (_init_params.flags_ & window_params::FSYSTEM_DECORATIONS) {
     winExStyle = WS_EX_CLIENTEDGE;
     winStyle = WS_OVERLAPPEDWINDOW;
     className = HUT_WIN32_CLASSNAME_SSD;
@@ -110,7 +110,7 @@ void window::fullscreen(bool _set) {
     SetWindowPos(window_, HWND_TOP, 0, 0, w, h, SWP_FRAMECHANGED);
   }
   else {
-    if (params_.flags_ & window_params::SYSTEM_DECORATIONS)
+    if (params_.flags_ & window_params::FSYSTEM_DECORATIONS)
       SetWindowLongPtr(window_, GWL_STYLE, WS_VISIBLE | WS_OVERLAPPEDWINDOW);
     SetWindowPos(window_, HWND_TOP, previous_pos_.x, previous_pos_.y, previous_size_.x, previous_size_.y, SWP_FRAMECHANGED);
   }

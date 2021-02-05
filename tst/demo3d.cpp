@@ -92,8 +92,12 @@ using rgb3d = hut::details::rgb3d::impl;
 int main(int, char **) {
   display d("hut demo3d");
 
-  window w(d);
-  w.clear_color({1, 1, 1, 1});
+  window_params params;
+  params.flags_.set(window_params::FDEPTH);
+  params.flags_.set(window_params::FTRANSPARENT);
+
+  window w(d, params);
+  w.clear_color({0.1f, 0.1f, 0.1f, 0.0f});
   w.title("hut demo3d win");
 
   auto b = d.alloc_buffer(1024*1024);

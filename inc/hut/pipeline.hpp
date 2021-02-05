@@ -46,6 +46,7 @@ struct pipeline_params {
   VkCompareOp depthCompare_ = VK_COMPARE_OP_LESS_OR_EQUAL;
   VkCullModeFlagBits cullMode_ = VK_CULL_MODE_NONE;
   VkFrontFace frontFace_ = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  VkBool32 enableBlending_ = VK_TRUE;
 };
 
 template<typename TDetails, typename... TExtraAttachments>
@@ -207,12 +208,12 @@ private:
         | VK_COLOR_COMPONENT_A_BIT;
     VkPipelineColorBlendAttachmentState blend_attachment = {};
     blend_attachment.colorWriteMask = component_mask;
-    blend_attachment.blendEnable = VK_TRUE;
+    blend_attachment.blendEnable = _params.enableBlending_;
     blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
     blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
     blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-    blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
     VkPipelineColorBlendStateCreateInfo blend_create_info = {};

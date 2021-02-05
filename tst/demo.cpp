@@ -60,8 +60,8 @@ int main(int, char **) {
 
   display d("hut demo");
 
-  window w(d);
-  w.clear_color({1, 1, 1, 1});
+  window w(d, window_params{.flags_{window_params::FTRANSPARENT}});
+  w.clear_color({0.1f, 0.1f, 0.1f, 0});
   w.title("hut demo win1");
 
   window w2(d);

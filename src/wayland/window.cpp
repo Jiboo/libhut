@@ -78,7 +78,7 @@ void hut::handle_toplevel_decoration_configure(void *_data, zxdg_toplevel_decora
 }
 
 window::window(display &_display, const window_params &_init_params)
-  : display_(_display), size_(bbox_size(_init_params.position_)) {
+  : display_(_display), params_(_init_params), size_(bbox_size(_init_params.position_)) {
   static const xdg_surface_listener xdg_surface_listeners = {
     handle_xdg_configure,
   };
@@ -109,7 +109,7 @@ window::window(display &_display, const window_params &_init_params)
   xdg_toplevel_add_listener(toplevel_, &xdg_toplevel_listeners, this);
 
   has_system_decorations_ = false;
-  if (_init_params.flags_ & window_params::SYSTEM_DECORATIONS && display_.decoration_manager_) {
+  if (_init_params.flags_ & window_params::FSYSTEM_DECORATIONS && display_.decoration_manager_) {
     static const zxdg_toplevel_decoration_v1_listener zxdg_toplevel_decoration_v1_listeners = {
         handle_toplevel_decoration_configure,
     };

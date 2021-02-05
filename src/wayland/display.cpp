@@ -84,10 +84,11 @@ void hut::pointer_handle_button(void *_data, wl_pointer *_pointer, uint32_t _ser
   auto *d = static_cast<display*>(_data);
   if (_pointer == d->pointer_) {
     auto *w = d->pointer_current_.second;
-    assert(w);
-    d->last_serial_ =  _serial;
-
-    HUT_PROFILE_EVENT_NAMED(w, on_mouse, ("button", "mouse_event_type", "coords"), _button - BTN_MOUSE + 1, _state ? MDOWN : MUP, w->mouse_lastmove_);
+    if (w) {
+      d->last_serial_ = _serial;
+      HUT_PROFILE_EVENT_NAMED(w, on_mouse, ("button", "mouse_event_type", "coords"), _button - BTN_MOUSE + 1,
+                              _state ? MDOWN : MUP, w->mouse_lastmove_);
+    }
   }
 }
 

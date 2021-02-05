@@ -29,6 +29,7 @@
 #include <iostream>
 #include <thread>
 
+#include "hut/color.hpp"
 #include "hut/display.hpp"
 #include "hut/window.hpp"
 #include "hut/image.hpp"
@@ -142,7 +143,7 @@ void window::init_vulkan_surface() {
     }
   }
 
-  if (params_.flags_ & window_params::DEPTH) {
+  if (params_.flags_ & window_params::FDEPTH) {
     VkFormat depth_format = VK_FORMAT_UNDEFINED;
     VkFormat depth_candidates[] = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
     for (VkFormat format : depth_candidates) {
@@ -165,7 +166,7 @@ void window::init_vulkan_surface() {
   HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, pdevice, surface_, &modes_count, nullptr);
   std::vector<VkPresentModeKHR> modes(modes_count);
   HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, pdevice, surface_, &modes_count, modes.data());
-  present_mode_ = params_.flags_ & window_params::VSYNC ? VK_PRESENT_MODE_FIFO_KHR : select_best_mode(modes);
+  present_mode_ = params_.flags_ & window_params::FVSYNC ? VK_PRESENT_MODE_FIFO_KHR : select_best_mode(modes);
 
   if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
     swapchain_extents_ = capabilities.currentExtent;
@@ -201,7 +202,7 @@ void window::init_vulkan_surface() {
     swapchain_infos.pQueueFamilyIndices = nullptr;
   }
   swapchain_infos.preTransform = capabilities.currentTransform;
-  swapchain_infos.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+  swapchain_infos.compositeAlpha = params_.flags_ & window_params::FTRANSPARENT ? VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR : VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
   swapchain_infos.presentMode = present_mode_;
   swapchain_infos.clipped = VK_TRUE;
   VkSwapchainKHR old_swapchain = swapchain_;

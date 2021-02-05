@@ -61,15 +61,16 @@ class display;
 
 struct window_params {
   enum flag {
-    SYSTEM_DECORATIONS,
-    VSYNC,
-    DEPTH,
-    FULLSCREEN,
-    FLAG_LAST_VALUE = FULLSCREEN,
+    FSYSTEM_DECORATIONS,
+    FVSYNC,
+    FDEPTH,
+    FTRANSPARENT,
+    FFULLSCREEN,
+    FLAG_LAST_VALUE = FFULLSCREEN,
   };
   using flags = flagged<flag, flag::FLAG_LAST_VALUE>;
 
-  flags flags_ {VSYNC, DEPTH, SYSTEM_DECORATIONS};
+  flags flags_ {FVSYNC, FSYSTEM_DECORATIONS};
   uvec4 position_ = {0, 0, 800, 600};
   uvec2 min_size_ = {0, 0}, max_size_ = {0, 0};
 };
