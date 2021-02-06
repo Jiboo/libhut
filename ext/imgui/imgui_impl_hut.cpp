@@ -270,7 +270,10 @@ bool ImGui_ImplHut_CreateDeviceObjects() {
 
   // Upload texture to graphics system
   std::span<uint8_t> pixels {data, size_t(width * height * 4)};
-  g_ctx.images_[0] = hut::image::load_raw(*g_ctx.display_, {width, height}, pixels, VK_FORMAT_R8G8B8A8_UNORM);
+  hut::image_params atlas_params;
+  atlas_params.size_ = {width, height};
+  atlas_params.format_ = VK_FORMAT_R8G8B8A8_UNORM;
+  g_ctx.images_[0] = hut::image::load_raw(*g_ctx.display_, pixels, atlas_params);
   io.Fonts->TexID = (ImTextureID)0;
 
   g_ctx.pipeline_ = std::make_unique<imgui_pipeline>(*g_ctx.window_);

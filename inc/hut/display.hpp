@@ -155,6 +155,7 @@ using modifiers = flagged<modifier, MODIFIER_LAST_VALUE>;
   void keyboard_handle_leave(void*, wl_keyboard*, uint32_t, wl_surface*);
   void keyboard_handle_key(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t);
   void keyboard_handle_modifiers(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+  void keyboard_handle_repeat_info(void*, wl_keyboard*, int32_t, int32_t);
   void data_source_handle_send(void*, wl_data_source*, const char*, int32_t);
   void data_source_handle_cancelled(void*, wl_data_source*);
   void data_offer_handle_offer(void*, wl_data_offer*, const char*);
@@ -316,6 +317,7 @@ class display {
   friend void keyboard_handle_leave(void*, wl_keyboard*, uint32_t, wl_surface*);
   friend void keyboard_handle_key(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t);
   friend void keyboard_handle_modifiers(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+  friend void keyboard_handle_repeat_info(void*, wl_keyboard*, int32_t, int32_t);
   friend void data_offer_handle_offer(void*, wl_data_offer*, const char*);
   friend void data_device_handle_data_offer(void*, wl_data_device*, wl_data_offer*);
   friend void data_device_handle_selection(void*, wl_data_device*, wl_data_offer*);
@@ -325,14 +327,30 @@ class display {
     std::thread thread_;
     std::mutex mutex_;
     std::condition_variable cv_;
+    bool stop_request_ = false;
+
     wl_cursor *cursor_ = nullptr;
     size_t frame_ = 0;
-    bool stop_request_ = false;
   };
   void cursor(cursor_type _c);
   void cursor_frame(wl_cursor *_cursor, size_t _frame);
   void animate_cursor(wl_cursor *_cursor);
   static void animate_cursor_thread(animate_cursor_context *_ctx);
+
+  struct keyboard_repeat_context {
+    display &display_;
+    std::thread thread_;
+    std::mutex mutex_;
+    std::condition_variable cv_;
+    bool stop_request_ = false;
+
+    duration delay_;
+    duration sleep_;
+    char32_t key_ = 0;
+    time_point start_;
+  };
+  void keyboard_repeat(char32_t _c);
+  static void keyboard_repeat_thread(keyboard_repeat_context *_ctx);
 
   static keysym map_xkb_keysym(xkb_keysym_t);
 
@@ -368,6 +386,7 @@ class display {
   uint32_t last_serial_ = 0;
   uint32_t last_keyboard_enter_serial_ = 0;
   animate_cursor_context animate_cursor_ctx_;
+  keyboard_repeat_context keyboard_repeat_ctx_;
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
   static std::string utf8_wstr(const WCHAR *_input);
   friend LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);

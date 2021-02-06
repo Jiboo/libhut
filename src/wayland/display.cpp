@@ -302,10 +302,22 @@ void hut::keyboard_handle_key(void *_data, wl_keyboard *_keyboard, uint32_t _ser
       const auto utf32 = xkb_keysym_to_utf32(ksym);
       const auto valid = utf32 != 0;
       const auto printable = utf32 > 0x7f || isprint(utf32);
-      if (valid && printable)
+      if (valid && printable) {
+        d->keyboard_repeat(utf32);
         HUT_PROFILE_EVENT(w, on_char, utf32);
+      }
+    }
+    else {
+      d->keyboard_repeat(0);
     }
   }
+}
+
+void hut::keyboard_handle_repeat_info(void *_data, wl_keyboard *_keyboard, int32_t _rate, int32_t _delay) {
+  //std::cout << "keyboard_handle_repeat_info " << _rate << ", " << _delay << std::endl;
+  auto *d = static_cast<display*>(_data);
+  d->keyboard_repeat_ctx_.delay_ = std::chrono::milliseconds(_delay);
+  d->keyboard_repeat_ctx_.sleep_ = std::chrono::milliseconds(1000 / _rate);
 }
 
 void hut::keyboard_handle_modifiers(void *_data, wl_keyboard *_keyboard, uint32_t _serial, uint32_t _mods_depressed, uint32_t _mods_latched, uint32_t _mods_locked, uint32_t _group) {
@@ -331,7 +343,7 @@ void hut::keyboard_handle_modifiers(void *_data, wl_keyboard *_keyboard, uint32_
 void hut::seat_handler(void *_data, wl_seat *_seat, uint32_t _caps) {
   //std::cout << "seat_handler " << _seat << ", " << _caps << std::endl;
   static const wl_keyboard_listener wl_keyboard_listeners = {
-      keyboard_handle_keymap, keyboard_handle_enter, keyboard_handle_leave, keyboard_handle_key, keyboard_handle_modifiers, nullptr
+      keyboard_handle_keymap, keyboard_handle_enter, keyboard_handle_leave, keyboard_handle_key, keyboard_handle_modifiers, keyboard_handle_repeat_info
   };
 
   static const wl_pointer_listener wl_pointer_listeners = {
@@ -385,7 +397,7 @@ void hut::registry_handler(void *_data, wl_registry *_registry, uint32_t _id,
     xdg_wm_base_add_listener(d->xdg_wm_base_, &xdg_wm_base_listeners, _data);
   }
   else if (strcmp(_interface, wl_seat_interface.name) == 0) {
-    d->seat_ = static_cast<wl_seat*>(wl_registry_bind(_registry, _id, &wl_seat_interface, 1));
+    d->seat_ = static_cast<wl_seat*>(wl_registry_bind(_registry, _id, &wl_seat_interface, 4));
     wl_seat_add_listener(d->seat_, &wl_seat_listeners, _data);
   }
   else if (strcmp(_interface, wl_shm_interface.name) == 0) {
@@ -423,7 +435,7 @@ void hut::data_device_handle_data_offer(void *_data, wl_data_device *_device, wl
 void hut::data_device_handle_selection(void *_data, wl_data_device *_device, wl_data_offer *_offer) {}
 
 display::display(const char *_app_name, uint32_t _app_version, const char *_name)
-  : animate_cursor_ctx_{*this} {
+  : animate_cursor_ctx_{*this}, keyboard_repeat_ctx_{*this} {
   HUT_PROFILE_SCOPE(PDISPLAY, "display::display");
   std::vector<const char *> extensions = {VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME};
   init_vulkan_instance(_app_name, _app_version, extensions);
@@ -495,6 +507,8 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
     cursor_surface_ = wl_compositor_create_surface(compositor_);
     animate_cursor_ctx_.thread_ = std::thread(animate_cursor_thread, &animate_cursor_ctx_);
   }
+
+  keyboard_repeat_ctx_.thread_ = std::thread(keyboard_repeat_thread, &keyboard_repeat_ctx_);
 }
 
 display::~display() {
@@ -509,6 +523,15 @@ display::~display() {
     }
     animate_cursor_ctx_.cv_.notify_all();
     animate_cursor_ctx_.thread_.join();
+  }
+  if (keyboard_repeat_ctx_.thread_.joinable()) {
+    {
+      std::scoped_lock lock(keyboard_repeat_ctx_.mutex_);
+      keyboard_repeat_ctx_.key_ = 0;
+      keyboard_repeat_ctx_.stop_request_ = true;
+    }
+    keyboard_repeat_ctx_.cv_.notify_all();
+    keyboard_repeat_ctx_.thread_.join();
   }
 
   if (keymap_) xkb_keymap_unref(keymap_);
@@ -617,6 +640,38 @@ void display::animate_cursor_thread(animate_cursor_context *_ctx) {
       if (_ctx->frame_ >= _ctx->cursor_->image_count)
         _ctx->frame_ = 0;
       _ctx->cv_.wait_for(lock, std::chrono::milliseconds(cur_frame->delay));
+    }
+  }
+}
+
+void display::keyboard_repeat(char32_t _c) {
+  {
+    std::scoped_lock lock(keyboard_repeat_ctx_.mutex_);
+    keyboard_repeat_ctx_.key_ = _c;
+    keyboard_repeat_ctx_.start_ = clock::now();
+  }
+  keyboard_repeat_ctx_.cv_.notify_all();
+}
+
+void display::keyboard_repeat_thread(keyboard_repeat_context *_ctx) {
+  std::unique_lock lock(_ctx->mutex_);
+  while (!_ctx->stop_request_) {
+    if (_ctx->key_ == 0)
+      _ctx->cv_.wait(lock);
+    if (_ctx->key_) {
+      auto *w = _ctx->display_.keyboard_current_.second;
+      auto now = clock::now();
+      auto elapsed = now - _ctx->start_;
+      if (elapsed < _ctx->delay_) {
+        auto initial_delay_remaining = _ctx->delay_ - elapsed;
+        _ctx->cv_.wait_for(lock, initial_delay_remaining);
+      }
+      else {
+        _ctx->display_.post([w, k=_ctx->key_](auto tp) {
+          HUT_PROFILE_EVENT(w, on_char, k);
+        });
+        _ctx->cv_.wait_for(lock, _ctx->sleep_);
+      }
     }
   }
 }

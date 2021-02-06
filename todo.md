@@ -13,4 +13,3 @@ features:
 - [w32] transparent window support
 - [wl][w32] clipboard image support
 - [wl][w32] drap&drop URI/text
-- [wl] xkb keyboard repeat

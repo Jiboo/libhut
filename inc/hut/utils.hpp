@@ -336,4 +336,22 @@ inline void hexdump(void *ptr, int buflen) {
   }
 }
 
+template <typename TRep, typename TPeriod>
+inline std::ostream &operator<<(std::ostream &_os, const std::chrono::duration<TRep, TPeriod> &_dur) {
+  auto nano = std::chrono::duration_cast<std::chrono::duration<double, std::nano>>(_dur).count();
+  if (nano < 1000)
+    return _os << nano << "ns";
+  else if (nano < 1'000'000)
+    return _os << nano / 1000.0 << "µs";
+  else if (nano < 1'000'000'000)
+    return _os << nano / 1'000'000.0 << "ms";
+  return _os << nano / 1'000'000'000.0 << "s";
+}
+
+template <typename TClock, typename TDur>
+inline std::ostream &operator<<(std::ostream &_os, const std::chrono::time_point<TClock, TDur> &_tp) {
+  auto elapsed = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(_tp.time_since_epoch());
+  return _os << elapsed.count();
+}
+
 }  // namespace hut

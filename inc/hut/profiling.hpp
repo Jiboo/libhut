@@ -83,18 +83,6 @@ inline std::ostream &operator<<(std::ostream &_os, const profiling_category &_in
   return _os;
 }
 
-template <typename TRep, typename TPeriod>
-inline std::ostream &operator<<(std::ostream &_os, const std::chrono::duration<TRep, TPeriod> &_dur) {
-  auto nano = std::chrono::duration_cast<std::chrono::duration<double, std::nano>>(_dur).count();
-  if (nano < 1000)
-    return _os << nano << "ns";
-  else if (nano < 1'000'000)
-    return _os << nano / 1000.0 << "µs";
-  else if (nano < 1'000'000'000)
-    return _os << nano / 1'000'000.0 << "ms";
-  return _os << nano / 1'000'000'000.0 << "s";
-}
-
 inline void escape_json(std::ostream &_os, std::string_view _in) {
   std::stringstream buffer;
 
