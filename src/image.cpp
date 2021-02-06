@@ -142,7 +142,10 @@ std::shared_ptr<image> image::load_png(display &_display, span<const uint8_t> _d
   subResource.mipLevel = 0;
   subResource.layerCount = 1;
 
-  auto dst = std::make_shared<image>(_display, uvec2{width, height}, format);
+  image_params params;
+  params.size_ = {width, height};
+  params.format_ = format;
+  auto dst = std::make_shared<image>(_display, params);
   shared_ref<u8> staging;
   {
     std::lock_guard lk(_display.staging_mutex_);
@@ -189,10 +192,9 @@ std::shared_ptr<image> image::load_png(display &_display, span<const uint8_t> _d
   return dst;
 }
 
-std::shared_ptr<image> image::load_raw(display &_display, uvec2 _extent,
-    span<const uint8_t> _data, VkFormat _format, VkImageTiling _tiling, VkImageUsageFlags _flags) {
+std::shared_ptr<image> image::load_raw(display &_display, span<const uint8_t> _data, const image_params &_params) {
   HUT_PROFILE_SCOPE(PIMAGE, "image::load_raw");
-  auto dst = std::make_shared<image>(_display, _extent, _format, _tiling, _flags);
+  auto dst = std::make_shared<image>(_display, _params);
 
   uint offsetAlignment = std::max(VkDeviceSize(4), _display.device_props_.limits.optimalBufferCopyOffsetAlignment);
   {
@@ -212,10 +214,10 @@ std::shared_ptr<image> image::load_raw(display &_display, uvec2 _extent,
     subResource.mipLevel = 0;
 
     display::buffer2image_copy copy = {};
-    copy.imageExtent = {_extent.x, _extent.y, 1};
+    copy.imageExtent = {_params.size_.x, _params.size_.y, 1};
     copy.imageOffset = {0, 0, 0};
-    copy.bufferRowLength = _extent.x;
-    copy.bufferImageHeight = _extent.y;
+    copy.bufferRowLength = _params.size_.x;
+    copy.bufferImageHeight = _params.size_.y;
     copy.bufferOffset = staging->offset_bytes();
     copy.imageSubresource = subResource;
     copy.source = staging->vkBuffer();
@@ -249,20 +251,18 @@ image::~image() {
   HUT_PVK(vkFreeMemory, display_.device_, memory_, nullptr);
 }
 
-image::image(display &_display, uvec2 _size, VkFormat _format, VkImageTiling _tiling, VkImageUsageFlags _flags,
-             VkImageAspectFlags _aspect)
-    : display_(_display), size_(_size), format_(_format) {
+image::image(display &_display, const image_params &_params)
+    : display_(_display), params_(_params) {
   HUT_PROFILE_SCOPE(PIMAGE, "image::image");
-  pixel_size_ = format_size(_format);
-  mem_reqs_ = create(_display, _size.x, _size.y, _format, _tiling, _flags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-      &image_, &memory_);
+  pixel_size_ = format_size(_params.format_);
+  mem_reqs_ = create(_display, _params, &image_, &memory_);
 
   VkImageViewCreateInfo viewInfo = {};
   viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
   viewInfo.image = image_;
   viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-  viewInfo.format = _format;
-  viewInfo.subresourceRange.aspectMask = _aspect;
+  viewInfo.format = _params.format_;
+  viewInfo.subresourceRange.aspectMask = _params.aspect_;
   viewInfo.subresourceRange.baseMipLevel = 0;
   viewInfo.subresourceRange.levelCount = 1;
   viewInfo.subresourceRange.baseArrayLayer = 0;
@@ -272,7 +272,7 @@ image::image(display &_display, uvec2 _size, VkFormat _format, VkImageTiling _ti
     throw std::runtime_error("failed to create texture image view!");
   }
 
-  if (_aspect & VK_IMAGE_ASPECT_DEPTH_BIT)
+  if ((_params.usage_ & (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)) == 0)
     return;
 
   display::image_transition pre = {};
@@ -298,22 +298,21 @@ image::image(display &_display, uvec2 _size, VkFormat _format, VkImageTiling _ti
   });
 }
 
-VkMemoryRequirements image::create(display &_display, uint32_t _width, uint32_t _height, VkFormat _format,
-                           VkImageTiling _tiling, VkImageUsageFlags _usage, VkMemoryPropertyFlags _properties,
+VkMemoryRequirements image::create(display &_display, const image_params &_params,
                            VkImage *_image, VkDeviceMemory *_imageMemory) {
   VkImageCreateInfo imageInfo = {};
   imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   imageInfo.imageType = VK_IMAGE_TYPE_2D;
-  imageInfo.extent.width = _width;
-  imageInfo.extent.height = _height;
+  imageInfo.extent.width = _params.size_.x;
+  imageInfo.extent.height = _params.size_.y;
   imageInfo.extent.depth = 1;
   imageInfo.mipLevels = 1;
   imageInfo.arrayLayers = 1;
-  imageInfo.format = _format;
-  imageInfo.tiling = _tiling;
+  imageInfo.format = _params.format_;
+  imageInfo.tiling = _params.tiling_;
   imageInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
-  imageInfo.usage = _usage;
-  imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+  imageInfo.usage = _params.usage_;
+  imageInfo.samples = _params.samples_;
   imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
   if (vkCreateImage(_display.device_, &imageInfo, nullptr, _image) != VK_SUCCESS) {
@@ -326,7 +325,7 @@ VkMemoryRequirements image::create(display &_display, uint32_t _width, uint32_t 
   VkMemoryAllocateInfo allocInfo = {};
   allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
   allocInfo.allocationSize = memReq.size;
-  auto memtype = _display.find_memory_type(memReq.memoryTypeBits, _properties);
+  auto memtype = _display.find_memory_type(memReq.memoryTypeBits, _params.properties_);
   allocInfo.memoryTypeIndex = memtype.first;
 
   if (vkAllocateMemory(_display.device_, &allocInfo, nullptr, _imageMemory) != VK_SUCCESS) {

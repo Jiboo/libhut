@@ -64,6 +64,7 @@ struct window_params {
     FSYSTEM_DECORATIONS,
     FVSYNC,
     FDEPTH,
+    FMULTISAMPLING,
     FTRANSPARENT,
     FFULLSCREEN,
     FLAG_LAST_VALUE = FFULLSCREEN,
@@ -157,11 +158,14 @@ class window {
   VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
   std::vector<VkImage> swapchain_images_;
   std::vector<VkImageView> swapchain_imageviews_;
-  shared_image depth_;
   std::vector<VkFramebuffer> swapchain_fbos_;
   std::vector<VkCommandBuffer> primary_cbs_;
   std::vector<VkCommandBuffer> cbs_;
   std::vector<uint8_t> dirty_;
+
+  shared_image depth_;
+  shared_image msaa_rendertarget_;
+  VkSampleCountFlagBits sample_count_ = VK_SAMPLE_COUNT_1_BIT;
 
   VkSemaphore sem_available_ = VK_NULL_HANDLE;
   VkSemaphore sem_rendered_ = VK_NULL_HANDLE;

@@ -143,6 +143,27 @@ void window::init_vulkan_surface() {
     }
   }
 
+  if (params_.flags_ & window_params::FMULTISAMPLING) {
+    VkSampleCountFlags counts = display_.limits().framebufferColorSampleCounts & display_.limits().framebufferDepthSampleCounts;
+    if (counts & VK_SAMPLE_COUNT_64_BIT) sample_count_ = VK_SAMPLE_COUNT_64_BIT;
+    else if (counts & VK_SAMPLE_COUNT_32_BIT) sample_count_ = VK_SAMPLE_COUNT_32_BIT;
+    else if (counts & VK_SAMPLE_COUNT_16_BIT) sample_count_ = VK_SAMPLE_COUNT_16_BIT;
+    else if (counts & VK_SAMPLE_COUNT_8_BIT) sample_count_ = VK_SAMPLE_COUNT_8_BIT;
+    else if (counts & VK_SAMPLE_COUNT_4_BIT) sample_count_ = VK_SAMPLE_COUNT_4_BIT;
+    else if (counts & VK_SAMPLE_COUNT_2_BIT) sample_count_ = VK_SAMPLE_COUNT_2_BIT;
+
+    if (sample_count_ != VK_SAMPLE_COUNT_1_BIT) {
+      image_params params;
+      params.size_ = size_;
+      params.format_ = surface_format_.format;
+      params.tiling_ = VK_IMAGE_TILING_OPTIMAL;
+      params.usage_ = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+      params.aspect_ = VK_IMAGE_ASPECT_COLOR_BIT;
+      params.samples_ = sample_count_;
+      msaa_rendertarget_ = std::make_shared<image>(display_, params);
+    }
+  }
+
   if (params_.flags_ & window_params::FDEPTH) {
     VkFormat depth_format = VK_FORMAT_UNDEFINED;
     VkFormat depth_candidates[] = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
@@ -158,8 +179,14 @@ void window::init_vulkan_surface() {
     if (depth_format == VK_FORMAT_UNDEFINED)
       throw std::runtime_error("failed to find compatible depth buffer!");
 
-    depth_ = std::make_shared<image>(display_, size_, depth_format, VK_IMAGE_TILING_OPTIMAL,
-                                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
+    image_params params;
+    params.size_ = size_;
+    params.format_ = depth_format;
+    params.tiling_ = VK_IMAGE_TILING_OPTIMAL;
+    params.usage_ = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    params.aspect_ = VK_IMAGE_ASPECT_DEPTH_BIT;
+    params.samples_ = sample_count_;
+    depth_ = std::make_shared<image>(display_, params);
   }
 
   uint32_t modes_count;
@@ -243,30 +270,6 @@ void window::init_vulkan_surface() {
       throw std::runtime_error("failed to create image views!");
   }
 
-  VkAttachmentDescription colorAttachment = {};
-  colorAttachment.format = surface_format_.format;
-  colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-  colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-  VkAttachmentReference colorAttachmentRef = {};
-  colorAttachmentRef.attachment = 0;
-  colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-  VkAttachmentReference depthAttachmentRef = {};
-  depthAttachmentRef.attachment = 1;
-  depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-  VkSubpassDescription subpass = {};
-  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-  subpass.colorAttachmentCount = 1;
-  subpass.pColorAttachments = &colorAttachmentRef;
-  subpass.pDepthStencilAttachment = depth_ ? &depthAttachmentRef : nullptr;
-
   VkSubpassDependency dependency = {};
   dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
   dependency.dstSubpass = 0;
@@ -275,12 +278,22 @@ void window::init_vulkan_surface() {
   dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
+  VkAttachmentDescription colorAttachment = {};
+  colorAttachment.format = surface_format_.format;
+  colorAttachment.samples = sample_count_;
+  colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+  colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+  colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  colorAttachment.finalLayout = msaa_rendertarget_ ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
   std::vector<VkAttachmentDescription> passAttachments {colorAttachment};
 
   if (depth_) {
     VkAttachmentDescription depthAttachment = {};
-    depthAttachment.format = depth_->format_;
-    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachment.format = depth_->params_.format_;
+    depthAttachment.samples = sample_count_;
     depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -290,6 +303,39 @@ void window::init_vulkan_surface() {
 
     passAttachments.emplace_back(depthAttachment);
   }
+
+  if (msaa_rendertarget_) {
+    VkAttachmentDescription colorAttachmentResolve{};
+    colorAttachmentResolve.format = surface_format_.format;
+    colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    passAttachments.emplace_back(colorAttachmentResolve);
+  }
+
+  VkAttachmentReference colorAttachmentRef = {};
+  colorAttachmentRef.attachment = 0;
+  colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+  VkAttachmentReference depthAttachmentRef = {};
+  depthAttachmentRef.attachment = 1;
+  depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+  VkAttachmentReference colorAttachmentResolveRef{};
+  colorAttachmentResolveRef.attachment = 2;
+  colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+  VkSubpassDescription subpass = {};
+  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+  subpass.colorAttachmentCount = 1;
+  subpass.pColorAttachments = &colorAttachmentRef;
+  subpass.pDepthStencilAttachment = depth_ ? &depthAttachmentRef : nullptr;
+  subpass.pResolveAttachments = msaa_rendertarget_ ? &colorAttachmentResolveRef : nullptr;
 
   VkRenderPassCreateInfo renderPassInfo = {};
   renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -314,9 +360,17 @@ void window::init_vulkan_surface() {
   std::vector<VkImageView> fbAttachments;
   for (size_t i = 0; i < swapchain_fbos_.size(); i++) {
     fbAttachments.clear();
-    fbAttachments.emplace_back(swapchain_imageviews_[i]);
+
+    if (msaa_rendertarget_)
+      fbAttachments.emplace_back(msaa_rendertarget_->view_);
+    else
+      fbAttachments.emplace_back(swapchain_imageviews_[i]);
+
     if (depth_)
       fbAttachments.emplace_back(depth_->view_);
+
+    if (msaa_rendertarget_)
+      fbAttachments.emplace_back(swapchain_imageviews_[i]);
 
     VkFramebufferCreateInfo framebufferInfo = {};
     framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;

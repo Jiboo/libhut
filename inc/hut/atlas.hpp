@@ -33,7 +33,7 @@ namespace hut {
 
 class atlas {
  public:
-  atlas(display &_display, VkFormat _format, uvec2 _size = {0, 0});
+  atlas(display &_display, const image_params &_params);
 
   inline shared_image image() {
     return atlas_;

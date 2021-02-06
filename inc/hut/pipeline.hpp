@@ -133,7 +133,7 @@ private:
       throw std::runtime_error("[sample] failed to create pipeline layout!");
   }
 
-  void init_pipeline(uvec2 _default_size, const pipeline_params &_params) {
+  void init_pipeline(uvec2 _default_size, VkSampleCountFlagBits _samples, const pipeline_params &_params) {
     HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
     VkPipelineShaderStageCreateInfo vert_stage_info = {};
     vert_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -196,7 +196,7 @@ private:
     VkPipelineMultisampleStateCreateInfo msaa_create_info = {};
     msaa_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     msaa_create_info.sampleShadingEnable = VK_FALSE;
-    msaa_create_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    msaa_create_info.rasterizationSamples = _samples;
     msaa_create_info.minSampleShading = 1.0f;
     msaa_create_info.pSampleMask = nullptr;
     msaa_create_info.alphaToCoverageEnable = VK_FALSE;
@@ -279,7 +279,7 @@ public:
     alloc_next_descriptors(1);
     init_shaders();
     init_pipeline_layout();
-    init_pipeline(_window.size(), _params);
+    init_pipeline(_window.size(), _window.sample_count_, _params);
   }
 
   virtual ~pipeline() {

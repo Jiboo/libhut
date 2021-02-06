@@ -94,6 +94,7 @@ int main(int, char **) {
 
   window_params params;
   params.flags_.set(window_params::FDEPTH);
+  params.flags_.set(window_params::FMULTISAMPLING);
   params.flags_.set(window_params::FTRANSPARENT);
 
   window w(d, params);

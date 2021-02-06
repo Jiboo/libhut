@@ -164,7 +164,7 @@ int main(int, char **) {
     tex_rgba::instance{make_mat({  0, 500}, {100,100,1})},
   });
 
-  shared_atlas r8_atlas = std::make_shared<atlas>(d, VK_FORMAT_R8_UNORM);
+  shared_atlas r8_atlas = std::make_shared<atlas>(d, image_params{.format_ = VK_FORMAT_R8_UNORM});
   auto tmask_pipeline = std::make_unique<tex_mask>(w);
   tmask_pipeline->write(0, ubo, r8_atlas->image(), samp);
 

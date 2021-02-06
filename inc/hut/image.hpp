@@ -38,6 +38,16 @@ namespace hut {
 
 class display;
 
+struct image_params {
+  uvec2 size_;
+  VkFormat format_;
+  VkImageTiling tiling_ = VkImageTiling::VK_IMAGE_TILING_LINEAR;
+  VkImageUsageFlags usage_ = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+  VkImageAspectFlags aspect_ = VK_IMAGE_ASPECT_COLOR_BIT;
+  VkMemoryPropertyFlags properties_ = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  VkSampleCountFlagBits samples_ = VK_SAMPLE_COUNT_1_BIT;
+};
+
 class image {
   friend class display;
   friend class font;
@@ -45,32 +55,23 @@ class image {
   friend class window;
 
  public:
-  static constexpr VkImageTiling defaultImageTiling = VkImageTiling::VK_IMAGE_TILING_LINEAR;
-  static constexpr VkImageUsageFlags defaultImageUsageFlags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-
   static std::shared_ptr<image> load_png(display &, span<const uint8_t> _data);
-  static std::shared_ptr<image> load_raw(display &, uvec2 _extent, span<const uint8_t> _data, VkFormat _format,
-                                         VkImageTiling _tiling = defaultImageTiling,
-                                         VkImageUsageFlags _flags = defaultImageUsageFlags);
+  static std::shared_ptr<image> load_raw(display &, span<const uint8_t> _data, const image_params &_params);
 
-  image(display &_display, uvec2 _size, VkFormat _format,
-      VkImageTiling _tiling = defaultImageTiling, VkImageUsageFlags _flags = defaultImageUsageFlags,
-      VkImageAspectFlags _aspect = VK_IMAGE_ASPECT_COLOR_BIT);
+  image(display &_display, const image_params &_params);
   ~image();
 
   void update(ivec4 _coords, uint8_t *_data, uint _srcRowPitch);
 
   [[nodiscard]] uint pixel_size() const { return pixel_size_; }
-  [[nodiscard]] uvec2 size() const { return size_; }
+  [[nodiscard]] uvec2 size() const { return params_.size_; }
 
  private:
-  static VkMemoryRequirements create(display &_display, uint32_t _width, uint32_t _height, VkFormat _format,
-                             VkImageTiling _tiling, VkImageUsageFlags _usage, VkMemoryPropertyFlags _properties,
+  static VkMemoryRequirements create(display &_display, const image_params &_params,
                              VkImage *_image, VkDeviceMemory *_imageMemory);
 
   display &display_;
-  uvec2 size_;
-  VkFormat format_;
+  image_params params_;
   uint pixel_size_;
 
   VkImage image_;

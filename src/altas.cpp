@@ -29,13 +29,14 @@
 
 using namespace hut;
 
-atlas::atlas(display &_display, VkFormat _format, uvec2 _size) {
+atlas::atlas(display &_display, const image_params &_params) {
   HUT_PROFILE_SCOPE(PIMAGE, "atlas::atlas");
-  if (_size == uvec2{0, 0}) {
-    _size = {_display.limits().maxImageDimension2D, _display.limits().maxImageDimension2D};
+  auto params = _params;
+  if (params.size_ == uvec2{0, 0}) {
+    params.size_ = {_display.limits().maxImageDimension2D, _display.limits().maxImageDimension2D};
   }
-  atlas_ = std::make_shared<hut::image>(_display, _size, _format);
-  root_.coords_ = {0, 0, _size};
+  atlas_ = std::make_shared<hut::image>(_display, params);
+  root_.coords_ = {0, 0, params.size_};
 }
 
 atlas::node::~node() {

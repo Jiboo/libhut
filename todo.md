@@ -10,7 +10,6 @@ refactor:
 - [wl] async clipboard read/write
 
 features:
-- [wl][w32] multisampling: window creation flags (+ pipeline creation flag)
 - [w32] transparent window support
 - [wl][w32] clipboard image support
 - [wl][w32] drap&drop URI/text
