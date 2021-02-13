@@ -25,7 +25,6 @@
  * SOFTWARE.
  */
 
-#include <algorithm>
 #include <cstring>
 #include <iostream>
 
@@ -154,10 +153,13 @@ buffer_pool::buffer *buffer_pool::grow(uint _size) {
   result.root_->next_ = nullptr;
   result.root_->prev_ = nullptr;
 
-  if (type_ == staging_type && usage_ == staging_usage)
+  if (type_ == staging_type && usage_ == staging_usage) {
     HUT_PVK(vkMapMemory, display_.device_, result.memory_, 0, _size, 0, reinterpret_cast<void**>(&result.permanent_map_));
-  else
+    assert(result.permanent_map_);
+  }
+  else {
     result.permanent_map_ = nullptr;
+  }
 
   return &buffers_.emplace_back(result);
 }
@@ -170,7 +172,7 @@ buffer_pool::alloc buffer_pool::do_alloc(uint _size, uint _align) {
   debug();
 #endif
 
-  uint aligned = 0, align_bytes = 0, aligned_size = _size;
+  uint aligned = 0, aligned_size = _size;
   range *fit = nullptr;
   buffer *container = nullptr;
   for (auto &buffer : buffers_) {
@@ -185,7 +187,7 @@ buffer_pool::alloc buffer_pool::do_alloc(uint _size, uint _align) {
         continue;
       }
       aligned = align<uint>(cur->offset_, _align);
-      align_bytes = aligned - cur->offset_;
+      uint align_bytes = aligned - cur->offset_;
       aligned_size = align_bytes + _size;
       if (aligned_size > cur->size_) {
         cur = cur->next_;
@@ -201,7 +203,6 @@ buffer_pool::alloc buffer_pool::do_alloc(uint _size, uint _align) {
     container = grow(align(total_size_ + _size, total_size_));
     fit = container->root_;
     aligned = 0;
-    align_bytes = 0;
     aligned_size = _size;
   }
 

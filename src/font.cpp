@@ -33,7 +33,7 @@
 
 using namespace hut;
 
-font::font(display &_display, const uint8_t *_addr, size_t _size, shared_atlas _atlas, bool _hinting)
+font::font(display &_display, const uint8_t *_addr, size_t _size, const shared_atlas &_atlas, bool _hinting)
   : library_(_display.ft_library_), atlas_(_atlas) {
   HUT_PROFILE_SCOPE(PFONT, "font::font");
   load_flags_ = FT_LOAD_COLOR | (_hinting ? FT_LOAD_FORCE_AUTOHINT : FT_LOAD_NO_HINTING);

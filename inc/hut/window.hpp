@@ -86,7 +86,6 @@ class window {
   event<uvec2> on_resize;
   event<VkCommandBuffer> on_draw;
   event<display::duration> on_frame;
-  event<std::string /*path*/, uvec2 /*pos*/> on_drop;
 
   event<uint8_t /*finger*/, touch_event_type, vec2 /*pos*/> on_touch;
   event<uint8_t /*button*/, mouse_event_type, vec2 /*pos*/> on_mouse;
@@ -98,7 +97,7 @@ class window {
   explicit window(display &_display, const window_params &_init_params = {});
   ~window();
 
-  bool has_system_decorations() { return has_system_decorations_; }
+  [[nodiscard]] bool has_system_decorations() const { return has_system_decorations_; }
 
   void close();
   void pause();
@@ -121,28 +120,16 @@ class window {
     invalidate(true);
   }
 
-  struct clipboard_sender {
-#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
-    int fd_;
-#elif defined(VK_USE_PLATFORM_WIN32_KHR)
-    std::vector<uint8_t> buffer_;
-#endif
-    size_t write(span<uint8_t>);
-  };
   using send_clipboard_data = std::function<void(clipboard_format /*_selected_format*/, clipboard_sender &)>;
   void clipboard_offer(clipboard_formats _supported_formats, const send_clipboard_data &_callback);
 
-  struct clipboard_receiver {
-#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
-    int fd_;
-#elif defined(VK_USE_PLATFORM_WIN32_KHR)
-    span<uint8_t> buffer_;
-    size_t offset_ = 0;
-#endif
-    size_t read(span<uint8_t>);
-  };
   using receive_clipboard_data = std::function<void(clipboard_format /*selected_format*/, clipboard_receiver &)>;
   bool clipboard_receive(clipboard_formats _supported_formats, const receive_clipboard_data &_callback);
+
+  void dragndrop_target(const std::shared_ptr<drop_target_interface> &_received) { drop_target_interface_ = _received; }
+
+  using send_dragndrop_data = std::function<void(dragndrop_action /*_action*/, clipboard_format /*_selected_format*/, clipboard_sender &)>;
+  void dragndrop_start(dragndrop_actions _supported_actions, clipboard_formats _supported_formats, const send_dragndrop_data &_callback);
 
  protected:
   display &display_;
@@ -177,6 +164,8 @@ class window {
   bool minimized_ = false;
   bool has_system_decorations_ = false;
 
+  std::shared_ptr<drop_target_interface> drop_target_interface_;
+
   void init_vulkan_surface();
   void rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb);
   void destroy_vulkan();
@@ -184,27 +173,63 @@ class window {
 
  protected:
 #if defined(VK_USE_PLATFORM_WAYLAND_KHR)
+  friend void registry_handler(void*, wl_registry*, uint32_t, const char*, uint32_t);
+  friend void seat_handler(void*, wl_seat*, uint32_t);
   friend void handle_xdg_configure(void*, xdg_surface*, uint32_t);
   friend void handle_toplevel_decoration_configure(void*, zxdg_toplevel_decoration_v1*, uint32_t);
   friend void handle_toplevel_configure(void*, xdg_toplevel*, int32_t, int32_t, wl_array*);
   friend void handle_toplevel_close(void*, xdg_toplevel*);
   friend void pointer_handle_enter(void*, wl_pointer*, uint32_t, wl_surface*, wl_fixed_t, wl_fixed_t);
+  friend void pointer_handle_leave(void*, wl_pointer*, uint32_t, wl_surface*);
   friend void pointer_handle_motion(void*, wl_pointer*, uint32_t, wl_fixed_t, wl_fixed_t);
   friend void pointer_handle_button(void*, wl_pointer*, uint32_t, uint32_t, uint32_t, uint32_t);
   friend void pointer_handle_axis(void*, wl_pointer*, uint32_t, uint32_t, wl_fixed_t);
-  friend void data_source_handle_send(void*, wl_data_source*, const char*, int32_t);
-  friend void data_source_handle_cancelled(void*, wl_data_source*);
+  friend void pointer_handle_frame(void*, wl_pointer*);
+  friend void pointer_handle_axis_source(void*, wl_pointer*, uint32_t);
+  friend void pointer_handle_axis_stop(void*, wl_pointer*, uint32_t, uint32_t);
+  friend void pointer_handle_axis_discrete(void*, wl_pointer*, uint32_t, int32_t);
+  friend void keyboard_handle_keymap(void*, wl_keyboard*, uint32_t, int, uint32_t);
+  friend void keyboard_handle_enter(void*, wl_keyboard*, uint32_t, wl_surface*, wl_array*);
+  friend void keyboard_handle_leave(void*, wl_keyboard*, uint32_t, wl_surface*);
+  friend void keyboard_handle_key(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t);
+  friend void keyboard_handle_modifiers(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+  friend void keyboard_handle_repeat_info(void*, wl_keyboard*, int32_t, int32_t);
+  friend void clipboard_data_source_handle_target(void*, wl_data_source*, const char*);
+  friend void clipboard_data_source_handle_send(void*, wl_data_source*, const char*, int32_t);
+  friend void clipboard_data_source_handle_cancelled(void*, wl_data_source*);
+  friend void clipboard_data_source_handle_dnd_drop_performed(void*, wl_data_source*);
+  friend void clipboard_data_source_handle_dnd_finished(void*, wl_data_source*);
+  friend void clipboard_data_source_handle_action(void*, wl_data_source*, uint32_t);
+  friend void drag_data_source_handle_target(void*, wl_data_source*, const char*);
+  friend void drag_data_source_handle_send(void*, wl_data_source*, const char*, int32_t);
+  friend void drag_data_source_handle_cancelled(void*, wl_data_source*);
+  friend void drag_data_source_handle_dnd_drop_performed(void*, wl_data_source*);
+  friend void drag_data_source_handle_dnd_finished(void*, wl_data_source*);
+  friend void drag_data_source_handle_action(void*, wl_data_source*, uint32_t);
+  friend void data_offer_handle_offer(void*, wl_data_offer*, const char*);
+  friend void data_offer_handle_source_actions(void*, wl_data_offer*, uint32_t);
+  friend void data_offer_handle_action(void*, wl_data_offer*, uint32_t);
+  friend void data_device_handle_data_offer(void*, wl_data_device*, wl_data_offer*);
+  friend void data_device_handle_enter(void*, wl_data_device*, uint32_t, wl_surface*, wl_fixed_t, wl_fixed_t, wl_data_offer*);
+  friend void data_device_handle_leave(void*, wl_data_device*);
+  friend void data_device_handle_motion(void*, wl_data_device*, uint32_t, wl_fixed_t, wl_fixed_t);
+  friend void data_device_handle_drop(void*, wl_data_device*);
+  friend void data_device_handle_selection(void*, wl_data_device*, wl_data_offer*);
 
   wl_surface *wayland_surface_;
   xdg_surface *window_;
   xdg_toplevel *toplevel_;
-  wl_data_source *current_selection_ = nullptr;
+  wl_data_source *current_selection_ = nullptr, *current_drag_source_ = nullptr;
   zxdg_toplevel_decoration_v1 *decoration_ = nullptr;
 
   std::atomic_bool invalidated_ = true;
   vec2 mouse_lastmove_ = {0, 0};
   cursor_type current_cursor_type_ = CDEFAULT;
   send_clipboard_data current_clipboard_sender_;
+  send_dragndrop_data current_dragndrop_sender_;
+  uint32_t last_pointer_button_press_serial_ = 0;
+  dragndrop_action last_drag_action_handled_ = DNDNONE;
+
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
   friend LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
 

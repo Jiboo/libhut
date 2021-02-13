@@ -46,7 +46,7 @@ class font {
   friend class shaper;
 
  public:
-  font(display &_display, const uint8_t *_addr, size_t _size, shared_atlas _atlas, bool _hinting = true);
+  font(display &_display, const uint8_t *_addr, size_t _size, const shared_atlas &_atlas, bool _hinting = true);
   ~font();
 
  private:

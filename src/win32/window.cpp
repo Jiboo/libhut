@@ -212,18 +212,6 @@ void window::cursor(cursor_type _c) {
   current_cursor_type_ = _c;
 }
 
-size_t window::clipboard_sender::write(span<uint8_t> _data) {
-  buffer_.insert(buffer_.cend(), _data.begin(), _data.end());
-  return _data.size_bytes();
-}
-size_t window::clipboard_receiver::read(span<uint8_t> _data) {
-  size_t remaining = buffer_.size() - offset_;
-  size_t reading = std::min(remaining, _data.size());
-  memcpy(_data.data(), buffer_.data() + offset_, reading);
-  offset_ += reading;
-  return reading;
-}
-
 int parse_html_header(std::string_view _input, const char *_name) {
   auto offset = _input.find(_name);
   if (offset == std::string_view::npos)
@@ -244,10 +232,15 @@ span<uint8_t> window::parse_html_clipboard(std::string_view _input) {
   if (!_input.starts_with("Version:0.9"))
     return {};
 
+  /*std::cout << "parse_html_clipboard: " << std::endl;
+  hexdump(_input.data(), _input.size());*/
+
   auto start = parse_html_header(_input, "StartFragment");
   auto end = parse_html_header(_input, "EndFragment");
   if (start <= 0 || end <= 0)
     return {};
+
+  //std::cout << "parse_html_clipboard limits: " << start << ", " << end << std::endl;
 
   return span<uint8_t>((uint8_t*)_input.data() + start, (uint8_t*)_input.data() + end);
 }
@@ -282,16 +275,16 @@ std::vector<uint8_t> window::format_html_clipboard(span<uint8_t> _input) {
   constexpr auto htmlCloseFragPos = footer.find("<!--EndFragment-->") + strlen("<!--EndFragment-->");
 
   char buff[9];
-  sprintf(buff, "%08u", htmlOpenTagPos);
+  sprintf(buff, "%08llu", htmlOpenTagPos);
   memcpy(result.data() + startHtml, buff, 8);
 
-  sprintf(buff, "%08u", header.size() + _input.size() + htmlCloseTagPos);
+  sprintf(buff, "%08llu", header.size() + _input.size() + htmlCloseTagPos);
   memcpy(result.data() + endHTML, buff, 8);
 
-  sprintf(buff, "%08u", htmlOpenFragPos);
+  sprintf(buff, "%08llu", htmlOpenFragPos);
   memcpy(result.data() + startFrag, buff, 8);
 
-  sprintf(buff, "%08u", header.size() + _input.size() + htmlCloseFragPos);
+  sprintf(buff, "%08llu", header.size() + _input.size() + htmlCloseFragPos);
   memcpy(result.data() + endFrag, buff, 8);
 
   return result;
@@ -322,7 +315,7 @@ void window::clipboard_offer(clipboard_formats _supported_formats, const send_cl
 }
 
 void window::clipboard_write(clipboard_format _format, UINT _win_format) {
-  window::clipboard_sender sender{};
+  clipboard_sender sender{};
   current_clipboard_sender_(_format, sender);
 
   switch(_win_format) {
@@ -374,8 +367,9 @@ void window::clipboard_write(clipboard_format _format, UINT _win_format) {
 }
 
 bool window::clipboard_receive(clipboard_formats _supported_formats, const receive_clipboard_data &_callback) {
-  if (!OpenClipboard(window_))
+  if (!OpenClipboard(window_)) {
     return false;
+  }
   for (auto format : _supported_formats) {
     auto wformat = display_.format_win32(format);
     if (wformat) {
@@ -383,7 +377,7 @@ bool window::clipboard_receive(clipboard_formats _supported_formats, const recei
       auto *locked = GlobalLock(object);
       if (!locked) {
         CloseClipboard();
-        return false;
+        continue;
       }
       switch(wformat) {
         case CF_UNICODETEXT: {
@@ -407,6 +401,10 @@ bool window::clipboard_receive(clipboard_formats _supported_formats, const recei
     }
   }
   return false;
+}
+
+void window::dragndrop_start(dragndrop_actions _supported_actions, clipboard_formats _supported_formats, const send_dragndrop_data &_callback) {
+  // TODO
 }
 
 void window::interactive_resize(edge _edge) {

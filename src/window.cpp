@@ -145,10 +145,7 @@ void window::init_vulkan_surface() {
 
   if (params_.flags_ & window_params::FMULTISAMPLING) {
     VkSampleCountFlags counts = display_.limits().framebufferColorSampleCounts & display_.limits().framebufferDepthSampleCounts;
-    if (counts & VK_SAMPLE_COUNT_64_BIT) sample_count_ = VK_SAMPLE_COUNT_64_BIT;
-    else if (counts & VK_SAMPLE_COUNT_32_BIT) sample_count_ = VK_SAMPLE_COUNT_32_BIT;
-    else if (counts & VK_SAMPLE_COUNT_16_BIT) sample_count_ = VK_SAMPLE_COUNT_16_BIT;
-    else if (counts & VK_SAMPLE_COUNT_8_BIT) sample_count_ = VK_SAMPLE_COUNT_8_BIT;
+    if (counts & VK_SAMPLE_COUNT_8_BIT) sample_count_ = VK_SAMPLE_COUNT_8_BIT;
     else if (counts & VK_SAMPLE_COUNT_4_BIT) sample_count_ = VK_SAMPLE_COUNT_4_BIT;
     else if (counts & VK_SAMPLE_COUNT_2_BIT) sample_count_ = VK_SAMPLE_COUNT_2_BIT;
 

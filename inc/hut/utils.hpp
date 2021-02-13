@@ -87,6 +87,11 @@ inline size_t utf8codepointsize(char32_t _c) {
 inline char8_t *utf8catcodepoint(char8_t *_s, char32_t _c, size_t _n) {
   // https://github.com/sheredom/utf8.h/blob/master/utf8.h
 
+  constexpr char8_t mask_extra = 0x80;
+  constexpr char8_t mask_2bytes = 0xc0;
+  constexpr char8_t mask_3bytes = 0xe0;
+  constexpr char8_t mask_4bytes = 0xf0;
+
   if (0 == (0xffffff80u & _c)) {
     // 1-byte/7-bit ascii
     // (0b0xxxxxxx)
@@ -101,8 +106,8 @@ inline char8_t *utf8catcodepoint(char8_t *_s, char32_t _c, size_t _n) {
     if (_n < 2) {
       return _s;
     }
-    _s[0] = 0xc0 | (char)(_c >> 6);
-    _s[1] = 0x80 | (char)(_c & 0x3f);
+    _s[0] = mask_2bytes | (char8_t)(_c >> 6);
+    _s[1] = mask_extra | (char8_t)(_c & 0x3f);
     _s += 2;
   } else if (0 == (0xffff0000u & _c)) {
     // 3-byte/16-bit utf8 code point
@@ -110,9 +115,9 @@ inline char8_t *utf8catcodepoint(char8_t *_s, char32_t _c, size_t _n) {
     if (_n < 3) {
       return _s;
     }
-    _s[0] = 0xe0 | (char)(_c >> 12);
-    _s[1] = 0x80 | (char)((_c >> 6) & 0x3f);
-    _s[2] = 0x80 | (char)(_c & 0x3f);
+    _s[0] = mask_3bytes | (char8_t)(_c >> 12);
+    _s[1] = mask_extra | (char8_t)((_c >> 6) & 0x3f);
+    _s[2] = mask_extra | (char8_t)(_c & 0x3f);
     _s += 3;
   } else { // if (0 == ((int)0xffe00000 & chr)) {
     // 4-byte/21-bit utf8 code point
@@ -120,10 +125,10 @@ inline char8_t *utf8catcodepoint(char8_t *_s, char32_t _c, size_t _n) {
     if (_n < 4) {
       return _s;
     }
-    _s[0] = 0xf0 | (char)(_c >> 18);
-    _s[1] = 0x80 | (char)((_c >> 12) & 0x3f);
-    _s[2] = 0x80 | (char)((_c >> 6) & 0x3f);
-    _s[3] = 0x80 | (char)(_c & 0x3f);
+    _s[0] = mask_4bytes | (char8_t)(_c >> 18);
+    _s[1] = mask_extra | (char8_t)((_c >> 12) & 0x3f);
+    _s[2] = mask_extra | (char8_t)((_c >> 6) & 0x3f);
+    _s[3] = mask_extra | (char8_t)(_c & 0x3f);
     _s += 4;
   }
 
@@ -131,7 +136,7 @@ inline char8_t *utf8catcodepoint(char8_t *_s, char32_t _c, size_t _n) {
 }
 
 inline char8_t *to_utf8(span<char8_t> _dst, char32_t _src) {
-  return static_cast<char8_t *>(utf8catcodepoint(_dst.data(), _src, _dst.size()));
+  return utf8catcodepoint(_dst.data(), _src, _dst.size());
 }
 
 inline std::u8string to_utf8(char32_t _src) {
@@ -274,9 +279,9 @@ struct flagged {
   [[nodiscard]] constexpr bool operator[](TEnum _flag) const { return query(_flag); }
   [[nodiscard]] constexpr bool operator&(TEnum _flag)  const { return query(_flag); }
 
-  [[nodiscard]] constexpr size_t   count()             const { return std::popcount(active_); }
+  [[nodiscard]] constexpr size_t   count()             const { return (size_t)std::popcount(active_); }
   [[nodiscard]] constexpr bool     empty()             const { return active_ == 0; }
-  [[nodiscard]] constexpr operator bool()              const { return active_ != 0; }
+  [[nodiscard]] constexpr explicit operator bool()              const { return active_ != 0; }
 
   constexpr void reset(TUnderlying _underlying) { active_ = _underlying; }
   constexpr flagged &operator=(TUnderlying _underlying) { reset(_underlying); return *this; }
@@ -317,12 +322,12 @@ inline glm::i16vec2 extent2_16(VkExtent2D _in) { return glm::u16vec2{_in.width, 
 inline glm::i16vec3 extent3_16(VkExtent3D _in) { return glm::u16vec3{_in.width, _in.height, _in.depth}; }
 inline glm::vec4 color3_32(VkClearColorValue _in) { return glm::vec4{_in.float32[0], _in.float32[1], _in.float32[2], _in.float32[3]}; }
 
-inline void hexdump(void *ptr, int buflen) {
+inline void hexdump(const void *ptr, size_t buflen) {
   // https://stackoverflow.com/questions/29242/off-the-shelf-c-hex-dump-code
   auto *buf = (unsigned char*)ptr;
-  int i, j;
+  size_t i, j;
   for (i=0; i<buflen; i+=16) {
-    printf("%06x: ", i);
+    printf("%06zx: ", i);
     for (j=0; j<16; j++)
       if (i+j < buflen)
         printf("%02x ", buf[i+j]);

@@ -191,7 +191,7 @@ void window::cursor(cursor_type _c) {
   display_.cursor(_c);
 }
 
-void hut::data_source_handle_send(void *_data, wl_data_source *_source, const char *_mime, int32_t _fd) {
+void hut::clipboard_data_source_handle_send(void *_data, wl_data_source *_source, const char *_mime, int32_t _fd) {
   auto *w = (window*)_data;
   auto format = mime_type_format(_mime);
   if (!format) {
@@ -202,32 +202,31 @@ void hut::data_source_handle_send(void *_data, wl_data_source *_source, const ch
     else if (strcmp("UTF8_STRING", _mime) == 0) format = FTEXT_PLAIN;
   }
   if (format) {
-    window::clipboard_sender sender{_fd};
+    clipboard_sender sender{_fd};
     w->current_clipboard_sender_(*format, sender);
   }
   ::close(_fd);
 }
 
-size_t window::clipboard_sender::write(span<uint8_t> _data) {
-  return ::write(fd_, _data.data(), _data.size_bytes());
-}
-size_t window::clipboard_receiver::read(span<uint8_t> _data) {
-  return ::read(fd_, _data.data(), _data.size_bytes());
-}
-
-void hut::data_source_handle_cancelled(void *_data, wl_data_source *_source) {
+void hut::clipboard_data_source_handle_cancelled(void *_data, wl_data_source *_source) {
   wl_data_source_destroy(_source);
   auto *w = (window*)_data;
   w->current_selection_ = nullptr;
 }
 
-void data_source_handle_target(void *data, struct wl_data_source *wl_data_source, const char *mime_type) {}
+void hut::clipboard_data_source_handle_target(void *_data, wl_data_source *_source, const char *_mime) {}
+void hut::clipboard_data_source_handle_dnd_drop_performed(void *_data, wl_data_source *_source) {}
+void hut::clipboard_data_source_handle_dnd_finished(void *_data, wl_data_source *_source) {}
+void hut::clipboard_data_source_handle_action(void *_data, wl_data_source *_source, uint32_t _action) {}
 
 void window::clipboard_offer(clipboard_formats _supported_formats, const send_clipboard_data &_callback) {
   static const wl_data_source_listener wl_data_source_listeners = {
-    data_source_handle_target,
-    data_source_handle_send,
-    data_source_handle_cancelled,
+    clipboard_data_source_handle_target,
+    clipboard_data_source_handle_send,
+    clipboard_data_source_handle_cancelled,
+    clipboard_data_source_handle_dnd_drop_performed,
+    clipboard_data_source_handle_dnd_finished,
+    clipboard_data_source_handle_action
   };
 
   if (!display_.data_device_manager_ || !display_.data_device_)
@@ -264,17 +263,20 @@ void window::clipboard_offer(clipboard_formats _supported_formats, const send_cl
 }
 
 bool window::clipboard_receive(clipboard_formats _supported_formats, const receive_clipboard_data &_callback) {
-  if (display_.current_data_offer_ == nullptr)
+  if (display_.last_offer_from_clipboard_ == nullptr)
     return false;
 
   for (auto mime : _supported_formats) {
-    if (display_.current_data_offer_formats_ & mime) {
+    auto *offer = display_.last_offer_from_clipboard_;
+    auto &params = display_.offer_params_[offer];
+    if (params.formats_ & mime) {
       int fds[2];
       if (pipe(fds) != 0)
         return false;
-      wl_data_offer_receive(display_.current_data_offer_, format_mime_type(mime), fds[1]);
+      wl_data_offer_receive(offer, format_mime_type(mime), fds[1]);
       ::close(fds[1]);
 
+      wl_display_flush(display_.display_);
       wl_display_roundtrip(display_.display_);
 
       clipboard_receiver receiver{fds[0]};
@@ -285,6 +287,110 @@ bool window::clipboard_receive(clipboard_formats _supported_formats, const recei
   }
 
   return false;
+}
+
+void hut::drag_data_source_handle_send(void *_data, wl_data_source *_source, const char *_mime, int32_t _fd) {
+  //std::cout << "drag_data_source_handle_send " << _source << ", " << _mime << std::endl;
+  auto *w = (window*)_data;
+  auto format = mime_type_format(_mime);
+  if (!format) {
+    if (strcmp("text/plain;charset=utf-8", _mime) == 0) format = FTEXT_PLAIN;
+    else if (strcmp("text/plain;charset=unicode", _mime) == 0) format = FTEXT_PLAIN;
+    else if (strcmp("STRING", _mime) == 0) format = FTEXT_PLAIN;
+    else if (strcmp("TEXT", _mime) == 0) format = FTEXT_PLAIN;
+    else if (strcmp("UTF8_STRING", _mime) == 0) format = FTEXT_PLAIN;
+  }
+  if (format) {
+    clipboard_sender sender{_fd};
+    w->current_dragndrop_sender_(w->last_drag_action_handled_, *format, sender);
+  }
+  ::close(_fd);
+}
+
+void hut::drag_data_source_handle_target(void *_data, wl_data_source *_source, const char *_mime) {
+  //std::cout << "drag_data_source_handle_target " << _source << ", " << (_mime ? _mime : "<nullptr>") << std::endl;
+  auto *w = (window*)_data;
+  if (_mime == nullptr)
+    w->last_drag_action_handled_ = DNDNONE;
+}
+
+void hut::drag_data_source_handle_action(void *_data, wl_data_source *_source, uint32_t _action) {
+  //std::cout << "drag_data_source_handle_action " << _source << ", " << _action << std::endl;
+
+  auto *w = (window*)_data;
+  if (_action == WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY)
+    w->last_drag_action_handled_ = DNDCOPY;
+  else if (_action == WL_DATA_DEVICE_MANAGER_DND_ACTION_MOVE)
+    w->last_drag_action_handled_ = DNDMOVE;
+}
+
+void hut::drag_data_source_handle_cancelled(void *_data, wl_data_source *_source) {
+  //std::cout << "drag_data_source_handle_cancelled " << _source << std::endl;
+  auto *w = (window*)_data;
+  assert(_source == w->current_drag_source_);
+  wl_data_source_destroy(_source);
+  w->current_drag_source_ = nullptr;
+}
+
+void hut::drag_data_source_handle_dnd_drop_performed(void *_data, wl_data_source *_source) {
+  //std::cout << "drag_data_source_handle_dnd_drop_performed " << _source << std::endl;
+}
+
+void hut::drag_data_source_handle_dnd_finished(void *_data, wl_data_source *_source) {
+  //std::cout << "drag_data_source_handle_dnd_finished " << _source << std::endl;
+  auto *w = (window*)_data;
+  assert(_source == w->current_drag_source_);
+  wl_data_source_destroy(_source);
+  w->current_drag_source_ = nullptr;
+}
+
+void window::dragndrop_start(dragndrop_actions _supported_actions, clipboard_formats _supported_formats, const send_dragndrop_data &_callback) {
+  static const wl_data_source_listener wl_data_source_listeners = {
+    drag_data_source_handle_target,
+    drag_data_source_handle_send,
+    drag_data_source_handle_cancelled,
+    drag_data_source_handle_dnd_drop_performed,
+    drag_data_source_handle_dnd_finished,
+    drag_data_source_handle_action
+  };
+
+  if (!display_.data_device_manager_ || !display_.data_device_)
+    return;
+  if (!_supported_formats)
+    return;
+
+  assert(last_pointer_button_press_serial_ != 0);
+  assert(current_drag_source_ == nullptr);
+
+  current_dragndrop_sender_ = _callback;
+  current_drag_source_ = wl_data_device_manager_create_data_source(display_.data_device_manager_);
+  wl_data_source_add_listener(current_drag_source_, &wl_data_source_listeners, this);
+  for (auto mime : _supported_formats) {
+    wl_data_source_offer(current_drag_source_, format_mime_type(mime));
+    switch(mime) {
+      default: break;
+      case FTEXT_URI_LIST:
+      case FTEXT_HTML:
+      case FTEXT_PLAIN:
+        wl_data_source_offer(current_drag_source_, "text/plain;charset=utf-8");
+        wl_data_source_offer(current_drag_source_, "text/plain;charset=unicode");
+        wl_data_source_offer(current_drag_source_, "STRING");
+        wl_data_source_offer(current_drag_source_, "TEXT");
+        wl_data_source_offer(current_drag_source_, "UTF8_STRING");
+        break;
+    }
+  }
+  uint32_t wl_actions = 0;
+  for (auto action : _supported_actions) {
+    switch(action) {
+      default: break;
+      case DNDCOPY: wl_actions |= WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY; break;
+      case DNDMOVE: wl_actions |= WL_DATA_DEVICE_MANAGER_DND_ACTION_MOVE; break;
+    }
+  }
+  wl_data_source_set_actions(current_drag_source_, wl_actions);
+  display_.cursor(CGRABBING);
+  wl_data_device_start_drag(display_.data_device_, current_drag_source_, wayland_surface_, nullptr, last_pointer_button_press_serial_);
 }
 
 void window::interactive_resize(edge _edge) {

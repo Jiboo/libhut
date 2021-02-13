@@ -31,7 +31,6 @@
 #include <chrono>
 #include <iostream>
 #include <set>
-#include <thread>
 
 #include <windows.h>
 
@@ -40,6 +39,19 @@
 
 using namespace hut;
 
+ssize_t clipboard_sender::write(span<uint8_t> _data) {
+  buffer_.insert(buffer_.cend(), _data.begin(), _data.end());
+  return _data.size_bytes();
+}
+
+ssize_t clipboard_receiver::read(span<uint8_t> _data) {
+  size_t remaining = buffer_.size() - offset_;
+  size_t reading = std::min(remaining, _data.size());
+  memcpy(_data.data(), buffer_.data() + offset_, reading);
+  offset_ += reading;
+  return reading;
+}
+
 std::string display::utf8_wstr(const WCHAR *_input) {
 #ifdef WC_ERR_INVALID_CHARS
   DWORD flags = WC_ERR_INVALID_CHARS;
@@ -47,8 +59,8 @@ std::string display::utf8_wstr(const WCHAR *_input) {
   DWORD flags = 0;
 #endif
 
-  size_t size = WideCharToMultiByte(CP_UTF8, flags, _input, -1, NULL, 0, NULL, NULL);
-  if (!size) return "";
+  auto size = WideCharToMultiByte(CP_UTF8, flags, _input, -1, NULL, 0, NULL, NULL);
+  if (size <= 0) return "";
 
   std::string result;
   result.resize(size);

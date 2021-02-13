@@ -27,7 +27,6 @@
 
 #include <cstring>
 
-#include <algorithm>
 #include <iostream>
 
 #include <png.h>
@@ -45,7 +44,7 @@ struct png_ctx {
 };
 
 void png_mem_read(png_structp _png_ptr, png_bytep _target, png_size_t _size) {
-  png_ctx *a = (png_ctx *)png_get_io_ptr(_png_ptr);
+  auto *a = (png_ctx *)png_get_io_ptr(_png_ptr);
 
   memcpy(_target, a->data_, _size);
   a->data_ += _size;
@@ -56,7 +55,7 @@ std::shared_ptr<image> image::load_png(display &_display, span<const uint8_t> _d
   if (png_sig_cmp((png_bytep)_data.data(), 0, 8))
     throw std::runtime_error("load_png: invalid data, can't validate PNG signature");
 
-  png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+  png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
 
   if (!png_ptr)
     throw std::runtime_error("load_png: png_create_read_struct failed");
@@ -345,7 +344,7 @@ void image::update(ivec4 coords, uint8_t *_data, uint _src_row_pitch) {
   uint offset_align = std::max(VkDeviceSize(4), display_.device_props_.limits.optimalBufferCopyOffsetAlignment);
   uint row_byte_size = width * pixel_size_;
   uint buffer_row_pitch = align(row_byte_size, buffer_align);
-  int byte_size = height * buffer_row_pitch;
+  auto byte_size = height * buffer_row_pitch;
 
   shared_ref<u8> staging;
   {

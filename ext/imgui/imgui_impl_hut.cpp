@@ -115,7 +115,7 @@ const char* GetClipboardText(void* user_data) {
   auto &target = g_ctx.clipboard_buffer_;
   target.clear();
   g_ctx.window_->clipboard_receive(hut::FTEXT_PLAIN,
-   [&](hut::clipboard_format _mime, hut::window::clipboard_receiver &_receiver) {
+   [&](hut::clipboard_format _mime, hut::clipboard_receiver &_receiver) {
      uint8_t buffer[2048];
      size_t read_bytes;
      while ((read_bytes = _receiver.read(buffer))) {
@@ -131,7 +131,7 @@ const char* GetClipboardText(void* user_data) {
 
 void SetClipboardText(void* user_data, const char* text) {
   g_ctx.window_->clipboard_offer(hut::FTEXT_PLAIN,
-    [buffer{std::string(text)}](hut::clipboard_format _mime, hut::window::clipboard_sender &_sender) {
+    [buffer{std::string(text)}](hut::clipboard_format _mime, hut::clipboard_sender &_sender) {
     if (_mime == hut::FTEXT_PLAIN) {
       auto wrote_bytes = _sender.write({(uint8_t *) buffer.data(), buffer.size()});
 #if !defined(NDEBUG) && 0

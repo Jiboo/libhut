@@ -126,7 +126,7 @@ struct fixed_string {
 
   fixed_string() = default;
   fixed_string(const fixed_string&) = default;
-  fixed_string(fixed_string&&) = default;
+  fixed_string(fixed_string&&) noexcept = default;
 
   constexpr fixed_string(const char *_in, size_t _byte_size) {
     auto min = std::min(str_size, _byte_size);
@@ -140,17 +140,12 @@ struct fixed_string {
     data_[min] = 0;
   }
 
-  constexpr fixed_string(const char (&_in)[TSize]) : fixed_string(_in, TSize - 1) {}
+  constexpr explicit fixed_string(const char (&_in)[TSize]) : fixed_string(_in, TSize - 1) {}
 };
 
 template<size_t TMaxSize>
 fixed_string<TMaxSize> make_fixed(std::string_view _view) {
   return fixed_string<TMaxSize>{_view.data(), _view.size()};
-}
-
-template<size_t TMaxSize>
-fixed_string<TMaxSize> make_fixed(const char *_in) {
-  return _in != nullptr ? fixed_string<TMaxSize>{_in, strlen(_in)} : fixed_string<TMaxSize>{nullptr, 0};
 }
 
 template <size_t TSize>
@@ -169,9 +164,9 @@ struct fixed_string_array {
   offsets_type offsets_ = {};
 
   fixed_string_array(const fixed_string_array&) = default;
-  fixed_string_array(fixed_string_array&&) = default;
+  fixed_string_array(fixed_string_array&&) noexcept = default;
 
-  constexpr fixed_string_array(const char (&... _in)[TSizes]) {
+  constexpr explicit fixed_string_array(const char (&... _in)[TSizes]) {
     init(0, 0, _in...);
   }
 
@@ -184,9 +179,9 @@ struct fixed_string_array {
       init(_index + 1, _byte_offset + TFirstSize, _rest...);
   }
 
-  constexpr void init(size_t _index, size_t _byte_offset) {}
+  constexpr void init(size_t, size_t) {}
 
-  constexpr const char *at(size_t _index) const {
+  [[nodiscard]] constexpr const char *at(size_t _index) const {
     assert(_index < count);
     return data_ + offsets_[_index];
   }

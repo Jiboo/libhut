@@ -118,7 +118,7 @@ protected:
     }
 
     ref &operator=(const ref&) = delete;
-    ref &operator=(ref &&_other) {
+    ref &operator=(ref &&_other) noexcept {
       alloc_ = _other.alloc_;
       _other.alloc_.reset();
       return *this;
@@ -126,7 +126,7 @@ protected:
 
     void update_raw(uint _byte_offset, uint _byte_size, void *_data) {
       assert(_byte_offset + _byte_size <= size_bytes());
-      pool().do_update(buff(), alloc_.offset_ + _byte_offset, _byte_size, (void *)_data);
+      pool().do_update(buff(), alloc_.offset_ + _byte_offset, _byte_size, _data);
     }
 
     updator update_raw_indirect(uint _byte_offset, uint _byte_size) {
@@ -147,7 +147,7 @@ protected:
     void update_subone(uint _index_offset, uint _byte_offset, uint _byte_size, void *_data) {
       const uint byte_offset = _index_offset * sizeof(T) + _byte_offset;
       assert(_byte_size <= sizeof(T));
-      update_raw(byte_offset, _byte_size, (void *)_data);
+      update_raw(byte_offset, _byte_size, _data);
     }
 
     void set(const T &_data) {

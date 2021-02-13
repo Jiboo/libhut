@@ -55,6 +55,32 @@ mat4 make_mat(vec2 _translate, float _rot_angle, vec2 _rot_center, vec3 _scale) 
   return m;
 }
 
+struct my_drop_target_interface : hut::drop_target_interface {
+  virtual void on_enter(dragndrop_actions _actions, clipboard_formats _formats) {
+    std::cout << "my_drop_target_interface::on_enter" << std::endl;
+    assert(_formats & FTEXT_PLAIN);
+    assert(_actions & DNDCOPY);
+  }
+
+  virtual move_result on_move(vec2 _pos) {
+    //std::cout << "my_drop_target_interface::on_move" << std::endl;
+    return {hut::DNDCOPY, hut::DNDCOPY, hut::FTEXT_PLAIN};
+  }
+
+  virtual void on_drop(dragndrop_action, clipboard_receiver &_receiver) {
+    std::cout << "my_drop_target_interface::on_drop" << std::endl;
+    uint8_t buffer[1024];
+    while (auto read_bytes = _receiver.read(buffer)) {
+      std::cout << "Dropped " << read_bytes << " bytes: " << std::endl;
+      hexdump(buffer, read_bytes);
+    }
+  }
+
+  virtual void on_leave() {
+    std::cout << "my_drop_target_interface::on_leave" << std::endl;
+  }
+};
+
 int main(int, char **) {
   std::cout << std::fixed << std::setprecision(1);
 
@@ -447,31 +473,46 @@ int main(int, char **) {
     return true;
   });
 
+  w.dragndrop_target(std::make_shared<my_drop_target_interface>());
+  w.on_mouse.connect([&w](uint8_t _button, mouse_event_type _type, vec2 _coords) {
+    if (_type == MDOWN && _button == 1) {
+      w.dragndrop_start(hut::DNDCOPY, clipboard_formats{} | FTEXT_HTML | FTEXT_PLAIN, [](dragndrop_action _action, clipboard_format _mime, clipboard_sender &_sender) {
+        static const char text_html[] = R"(<meta http-equiv="content-type" content="text/html; charset=UTF-8"><html><body><b>Hello</b> from <i>libhut</i></body></html>)";
+        static const char text_plain[] = "Hello from libhut";
+        if (_mime == FTEXT_HTML) {
+          _sender.write({(uint8_t*)text_html, strlen(text_html)});
+        }
+        else if (_mime == FTEXT_PLAIN) {
+          _sender.write({(uint8_t*)text_plain, strlen(text_plain)});
+        }
+      });
+    }
+    return true;
+  });
+
   w.on_key.connect([&w](keycode, keysym _key, bool _pressed) {
     if (_key == KSYM_C && _pressed) {
       std::cout << "Offering to clipboard" << std::endl;
-
-      static const char text_html[] = R"(<meta http-equiv="content-type" content="text/html; charset=UTF-8"><html><body><b>Hello</b> from <i>libhut</i></body></html>)";
-      static const char text_plain[] = "Hello from libhut";
-      w.clipboard_offer(clipboard_formats{} | FTEXT_HTML | FTEXT_PLAIN, [](clipboard_format _mime, window::clipboard_sender &_sender) {
+      w.clipboard_offer(clipboard_formats{} | FTEXT_PLAIN | FTEXT_HTML, [](clipboard_format _mime, clipboard_sender &_sender) {
         std::cout << "Writing to clipboard in " << format_mime_type(_mime) << std::endl;
+        static const char text_html[] = R"(<meta http-equiv="content-type" content="text/html; charset=UTF-8"><html><body><b>Hello</b> from <i>libhut</i></body></html>)";
+        static const char text_plain[] = "Hello from libhut";
         if (_mime == FTEXT_HTML) {
-          _sender.write({(uint8_t*)text_html, sizeof(text_html)});
+          _sender.write({(uint8_t*)text_html, strlen(text_html)});
         }
         else if (_mime == FTEXT_PLAIN) {
-          _sender.write({(uint8_t*)text_plain, sizeof(text_plain)});
+          _sender.write({(uint8_t*)text_plain, strlen(text_plain)});
         }
       });
     }
     if (_key == KSYM_V && _pressed) {
-      std::cout << "Receiving from clipboard" << std::endl;
-
-      w.clipboard_receive(clipboard_formats{} | FTEXT_HTML | FTEXT_PLAIN, [](clipboard_format _mime, window::clipboard_receiver &_receiver) {
-        std::cout << "Clipboard contents in " << format_mime_type(_mime) << ": ";
+      w.clipboard_receive(clipboard_formats{} | FTEXT_PLAIN | FTEXT_HTML, [](clipboard_format _mime, clipboard_receiver &_receiver) {
+        std::cout << "Clipboard contents in " << format_mime_type(_mime) << std::endl;
         uint8_t buffer[2048];
         size_t read_bytes;
         while ((read_bytes = _receiver.read(buffer))) {
-          std::cout << std::string_view{(const char*)buffer, read_bytes};
+          std::cout << "Read " << read_bytes << " bytes from clipboard:" << std::endl;
+          hexdump(buffer, read_bytes);
         }
         std::cout << std::endl;
       });

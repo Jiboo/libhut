@@ -25,7 +25,6 @@
  * SOFTWARE.
  */
 
-#include <cassert>
 #include <cstring>
 
 #include <algorithm>
@@ -46,12 +45,13 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT flags
   /*if (strcmp(layerPrefix, "Loader Message") == 0)
     return VK_FALSE;*/
 
-  char level = 'D';
+  char level;
   switch (flags) {
     case VK_DEBUG_REPORT_INFORMATION_BIT_EXT: level = 'I'; break;
     case VK_DEBUG_REPORT_WARNING_BIT_EXT: level = 'W'; break;
     case VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT: level = 'P'; break;
     case VK_DEBUG_REPORT_ERROR_BIT_EXT: level = 'E'; break;
+    default: level = 'D'; break;
   }
 
   std::cout << '[' << level << ' ' << layerPrefix << "] " << msg << std::endl;
