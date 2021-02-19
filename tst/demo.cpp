@@ -190,9 +190,9 @@ int main(int, char **) {
     tex_rgba::instance{make_mat({  0, 500}, {100,100,1})},
   });
 
-  shared_atlas r8_atlas = std::make_shared<atlas>(d, image_params{.format_ = VK_FORMAT_R8_UNORM});
+  shared_atlas r8_atlas = std::make_shared<atlas_pool>(d, image_params{.format_ = VK_FORMAT_R8_UNORM});
   auto tmask_pipeline = std::make_unique<tex_mask>(w);
-  tmask_pipeline->write(0, ubo, r8_atlas->image(), samp);
+  tmask_pipeline->write(0, ubo, r8_atlas->image(0), samp);
 
   auto text_instances = b->allocate<tex_mask::instance>(2);
   auto icons_instances = b->allocate<tex_mask::instance>(2);
@@ -217,7 +217,7 @@ int main(int, char **) {
     tex_mask::vertex{{1, 0}, {1, 0}},
     tex_mask::vertex{{1, 1}, {1, 1}},
   });
-  atlas_instances->set(tex_mask::instance{make_mat({200, 0}, {r8_atlas->image()->size(), 1}), {1, 0, 0, 1}});
+  atlas_instances->set(tex_mask::instance{make_mat({200, 0}, {r8_atlas->image(0)->size(), 1}), {1, 0, 0, 1}});
 
   auto box_rgba_pipeline = std::make_unique<box_rgba>(w);
   auto box_rgba_vertices = b->allocate<box_rgba::vertex>(4);
@@ -255,7 +255,7 @@ int main(int, char **) {
 
   std::atomic_bool tex1_ready = false, tex2_ready = false;
 
-  std::thread load_res([&]() {
+  //std::thread load_res([&]() {
     tex1 = image::load_png(d, demo_png::tex1_png);
     tex_pipeline->write(0, ubo, tex1, samp);
     tex_rgb_pipeline->write(0, ubo, tex1, samp);
@@ -290,7 +290,7 @@ int main(int, char **) {
     material_icons = std::make_shared<font>(d, demo_ttf::MaterialIcons_Regular_ttf.data(), demo_ttf::MaterialIcons_Regular_ttf.size(), r8_atlas, false);
     s.bake(b, icons_test, material_icons, 16, "\uE834\uE835\uE836\uE837");
     w.invalidate(true);  // will force to call on_draw on the next frame
-  });
+  //});
 
   w.on_draw.connect([&](VkCommandBuffer _buffer) {
     tmask_pipeline->draw(_buffer, 0, indices, atlas_instances, atlas_vertices);
@@ -544,7 +544,7 @@ int main(int, char **) {
   });
 
   auto result = d.dispatch();
-  load_res.join();
+  //load_res.join();
   std::cout << "done!" << std::endl;
   return result;
 }

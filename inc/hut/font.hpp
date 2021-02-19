@@ -35,7 +35,7 @@
 #include <harfbuzz/hb.h>
 #include <harfbuzz/hb-ft.h>
 
-#include "hut/atlas.hpp"
+#include "hut/atlas_pool.hpp"
 #include "hut/buffer_pool.hpp"
 #include "hut/pipeline.hpp"
 #include "hut/image.hpp"
@@ -51,6 +51,7 @@ class font {
 
  private:
   struct glyph {
+    shared_subimage subimage_;
     vec4 texcoords_ {0, 0, 0, 0};
     vec2 bearing_ {0, 0};
     uvec2 bounds_ {0, 0};

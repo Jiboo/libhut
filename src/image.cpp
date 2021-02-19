@@ -336,10 +336,11 @@ VkMemoryRequirements image::create(display &_display, const image_params &_param
   return memReq;
 }
 
-void image::update(ivec4 coords, uint8_t *_data, uint _src_row_pitch) {
+void image::update(u16vec4 coords, uint8_t *_data, uint _src_row_pitch) {
+  assert(coords[2] > coords[0]);
+  assert(coords[3] > coords[1]);
   uint width = coords[2] - coords[0];
   uint height = coords[3] - coords[1];
-  assert (width > 0 && height > 0);
   uint buffer_align = display_.device_props_.limits.optimalBufferCopyRowPitchAlignment;
   uint offset_align = std::max(VkDeviceSize(4), display_.device_props_.limits.optimalBufferCopyOffsetAlignment);
   uint row_byte_size = width * pixel_size_;

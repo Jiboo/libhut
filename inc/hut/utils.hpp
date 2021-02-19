@@ -176,8 +176,26 @@ inline vec<2, T, Q> bbox_center(const vec<4, T, Q> &_input) {
   return vec<2, T, Q>{_input[0] + size.x / 2, _input[1] + size.y / 2};
 }
 
+template<typename T, qualifier Q = defaultp>
+inline vec<4, T, Q> make_bbox_with_origin_size(const vec<2, T, Q> &_offset, const vec<2, T, Q> &_size) {
+  return vec<4, T, Q>{_offset.x, _offset.y, _offset.x + _size.x, _offset.y + _size.y};
+}
+
+template<typename T, qualifier Q = defaultp>
+inline vec<4, T, Q> bbox_transform_relative(const vec<4, T, Q> &_big, const vec<4, T, Q> &_small) { // FIXME JBL: Naming, dunno what's this operation, _small is in coordinate space of _big ( (0,0) means topleft corner of _big), to be in _big coordinate space
+  return vec<4, T, Q>{
+      _big.x + _small.x,
+      _big.y + _small.y,
+      _big.z - _small.z,
+      _big.w - _small.w
+  };
+}
+
 template<typename T>
 inline T align(T _input, T _align) {
+  if (_align == 0)
+    return _input;
+
   T rest = _input % _align;
   return _input + (rest ? (_align - rest) : 0);
 }
@@ -357,6 +375,18 @@ template <typename TClock, typename TDur>
 inline std::ostream &operator<<(std::ostream &_os, const std::chrono::time_point<TClock, TDur> &_tp) {
   auto elapsed = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(_tp.time_since_epoch());
   return _os << elapsed.count();
+}
+
+template<typename TContainer>
+void unordered_erase_at_index(TContainer &_container, size_t _index) {
+  auto size = _container.size();
+  assert(_index < size);
+  if (size <= 1)
+    _container.clear();
+  else {
+    std::swap(_container.back(), _container[_index]);
+    _container.resize(size - 1);
+  }
 }
 
 }  // namespace hut

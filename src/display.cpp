@@ -172,10 +172,26 @@ struct score_t {
 score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
   score_t result{};
 
-  VkPhysicalDeviceProperties properties;
-  VkPhysicalDeviceFeatures features;
-  HUT_PVK(vkGetPhysicalDeviceProperties, _device, &properties);
-  HUT_PVK(vkGetPhysicalDeviceFeatures, _device, &features);
+  VkPhysicalDeviceVulkan12Properties properties12 {};
+  properties12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES;
+  VkPhysicalDeviceProperties2 properties2;
+  properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+  properties2.pNext = &properties12;
+  HUT_PVK(vkGetPhysicalDeviceProperties2, _device, &properties2);
+  VkPhysicalDeviceProperties &properties = properties2.properties;
+
+  VkPhysicalDeviceVulkan12Features features12 {};
+  features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+  VkPhysicalDeviceFeatures2 features2 {};
+  features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  features2.pNext = &features12;
+  HUT_PVK(vkGetPhysicalDeviceFeatures2, _device, &features2);
+  VkPhysicalDeviceFeatures &features = features2.features;
+
+  if (features12.descriptorBindingPartiallyBound == VK_FALSE)
+    return score_t{.score_ = 0};
+  if (features12.shaderSampledImageArrayNonUniformIndexing == VK_FALSE)
+    return score_t{.score_ = 0};
 
   result.score_ = properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? 1000 : 100;
 #ifdef HUT_PREFER_NONDESCRETE_DEVICES

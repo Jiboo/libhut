@@ -33,6 +33,7 @@
 #include <set>
 
 #include "hut/utils.hpp"
+#include "hut/binpacks.hpp"
 
 namespace hut {
 
@@ -45,35 +46,29 @@ protected:
   friend class image;
   template<typename TDetails, typename... TExtraBindings> friend class pipeline;
 
-  struct range {
-    range *prev_, *next_;
-    uint offset_, size_;
-    bool allocated_;
-  };
-
   struct buffer {
     buffer_pool &parent_;
+    uint size_;
+    binpack::linear1d<uint> suballocator_;
     VkBuffer buffer_;
     VkDeviceMemory memory_;
-    range *root_;
     uint8_t *permanent_map_;
-    uint size_;
+
+    buffer(buffer_pool &_parent, uint _size) : parent_(_parent), size_(_size), suballocator_(_size) {}
   };
 
   struct alloc {
     buffer *buffer_;
-    range *node_;
     uint offset_, size_;
 
     void reset() {
       buffer_ = nullptr;
-      node_ = nullptr;
       size_ = 0;
     }
   };
 
  public:
-  /** Advance update usage, to write directly to staging memory. */
+  /** Advanced update usage, to write directly to staging memory. */
   class updator {
     friend buffer_pool;
 
@@ -114,7 +109,7 @@ protected:
       _other.alloc_.reset();
     }
     ~ref() {
-      pool().do_free(alloc_.node_);
+      pool().do_free(alloc_);
     }
 
     ref &operator=(const ref&) = delete;
@@ -201,7 +196,7 @@ protected:
   buffer *grow(uint new_size);
   void free_buffer(buffer &_buff);
   alloc do_alloc(uint _size, uint _align = 4);
-  void do_free(range *_ref);
+  void do_free(const alloc &_alloc);
   void do_update(buffer &_buf, uint _offset, uint _size, const void *_data);
   updator prepare_update(buffer &_buf, uint _offset, uint _size);
   void finalize_update(updator &_update);

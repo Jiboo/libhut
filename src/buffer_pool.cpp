@@ -90,7 +90,7 @@ void buffer_pool::finalize_update(updator &_update) {
   display_.staging_jobs_++;
   display_.preflush([this, copy, staging = _update.staging_]() {
     display_.stage_copy(copy);
-    do_free(staging.node_);
+    do_free(staging);
     display_.staging_jobs_--;
   });
 }
@@ -114,8 +114,7 @@ buffer_pool::buffer *buffer_pool::grow(uint _size) {
 
   assert(buffers_.size() < buffers_.capacity()); // NOTE JBL: If you hit this, you would invalidate all pointers to elements in this array, increase initial buffer size, or fix a potential leak
 
-  buffer result = {*this};
-  result.size_ = _size;
+  buffer result = {*this, _size};
   total_size_ += _size;
 
   VkBufferCreateInfo create_info = {};
@@ -146,13 +145,6 @@ buffer_pool::buffer *buffer_pool::grow(uint _size) {
   }
   HUT_PVK(vkBindBufferMemory, display_.device_, result.buffer_, result.memory_, 0);
 
-  result.root_ = new range;
-  result.root_->offset_ = 0;
-  result.root_->size_ = _size;
-  result.root_->allocated_ = false;
-  result.root_->next_ = nullptr;
-  result.root_->prev_ = nullptr;
-
   if (type_ == staging_type && usage_ == staging_usage) {
     HUT_PVK(vkMapMemory, display_.device_, result.memory_, 0, _size, 0, reinterpret_cast<void**>(&result.permanent_map_));
     assert(result.permanent_map_);
@@ -167,139 +159,27 @@ buffer_pool::buffer *buffer_pool::grow(uint _size) {
 buffer_pool::alloc buffer_pool::do_alloc(uint _size, uint _align) {
   HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::do_alloc {}", _size);
 
-#ifdef HUT_DEBUG_ALLOCATIONS
-  std::cout << "[alloc] pre-do_alloc" << std::endl;
-  debug();
-#endif
-
-  uint aligned = 0, aligned_size = _size;
-  range *fit = nullptr;
-  buffer *container = nullptr;
   for (auto &buffer : buffers_) {
-    if (fit != nullptr)
-      break;
-
-    range *cur = buffer.root_;
-    assert(cur);
-    while (cur != nullptr) {
-      if (cur->allocated_) {
-        cur = cur->next_;
-        continue;
-      }
-      aligned = align<uint>(cur->offset_, _align);
-      uint align_bytes = aligned - cur->offset_;
-      aligned_size = align_bytes + _size;
-      if (aligned_size > cur->size_) {
-        cur = cur->next_;
-        continue;
-      }
-      fit = cur;
-      container = &buffer;
-      break;
-    }
+    auto fit = buffer.suballocator_.pack(_size, _align);
+    if (fit)
+      return alloc{&buffer, *fit, _size};
   }
 
-  if (fit == nullptr) {
-    container = grow(align(total_size_ + _size, total_size_));
-    fit = container->root_;
-    aligned = 0;
-    aligned_size = _size;
-  }
+  auto *new_buffer = grow(align(total_size_ + _size, total_size_));
+  auto fit = new_buffer->suballocator_.pack(_size, _align);
+  assert(fit);
 
-  assert(!fit->allocated_);
-  assert(fit->size_ >= aligned_size);
-
-  if (fit->size_ == aligned_size) {
-    fit->allocated_ = true;
-  }
-  else {
-    auto new_range = new range;
-    new_range->size_ = fit->size_ - aligned_size;
-    new_range->offset_ = fit->offset_ + aligned_size;
-    new_range->allocated_ = false;
-    new_range->prev_ = fit;
-    new_range->next_ = fit->next_;
-
-    fit->next_ = new_range;
-    fit->size_ = aligned_size;
-    fit->allocated_ = true;
-
-    if (new_range->next_ != nullptr) {
-      new_range->next_->prev_ = new_range;
-    }
-  }
-
-#ifdef HUT_DEBUG_ALLOCATIONS
-  std::cout << "[alloc] post-do_alloc " << fit->offset_ << " - " << (fit->offset_ + fit->size_)
-                << ": " << fit->allocated_ << std::endl;
-  debug();
-#endif
-
-  return alloc{ container, fit, aligned, _size };
+  return alloc{ new_buffer, *fit, _size };
 }
 
-void buffer_pool::do_free(range *_range) {
+void buffer_pool::do_free(const alloc &_alloc) {
   HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::do_free {}", _range->size_);
-
-#ifdef HUT_DEBUG_ALLOCATIONS
-  std::cout << "[alloc] pre-do_free" << _range->offset_ << " - " << (_range->offset_ + _range->size_)
-                                     << ": " << _range->allocated_ << std::endl;
-  debug();
-#endif
-
-  range *prev = _range->prev_, *next = _range->next_;
-  const bool prev_free = prev != nullptr && !prev->allocated_;
-  const bool next_free = next != nullptr && !next->allocated_;
-  if (prev_free && next_free) {
-    // merges _range and next into prev
-    prev->size_ += _range->size_ + next->size_;
-    prev->next_ = next->next_;
-    if (next->next_)
-      next->next_->prev_ = prev;
-    delete _range;
-    delete next;
-  }
-  else if (prev_free) {
-    // merge _range into prev
-    prev->size_ += _range->size_;
-    prev->next_ = next;
-    if (next->next_)
-      next->prev_ = prev;
-    delete _range;
-  }
-  else if (next_free) {
-    // merge next into _range
-    _range->size_ += next->size_;
-    _range->allocated_ = false;
-    _range->next_ = next->next_;
-    if (next->next_)
-      next->next_->prev_ = _range;
-    delete next;
-  }
-  else {
-    _range->allocated_ = false;
-  }
-
-#ifdef HUT_DEBUG_ALLOCATIONS
-  std::cout << "[alloc] post-do_free" << std::endl;
-  debug();
-#endif
+  _alloc.buffer_->suballocator_.offer(_alloc.offset_);
 }
 
 void buffer_pool::clear_ranges() {
-  for (const auto &buffer : buffers_) {
-    range *cur = buffer.root_;
-    cur = cur->next_;
-    while(cur != nullptr) {
-      range *next = cur->next_;
-      delete cur;
-      cur = next;
-    }
-    cur = buffer.root_;
-    cur->next_ = nullptr;
-    cur->size_ = buffer.size_;
-    cur->allocated_ = false;
-    assert(cur->offset_ == 0);
+  for (auto &buffer : buffers_) {
+    buffer.suballocator_.reset();
   }
 }
 
@@ -311,15 +191,6 @@ void buffer_pool::free_buffer(buffer_pool::buffer &_buff) {
     HUT_PVK(vkDestroyBuffer, display_.device_, _buff.buffer_, nullptr);
   if (_buff.memory_)
     HUT_PVK(vkFreeMemory, display_.device_, _buff.memory_, nullptr);
-
-  if (_buff.root_) {
-    range *cur = _buff.root_;
-    while (cur != nullptr) {
-      range *next = cur->next_;
-      delete cur;
-      cur = next;
-    }
-  }
 }
 
 void buffer_pool::debug() {
@@ -327,13 +198,10 @@ void buffer_pool::debug() {
   for (const auto &buffer : buffers_) {
     std::cout << "\tVkBuffer " << buffer.buffer_ << " size:" << buffer.size_ << std::endl;
 
-    range *cur = buffer.root_;
-    while (cur != nullptr) {
-      std::cout << "\t\trange " << cur << " " << cur->offset_ << " - " << (cur->offset_ + cur->size_)
-                << ": " << cur->allocated_
-                << " (p: " << cur->prev_ << ", n: " << cur->next_ << ")"
+    for (const auto &block : buffer.suballocator_.blocks_) {
+      std::cout << "\t\trange " << block.offset_ << " - " << (block.offset_ + block.size_)
+                << ": " << block.used_
                 << std::endl;
-      cur = cur->next_;
     }
   }
 }

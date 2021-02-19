@@ -8,17 +8,17 @@ fix:
 
 refactor:
   - [wl] async clipboard read/write
-  - atlas => atlas_pool (same change a buffer => buffer_pool), a collection of images, instead of a single one
-    - not with multiple layers, cause we can't add new layers without creating a new image
-      - any extension to do that?
-    - add a ref like buffer_pool, allowing to update pixels, and free this space when ref is destroyed
-    - rework load_png to target an atlas_pool
+  - ~~atlas => atlas_pool (same change a buffer => buffer_pool), a collection of images, instead of a single one~~
+        - ~~not with multiple layers, cause we can't add new layers without creating a new image~~
+        - ~~any extension to do that?~~
+      - ~~add a ref like buffer_pool, allowing to update pixels, and free this space when ref is destroyed~~
+        - rework load_png to target an atlas_pool
     - rework pipelines
       - simplify by removing attachments customisation, make only ONE atlas_pool and UBO bindable (no version without UBO or atlas, but support for them being empty refs)
       - make sure we update descriptors before usage in on_draw (and no way to update them before draw finished)
         - if the atlas maintain a list of pipelines using it, it could potentially post a "staging" job to update the descriptor sets, when a new "layer" is added to the atlas
-      - make descriptorBindingPartiallyBound requried (100% on gpuinfo), and pass 256 textures, bound from the atlas
-      - make shaderSampledImageArrayNonUniformIndexing required (100% on gpuinfo), and allow indexing into atlas textures array from shader
+      - ~~make descriptorBindingPartiallyBound requried (100% on gpuinfo), and pass 256 textures, bound from the atlas~~
+      - ~~make shaderSampledImageArrayNonUniformIndexing required (100% on gpuinfo), and allow indexing into atlas textures array from shader~~
       - https://github.com/KhronosGroup/Vulkan-Guide/blob/master/chapters/extensions/VK_EXT_descriptor_indexing.md
       - http://chunkstories.xyz/blog/a-note-on-descriptor-indexing/
     - huge, but will make image as easy to work with as the buffer, just create a pool and alloc from it.

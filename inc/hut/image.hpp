@@ -39,7 +39,7 @@ namespace hut {
 class display;
 
 struct image_params {
-  uvec2 size_;
+  u16vec2 size_;
   VkFormat format_;
   VkImageTiling tiling_ = VkImageTiling::VK_IMAGE_TILING_LINEAR;
   VkImageUsageFlags usage_ = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -61,10 +61,10 @@ class image {
   image(display &_display, const image_params &_params);
   ~image();
 
-  void update(ivec4 _coords, uint8_t *_data, uint _srcRowPitch);
+  void update(u16vec4 _coords, uint8_t *_data, uint _srcRowPitch);
 
   [[nodiscard]] uint pixel_size() const { return pixel_size_; }
-  [[nodiscard]] uvec2 size() const { return params_.size_; }
+  [[nodiscard]] u16vec2 size() const { return params_.size_; }
 
  private:
   static VkMemoryRequirements create(display &_display, const image_params &_params,
