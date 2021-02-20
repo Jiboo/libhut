@@ -47,16 +47,18 @@ void atlas_pool::add_bin() {
 }
 
 shared_subimage atlas_pool::alloc(const u16vec2 &_bounds) {
+  assert(_bounds.x > 0);
+  assert(_bounds.y > 0);
   auto padded = _bounds + padding;
   for (uint i = 0; i < bins_.size(); i++) {
     auto packed = bins_[i].packer_.pack(padded);
     if (packed)
-      return std::make_shared<subimage>(this, i, make_bbox_with_origin_size(*packed, _bounds));
+      return std::make_shared<subimage>(this, i, make_bbox_with_origin_size(*packed, padded));
   }
   add_bin();
   auto packed = bins_.back().packer_.pack(padded);
   assert(packed.has_value());
-  return std::make_shared<subimage>(this, bins_.size() - 1, make_bbox_with_origin_size(packed.value(), _bounds));
+  return std::make_shared<subimage>(this, bins_.size() - 1, make_bbox_with_origin_size(packed.value(), padded));
 }
 
 shared_subimage atlas_pool::pack(const u16vec2 &_bounds, uint8_t *_data, uint _src_row_pitch) {

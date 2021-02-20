@@ -351,7 +351,7 @@ int main(int, char **) {
     shadow_instances->update_subone(0, offsetof(box_rgba::instance, params_), sizeof(new_box_params), &new_box_params);
 
     float blink = (sin(time * 4) + 1) / 2;
-    constexpr uint transparency_offset = offsetof(tex_mask::instance, color_) + 3 * sizeof(float);
+    constexpr uint transparency_offset = offsetof(tex_mask::instance, col_) + 3 * sizeof(float);
     icons_instances->update_subone(1, transparency_offset, sizeof(float), &blink);
 
     {

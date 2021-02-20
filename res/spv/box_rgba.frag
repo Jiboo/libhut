@@ -1,11 +1,11 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-layout(location = 0) in vec4 inColor;
-layout(location = 1) in vec2 inParams; // corner radius, blur radius
-layout(location = 2) in vec4 inBoxBounds;
+layout(location = 0) in vec4 in_col;
+layout(location = 1) in vec2 in_params; // corner radius, blur radius
+layout(location = 2) in vec4 in_bounds;
 
-layout(location = 0) out vec4 outColor;
+layout(location = 0) out vec4 out_color;
 
 // credits: https://www.shadertoy.com/view/llffD8
 float rrect(in vec2 uv, in vec2 pos, in vec2 size, float rad, float s)
@@ -29,9 +29,9 @@ float rrect(in vec2 uv, in vec2 pos, in vec2 size, float rad, float s)
 }
 
 void main() {
-    float blur = inParams[1];
-    vec2 box_screen_offset = inBoxBounds.xy;
-    vec2 box_screen_size = vec2(inBoxBounds[2] - inBoxBounds[0], inBoxBounds[3] - inBoxBounds[1]);
+    float blur = in_params[1];
+    vec2 box_screen_offset = in_bounds.xy;
+    vec2 box_screen_size = vec2(in_bounds[2] - in_bounds[0], in_bounds[3] - in_bounds[1]);
     vec2 frag_bounds_offset = min(box_screen_offset , box_screen_offset) - blur;
     vec2 frag_bounds_size = box_screen_size + 2 * blur;
     vec2 screen = gl_FragCoord.xy;
@@ -39,10 +39,10 @@ void main() {
     vec2 screen_pos = screen - frag_bounds_offset;
     vec2 uv = vec2(aspect, 1.0) * screen_pos.xy / frag_bounds_size;
 
-    vec2 params_radius = vec2(aspect, 1.0) * inParams.xy / frag_bounds_size;
+    vec2 params_radius = vec2(aspect, 1.0) * in_params.xy / frag_bounds_size;
     vec2 box_uv_offset = vec2(aspect, 1.0) * (box_screen_offset - frag_bounds_offset) / frag_bounds_size;
     vec2 box_uv_size = vec2(aspect, 1.0) * box_screen_size / frag_bounds_size;
 
-    vec4 transparent_col = vec4(inColor.rgb, 0);
-    outColor = mix(transparent_col, inColor, rrect(uv, box_uv_offset, box_uv_size, params_radius.x, params_radius.y));
+    vec4 transparent_col = vec4(in_col.rgb, 0);
+    out_color = mix(transparent_col, in_col, rrect(uv, box_uv_offset, box_uv_size, params_radius.x, params_radius.y));
 }

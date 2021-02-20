@@ -232,7 +232,7 @@ class display {
   friend class image;
   friend class sampler;
   friend class font;
-  template<typename TDetails, typename... TExtraBindings> friend class pipeline;
+  template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
 
  public:
   using clock = std::chrono::steady_clock;

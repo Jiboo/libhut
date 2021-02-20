@@ -78,7 +78,7 @@ struct window_params {
 
 class window {
   friend class display;
-  template<typename TDetails, typename... TExtraBindings> friend class pipeline;
+  template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
 
  public:
   event<> on_pause, on_resume, on_focus, on_blur, on_close;

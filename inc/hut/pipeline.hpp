@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "hut_shaders.hpp"
+#include "hut_shaders_refl.hpp"
 
 #include "hut/buffer_pool.hpp"
 #include "hut/color.hpp"
@@ -47,25 +47,29 @@ struct pipeline_params {
   VkCullModeFlagBits cullMode_ = VK_CULL_MODE_NONE;
   VkFrontFace frontFace_ = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   VkBool32 enableBlending_ = VK_TRUE;
+  uint32_t max_sets_ = 16;
 };
 
-template<typename TDetails, typename... TExtraAttachments>
+template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments>
 class pipeline {
 public:
-  using instance = typename TDetails::instance;
-  using vertex = typename TDetails::vertex;
-  using ubo = typename TDetails::ubo;
-  using indice = uint16_t;
+  using ubo = TUBO;
+  using indice = TIndice;
+  using vertex = typename TVertexRefl::vertex;
+  using instance = typename TVertexRefl::instance;
 
-  using shared_instances = shared_ref<instance>;
-  using shared_vertices = shared_ref<vertex>;
+  using shared_ubo = shared_ref<ubo>;
   using shared_indices = shared_ref<indice>;
+  using shared_vertices = shared_ref<vertex>;
+  using shared_instances = shared_ref<instance>;
 
 private:
   using extra_attachments = std::tuple<TExtraAttachments...>;
 
+  static constexpr auto combined_bindings_ = combine(TVertexRefl::descriptor_bindings_, TFragRefl::descriptor_bindings_);
+
   struct attachments {
-    shared_ref<ubo> ubo_buffer_;
+    shared_ubo ubo_buffer_;
     extra_attachments extras_;
   };
 
@@ -81,12 +85,28 @@ private:
   std::vector<VkDescriptorSet> descriptors_;
   std::unordered_map<uint, attachments> attachments_;
 
-  void init_pools() {
+  void init_pools(const pipeline_params &_params) {
+    std::array<VkDescriptorPoolSize, 2> descriptor_pools {
+      VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 0},
+      VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 0},
+    };
+
+    for (auto binding : combined_bindings_) {
+      switch (binding.descriptorType) {
+        case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER: descriptor_pools[0].descriptorCount++; break;
+        case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER: descriptor_pools[1].descriptorCount++; break;
+        default: assert(false);
+      }
+    }
+
+    for (auto &pool : descriptor_pools)
+      pool.descriptorCount *= _params.max_sets_;
+
     VkDescriptorPoolCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    create_info.poolSizeCount = TDetails::descriptor_pools_.size();
-    create_info.pPoolSizes = TDetails::descriptor_pools_.data();
-    create_info.maxSets = TDetails::max_descriptor_sets_;
+    create_info.poolSizeCount = descriptor_pools[1].descriptorCount == 0 ? 1 : 2;
+    create_info.pPoolSizes = descriptor_pools.data();
+    create_info.maxSets = _params.max_sets_;
 
     if (vkCreateDescriptorPool(window_.display_.device_, &create_info, nullptr, &descriptor_pool_) != VK_SUCCESS)
       throw std::runtime_error("failed to create descriptor pool!");
@@ -95,8 +115,8 @@ private:
   void init_descriptor_layout() {
     VkDescriptorSetLayoutCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    create_info.bindingCount = TDetails::descriptor_bindings_.size();
-    create_info.pBindings = TDetails::descriptor_bindings_.data();
+    create_info.bindingCount = combined_bindings_.size();
+    create_info.pBindings = combined_bindings_.data();
 
     if (vkCreateDescriptorSetLayout(window_.display_.device_, &create_info, nullptr, &descriptor_layout_) != VK_SUCCESS)
       throw std::runtime_error("failed to create descriptor set layout!");
@@ -105,16 +125,16 @@ private:
   void init_shaders() {
     VkShaderModuleCreateInfo vert_create_info = {};
     vert_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    vert_create_info.codeSize = TDetails::vert_bytecode_.size();
-    vert_create_info.pCode = (uint32_t*)TDetails::vert_bytecode_.data();
+    vert_create_info.codeSize = TVertexRefl::bytecode_.size();
+    vert_create_info.pCode = (uint32_t*)TVertexRefl::bytecode_.data();
 
     if (vkCreateShaderModule(window_.display_.device_, &vert_create_info, nullptr, &vert_) != VK_SUCCESS)
       throw std::runtime_error("[sample] failed to create vertex module!");
 
     VkShaderModuleCreateInfo frag_create_info = {};
     frag_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    frag_create_info.codeSize = TDetails::frag_bytecode_.size();
-    frag_create_info.pCode = (uint32_t*)TDetails::frag_bytecode_.data();
+    frag_create_info.codeSize = TFragRefl::bytecode_.size();
+    frag_create_info.pCode = (uint32_t*)TFragRefl::bytecode_.data();
 
     if (vkCreateShaderModule(window_.display_.device_, &frag_create_info, nullptr, &frag_) != VK_SUCCESS)
       throw std::runtime_error("[sample] failed to create fragment module!");
@@ -149,12 +169,17 @@ private:
 
     VkPipelineShaderStageCreateInfo shader_create_infos[] = {vert_stage_info, frag_stage_info};
 
+    constexpr static std::array<VkVertexInputBindingDescription, 2> vertices_binding_ = {
+        VkVertexInputBindingDescription{.binding = 0, .stride = sizeof(vertex),   .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
+        VkVertexInputBindingDescription{.binding = 1, .stride = sizeof(instance), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE},
+    };
+
     VkPipelineVertexInputStateCreateInfo vertex_create_info = {};
     vertex_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertex_create_info.vertexBindingDescriptionCount = uint(TDetails::vertices_binding_.size());
-    vertex_create_info.pVertexBindingDescriptions = TDetails::vertices_binding_.data();
-    vertex_create_info.vertexAttributeDescriptionCount = (uint32_t)TDetails::vertices_description_.size();
-    vertex_create_info.pVertexAttributeDescriptions = TDetails::vertices_description_.data();
+    vertex_create_info.vertexBindingDescriptionCount = sizeof(instance) <= 1 ? 1 : 2;
+    vertex_create_info.pVertexBindingDescriptions = vertices_binding_.data();
+    vertex_create_info.vertexAttributeDescriptionCount = (uint32_t)TVertexRefl::vertices_description_.size();
+    vertex_create_info.pVertexAttributeDescriptions = TVertexRefl::vertices_description_.data();
 
     VkPipelineInputAssemblyStateCreateInfo assembly_create_info = {};
     assembly_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -274,7 +299,7 @@ public:
   explicit pipeline(window &_window, const pipeline_params &_params = {})
       : window_(_window) {
     HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
-    init_pools();
+    init_pools(_params);
     init_descriptor_layout();
     alloc_next_descriptors(1);
     init_shaders();
@@ -322,7 +347,7 @@ public:
     std::vector<VkDescriptorBufferInfo> buffers_;
     VkDescriptorSet dst_ = VK_NULL_HANDLE;
 
-    void buffer(uint _binding, const shared_ref<ubo> &_ubo) {
+    void buffer(uint _binding, const shared_ubo &_ubo) {
       VkDescriptorBufferInfo info = {};
       info.buffer = _ubo->alloc_.buffer_->buffer_;
       info.offset = _ubo->alloc_.offset_;
@@ -359,7 +384,21 @@ public:
     }
   };
 
-  void write(uint _descriptor_index, const shared_ref<ubo> &_ubo, TExtraAttachments... _attachments) {
+  void write_continue(int _binding, descriptor_write_context &_context) {}
+
+  template<typename TBufferType, typename... TRest>
+  void write_continue(int _binding, descriptor_write_context &_context, const shared_ref<TBufferType> &_buffer, const TRest&... _rest) {
+    _context.buffer(_binding);
+    write_continue(_binding + 1, _context, std::forward<TRest>(_rest)...);
+  }
+
+  template<typename... TRest>
+  void write_continue(int _binding, descriptor_write_context &_context, const shared_image &_image, const shared_sampler &_sampler, const TRest&... _rest) {
+    _context.texture(_binding, _image, _sampler);
+    write_continue(_binding + 1, _context, std::forward<TRest>(_rest)...);
+  }
+
+  void write(uint _descriptor_index, const shared_ubo &_ubo, const TExtraAttachments&... _attachments) {
     HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
     assert(_descriptor_index < descriptors_.size());
     attachments_.emplace(_descriptor_index, attachments{_ubo, std::forward_as_tuple(_attachments...)});
@@ -367,7 +406,7 @@ public:
     descriptor_write_context filler;
     filler.dst_ = *(descriptors_.data() + _descriptor_index);
     filler.buffer(0, _ubo);
-    TDetails::fill_extra_descriptor_writes(filler, std::forward<TExtraAttachments>(_attachments)...);
+    write_continue(1, filler, std::forward<TExtraAttachments>(_attachments)...);
 
     HUT_PVK(vkUpdateDescriptorSets, window_.display_.device_, filler.writes_.size(), filler.writes_.data(), 0, nullptr);
   }
@@ -448,356 +487,12 @@ public:
   }
 };
 
-namespace details {
-
-  template<typename T>
-  constexpr uint transform_offset(uint _column) {
-    return offsetof(typename T::instance, transform_) + sizeof(vec4) * _column;
-  }
-
-  using descriptor_writes = std::vector<VkWriteDescriptorSet>;
-
-  // TODO JBL: Generate this from reflection on shader code at compile time, and include generated .h
-
-  struct rgb {
-    using impl = pipeline<details::rgb>;
-    using ubo = proj_ubo;
-
-    struct instance {
-      mat4 transform_;
-    };
-
-    struct vertex {
-      vec2 pos_;
-      vec3 color_;
-    };
-
-    constexpr static uint max_descriptor_sets_ = 1;
-
-    constexpr static std::array<VkDescriptorPoolSize, 1> descriptor_pools_ {
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = max_descriptor_sets_},
-    };
-
-    constexpr static std::array<VkDescriptorSetLayoutBinding, 1> descriptor_bindings_{
-        VkDescriptorSetLayoutBinding{.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .pImmutableSamplers = nullptr},
-    };
-
-    static void fill_extra_descriptor_writes(impl::descriptor_write_context &) {
-    }
-
-    constexpr static std::array<VkVertexInputBindingDescription, 2> vertices_binding_ = {
-        VkVertexInputBindingDescription{.binding = 0, .stride = sizeof(vertex),   .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
-        VkVertexInputBindingDescription{.binding = 1, .stride = sizeof(instance), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE},
-    };
-
-    constexpr static std::array<VkVertexInputAttributeDescription, 6> vertices_description_ {
-        VkVertexInputAttributeDescription{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(vertex, pos_)},
-        VkVertexInputAttributeDescription{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(vertex, color_)},
-        VkVertexInputAttributeDescription{.location = 2, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<rgb>(0)},
-        VkVertexInputAttributeDescription{.location = 3, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<rgb>(1)},
-        VkVertexInputAttributeDescription{.location = 4, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<rgb>(2)},
-        VkVertexInputAttributeDescription{.location = 5, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<rgb>(3)},
-    };
-
-    constexpr static auto &frag_bytecode_ = hut_shaders::rgb_frag_spv;
-    constexpr static auto &vert_bytecode_ = hut_shaders::rgb_vert_spv;
-  };
-
-  struct rgba {
-    using impl = pipeline<details::rgba>;
-    using ubo = proj_ubo;
-
-    struct instance {
-      mat4 transform_;
-    };
-
-    struct vertex {
-      vec2 pos_;
-      vec4 color_;
-    };
-
-    constexpr static uint max_descriptor_sets_ = 1;
-
-    constexpr static std::array<VkDescriptorPoolSize, 1> descriptor_pools_ {
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = max_descriptor_sets_},
-    };
-
-    constexpr static std::array<VkDescriptorSetLayoutBinding, 1> descriptor_bindings_{
-        VkDescriptorSetLayoutBinding{.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .pImmutableSamplers = nullptr},
-    };
-
-    static void fill_extra_descriptor_writes(impl::descriptor_write_context &) {}
-
-    constexpr static std::array<VkVertexInputBindingDescription, 2> vertices_binding_ = {
-        VkVertexInputBindingDescription{.binding = 0, .stride = sizeof(vertex),   .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
-        VkVertexInputBindingDescription{.binding = 1, .stride = sizeof(instance), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE},
-    };
-
-    constexpr static std::array<VkVertexInputAttributeDescription, 6> vertices_description_ {
-        VkVertexInputAttributeDescription{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(vertex, pos_)},
-        VkVertexInputAttributeDescription{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(vertex, color_)},
-        VkVertexInputAttributeDescription{.location = 2, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<rgb>(0)},
-        VkVertexInputAttributeDescription{.location = 3, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<rgb>(1)},
-        VkVertexInputAttributeDescription{.location = 4, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<rgb>(2)},
-        VkVertexInputAttributeDescription{.location = 5, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<rgb>(3)},
-    };
-
-    constexpr static auto &frag_bytecode_ = hut_shaders::rgba_frag_spv;
-    constexpr static auto &vert_bytecode_ = hut_shaders::rgba_vert_spv;
-  };
-
-  struct tex {
-    using impl = pipeline<details::tex, const shared_image &, const shared_sampler &>;
-    using ubo = proj_ubo;
-
-    struct instance {
-      mat4 transform_;
-    };
-
-    struct vertex {
-      vec2 pos_;
-      vec2 texcoords_;
-    };
-
-    constexpr static uint max_descriptor_sets_ = 128;
-
-    constexpr static std::array<VkDescriptorPoolSize, 2> descriptor_pools_ {
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = max_descriptor_sets_},
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = max_descriptor_sets_},
-    };
-
-    constexpr static std::array<VkDescriptorSetLayoutBinding, 2> descriptor_bindings_{
-        VkDescriptorSetLayoutBinding{.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .pImmutableSamplers = nullptr},
-        VkDescriptorSetLayoutBinding{.binding = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT, .pImmutableSamplers = nullptr},
-    };
-
-    static void fill_extra_descriptor_writes(impl::descriptor_write_context &_context,
-                                                       const shared_image &_mask, const shared_sampler &_sampler) {
-      _context.texture(1, _mask, _sampler);
-    }
-
-    constexpr static std::array<VkVertexInputBindingDescription, 2> vertices_binding_ = {
-        VkVertexInputBindingDescription{.binding = 0, .stride = sizeof(vertex),   .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
-        VkVertexInputBindingDescription{.binding = 1, .stride = sizeof(instance), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE},
-    };
-
-    constexpr static std::array<VkVertexInputAttributeDescription, 6> vertices_description_ {
-        VkVertexInputAttributeDescription{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(vertex, pos_)},
-        VkVertexInputAttributeDescription{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(vertex, texcoords_)},
-        VkVertexInputAttributeDescription{.location = 2, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(0)},
-        VkVertexInputAttributeDescription{.location = 3, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(1)},
-        VkVertexInputAttributeDescription{.location = 4, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(2)},
-        VkVertexInputAttributeDescription{.location = 5, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(3)},
-    };
-
-    constexpr static auto &frag_bytecode_ = hut_shaders::tex_frag_spv;
-    constexpr static auto &vert_bytecode_ = hut_shaders::tex_vert_spv;
-  };
-
-  struct tex_rgb {
-    using impl = pipeline<details::tex_rgb, const shared_image &, const shared_sampler &>;
-    using ubo = proj_ubo;
-
-    struct instance {
-      mat4 transform_;
-    };
-
-    struct vertex {
-      vec2 pos_;
-      vec2 texcoords_;
-      vec3 color_;
-    };
-
-    constexpr static uint max_descriptor_sets_ = 128;
-
-    constexpr static std::array<VkDescriptorPoolSize, 2> descriptor_pools_ {
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = max_descriptor_sets_},
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = max_descriptor_sets_},
-    };
-
-    constexpr static std::array<VkDescriptorSetLayoutBinding, 2> descriptor_bindings_{
-        VkDescriptorSetLayoutBinding{.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .pImmutableSamplers = nullptr},
-        VkDescriptorSetLayoutBinding{.binding = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT, .pImmutableSamplers = nullptr},
-    };
-
-    static void fill_extra_descriptor_writes(impl::descriptor_write_context &_context,
-                                                       const shared_image &_mask, const shared_sampler &_sampler) {
-      _context.texture(1, _mask, _sampler);
-    }
-
-    constexpr static std::array<VkVertexInputBindingDescription, 2> vertices_binding_ = {
-        VkVertexInputBindingDescription{.binding = 0, .stride = sizeof(vertex),   .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
-        VkVertexInputBindingDescription{.binding = 1, .stride = sizeof(instance), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE},
-    };
-
-    constexpr static std::array<VkVertexInputAttributeDescription, 7> vertices_description_ {
-        VkVertexInputAttributeDescription{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(vertex, pos_)},
-        VkVertexInputAttributeDescription{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(vertex, texcoords_)},
-        VkVertexInputAttributeDescription{.location = 2, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(vertex, color_)},
-        VkVertexInputAttributeDescription{.location = 3, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(0)},
-        VkVertexInputAttributeDescription{.location = 4, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(1)},
-        VkVertexInputAttributeDescription{.location = 5, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(2)},
-        VkVertexInputAttributeDescription{.location = 6, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(3)},
-    };
-
-    constexpr static auto &frag_bytecode_ = hut_shaders::tex_rgb_frag_spv;
-    constexpr static auto &vert_bytecode_ = hut_shaders::tex_rgb_vert_spv;
-  };
-
-  struct tex_rgba {
-    using impl = pipeline<details::tex_rgba, const shared_image &, const shared_sampler &>;
-    using ubo = proj_ubo;
-
-    struct instance {
-      mat4 transform_;
-    };
-
-    struct vertex {
-      vec2 pos_;
-      vec2 texcoords_;
-      vec4 color_;
-    };
-
-    constexpr static uint max_descriptor_sets_ = 128;
-
-    constexpr static std::array<VkDescriptorPoolSize, 2> descriptor_pools_ {
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = max_descriptor_sets_},
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = max_descriptor_sets_},
-    };
-
-    constexpr static std::array<VkDescriptorSetLayoutBinding, 2> descriptor_bindings_{
-        VkDescriptorSetLayoutBinding{.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .pImmutableSamplers = nullptr},
-        VkDescriptorSetLayoutBinding{.binding = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT, .pImmutableSamplers = nullptr},
-    };
-
-    static void fill_extra_descriptor_writes(impl::descriptor_write_context &_context,
-                                                       const shared_image &_mask, const shared_sampler &_sampler) {
-      _context.texture(1, _mask, _sampler);
-    }
-
-    constexpr static std::array<VkVertexInputBindingDescription, 2> vertices_binding_ = {
-        VkVertexInputBindingDescription{.binding = 0, .stride = sizeof(vertex),   .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
-        VkVertexInputBindingDescription{.binding = 1, .stride = sizeof(instance), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE},
-    };
-
-    constexpr static std::array<VkVertexInputAttributeDescription, 7> vertices_description_ {
-        VkVertexInputAttributeDescription{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(vertex, pos_)},
-        VkVertexInputAttributeDescription{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(vertex, texcoords_)},
-        VkVertexInputAttributeDescription{.location = 2, .binding = 0, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(vertex, color_)},
-        VkVertexInputAttributeDescription{.location = 3, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(0)},
-        VkVertexInputAttributeDescription{.location = 4, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(1)},
-        VkVertexInputAttributeDescription{.location = 5, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(2)},
-        VkVertexInputAttributeDescription{.location = 6, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex>(3)},
-    };
-
-    constexpr static auto &frag_bytecode_ = hut_shaders::tex_rgba_frag_spv;
-    constexpr static auto &vert_bytecode_ = hut_shaders::tex_rgba_vert_spv;
-  };
-
-  struct tex_mask {
-    using impl = pipeline<details::tex_mask, const shared_image &, const shared_sampler &>;
-    using ubo = proj_ubo;
-
-    struct instance {
-      mat4 transform_;
-      vec4 color_;
-    };
-
-    struct vertex {
-      vec2 pos_;
-      vec2 texcoords_;
-    };
-
-    constexpr static uint max_descriptor_sets_ = 128;
-
-    constexpr static std::array<VkDescriptorPoolSize, 2> descriptor_pools_ {
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = max_descriptor_sets_},
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = max_descriptor_sets_},
-    };
-
-    constexpr static std::array<VkDescriptorSetLayoutBinding, 2> descriptor_bindings_{
-        VkDescriptorSetLayoutBinding{.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .pImmutableSamplers = nullptr},
-        VkDescriptorSetLayoutBinding{.binding = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT, .pImmutableSamplers = nullptr},
-    };
-
-    static void fill_extra_descriptor_writes(impl::descriptor_write_context &_context,
-                                                       const shared_image &_mask, const shared_sampler &_sampler) {
-      _context.texture(1, _mask, _sampler);
-    }
-
-    constexpr static std::array<VkVertexInputBindingDescription, 2> vertices_binding_ = {
-        VkVertexInputBindingDescription{.binding = 0, .stride = sizeof(vertex),   .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
-        VkVertexInputBindingDescription{.binding = 1, .stride = sizeof(instance), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE},
-    };
-
-    constexpr static std::array<VkVertexInputAttributeDescription, 7> vertices_description_ {
-        VkVertexInputAttributeDescription{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(vertex, pos_)},
-        VkVertexInputAttributeDescription{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(vertex, texcoords_)},
-        VkVertexInputAttributeDescription{.location = 2, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex_mask>(0)},
-        VkVertexInputAttributeDescription{.location = 3, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex_mask>(1)},
-        VkVertexInputAttributeDescription{.location = 4, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex_mask>(2)},
-        VkVertexInputAttributeDescription{.location = 5, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex_mask>(3)},
-        VkVertexInputAttributeDescription{.location = 6, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(instance, color_)},
-    };
-
-    constexpr static auto &frag_bytecode_ = hut_shaders::tex_mask_frag_spv;
-    constexpr static auto &vert_bytecode_ = hut_shaders::tex_mask_vert_spv;
-  };
-
-  struct box_rgba {
-    using impl = pipeline<details::box_rgba>;
-    using ubo = proj_ubo;
-
-    struct instance {
-      mat4 transform_;
-      vec2 params_;
-      vec4 box_bounds_;
-    };
-
-    struct vertex {
-      vec2 pos_;
-      vec4 color_;
-    };
-
-    constexpr static uint max_descriptor_sets_ = 1;
-
-    constexpr static std::array<VkDescriptorPoolSize, 1> descriptor_pools_ {
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = max_descriptor_sets_},
-    };
-
-    constexpr static std::array<VkDescriptorSetLayoutBinding, 1> descriptor_bindings_{
-        VkDescriptorSetLayoutBinding{.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .pImmutableSamplers = nullptr},
-    };
-
-    static void fill_extra_descriptor_writes(impl::descriptor_write_context &) {}
-
-    constexpr static std::array<VkVertexInputBindingDescription, 2> vertices_binding_ = {
-        VkVertexInputBindingDescription{.binding = 0, .stride = sizeof(vertex),   .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
-        VkVertexInputBindingDescription{.binding = 1, .stride = sizeof(instance), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE},
-    };
-
-    constexpr static std::array<VkVertexInputAttributeDescription, 8> vertices_description_ {
-        VkVertexInputAttributeDescription{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT,       .offset = offsetof(vertex, pos_)},
-        VkVertexInputAttributeDescription{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(vertex, color_)},
-        VkVertexInputAttributeDescription{.location = 2, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex_mask>(0)},
-        VkVertexInputAttributeDescription{.location = 3, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex_mask>(1)},
-        VkVertexInputAttributeDescription{.location = 4, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex_mask>(2)},
-        VkVertexInputAttributeDescription{.location = 5, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<tex_mask>(3)},
-        VkVertexInputAttributeDescription{.location = 6, .binding = 1, .format = VK_FORMAT_R32G32_SFLOAT,       .offset = offsetof(instance, params_)},
-        VkVertexInputAttributeDescription{.location = 7, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(instance, box_bounds_)},
-    };
-
-    constexpr static auto &frag_bytecode_ = hut_shaders::box_rgba_frag_spv;
-    constexpr static auto &vert_bytecode_ = hut_shaders::box_rgba_vert_spv;
-  };
-}  // namespace details
-
-using rgb      = details::rgb::impl;
-using rgba     = details::rgba::impl;
-using tex      = details::tex::impl;
-using tex_rgb  = details::tex_rgb::impl;
-using tex_rgba = details::tex_rgba::impl;
-using tex_mask = details::tex_mask::impl;
-using box_rgba = details::box_rgba::impl;
+using rgb      = pipeline<proj_ubo, uint16_t, hut_shaders::rgb_vert_spv_refl, hut_shaders::rgb_frag_spv_refl>;
+using rgba     = pipeline<proj_ubo, uint16_t, hut_shaders::rgba_vert_spv_refl, hut_shaders::rgba_frag_spv_refl>;
+using tex      = pipeline<proj_ubo, uint16_t, hut_shaders::tex_vert_spv_refl, hut_shaders::tex_frag_spv_refl, const shared_image &, const shared_sampler &>;
+using tex_rgb  = pipeline<proj_ubo, uint16_t, hut_shaders::tex_rgb_vert_spv_refl, hut_shaders::tex_rgb_frag_spv_refl, const shared_image &, const shared_sampler &>;
+using tex_rgba = pipeline<proj_ubo, uint16_t, hut_shaders::tex_rgba_vert_spv_refl, hut_shaders::tex_rgba_frag_spv_refl, const shared_image &, const shared_sampler &>;
+using tex_mask = pipeline<proj_ubo, uint16_t, hut_shaders::tex_mask_vert_spv_refl, hut_shaders::tex_mask_frag_spv_refl, const shared_image &, const shared_sampler &>;
+using box_rgba = pipeline<proj_ubo, uint16_t, hut_shaders::box_rgba_vert_spv_refl, hut_shaders::box_rgba_frag_spv_refl>;
 
 }  // namespace hut

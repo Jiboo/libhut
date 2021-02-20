@@ -42,8 +42,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT flags
                                                      VkDebugReportObjectTypeEXT /*objType*/, uint64_t /*obj*/,
                                                      size_t /*location*/, int32_t /*code*/, const char *layerPrefix,
                                                      const char *msg, void * /*userData*/) {
-  /*if (strcmp(layerPrefix, "Loader Message") == 0)
-    return VK_FALSE;*/
+  if (strcmp(layerPrefix, "Loader Message") == 0)
+    return VK_FALSE;
 
   char level;
   switch (flags) {

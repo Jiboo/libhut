@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_COMPILE_WARNING_MODE HIGH)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/deps/")
+set(BUILD_SHARED_LIBS OFF) # FIXME JBL: add_library from dependencies makes shared by default without this, leading to missing dlls when launching an EXE because we aren't searching for them in their respective output dir
 
 ###########################################################
 # Configuration
@@ -34,6 +35,9 @@ endif()
 message("Checking for required dependencies...")
 ###########################################################
 
+add_subdirectory(dep/glslang)
+include(dep/spirv_reflect.cmake)
+
 find_package(Threads REQUIRED)
 set(HUT_LIBS ${HUT_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
@@ -57,10 +61,6 @@ find_package(HarfBuzz REQUIRED)
 set(HUT_INCLUDES ${HUT_INCLUDES} ${HARFBUZZ_INCLUDE_DIRS})
 set(HUT_LIBS ${HUT_LIBS} ${HARFBUZZ_LIBRARIES})
 
-find_program(GLSLANG_VALIDATOR NAMES glslangValidator)
-if(NOT GLSLANG_VALIDATOR)
-  message(FATAL_ERROR "Can't find glslangValidator, needed for shader compilation.")
-endif()
 set(GLSLANG_VALIDATOR_FLAGS "")
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
   set(GLSLANG_VALIDATOR_FLAGS "${GLSLANG_VALIDATOR_FLAGS} -g")
@@ -197,8 +197,8 @@ function(gen_spv_bundle)
     set(HUT_GEN_SPV_BUNDLE_SHADER_OBJECTS ${HUT_GEN_SPV_BUNDLE_SHADER_OBJECTS};${shader_target})
 
     add_custom_command(OUTPUT ${shader_target}
-            COMMAND ${GLSLANG_VALIDATOR} ${GLSLANG_VALIDATOR_FLAGS} -V ${shader_source} -o ${shader_target}
-            DEPENDS ${shader_source}
+            COMMAND $<TARGET_FILE:glslangValidator> ${GLSLANG_VALIDATOR_FLAGS} -V ${shader_source} -o ${shader_target}
+            DEPENDS ${shader_source} glslangValidator
             COMMENT "Generating SPIR-V for ${shader_source}")
   endforeach()
 
@@ -213,13 +213,22 @@ function(gen_spv_bundle)
           DEPENDS gen_res ${HUT_GEN_SPV_BUNDLE_SHADER_OBJECTS}
           COMMENT "Generating ${HUT_GEN_SPV_BUNDLE_NAMESPACE}.cpp")
 
-  add_custom_target(${bundle_gen_name} DEPENDS ${HUT_GEN_SPV_BUNDLE_OUTDIR}/${HUT_GEN_SPV_BUNDLE_NAMESPACE}.cpp
+  add_custom_command(OUTPUT ${HUT_GEN_SPV_BUNDLE_OUTDIR}/${HUT_GEN_SPV_BUNDLE_NAMESPACE}_refl.hpp
+          COMMAND $<TARGET_FILE:gen_spv> ${HUT_GEN_SPV_BUNDLE_NAMESPACE}_refl ${HUT_GEN_SPV_BUNDLE_OUTDIR} ${HUT_GEN_SPV_BUNDLE_SHADER_OBJECTS}
+          DEPENDS ${HUT_GEN_SPV_BUNDLE_SHADER_OBJECTS} gen_spv
+          COMMENT "Generating SPIR-V reflection for ${HUT_GEN_SPV_BUNDLE_NAMESPACE}")
+
+  add_custom_target(${bundle_gen_name} DEPENDS ${HUT_GEN_SPV_BUNDLE_OUTDIR}/${HUT_GEN_SPV_BUNDLE_NAMESPACE}.cpp ${HUT_GEN_SPV_BUNDLE_OUTDIR}/${HUT_GEN_SPV_BUNDLE_NAMESPACE}_refl.hpp
           COMMENT "Checked if ${HUT_GEN_SPV_BUNDLE_NAMESPACE}.cpp need regeneration")
 endfunction()
 
 add_executable(gen_res src/tools/gen_res/main.cpp)
 target_link_libraries(gen_res)
 target_include_directories(gen_res PRIVATE inc)
+
+add_executable(gen_spv src/tools/gen_spv/main.cpp)
+target_link_libraries(gen_spv spirv_reflect)
+target_include_directories(gen_spv PRIVATE inc)
 
 set(HUT_GEN_DIR "${CMAKE_BINARY_DIR}/gen")
 file(MAKE_DIRECTORY ${HUT_GEN_DIR})

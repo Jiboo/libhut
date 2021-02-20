@@ -44,7 +44,7 @@ protected:
   friend class display;
   friend class shaper;
   friend class image;
-  template<typename TDetails, typename... TExtraBindings> friend class pipeline;
+  template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
 
   struct buffer {
     buffer_pool &parent_;
@@ -93,7 +93,7 @@ protected:
   class ref {
     friend class image;
     friend class buffer_pool;
-    template<typename TDetails, typename... TExtraBindings> friend class pipeline;
+    template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
 
     alloc alloc_;
 

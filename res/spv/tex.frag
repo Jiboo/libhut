@@ -1,12 +1,12 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-layout(binding = 1) uniform sampler2D setSampler;
+layout(binding = 1) uniform sampler2D uni_sampler;
 
-layout(location = 0) in vec2 inTexCoord;
+layout(location = 0) in vec2 in_uv;
 
-layout(location = 0) out vec4 outColor;
+layout(location = 0) out vec4 out_col;
 
 void main() {
-    outColor = texture(setSampler, inTexCoord);
+    out_col = texture(uni_sampler, in_uv);
 }

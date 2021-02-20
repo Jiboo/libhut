@@ -33,7 +33,7 @@
 #include "hut/font.hpp"
 #include "hut/window.hpp"
 
-#include "demo_shaders.hpp"
+#include "demo_shaders_refl.hpp"
 
 using namespace hut;
 
@@ -42,52 +42,7 @@ struct vp_ubo {
   mat4 view_;
 };
 
-namespace hut::details {
-  struct rgb3d {
-    using impl = pipeline<hut::details::rgb3d>;
-    using ubo = vp_ubo;
-
-    struct instance {
-      mat4 transform_;
-    };
-
-    struct vertex {
-      vec3 pos_;
-      vec3 color_;
-    };
-
-    constexpr static uint max_descriptor_sets_ = 1;
-
-    constexpr static std::array<VkDescriptorPoolSize, 1> descriptor_pools_{
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = max_descriptor_sets_},
-    };
-
-    constexpr static std::array<VkDescriptorSetLayoutBinding, 1> descriptor_bindings_{
-        VkDescriptorSetLayoutBinding{.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .pImmutableSamplers = nullptr},
-    };
-
-    static void fill_extra_descriptor_writes(impl::descriptor_write_context &) {
-    }
-
-    constexpr static std::array<VkVertexInputBindingDescription, 2> vertices_binding_ = {
-        VkVertexInputBindingDescription{.binding = 0, .stride = sizeof(vertex), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
-        VkVertexInputBindingDescription{.binding = 1, .stride = sizeof(instance), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE},
-    };
-
-    constexpr static std::array<VkVertexInputAttributeDescription, 6> vertices_description_{
-        VkVertexInputAttributeDescription{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(vertex, pos_)},
-        VkVertexInputAttributeDescription{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(vertex, color_)},
-        VkVertexInputAttributeDescription{.location = 2, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<rgb>(0)},
-        VkVertexInputAttributeDescription{.location = 3, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<rgb>(1)},
-        VkVertexInputAttributeDescription{.location = 4, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<rgb>(2)},
-        VkVertexInputAttributeDescription{.location = 5, .binding = 1, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = transform_offset<rgb>(3)},
-    };
-
-    constexpr static decltype(hut_shaders::rgb_frag_spv) &frag_bytecode_ = hut_shaders::rgb_frag_spv;
-    constexpr static decltype(demo_shaders::rgb3d_vert_spv) &vert_bytecode_ = demo_shaders::rgb3d_vert_spv;
-  };
-}
-using rgb3d = hut::details::rgb3d::impl;
+using rgb3d = hut::pipeline<vp_ubo, uint16_t, hut::demo_shaders::rgb3d_vert_spv_refl, hut::hut_shaders::rgb_frag_spv_refl>;
 
 int main(int, char **) {
   display d("hut demo3d");

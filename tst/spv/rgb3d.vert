@@ -6,18 +6,18 @@ layout(binding = 0) uniform UniformBufferObject {
     mat4 view;
 } ubo;
 
-layout(location = 0) in vec3 inVertexPosition;
-layout(location = 1) in vec3 inVertexColor;
+layout(location = 0) in vec3 in_v_pos;
+layout(location = 1) in vec3 in_v_col;
 
-layout(location = 2) in mat4 inInstanceTransform;
+layout(location = 2) in mat4 in_i_transform;
 
-layout(location = 0) out vec3 outColor;
+layout(location = 0) out vec3 out_color;
 
 out gl_PerVertex {
     vec4 gl_Position;
 };
 
 void main() {
-    gl_Position = ubo.proj * ubo.view * inInstanceTransform * vec4(inVertexPosition, 1.0);
-    outColor = inVertexColor;
+    gl_Position = ubo.proj * ubo.view * in_i_transform * vec4(in_v_pos, 1.0);
+    out_color = in_v_col;
 }

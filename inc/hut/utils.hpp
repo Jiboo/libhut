@@ -53,7 +53,7 @@ namespace hut {
 
 class buffer_pool;
 class display;
-template<typename TDetails, typename... TExtraBindings> class pipeline;
+template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> class pipeline;
 class font;
 class shaper;
 class image;
@@ -198,6 +198,18 @@ inline T align(T _input, T _align) {
 
   T rest = _input % _align;
   return _input + (rest ? (_align - rest) : 0);
+}
+
+template<typename T, size_t TLeftSize, size_t TRightSize>
+constexpr std::array<T, TLeftSize + TRightSize> combine(std::array<T, TLeftSize> _left, std::array<T, TRightSize> _right) {
+  std::array<T, TLeftSize + TRightSize> result;
+  for (size_t i = 0; i < TLeftSize; i++) {
+    result[i] = _left[i];
+  }
+  for (size_t i = 0; i < TRightSize; i++) {
+    result[TLeftSize + i] = _right[i];
+  }
+  return result;
 }
 
 template <typename... TArgTypes>
@@ -375,18 +387,6 @@ template <typename TClock, typename TDur>
 inline std::ostream &operator<<(std::ostream &_os, const std::chrono::time_point<TClock, TDur> &_tp) {
   auto elapsed = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(_tp.time_since_epoch());
   return _os << elapsed.count();
-}
-
-template<typename TContainer>
-void unordered_erase_at_index(TContainer &_container, size_t _index) {
-  auto size = _container.size();
-  assert(_index < size);
-  if (size <= 1)
-    _container.clear();
-  else {
-    std::swap(_container.back(), _container[_index]);
-    _container.resize(size - 1);
-  }
 }
 
 }  // namespace hut

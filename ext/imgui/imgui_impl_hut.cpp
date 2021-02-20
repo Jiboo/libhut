@@ -35,48 +35,21 @@
 #include "hut/image.hpp"
 #include "hut/pipeline.hpp"
 
-#include "hut_imgui_shaders.hpp"
+#include "hut_imgui_shaders_refl.hpp"
 
-namespace hut::details {
-  struct imgui_pipeline {
-    using impl = pipeline<details::imgui_pipeline, const shared_image &, const shared_sampler &>;
-    using ubo = proj_ubo;
-    using vertex = ImDrawVert;
+// NOTE JBL: Must override the generated reflection, as we currently have no way for custom pragma/decoration/attribute to generate the color as R8G8B8A8 instead of R32G32B32A32, which is chosen because the type in the glsl is vec4
+struct imgui_vert_spv_refl : hut::hut_imgui_shaders::imgui_vert_spv_refl {
+  using instance = typename hut::hut_imgui_shaders::imgui_vert_spv_refl::instance;
+  using vertex = ImDrawVert;
 
-    struct instance {};
-
-    constexpr static uint max_descriptor_sets_ = 128;
-
-    constexpr static std::array<VkDescriptorPoolSize, 2> descriptor_pools_ {
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = max_descriptor_sets_},
-        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = max_descriptor_sets_},
-    };
-
-    constexpr static std::array<VkDescriptorSetLayoutBinding, 2> descriptor_bindings_{
-        VkDescriptorSetLayoutBinding{.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .pImmutableSamplers = nullptr},
-        VkDescriptorSetLayoutBinding{.binding = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT, .pImmutableSamplers = nullptr},
-    };
-
-    static void fill_extra_descriptor_writes(impl::descriptor_write_context &_context,
-                                             const shared_image &_mask, const shared_sampler &_sampler) {
-      _context.texture(1, _mask, _sampler);
-    }
-
-    constexpr static std::array<VkVertexInputBindingDescription, 1> vertices_binding_ = {
-        VkVertexInputBindingDescription{.binding = 0, .stride = sizeof(vertex),   .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
-    };
-
-    constexpr static std::array<VkVertexInputAttributeDescription, 3> vertices_description_ {
-        VkVertexInputAttributeDescription{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(ImDrawVert, pos)},
-        VkVertexInputAttributeDescription{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(ImDrawVert, uv)},
-        VkVertexInputAttributeDescription{.location = 2, .binding = 0, .format = VK_FORMAT_R8G8B8A8_UNORM, .offset = offsetof(ImDrawVert, col)},
-    };
-
-    constexpr static auto &frag_bytecode_ = hut_imgui_shaders::imgui_frag_spv;
-    constexpr static auto &vert_bytecode_ = hut_imgui_shaders::imgui_vert_spv;
+  constexpr static std::array<VkVertexInputAttributeDescription, 3> vertices_description_ {
+    VkVertexInputAttributeDescription{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(vertex, pos)},
+    VkVertexInputAttributeDescription{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(vertex, uv)},
+    VkVertexInputAttributeDescription{.location = 2, .binding = 0, .format = VK_FORMAT_R8G8B8A8_UNORM, .offset = offsetof(vertex, col)},
   };
-}
-using imgui_pipeline = hut::details::imgui_pipeline::impl;
+};
+
+using imgui_pipeline = hut::pipeline<hut::proj_ubo, ImDrawIdx, imgui_vert_spv_refl, hut::hut_imgui_shaders::imgui_frag_spv_refl, const hut::shared_image &, const hut::shared_sampler &>;
 
 struct hut_imgui_mesh {
   imgui_pipeline::shared_indices indices_;
@@ -212,7 +185,6 @@ void ImGui_ImplHut_RenderDrawData(VkCommandBuffer _cmd_buffer, ImDrawData* _draw
 
   static_assert(std::is_same_v<imgui_pipeline::indice, ImDrawIdx>);
   static_assert(std::is_same_v<imgui_pipeline::vertex, ImDrawVert>);
-  static_assert(sizeof(ImDrawVert) == sizeof(hut::vec2) + sizeof(hut::vec2) + sizeof(uint32_t));
 
   g_ctx.meshes_.clear();
   for (int n = 0; n < _draw_data->CmdListsCount; n++) {
