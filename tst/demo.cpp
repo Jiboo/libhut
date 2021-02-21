@@ -38,23 +38,6 @@
 
 using namespace hut;
 
-mat4 make_mat(vec2 _translate, vec3 _scale) {
-  mat4 m(1);
-  m = translate(m, vec3(_translate, 0));
-  m = scale(m, _scale);
-  return m;
-}
-
-mat4 make_mat(vec2 _translate, float _rot_angle, vec2 _rot_center, vec3 _scale) {
-  mat4 m(1);
-  m = translate(m, vec3(_translate, 0));
-  m = translate(m, vec3(_rot_center, 0));
-  m = rotate(m, _rot_angle, {0, 0, 1});
-  m = translate(m, vec3(-_rot_center, 0));
-  m = scale(m, _scale);
-  return m;
-}
-
 struct my_drop_target_interface : hut::drop_target_interface {
   virtual void on_enter(dragndrop_actions _actions, clipboard_formats _formats) {
     std::cout << "my_drop_target_interface::on_enter" << std::endl;
@@ -115,8 +98,8 @@ int main(int, char **) {
     rgb::vertex{{100, 100}, {1, 1, 1}},
   });
   rgb_instances->set({
-    rgb::instance{make_mat({  0, 100}, {1,1,1})},
-    rgb::instance{make_mat({100,   0}, {1,1,1})}
+    rgb::instance{make_transform_mat4({  0, 100}, {1,1,1})},
+    rgb::instance{make_transform_mat4({100,   0}, {1,1,1})}
   });
   rgb_pipeline->write(0, ubo);
 
@@ -133,8 +116,8 @@ int main(int, char **) {
     rgba::vertex{{100, 100}, {1, 1, 1, 0.25}},
   });
   rgba_instances->set({
-    rgba::instance{make_mat({  0,   0}, {1,1,1})},
-    rgba::instance{make_mat({100, 100}, {1,1,1})}
+    rgba::instance{make_transform_mat4({  0,   0}, {1,1,1})},
+    rgba::instance{make_transform_mat4({100, 100}, {1,1,1})}
   });
   rgba_pipeline->write(0, ubo);
 
@@ -162,12 +145,12 @@ int main(int, char **) {
     tex_rgb::vertex{{1, 1}, {1, 1}, {1, 1, 1}},
   });
   tex1_rgb_instances->set({
-    tex_rgb::instance{make_mat({  0, 200}, {100,100,1})},
-    tex_rgb::instance{make_mat({100, 300}, {100,100,1})},
+    tex_rgb::instance{make_transform_mat4({  0, 200}, {100,100,1})},
+    tex_rgb::instance{make_transform_mat4({100, 300}, {100,100,1})},
   });
   tex2_rgb_instances->set({
-    tex_rgb::instance{make_mat({100, 200}, {100,100,1})},
-    tex_rgb::instance{make_mat({  0, 300}, {100,100,1})},
+    tex_rgb::instance{make_transform_mat4({100, 200}, {100,100,1})},
+    tex_rgb::instance{make_transform_mat4({  0, 300}, {100,100,1})},
   });
 
   auto tex_rgba_pipeline = std::make_unique<tex_rgba>(w);
@@ -182,12 +165,12 @@ int main(int, char **) {
     tex_rgba::vertex{{1, 1}, {1, 1}, {1, 1, 1, 0.25}},
   });
   tex1_rgba_instances->set({
-    tex_rgba::instance{make_mat({  0, 400}, {100,100,1})},
-    tex_rgba::instance{make_mat({100, 500}, {100,100,1})},
+    tex_rgba::instance{make_transform_mat4({  0, 400}, {100,100,1})},
+    tex_rgba::instance{make_transform_mat4({100, 500}, {100,100,1})},
   });
   tex2_rgba_instances->set({
-    tex_rgba::instance{make_mat({100, 400}, {100,100,1})},
-    tex_rgba::instance{make_mat({  0, 500}, {100,100,1})},
+    tex_rgba::instance{make_transform_mat4({100, 400}, {100,100,1})},
+    tex_rgba::instance{make_transform_mat4({  0, 500}, {100,100,1})},
   });
 
   shared_atlas r8_atlas = std::make_shared<atlas_pool>(d, image_params{.format_ = VK_FORMAT_R8_UNORM});
@@ -200,16 +183,16 @@ int main(int, char **) {
   auto atlas_instances = b->allocate<tex_mask::instance>(1);
   auto atlas_vertices = b->allocate<tex_mask::vertex>(4);
   text_instances->set({
-    tex_mask::instance{make_mat({  1, 101}, {1,1,1}), {0, 0, 0, 1}},
-    tex_mask::instance{make_mat({  0, 100}, {1,1,1}), {1, 1, 1, 1}},
+    tex_mask::instance{make_transform_mat4({  1, 101}, {1,1,1}), {0, 0, 0, 1}},
+    tex_mask::instance{make_transform_mat4({  0, 100}, {1,1,1}), {1, 1, 1, 1}},
   });
   icons_instances->set({
-    tex_mask::instance{make_mat({  1, 201}, {1,1,1}), {0, 0, 0, 1}},
-    tex_mask::instance{make_mat({  0, 200}, {1,1,1}), {1, 1, 1, 1}},
+    tex_mask::instance{make_transform_mat4({  1, 201}, {1,1,1}), {0, 0, 0, 1}},
+    tex_mask::instance{make_transform_mat4({  0, 200}, {1,1,1}), {1, 1, 1, 1}},
   });
   fps_instances->set({
-    tex_mask::instance{make_mat({  6, 17}, {1,1,1}), {0, 0, 0, 1}},
-    tex_mask::instance{make_mat({  5, 16}, {1,1,1}), {1, 1, 1, 1}},
+    tex_mask::instance{make_transform_mat4({  6, 17}, {1,1,1}), {0, 0, 0, 1}},
+    tex_mask::instance{make_transform_mat4({  5, 16}, {1,1,1}), {1, 1, 1, 1}},
   });
   atlas_vertices->set({
     tex_mask::vertex{{0, 0}, {0, 0}},
@@ -217,7 +200,7 @@ int main(int, char **) {
     tex_mask::vertex{{1, 0}, {1, 0}},
     tex_mask::vertex{{1, 1}, {1, 1}},
   });
-  atlas_instances->set(tex_mask::instance{make_mat({200, 0}, {r8_atlas->image(0)->size(), 1}), {1, 0, 0, 1}});
+  atlas_instances->set(tex_mask::instance{make_transform_mat4({200, 0}, {r8_atlas->image(0)->size(), 1}), {1, 0, 0, 1}});
 
   auto box_rgba_pipeline = std::make_unique<box_rgba>(w);
   auto box_rgba_vertices = b->allocate<box_rgba::vertex>(4);
@@ -237,10 +220,10 @@ int main(int, char **) {
   auto box_rgba_instances = b->allocate<box_rgba::instance>(1);
   auto shadow_instances = b->allocate<box_rgba::instance>(1);
   box_rgba_instances->set({
-    box_rgba::instance{make_mat({300, 400}, {1,1,1}), {8, 8}, {300, 400, 400, 500}},
+    box_rgba::instance{make_transform_mat4({300, 400}, {1,1,1}), {8, 8}, {300, 400, 400, 500}},
   });
   shadow_instances->set({
-    box_rgba::instance{make_mat({300, 400}, {1,1,1}), {8, 8}, {300, 400, 400, 500}},
+    box_rgba::instance{make_transform_mat4({300, 400}, {1,1,1}), {8, 8}, {300, 400, 400, 500}},
   });
   box_rgba_pipeline->write(0, ubo);
 
@@ -255,14 +238,14 @@ int main(int, char **) {
 
   std::atomic_bool tex1_ready = false, tex2_ready = false;
 
-  //std::thread load_res([&]() {
+  std::thread load_res([&]() {
     tex1 = image::load_png(d, demo_png::tex1_png);
     tex_pipeline->write(0, ubo, tex1, samp);
     tex_rgb_pipeline->write(0, ubo, tex1, samp);
     tex_rgba_pipeline->write(0, ubo, tex1, samp);
     tex1_instances->set({
-      tex::instance{make_mat({200,   0}, {tex1->size() / 2, 1})},
-      tex::instance{make_mat({300, 100}, {tex1->size() / 2, 1})},
+      tex::instance{make_transform_mat4({200,   0}, {tex1->size() / 2, 1})},
+      tex::instance{make_transform_mat4({300, 100}, {tex1->size() / 2, 1})},
     });
     tex1_ready = true;
     w.invalidate(true);  // will force to call on_draw on the next frame
@@ -280,8 +263,8 @@ int main(int, char **) {
     tex_rgb_pipeline->write(1, ubo, tex2, samp);
     tex_rgba_pipeline->write(1, ubo, tex2, samp);
     tex2_instances->set({
-      tex::instance{make_mat({300,   0}, {tex2->size() / 2, 1})},
-      tex::instance{make_mat({400, 100}, {tex2->size() / 2, 1})},
+      tex::instance{make_transform_mat4({300,   0}, {tex2->size() / 2, 1})},
+      tex::instance{make_transform_mat4({400, 100}, {tex2->size() / 2, 1})},
     });
     tex2_ready = true;
     w.invalidate(true);  // will force to call on_draw on the next frame
@@ -290,7 +273,7 @@ int main(int, char **) {
     material_icons = std::make_shared<font>(d, demo_ttf::MaterialIcons_Regular_ttf.data(), demo_ttf::MaterialIcons_Regular_ttf.size(), r8_atlas, false);
     s.bake(b, icons_test, material_icons, 16, "\uE834\uE835\uE836\uE837");
     w.invalidate(true);  // will force to call on_draw on the next frame
-  //});
+  });
 
   w.on_draw.connect([&](VkCommandBuffer _buffer) {
     tmask_pipeline->draw(_buffer, 0, indices, atlas_instances, atlas_vertices);
@@ -337,10 +320,10 @@ int main(int, char **) {
 
     float angle = radians(time * 10);
     if (tex1_ready) {
-      tex1_instances->update_one(1, tex::instance{make_mat({300, 100}, angle, tex1->size()/4, {tex1->size()/2, 1})});
+      tex1_instances->update_one(1, tex::instance{make_transform_mat4({300, 100}, angle, tex1->size()/4, {tex1->size()/2, 1})});
     }
     if (tex2_ready) {
-      tex2_instances->update_one(1, tex::instance{make_mat({400, 100}, angle, tex2->size()/4, {tex2->size()/2, 1})});
+      tex2_instances->update_one(1, tex::instance{make_transform_mat4({400, 100}, angle, tex2->size()/4, {tex2->size()/2, 1})});
     }
 
     float border_radius = (sin(time * 4) + 1) * 20 + 1;
@@ -544,7 +527,7 @@ int main(int, char **) {
   });
 
   auto result = d.dispatch();
-  //load_res.join();
+  load_res.join();
   std::cout << "done!" << std::endl;
   return result;
 }

@@ -679,6 +679,9 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
 }
 
 display::~display() {
+  preflush_jobs_.clear();
+  posted_jobs_.clear();
+
   FT_Done_FreeType(ft_library_);
   destroy_vulkan();
 

@@ -173,7 +173,7 @@ int main(int, char**) {
   hut::display d("hut demo");
 
   hut::window w(d, window_params {.position_ = {0, 0, 1920, 1080}});
-  w.clear_color({1, 1, 1, 1});
+  w.clear_color({0, 0, 0, 1});
   w.title("hut imgui demo");
 
   IMGUI_CHECKVERSION();
@@ -192,67 +192,9 @@ int main(int, char**) {
   shared_sampler samp = std::make_shared<sampler>(d);
   auto b = d.alloc_buffer(1024*1024);
 
-  vec4 clear_color {0, 0, 0, 1};
-
-  bool show_demo_window = true;
-  bool show_another_window = true;
-
   w.on_draw.connect([&](VkCommandBuffer _buffer) {
     ImGui_ImplHut_NewFrame();
     ImGui::NewFrame();
-
-    // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-    if (show_demo_window)
-      ImGui::ShowDemoWindow(&show_demo_window);
-
-    // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
-    {
-      static float f = 0.0f;
-      static int counter = 0;
-
-      ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-      ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-      ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-      ImGui::Checkbox("Another Window", &show_another_window);
-
-      ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-      ImGui::ColorEdit4("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-      if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-        counter++;
-      ImGui::SameLine();
-      ImGui::Text("counter = %d", counter);
-
-      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-      ImGui::End();
-    }
-
-    // 3. Show another simple window.
-    if (show_another_window)
-    {
-      ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-      ImGui::Text("Hello from another window!");
-      if (ImGui::Button("Close Me"))
-        show_another_window = false;
-
-      static char text[1024 * 16] =
-          "/*\n"
-          " The Pentium F00F bug, shorthand for F0 0F C7 C8,\n"
-          " the hexadecimal encoding of one offending instruction,\n"
-          " more formally, the invalid operand with locked CMPXCHG8B\n"
-          " instruction bug, is a design flaw in the majority of\n"
-          " Intel Pentium, Pentium MMX, and Pentium OverDrive\n"
-          " processors (all in the P5 microarchitecture).\n"
-          "*/\n\n"
-          "label:\n"
-          "\tlock cmpxchg8b eax\n";
-
-      static ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput;
-      ImGui::InputTextMultiline("##source", text, IM_ARRAYSIZE(text), ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 16), flags);
-
-      ImGui::End();
-    }
 
     ImPacker<binpack::adaptor1d_dummy2d<u16, binpack::linear1d<u16>>>("linear1d", {32*1024, 100});
     ImPacker<binpack::shelve<u16, binpack::shelve_separator_align<u16, 16>>>("shelves<align<16>>");
@@ -267,7 +209,6 @@ int main(int, char**) {
   w.on_frame.connect([&](display::duration _dt) {
     d.post([&](auto){
       w.invalidate(true);
-      w.clear_color(clear_color);
     });
 
     return false;

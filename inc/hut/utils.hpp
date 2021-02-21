@@ -191,6 +191,23 @@ inline vec<4, T, Q> bbox_transform_relative(const vec<4, T, Q> &_big, const vec<
   };
 }
 
+inline mat4 make_transform_mat4(vec2 _translate, vec3 _scale) {
+  mat4 m(1);
+  m = translate(m, vec3(_translate, 0));
+  m = scale(m, _scale);
+  return m;
+}
+
+inline mat4 make_transform_mat4(vec2 _translate, float _rot_angle, vec2 _rot_center, vec3 _scale) {
+  mat4 m(1);
+  m = translate(m, vec3(_translate, 0));
+  m = translate(m, vec3(_rot_center, 0));
+  m = rotate(m, _rot_angle, {0, 0, 1});
+  m = translate(m, vec3(-_rot_center, 0));
+  m = scale(m, _scale);
+  return m;
+}
+
 template<typename T>
 inline T align(T _input, T _align) {
   if (_align == 0)

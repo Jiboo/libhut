@@ -97,6 +97,7 @@ font::cache &font::load_cache(uint8_t _size) {
     return cache;
 
   cache.font_ = hb_ft_font_create(face_, nullptr);
+  hb_ft_font_set_funcs(cache.font_);
   hb_ft_font_set_load_flags(cache.font_, load_flags_);
   return cache;
 }
@@ -178,8 +179,8 @@ bool shaper::bake(shared_buffer &_buff, result &_dst, const shared_font &_font, 
       drawn_codepoints++;
     }
 
-    x += float(pos[i].x_advance) / font_scale;
-    y += float(pos[i].y_advance) / font_scale;
+    x += std::round(float(pos[i].x_advance) / font_scale);
+    y += std::round(float(pos[i].y_advance) / font_scale);
   }
   bbox[0] = 0;
   bbox[2] = x;

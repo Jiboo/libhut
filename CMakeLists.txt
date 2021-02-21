@@ -286,13 +286,19 @@ if(HUT_COMPILE_DEMOS)
   target_link_libraries(demo hut)
   add_dependencies(demo gen_demo_shaders)
 
-  add_executable(demo3d tst/demo3d.cpp ${HUT_GEN_DIR}/demo_shaders.cpp)
-  target_link_libraries(demo3d hut)
-  add_dependencies(demo3d gen_demo_shaders)
+  add_executable(demo_3d tst/demo_3d.cpp ${HUT_GEN_DIR}/demo_shaders.cpp)
+  target_link_libraries(demo_3d hut)
+  add_dependencies(demo_3d gen_demo_shaders)
 
   if (HUT_ENABLE_IMGUI)
-    add_executable(imgui_demo tst/imgui_demo.cpp)
-    target_link_libraries(imgui_demo hut_imgui_impl)
+    add_executable(demo_imgui tst/demo_imgui.cpp)
+    target_link_libraries(demo_imgui hut_imgui_impl)
+
+    add_executable(sandbox_binpacks tst/sandbox_binpacks_imgui.cpp)
+    target_link_libraries(sandbox_binpacks hut_imgui_impl)
+
+    add_executable(sandbox_text tst/sandbox_text_imgui.cpp)
+    target_link_libraries(sandbox_text hut_imgui_impl)
   endif()
 endif()
 

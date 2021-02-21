@@ -1,0 +1,162 @@
+/*  _ _ _   _       _
+ * | |_| |_| |_ _ _| |_
+ * | | | . |   | | |  _|
+ * |_|_|___|_|_|___|_|
+ * Hobby graphics and GUI library under the MIT License (MIT)
+ *
+ * Copyright (c) 2014 Jean-Baptiste Lepesme github.com/jiboo/libhut
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+#include <random>
+
+#include "imgui_impl_hut.h"
+#include "demo_ttf.hpp"
+
+#include "hut/display.hpp"
+#include "hut/window.hpp"
+#include "hut/pipeline.hpp"
+#include "hut/atlas_pool.hpp"
+#include "hut/font.hpp"
+
+using namespace hut;
+
+int main(int, char**) {
+  hut::display d("hut demo");
+
+  hut::window w(d, window_params {.position_ = {0, 0, 1920, 1080}});
+  w.clear_color({1, 1, 1, 1});
+  w.title("hut imgui demo");
+
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGuiIO& io = ImGui::GetIO();
+  ImFontConfig font_cfg{};
+  font_cfg.FontDataOwnedByAtlas = false;
+  io.Fonts->AddFontFromMemoryTTF((void*)demo_ttf::Roboto_Regular_ttf.data(), demo_ttf::Roboto_Regular_ttf.size(), 16, &font_cfg);
+  //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
+
+  // Setup Dear ImGui style
+  ImGui::StyleColorsDark();
+  //ImGui::StyleColorsClassic();
+
+  // Setup Platform/Renderer backends
+  if (!ImGui_ImplHut_Init(&d, &w, true))
+    return EXIT_FAILURE;
+
+  shared_sampler samp = std::make_shared<sampler>(d);
+  auto b = d.alloc_buffer(1024*1024);
+
+  vec4 clear_color({0, 0, 0, 1});
+
+  proj_ubo default_ubo;
+  default_ubo.proj_ = ortho<float>(0, w.size().x, 0, w.size().y);
+  shared_ref<proj_ubo> ubo = d.alloc_ubo(b, default_ubo);
+
+  shared_atlas r8_atlas = std::make_shared<atlas_pool>(d, image_params{.size_ = {1024, 1024}, .format_ = VK_FORMAT_R8_UNORM});
+  auto tmask_pipeline = std::make_unique<tex_mask>(w);
+  tmask_pipeline->write(0, ubo, r8_atlas->image(0), samp);
+
+  auto text_instances = b->allocate<tex_mask::instance>(1);
+  vec2 text_translate = {  1, 101};
+  vec3 text_scale = {1,1,1};
+  vec4 text_color = {1, 1, 1, 1};
+  text_instances->set(tex_mask::instance{make_transform_mat4(text_translate, text_scale), text_color});
+
+  auto atlas_instances = b->allocate<tex_mask::instance>(1);
+  auto atlas_vertices = b->allocate<tex_mask::vertex>(4);
+  auto atlas_indices = b->allocate<uint16_t>(6);
+  atlas_indices->set({0, 1, 2, 2, 1, 3});
+  atlas_vertices->set({
+    tex_mask::vertex{{0, 0}, {0, 0}},
+    tex_mask::vertex{{0, 1}, {0, 1}},
+    tex_mask::vertex{{1, 0}, {1, 0}},
+    tex_mask::vertex{{1, 1}, {1, 1}},
+  });
+  atlas_instances->set(tex_mask::instance{make_transform_mat4({0, 200}, {r8_atlas->image(0)->size(), 1}), {1, 1, 1, 1}});
+
+  shared_font roboto = std::make_shared<font>(d, demo_ttf::Roboto_Regular_ttf.data(), demo_ttf::Roboto_Regular_ttf.size(), r8_atlas, true);
+  shaper s;
+  shaper::result sresult;
+
+  float font_size = 12;
+  static char text[1024 * 16] =
+      "Validation Error: [ VUID-vkCmdDrawIndexed-None-04007 ] Object 0: handle = 0x1116d20,"
+      "type = VK_OBJECT_TYPE_COMMAND_BUFFER; | MessageID = 0x5e4491cd | vkCmdDrawIndexed():"
+      "VkPipeline 0x290000000029[] expects that this Command Buffer's vertex binding Index 1"
+      "should be set via vkCmdBindVertexBuffers. This is because VkVertexInputBindingDescription"
+      "struct at index 1 of pVertexBindingDescriptions has a binding value of 1."
+      "The Vulkan spec states: All vertex input bindings accessed via vertex input variables"
+      "declared in the vertex shader entry point's interface must have either valid or VK_NULL_HANDLE"
+      "buffers bound (https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#VUID-vkCmdDrawIndexed-None-04007)";
+
+  w.on_draw.connect([&](VkCommandBuffer _buffer) {
+    ImGui_ImplHut_NewFrame();
+    ImGui::NewFrame();
+
+    {
+      ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+
+      ImGui::ColorEdit4("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+      ImGui::ColorEdit4("text color", (float*)&text_color); // Edit 3 floats representing a color
+      ImGui::InputFloat4("translate,", &text_translate[0]);
+      ImGui::InputFloat3("scale,", &text_scale[0]);
+      ImGui::InputFloat("font size,", &font_size);
+
+      static ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput;
+      ImGui::InputTextMultiline("##source", text, IM_ARRAYSIZE(text), ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 16), flags);
+
+      s.bake(b, sresult, roboto, font_size, text);
+      tmask_pipeline->draw(_buffer, 0, sresult.indices_, sresult.indices_count_, text_instances, sresult.vertices_);
+      tmask_pipeline->draw(_buffer, 0, atlas_indices, atlas_instances, atlas_vertices);
+
+      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+      ImGui::End();
+    }
+
+    ImGui::Render();
+    ImGui_ImplHut_RenderDrawData(_buffer, ImGui::GetDrawData());
+
+    return false;
+  });
+
+  w.on_frame.connect([&](display::duration _dt) {
+    d.post([&](auto){
+      w.invalidate(true);
+      w.clear_color(clear_color);
+      text_instances->set(tex_mask::instance{make_transform_mat4(text_translate, text_scale), text_color});
+    });
+
+    return false;
+  });
+
+  w.on_key.connect([&](keycode _kcode, keysym _ksym, bool _down) {
+    if (_ksym == KSYM_ESC)
+      w.close();
+    return false;
+  });
+
+  d.dispatch();
+
+  ImGui_ImplHut_Shutdown();
+  ImGui::DestroyContext();
+
+  return EXIT_SUCCESS;
+}
