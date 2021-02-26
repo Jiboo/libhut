@@ -42,7 +42,7 @@ class display;
 class buffer_pool {
 protected:
   friend class display;
-  friend class shaper;
+  template<typename TIndexType, typename TVertexType, typename TUpdater> friend class shaper;
   friend class image;
   template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
 

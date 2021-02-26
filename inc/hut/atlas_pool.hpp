@@ -27,8 +27,8 @@
 
 #pragma once
 
-#include "hut/image.hpp"
 #include "hut/binpacks.hpp"
+#include "hut/image.hpp"
 
 namespace hut {
 

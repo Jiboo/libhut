@@ -27,3 +27,4 @@ features:
   - [w32] transparent window support
   - [wl][w32] clipboard image support
   - [w32] drap&drop URI/text
+  - COLRv1 as an alternative to CPAL/COLR emoji fonts, but not sure a renderer will be available in freetype https://github.com/googlefonts/colr-gradients-spec/

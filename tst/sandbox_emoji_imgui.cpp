@@ -30,8 +30,8 @@
 #include "imgui_impl_hut.h"
 #include "demo_woff2.hpp"
 
-#include "hut/display.hpp"
 #include "hut/atlas_pool.hpp"
+#include "hut/display.hpp"
 #include "hut/font.hpp"
 #include "hut/pipeline.hpp"
 #include "hut/shaping.hpp"
@@ -70,64 +70,45 @@ int main(int, char**) {
   default_ubo.proj_ = ortho<float>(0, w.size().x, 0, w.size().y);
   shared_ref<proj_ubo> ubo = d.alloc_ubo(b, default_ubo);
 
-  shared_atlas r8_atlas = std::make_shared<atlas_pool>(d, image_params{.size_ = {1024, 1024}, .format_ = VK_FORMAT_R8_UNORM});
-  auto tmask_pipeline = std::make_unique<tex_mask>(w);
-  tmask_pipeline->write(0, ubo, r8_atlas->image(0), samp);
+  shared_atlas b8g8r8a8_atlas = std::make_shared<atlas_pool>(d, image_params{.size_ = {1024, 1024}, .format_ = VK_FORMAT_B8G8R8A8_UNORM});
+  auto pipeline = std::make_unique<tex>(w);
+  pipeline->write(0, ubo, b8g8r8a8_atlas->image(0), samp);
 
-  auto text_instances = b->allocate<tex_mask::instance>(1);
+  auto text_instances = b->allocate<tex::instance>(1);
   vec2 text_translate = {  1, 101};
   vec3 text_scale = {1,1,1};
-  vec4 text_color = {1, 1, 1, 1};
-  text_instances->set(tex_mask::instance{make_transform_mat4(text_translate, text_scale), text_color});
+  text_instances->set(tex::instance{make_transform_mat4(text_translate, text_scale)});
 
-  auto atlas_instances = b->allocate<tex_mask::instance>(1);
-  auto atlas_vertices = b->allocate<tex_mask::vertex>(4);
+  auto atlas_instances = b->allocate<tex::instance>(1);
+  auto atlas_vertices = b->allocate<tex::vertex>(4);
   auto atlas_indices = b->allocate<uint16_t>(6);
   atlas_indices->set({0, 1, 2, 2, 1, 3});
   atlas_vertices->set({
-    tex_mask::vertex{{0, 0}, {0, 0}},
-    tex_mask::vertex{{0, 1}, {0, 1}},
-    tex_mask::vertex{{1, 0}, {1, 0}},
-    tex_mask::vertex{{1, 1}, {1, 1}},
+    tex::vertex{{0, 0}, {0, 0}},
+    tex::vertex{{0, 1}, {0, 1}},
+    tex::vertex{{1, 0}, {1, 0}},
+    tex::vertex{{1, 1}, {1, 1}},
   });
-  atlas_instances->set(tex_mask::instance{make_transform_mat4({0, 200}, {r8_atlas->image(0)->size(), 1}), {1, 1, 1, 1}});
+  atlas_instances->set(tex::instance{make_transform_mat4({0, 200}, {b8g8r8a8_atlas->image(0)->size(), 1})});
 
   std::vector<shared_font> fonts {
-    std::make_shared<font>(d, demo_woff2::Roboto_Regular_woff2.data(), demo_woff2::Roboto_Regular_woff2.size(), r8_atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_Medium_woff2.data(), demo_woff2::Roboto_Medium_woff2.size(), r8_atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_Thin_woff2.data(), demo_woff2::Roboto_Thin_woff2.size(), r8_atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_Light_woff2.data(), demo_woff2::Roboto_Light_woff2.size(), r8_atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_Italic_woff2.data(), demo_woff2::Roboto_Italic_woff2.size(), r8_atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_Bold_woff2.data(), demo_woff2::Roboto_Bold_woff2.size(), r8_atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_BoldItalic_woff2.data(), demo_woff2::Roboto_BoldItalic_woff2.size(), r8_atlas, true),
-    std::make_shared<font>(d, demo_woff2::ProggyClean_woff2.data(), demo_woff2::ProggyClean_woff2.size(), r8_atlas, true),
+    std::make_shared<font>(d, demo_woff2::TwemojiMozilla_woff2.data(), demo_woff2::TwemojiMozilla_woff2.size(), b8g8r8a8_atlas, true),
+    std::make_shared<font>(d, demo_woff2::materialdesignicons_webfont_woff2.data(), demo_woff2::materialdesignicons_webfont_woff2.size(), b8g8r8a8_atlas, true),
   };
   std::vector<const char*> font_names {
-    "Roboto_Regular_woff2",
-    "Roboto_Medium_woff2",
-    "Roboto_Thin_woff2",
-    "Roboto_Light_woff2",
-    "Roboto_Italic_woff2",
-    "Roboto_Bold_woff2",
-    "Roboto_BoldItalic_woff2",
-    "ProggyClean_woff2",
+    "TwemojiMozilla_woff2",
+    "materialdesignicons_webfont_woff2",
   };
   int font_selection = 0;
 
-  using myshaper = shaper<uint16_t, tex_mask::vertex>;
+  using myshaper = shaper<uint16_t, tex::vertex>;
   myshaper s;
   myshaper::result sresult;
 
-  float font_size = 12;
-  static char text[1024 * 16] =
-      "Validation Error: [ VUID-vkCmdDrawIndexed-None-04007 ] Object 0: handle = 0x1116d20,"
-      "type = VK_OBJECT_TYPE_COMMAND_BUFFER; | MessageID = 0x5e4491cd | vkCmdDrawIndexed():"
-      "VkPipeline 0x290000000029[] expects that this Command Buffer's vertex binding Index 1"
-      "should be set via vkCmdBindVertexBuffers. This is because VkVertexInputBindingDescription"
-      "struct at index 1 of pVertexBindingDescriptions has a binding value of 1."
-      "The Vulkan spec states: All vertex input bindings accessed via vertex input variables"
-      "declared in the vertex shader entry point's interface must have either valid or VK_NULL_HANDLE"
-      "buffers bound (https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#VUID-vkCmdDrawIndexed-None-04007)";
+  float font_size = 64;
+
+  char32_t c32_emoji = U'😀';
+  char8_t c8_emoji[6];
 
   w.on_draw.connect([&](VkCommandBuffer _buffer) {
     ImGui_ImplHut_NewFrame();
@@ -137,19 +118,19 @@ int main(int, char**) {
       ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
 
       ImGui::ColorEdit4("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-      ImGui::ColorEdit4("text color", (float*)&text_color); // Edit 3 floats representing a color
       ImGui::InputFloat4("translate,", &text_translate[0]);
       ImGui::InputFloat3("scale,", &text_scale[0]);
       ImGui::InputFloat("font size,", &font_size);
       ImGui::Combo("font", &font_selection, font_names.data(), font_names.size());
 
-      static ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput;
-      ImGui::InputTextMultiline("##source", text, IM_ARRAYSIZE(text), ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 16), flags);
+      ImGui::InputScalar("emoji utf32 code", ImGuiDataType_U32, &c32_emoji, nullptr, nullptr, "%08X", ImGuiInputTextFlags_CharsHexadecimal);
+      *to_utf8(c8_emoji, c32_emoji) = '\0';
 
-      myshaper::context ctx{b, sresult, fonts[font_selection], (u8)font_size, text};
+      myshaper::context ctx {b, sresult, fonts[font_selection], (uint8_t)font_size, (char*)c8_emoji};
+
       s.bake(ctx);
-      tmask_pipeline->draw(_buffer, 0, sresult.indices_, sresult.indices_count_, text_instances, sresult.vertices_);
-      tmask_pipeline->draw(_buffer, 0, atlas_indices, atlas_instances, atlas_vertices);
+      pipeline->draw(_buffer, 0, sresult.indices_, sresult.indices_count_, text_instances, sresult.vertices_);
+      pipeline->draw(_buffer, 0, atlas_indices, atlas_instances, atlas_vertices);
 
       ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
       ImGui::End();
@@ -165,7 +146,7 @@ int main(int, char**) {
     d.post([&](auto){
       w.invalidate(true);
       w.clear_color(clear_color);
-      text_instances->set(tex_mask::instance{make_transform_mat4(text_translate, text_scale), text_color});
+      text_instances->set(tex::instance{make_transform_mat4(text_translate, text_scale)});
     });
 
     return false;

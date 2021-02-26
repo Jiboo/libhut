@@ -29,11 +29,11 @@
 
 #include "imgui_impl_hut.h"
 
-#include "hut/display.hpp"
-#include "hut/window.hpp"
 #include "hut/buffer_pool.hpp"
+#include "hut/display.hpp"
 #include "hut/image.hpp"
 #include "hut/pipeline.hpp"
+#include "hut/window.hpp"
 
 #include "hut_imgui_shaders_refl.hpp"
 

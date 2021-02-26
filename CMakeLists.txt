@@ -12,8 +12,6 @@ set(BUILD_SHARED_LIBS OFF) # FIXME JBL: add_library from dependencies makes shar
 # Configuration
 ###########################################################
 
-#set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_PREFER_NONDESCRETE_DEVICES)
-
 set(HUT_COMPILE_DEMOS 1)
 set(HUT_ENABLE_IMGUI TRUE)
 
@@ -25,10 +23,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(NOT WIN32)
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -v")
-#set(HUT_ENABLE_PROFILING TRUE)
+set(HUT_ENABLE_PROFILING TRUE)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION_DEBUG)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_DEBUG_STAGING)
+#set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_PREFER_NONDESCRETE_DEVICES)
 endif()
 
 ###########################################################
@@ -273,32 +272,37 @@ if(HUT_COMPILE_DEMOS)
       DEPENDS gen_res ${HUT_DEMO_PNG}
       COMMENT "Generating demo_png.cpp")
 
-  file(GLOB_RECURSE HUT_DEMO_TTF tst/ttf/*.ttf)
-  add_custom_command(OUTPUT ${HUT_GEN_DIR}/demo_ttf.cpp
-      COMMAND $<TARGET_FILE:gen_res> demo_ttf ${HUT_GEN_DIR} ${HUT_DEMO_TTF}
-      DEPENDS gen_res ${HUT_DEMO_TTF}
-      COMMENT "Generating demo_ttf.cpp")
+  file(GLOB_RECURSE HUT_DEMO_WOFF2 tst/woff2/*.woff2)
+  add_custom_command(OUTPUT ${HUT_GEN_DIR}/demo_woff2.cpp
+      COMMAND $<TARGET_FILE:gen_res> demo_woff2 ${HUT_GEN_DIR} ${HUT_DEMO_WOFF2}
+      DEPENDS gen_res ${HUT_DEMO_WOFF2}
+      COMMENT "Generating demo_woff2.cpp")
 
   file(GLOB HUT_DEMO_SHADERS_SOURCE tst/spv/*.vert tst/spv/*.frag)
   gen_spv_bundle(NAMESPACE demo_shaders OUTDIR ${HUT_GEN_DIR} SHADER_SOURCES ${HUT_DEMO_SHADERS_SOURCE})
 
-  add_executable(demo tst/demo.cpp ${HUT_GEN_DIR}/demo_png.cpp ${HUT_GEN_DIR}/demo_ttf.cpp ${HUT_GEN_DIR}/demo_shaders.cpp)
+  set(HUT_DEMO_GENERATED_RES ${HUT_GEN_DIR}/demo_png.cpp ${HUT_GEN_DIR}/demo_woff2.cpp ${HUT_GEN_DIR}/demo_shaders.cpp)
+
+  add_executable(demo tst/demo.cpp ${HUT_DEMO_GENERATED_RES})
   target_link_libraries(demo hut)
   add_dependencies(demo gen_demo_shaders)
 
-  add_executable(demo_3d tst/demo_3d.cpp ${HUT_GEN_DIR}/demo_shaders.cpp)
+  add_executable(demo_3d tst/demo_3d.cpp) # try to keep the demo3d "res" free, to use it as gauge for hut size
   target_link_libraries(demo_3d hut)
   add_dependencies(demo_3d gen_demo_shaders)
 
   if (HUT_ENABLE_IMGUI)
-    add_executable(demo_imgui tst/demo_imgui.cpp)
+    add_executable(demo_imgui tst/demo_imgui.cpp ${HUT_DEMO_GENERATED_RES})
     target_link_libraries(demo_imgui hut_imgui_impl)
 
-    add_executable(sandbox_binpacks tst/sandbox_binpacks_imgui.cpp)
+    add_executable(sandbox_binpacks tst/sandbox_binpacks_imgui.cpp ${HUT_DEMO_GENERATED_RES})
     target_link_libraries(sandbox_binpacks hut_imgui_impl)
 
-    add_executable(sandbox_text tst/sandbox_text_imgui.cpp)
+    add_executable(sandbox_text tst/sandbox_text_imgui.cpp ${HUT_DEMO_GENERATED_RES})
     target_link_libraries(sandbox_text hut_imgui_impl)
+
+    add_executable(sandbox_emoji tst/sandbox_emoji_imgui.cpp ${HUT_DEMO_GENERATED_RES})
+    target_link_libraries(sandbox_emoji hut_imgui_impl)
   endif()
 endif()
 

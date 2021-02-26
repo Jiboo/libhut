@@ -55,8 +55,8 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
-#include "hut/utils.hpp"
 #include "hut/buffer_pool.hpp"
+#include "hut/utils.hpp"
 
 namespace hut {
 
@@ -72,6 +72,7 @@ enum keysym {
   KSYM_LAST_VALUE = KSYM_RIGHTMETA,
 };
 const char *keysym_name(keysym);
+inline std::ostream &operator<<(std::ostream &_os, keysym _k) { return _os << keysym_name(_k); }
 
 enum cursor_type {
   CNONE,
@@ -116,6 +117,7 @@ enum cursor_type {
   CURSOR_TYPE_LAST_VALUE = CZOOM_OUT,
 };
 const char *cursor_css_name(cursor_type);
+inline std::ostream &operator<<(std::ostream &_os, cursor_type _c) { return _os << cursor_css_name(_c); }
 
 enum clipboard_format {
   FIMAGE_PNG,
@@ -128,6 +130,7 @@ enum clipboard_format {
 };
 using clipboard_formats = flagged<clipboard_format, CLIPBOARD_FORMAT_LAST_VALUE>;
 const char *format_mime_type(clipboard_format _f);
+inline std::ostream &operator<<(std::ostream &_os, clipboard_format _f) { return _os << format_mime_type(_f); }
 std::optional<clipboard_format> mime_type_format(const char * _mime_type);
 
 enum dragndrop_action {
@@ -137,7 +140,8 @@ enum dragndrop_action {
   DRAGNDROP_ACTION_LAST_VALUE = DNDMOVE,
 };
 using dragndrop_actions = flagged<dragndrop_action, DRAGNDROP_ACTION_LAST_VALUE>;
-const char *action_name(dragndrop_action);
+const char *action_name(dragndrop_action _a);
+inline std::ostream &operator<<(std::ostream &_os, dragndrop_action _a) { return _os << action_name(_a); }
 
 enum modifier {
   KMOD_ALT,
@@ -146,6 +150,8 @@ enum modifier {
   MODIFIER_LAST_VALUE = KMOD_SHIFT,
 };
 using modifiers = flagged<modifier, MODIFIER_LAST_VALUE>;
+const char *modifier_name(modifier _m);
+inline std::ostream &operator<<(std::ostream &_os, modifier _a) { return _os << modifier_name(_a); }
 
 struct clipboard_sender {
   ssize_t write(span<uint8_t>);

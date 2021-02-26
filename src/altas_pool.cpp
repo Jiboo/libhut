@@ -26,6 +26,7 @@
  */
 
 #include "hut/atlas_pool.hpp"
+#include "hut/profiling.hpp"
 
 using namespace hut;
 

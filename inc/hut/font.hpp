@@ -37,13 +37,13 @@
 
 #include "hut/atlas_pool.hpp"
 #include "hut/buffer_pool.hpp"
-#include "hut/pipeline.hpp"
 #include "hut/image.hpp"
+#include "hut/pipeline.hpp"
 
 namespace hut {
 
 class font {
-  friend class shaper;
+  template<typename TIndexType, typename TVertexType, typename TUpdater> friend class shaper;
 
  public:
   font(display &_display, const uint8_t *_addr, size_t _size, const shared_atlas &_atlas, bool _hinting = true);
@@ -79,30 +79,5 @@ class font {
 };
 
 using shared_font = std::shared_ptr<font>;
-
-class shaper {
- private:
-  hb_buffer_t *buffer_;
-
- public:
-  struct result {
-    friend class shaper;
-
-    tex_mask::shared_vertices vertices_;
-    tex_mask::shared_indices indices_;
-    uint indices_count_ = 0;
-    uint vertices_count_ = 0;
-    vec4 bbox_;
-
-    inline explicit operator bool() const {
-      return vertices_ && indices_;
-    }
-  };
-
-  shaper();
-  ~shaper();
-
-  bool bake(shared_buffer &_buff, result &_dst, const shared_font &_font, uint8_t _size, const std::string_view &_text);
-};
 
 }  // namespace hut

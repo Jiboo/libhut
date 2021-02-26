@@ -32,8 +32,9 @@
 #include <set>
 #include <unordered_set>
 
-#include "hut/display.hpp"
 #include "hut/buffer_pool.hpp"
+#include "hut/display.hpp"
+#include "hut/profiling.hpp"
 
 using namespace hut;
 
@@ -139,6 +140,24 @@ std::optional<clipboard_format> hut::mime_type_format(const char * _mime_type) {
   return {};
 }
 
+const char *hut::action_name(dragndrop_action _a) {
+  switch(_a) {
+    case DNDNONE: return "None";
+    case DNDMOVE: return "Move";
+    case DNDCOPY: return "Copy";
+  }
+  return nullptr;
+}
+
+const char *hut::modifier_name(modifier _m) {
+  switch(_m) {
+    case KMOD_CTRL: return "Ctrl";
+    case KMOD_ALT: return "Alt";
+    case KMOD_SHIFT: return "Shift";
+  }
+  return nullptr;
+}
+
 void display::post(const display::callback &_callback) {
   {
     std::lock_guard lock(posted_mutex_);
@@ -171,6 +190,7 @@ struct score_t {
 
 score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
   score_t result{};
+  result.score_ = 1;
 
   VkPhysicalDeviceVulkan12Properties properties12 {};
   properties12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES;
@@ -189,16 +209,14 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
   VkPhysicalDeviceFeatures &features = features2.features;
 
   if (features12.descriptorBindingPartiallyBound == VK_FALSE)
-    return score_t{.score_ = 0};
+    result.score_ = 0;
   if (features12.shaderSampledImageArrayNonUniformIndexing == VK_FALSE)
-    return score_t{.score_ = 0};
+    result.score_ = 0;
 
-  result.score_ = properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? 1000 : 100;
 #ifdef HUT_PREFER_NONDESCRETE_DEVICES
   if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
     result.score_ = 0;
 #endif
-  result.score_ += properties.limits.maxImageDimension2D;
 
   uint32_t extension_count;
   HUT_PVK(vkEnumerateDeviceExtensionProperties, _device, nullptr, &extension_count, nullptr);
@@ -210,7 +228,7 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
       has_swapchhain_ext = true;
   }
 
-  if (has_swapchhain_ext) {
+  if (result.score_ > 0 && has_swapchhain_ext) {
     uint32_t famillies_count;
     HUT_PVK(vkGetPhysicalDeviceQueueFamilyProperties, _device, &famillies_count, nullptr);
     std::vector<VkQueueFamilyProperties> famillies(famillies_count);
@@ -252,18 +270,20 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
       result.score_ = 0;
     if (modes_count == 0)
       result.score_ = 0;
-  } else {
-    result.score_ = 0;
+    if (result.iqueueg_ == score_t::bad_id)
+      result.score_ = 0;
+    if (result.iqueuec_ == score_t::bad_id)
+      result.score_ = 0;
+    if (result.iqueuet_ == score_t::bad_id)
+      result.score_ = 0;
+    if (result.iqueuep_ == score_t::bad_id)
+      result.score_ = 0;
   }
 
-  if (result.iqueueg_ == score_t::bad_id)
-    result.score_ = 0;
-  if (result.iqueuec_ == score_t::bad_id)
-    result.score_ = 0;
-  if (result.iqueuet_ == score_t::bad_id)
-    result.score_ = 0;
-  if (result.iqueuep_ == score_t::bad_id)
-    result.score_ = 0;
+  if (result.score_) {
+    result.score_ += properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? 1000 : 100;
+    result.score_ += properties.limits.maxImageDimension2D;
+  }
 
 #ifdef HUT_ENABLE_VALIDATION_DEBUG
   std::cout << "[hut] device " << properties.deviceName << " using Vulkan "
@@ -347,7 +367,7 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   score_t prefered_rate;
   for (VkPhysicalDevice &device : physical_devices) {
     score_t rate = rate_p_device(device, _dummy);
-    if (rate.score_ > prefered_rate.score_) {
+    if (rate.score_ > 0 && rate.score_ > prefered_rate.score_) {
       prefered_rate = rate;
       prefered_device = device;
     }

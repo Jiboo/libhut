@@ -32,6 +32,7 @@
 #include <windows.h>
 
 #include "hut/display.hpp"
+#include "hut/profiling.hpp"
 #include "hut/window.hpp"
 
 using namespace hut;

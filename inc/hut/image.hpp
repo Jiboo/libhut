@@ -30,9 +30,9 @@
 #include <memory>
 #include <set>
 
-#include "hut/utils.hpp"
-#include "hut/display.hpp"
 #include "hut/buffer_pool.hpp"
+#include "hut/display.hpp"
+#include "hut/utils.hpp"
 
 namespace hut {
 

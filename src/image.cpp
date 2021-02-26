@@ -31,10 +31,11 @@
 
 #include <png.h>
 
+#include "hut/buffer_pool.hpp"
+#include "hut/color.hpp"
 #include "hut/display.hpp"
 #include "hut/image.hpp"
-#include "hut/color.hpp"
-#include "hut/buffer_pool.hpp"
+#include "hut/profiling.hpp"
 
 using namespace hut;
 

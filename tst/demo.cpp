@@ -31,9 +31,10 @@
 #include "hut/display.hpp"
 #include "hut/pipeline.hpp"
 #include "hut/font.hpp"
+#include "hut/shaping.hpp"
 #include "hut/window.hpp"
 
-#include "demo_ttf.hpp"
+#include "demo_woff2.hpp"
 #include "demo_png.hpp"
 
 using namespace hut;
@@ -230,11 +231,12 @@ int main(int, char **) {
   shared_image tex1, tex2;
   shared_font roboto, material_icons;
 
-  shaper s;
+  using myshaper = shaper<uint16_t, tex_mask::vertex>;
+  myshaper s;
   // in this context to keep a ref on buffers
-  shaper::result hello_world;
-  shaper::result fps_counter;
-  shaper::result icons_test;
+  myshaper::result hello_world;
+  myshaper::result fps_counter;
+  myshaper::result icons_test;
 
   std::atomic_bool tex1_ready = false, tex2_ready = false;
 
@@ -269,9 +271,9 @@ int main(int, char **) {
     tex2_ready = true;
     w.invalidate(true);  // will force to call on_draw on the next frame
 
-    roboto = std::make_shared<font>(d, demo_ttf::Roboto_Regular_ttf.data(), demo_ttf::Roboto_Regular_ttf.size(), r8_atlas, true);
-    material_icons = std::make_shared<font>(d, demo_ttf::MaterialIcons_Regular_ttf.data(), demo_ttf::MaterialIcons_Regular_ttf.size(), r8_atlas, false);
-    s.bake(b, icons_test, material_icons, 16, "\uE834\uE835\uE836\uE837");
+    roboto = std::make_shared<font>(d, demo_woff2::Roboto_Regular_woff2.data(), demo_woff2::Roboto_Regular_woff2.size(), r8_atlas, true);
+    material_icons = std::make_shared<font>(d, demo_woff2::materialdesignicons_webfont_woff2.data(), demo_woff2::materialdesignicons_webfont_woff2.size(), r8_atlas, false);
+    s.bake(myshaper::context{b, icons_test, material_icons, 16, "\uE834\uE835\uE836\uE837"});
     w.invalidate(true);  // will force to call on_draw on the next frame
   });
 
@@ -341,7 +343,7 @@ int main(int, char **) {
       int font_size = round((sin(time * 2) + 1) * 14 + 8);
       char buff[64];
       snprintf(buff, sizeof(buff), "The The quick brown %d foxes, jump over the lazy dog. fi", font_size);
-      if (roboto && s.bake(b, hello_world, roboto, font_size, buff))
+      if (roboto && s.bake(myshaper::context{b, hello_world, roboto, (u8)font_size, buff}))
         w.invalidate(true);
     }
 
@@ -354,7 +356,7 @@ int main(int, char **) {
       double fps = double(frameCount) / std::chrono::duration<double>(diffReport).count();
       char buff[32];
       snprintf(buff, sizeof(buff), "fps: %f", fps);
-      if (s.bake(b, fps_counter, roboto, 12, buff))
+      if (s.bake(myshaper::context{b, fps_counter, roboto, 12, buff}))
         w.invalidate(true);
       if (diffReport > 1s) {
         lastReport = currentTime;

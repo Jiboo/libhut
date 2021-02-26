@@ -31,8 +31,9 @@
 
 #include "hut/color.hpp"
 #include "hut/display.hpp"
-#include "hut/window.hpp"
 #include "hut/image.hpp"
+#include "hut/profiling.hpp"
+#include "hut/window.hpp"
 
 using namespace hut;
 

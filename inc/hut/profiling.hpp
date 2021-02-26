@@ -140,12 +140,17 @@ struct fixed_string {
     data_[min] = 0;
   }
 
-  constexpr explicit fixed_string(const char (&_in)[TSize]) : fixed_string(_in, TSize - 1) {}
+  constexpr fixed_string(const char (&_in)[TSize]) : fixed_string(_in, TSize - 1) {}
 };
 
 template<size_t TMaxSize>
 fixed_string<TMaxSize> make_fixed(std::string_view _view) {
   return fixed_string<TMaxSize>{_view.data(), _view.size()};
+}
+
+template<size_t TMaxSize>
+fixed_string<TMaxSize> make_fixed(const char *_in) {
+  return _in != nullptr ? fixed_string<TMaxSize>{_in, strlen(_in)} : fixed_string<TMaxSize>{nullptr, 0};
 }
 
 template <size_t TSize>
@@ -166,7 +171,7 @@ struct fixed_string_array {
   fixed_string_array(const fixed_string_array&) = default;
   fixed_string_array(fixed_string_array&&) noexcept = default;
 
-  constexpr explicit fixed_string_array(const char (&... _in)[TSizes]) {
+  constexpr fixed_string_array(const char (&... _in)[TSizes]) {
     init(0, 0, _in...);
   }
 

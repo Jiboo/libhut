@@ -30,7 +30,7 @@
 #include <bit>
 #include <list>
 
-#include "utils.hpp"
+#include "hut/utils.hpp"
 
 namespace hut::binpack {
 

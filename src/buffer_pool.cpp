@@ -30,6 +30,7 @@
 
 #include "hut/buffer_pool.hpp"
 #include "hut/display.hpp"
+#include "hut/profiling.hpp"
 
 using namespace hut;
 
@@ -173,7 +174,7 @@ buffer_pool::alloc buffer_pool::do_alloc(uint _size, uint _align) {
 }
 
 void buffer_pool::do_free(const alloc &_alloc) {
-  HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::do_free {}", _range->size_);
+  HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::do_free {}", _alloc.size_);
   _alloc.buffer_->suballocator_.offer(_alloc.offset_);
 }
 

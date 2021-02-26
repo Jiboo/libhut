@@ -47,29 +47,27 @@
 
 #include <vulkan/vulkan.h>
 
-#include "hut/profiling.hpp"
-
 namespace hut {
+
+using namespace std::chrono_literals;
+using namespace glm;
+
+template<typename TType, size_t TExtent = std::dynamic_extent>
+using span = std::span<TType, TExtent>;
 
 class buffer_pool;
 class display;
 template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> class pipeline;
 class font;
-class shaper;
+template<typename TIndexType, typename TVertexType, typename TUpdater> class shaper;
 class image;
 class sampler;
 class window;
-
-template<typename TType, size_t TExtent = std::dynamic_extent>
-using span = std::span<TType, TExtent>;
 
 using shared_buffer = std::shared_ptr<buffer_pool>;
 using shared_font = std::shared_ptr<font>;
 using shared_image = std::shared_ptr<image>;
 using shared_sampler = std::shared_ptr<sampler>;
-
-using namespace std::chrono_literals;
-using namespace glm;
 
 inline size_t utf8codepointsize(char32_t _c) {
   // https://github.com/sheredom/utf8.h/blob/master/utf8.h
@@ -362,6 +360,14 @@ struct flagged {
   constexpr const_iterator cend() const { return const_iterator{0, underlying_bits}; }
   constexpr const_iterator end() const { return cend(); }
 };
+
+template<typename TEnum, TEnum TEnd, typename TUnderlying = uint32_t>
+inline std::ostream &operator<<(std::ostream &_os, flagged<TEnum, TEnd, TUnderlying> _flags) {
+  _os << "(";
+  for (auto flag : _flags)
+    _os << flag;
+  return _os << ")";
+}
 
 inline glm::i16vec2 offset2_16(VkOffset2D _in) { return glm::i16vec2{_in.x, _in.y}; }
 inline glm::i16vec3 offset3_16(VkOffset3D _in) { return glm::i16vec3{_in.x, _in.y, _in.z}; }

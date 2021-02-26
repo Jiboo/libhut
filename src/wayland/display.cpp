@@ -34,6 +34,7 @@
 #include <sys/mman.h>
 
 #include "hut/display.hpp"
+#include "hut/profiling.hpp"
 #include "hut/window.hpp"
 
 using namespace hut;
@@ -322,7 +323,7 @@ void hut::keyboard_handle_key(void *_data, wl_keyboard *_keyboard, uint32_t _ser
       const auto printable = utf32 > 0x7f || isprint(utf32);
       if (valid && printable) {
         d->keyboard_repeat(utf32);
-        HUT_PROFILE_EVENT(w, on_char, utf32);
+        HUT_PROFILE_EVENT(w, on_char, (u32)utf32);
       }
     }
     else {
@@ -839,7 +840,7 @@ void display::keyboard_repeat_thread(keyboard_repeat_context *_ctx) {
       }
       else {
         _ctx->display_.post([w, k=_ctx->key_](auto tp) {
-          HUT_PROFILE_EVENT(w, on_char, k);
+          HUT_PROFILE_EVENT(w, on_char, (u32)k);
         });
         _ctx->cv_.wait_for(lock, _ctx->sleep_);
       }
