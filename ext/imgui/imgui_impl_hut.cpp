@@ -37,19 +37,7 @@
 
 #include "hut_imgui_shaders_refl.hpp"
 
-// NOTE JBL: Must override the generated reflection, as we currently have no way for custom pragma/decoration/attribute to generate the color as R8G8B8A8 instead of R32G32B32A32, which is chosen because the type in the glsl is vec4
-struct imgui_vert_spv_refl : hut::hut_imgui_shaders::imgui_vert_spv_refl {
-  using instance = typename hut::hut_imgui_shaders::imgui_vert_spv_refl::instance;
-  using vertex = ImDrawVert;
-
-  constexpr static std::array<VkVertexInputAttributeDescription, 3> vertices_description_ {
-    VkVertexInputAttributeDescription{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(vertex, pos)},
-    VkVertexInputAttributeDescription{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(vertex, uv)},
-    VkVertexInputAttributeDescription{.location = 2, .binding = 0, .format = VK_FORMAT_R8G8B8A8_UNORM, .offset = offsetof(vertex, col)},
-  };
-};
-
-using imgui_pipeline = hut::pipeline<hut::proj_ubo, ImDrawIdx, imgui_vert_spv_refl, hut::hut_imgui_shaders::imgui_frag_spv_refl, const hut::shared_image &, const hut::shared_sampler &>;
+using imgui_pipeline = hut::pipeline<hut::proj_ubo, ImDrawIdx, hut::hut_imgui_shaders::imgui_vert_spv_refl, hut::hut_imgui_shaders::imgui_frag_spv_refl, const hut::shared_image &, const hut::shared_sampler &>;
 
 struct hut_imgui_mesh {
   imgui_pipeline::shared_indices indices_;
@@ -184,7 +172,11 @@ void ImGui_ImplHut_RenderDrawData(VkCommandBuffer _cmd_buffer, ImDrawData* _draw
     return;
 
   static_assert(std::is_same_v<imgui_pipeline::indice, ImDrawIdx>);
-  static_assert(std::is_same_v<imgui_pipeline::vertex, ImDrawVert>);
+  // check bitcast compatibility between our pipeline vertex (generated from reflection) and ImDrawVert
+  static_assert(sizeof(imgui_pipeline::vertex) == sizeof(ImDrawVert));
+  static_assert(offsetof(imgui_pipeline::vertex, pos_) == offsetof(ImDrawVert, pos));
+  static_assert(offsetof(imgui_pipeline::vertex, uv_) == offsetof(ImDrawVert, uv));
+  static_assert(offsetof(imgui_pipeline::vertex, col_) == offsetof(ImDrawVert, col));
 
   g_ctx.meshes_.clear();
   for (int n = 0; n < _draw_data->CmdListsCount; n++) {
