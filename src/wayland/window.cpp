@@ -195,13 +195,6 @@ void window::cursor(cursor_type _c) {
 void hut::clipboard_data_source_handle_send(void *_data, wl_data_source *_source, const char *_mime, int32_t _fd) {
   auto *w = (window*)_data;
   auto format = mime_type_format(_mime);
-  if (!format) {
-    if (strcmp("text/plain;charset=utf-8", _mime) == 0) format = FTEXT_PLAIN;
-    else if (strcmp("text/plain;charset=unicode", _mime) == 0) format = FTEXT_PLAIN;
-    else if (strcmp("STRING", _mime) == 0) format = FTEXT_PLAIN;
-    else if (strcmp("TEXT", _mime) == 0) format = FTEXT_PLAIN;
-    else if (strcmp("UTF8_STRING", _mime) == 0) format = FTEXT_PLAIN;
-  }
   if (format) {
     clipboard_sender sender{_fd};
     w->current_clipboard_sender_(*format, sender);
@@ -246,18 +239,6 @@ void window::clipboard_offer(clipboard_formats _supported_formats, const send_cl
   wl_data_source_add_listener(current_selection_, &wl_data_source_listeners, this);
   for (auto mime : _supported_formats) {
     wl_data_source_offer(current_selection_, format_mime_type(mime));
-    switch(mime) {
-      default: break;
-      case FTEXT_URI_LIST:
-      case FTEXT_HTML:
-      case FTEXT_PLAIN:
-        wl_data_source_offer(current_selection_, "text/plain;charset=utf-8");
-        wl_data_source_offer(current_selection_, "text/plain;charset=unicode");
-        wl_data_source_offer(current_selection_, "STRING");
-        wl_data_source_offer(current_selection_, "TEXT");
-        wl_data_source_offer(current_selection_, "UTF8_STRING");
-        break;
-    }
   }
 
   wl_data_device_set_selection(display_.data_device_, current_selection_, display_.last_serial_);
@@ -294,13 +275,6 @@ void hut::drag_data_source_handle_send(void *_data, wl_data_source *_source, con
   //std::cout << "drag_data_source_handle_send " << _source << ", " << _mime << std::endl;
   auto *w = (window*)_data;
   auto format = mime_type_format(_mime);
-  if (!format) {
-    if (strcmp("text/plain;charset=utf-8", _mime) == 0) format = FTEXT_PLAIN;
-    else if (strcmp("text/plain;charset=unicode", _mime) == 0) format = FTEXT_PLAIN;
-    else if (strcmp("STRING", _mime) == 0) format = FTEXT_PLAIN;
-    else if (strcmp("TEXT", _mime) == 0) format = FTEXT_PLAIN;
-    else if (strcmp("UTF8_STRING", _mime) == 0) format = FTEXT_PLAIN;
-  }
   if (format) {
     clipboard_sender sender{_fd};
     w->current_dragndrop_sender_(w->last_drag_action_handled_, *format, sender);
@@ -368,18 +342,6 @@ void window::dragndrop_start(dragndrop_actions _supported_actions, clipboard_for
   wl_data_source_add_listener(current_drag_source_, &wl_data_source_listeners, this);
   for (auto mime : _supported_formats) {
     wl_data_source_offer(current_drag_source_, format_mime_type(mime));
-    switch(mime) {
-      default: break;
-      case FTEXT_URI_LIST:
-      case FTEXT_HTML:
-      case FTEXT_PLAIN:
-        wl_data_source_offer(current_drag_source_, "text/plain;charset=utf-8");
-        wl_data_source_offer(current_drag_source_, "text/plain;charset=unicode");
-        wl_data_source_offer(current_drag_source_, "STRING");
-        wl_data_source_offer(current_drag_source_, "TEXT");
-        wl_data_source_offer(current_drag_source_, "UTF8_STRING");
-        break;
-    }
   }
   uint32_t wl_actions = 0;
   for (auto action : _supported_actions) {

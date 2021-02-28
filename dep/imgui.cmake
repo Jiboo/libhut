@@ -1,4 +1,4 @@
-set(IMGUI_DEFINITIONS "")
+set(IMGUI_DEFINITIONS "IMGUI_USE_WCHAR32")
 file(GLOB IMGUI_HEADERS dep/imgui/*.h)
 file(GLOB IMGUI_SOURCES dep/imgui/*.cpp)
 set(IMGUI_INCLUDES dep/imgui)

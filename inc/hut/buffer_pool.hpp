@@ -121,11 +121,13 @@ protected:
 
     void update_raw(uint _byte_offset, uint _byte_size, void *_data) {
       assert(_byte_offset + _byte_size <= size_bytes());
+      assert(_byte_size > 0);
       pool().do_update(buff(), alloc_.offset_ + _byte_offset, _byte_size, _data);
     }
 
     updator update_raw_indirect(uint _byte_offset, uint _byte_size) {
       assert(_byte_offset + _byte_size <= size_bytes());
+      assert(_byte_size > 0);
       return pool().prepare_update(buff(), alloc_.offset_ + _byte_offset, _byte_size);
     }
 
@@ -158,6 +160,7 @@ protected:
     void zero(uint _indice, uint _count) {
       size_t byte_offset = _indice * sizeof(T);
       size_t byte_size = _count * sizeof(T);
+      assert(_count > 0);
       assert(byte_offset % 4U == 0);
       assert(byte_size % 4U == 0);
       assert(byte_offset + byte_size <= size_bytes());

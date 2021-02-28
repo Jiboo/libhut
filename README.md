@@ -1,7 +1,8 @@
-This is a hobby attempt at a GUI library, still in early and unusable state (see todo.md).
+HUT (Hobby Ui Toolkit), attempt at a GUI library, still in early and unusable state (see todo.md).
 
 Dependencies (Fedora):
-- common: mesa-vulkan-devel, glm-devel, libpng-devel, freetype-devel, harfbuzz-devel, KhronosGroup/glslang.
+- submodules: KhronosGroup/glslang (glsl->spirv), KhronosGroup/SPIRV-Reflect, imgui (optional, used for tests/playgrounds).
+- common: mesa-vulkan-devel, glm-devel, libpng-devel, freetype-devel, harfbuzz-devel.
 - testing: gtest-devel.
 - profling: fmt-devel, boost-devel.
 - wayland backend: wayland-devel, libxkbcommon-devel, wayland-protocols-devel, wayland-cursor.

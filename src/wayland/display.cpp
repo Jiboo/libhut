@@ -299,8 +299,10 @@ void hut::keyboard_handle_leave(void *_data, wl_keyboard *_keyboard, uint32_t _s
   if (_keyboard == d->keyboard_) {
     d->last_serial_ =  _serial;
     d->keyboard_current_ = {nullptr, nullptr};
-    if (wit != d->windows_.end())
+    if (wit != d->windows_.end()) {
       HUT_PROFILE_EVENT(wit->second, on_blur);
+      d->keyboard_repeat(0);
+    }
   }
 }
 
@@ -446,13 +448,6 @@ void hut::data_offer_handle_offer(void *_data, wl_data_offer *_offer, const char
   //std::cout << "data_offer_handle_offer " << _offer << ", " << _mime << std::endl;
   auto *d = static_cast<display*>(_data);
   auto format = mime_type_format(_mime);
-  if (!format) {
-    if (strcmp("text/plain;charset=utf-8", _mime) == 0) format = FTEXT_PLAIN;
-    else if (strcmp("text/plain;charset=unicode", _mime) == 0) format = FTEXT_PLAIN;
-    else if (strcmp("STRING", _mime) == 0) format = FTEXT_PLAIN;
-    else if (strcmp("TEXT", _mime) == 0) format = FTEXT_PLAIN;
-    else if (strcmp("UTF8_STRING", _mime) == 0) format = FTEXT_PLAIN;
-  }
   if (format) {
     //std::cout << "data_offer_handle_offer got " << format_mime_type(*format) << std::endl;
     d->offer_params_[_offer].formats_ |= *format;

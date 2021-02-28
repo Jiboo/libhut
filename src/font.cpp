@@ -38,7 +38,7 @@ font::font(display &_display, const uint8_t *_addr, size_t _size, const shared_a
   : library_(_display.ft_library_), atlas_(_atlas) {
   HUT_PROFILE_SCOPE(PFONT, "font::font");
   load_flags_ = FT_LOAD_COLOR | (_hinting ? FT_LOAD_FORCE_AUTOHINT : FT_LOAD_NO_HINTING);
-  FT_New_Memory_Face(library_, _addr, _size, 0, &face_);
+  assert(FT_New_Memory_Face(library_, _addr, _size, 0, &face_) == 0);
   if (FT_HAS_COLOR(face_))
     assert(_atlas->params_.format_ == VK_FORMAT_B8G8R8A8_UNORM);
 }

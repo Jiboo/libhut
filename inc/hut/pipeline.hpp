@@ -584,11 +584,11 @@ public:
 using rgb        = pipeline<proj_ubo, uint16_t, hut_shaders::rgb_vert_spv_refl, hut_shaders::rgb_frag_spv_refl>;
 using rgba       = pipeline<proj_ubo, uint16_t, hut_shaders::rgba_vert_spv_refl, hut_shaders::rgba_frag_spv_refl>;
 using tex        = pipeline<proj_ubo, uint16_t, hut_shaders::tex_vert_spv_refl, hut_shaders::tex_frag_spv_refl, const shared_image &, const shared_sampler &>;
-using atlas      = pipeline<proj_ubo, uint16_t, hut_shaders::atlas_vert_spv_refl, hut_shaders::atlas_frag_spv_refl, const shared_atlas &, const shared_sampler &>;
+using atlas      = pipeline<proj_ubo, uint16_t, hut_shaders::tex_vert_spv_refl, hut_shaders::atlas_frag_spv_refl, const shared_atlas &, const shared_sampler &>;
 using tex_rgb    = pipeline<proj_ubo, uint16_t, hut_shaders::tex_rgb_vert_spv_refl, hut_shaders::tex_rgb_frag_spv_refl, const shared_image &, const shared_sampler &>;
 using tex_rgba   = pipeline<proj_ubo, uint16_t, hut_shaders::tex_rgba_vert_spv_refl, hut_shaders::tex_rgba_frag_spv_refl, const shared_image &, const shared_sampler &>;
 using tex_mask   = pipeline<proj_ubo, uint16_t, hut_shaders::tex_mask_vert_spv_refl, hut_shaders::tex_mask_frag_spv_refl, const shared_image &, const shared_sampler &>;
-using atlas_mask = pipeline<proj_ubo, uint16_t, hut_shaders::atlas_mask_vert_spv_refl, hut_shaders::atlas_mask_frag_spv_refl, const shared_atlas &, const shared_sampler &>;
+using atlas_mask = pipeline<proj_ubo, uint16_t, hut_shaders::tex_mask_vert_spv_refl, hut_shaders::atlas_mask_frag_spv_refl, const shared_atlas &, const shared_sampler &>;
 using box_rgba   = pipeline<proj_ubo, uint16_t, hut_shaders::box_rgba_vert_spv_refl, hut_shaders::box_rgba_frag_spv_refl>;
 
 }  // namespace hut

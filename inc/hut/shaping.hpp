@@ -95,7 +95,17 @@ class shaper {
 
   bool bake(const context &_ctx, void *_updater_param = nullptr) {
     HUT_PROFILE_SCOPE_NAMED(PFONT, "shaper::bake {}", ("text"), make_fixed<40>(_ctx.text_));
-    assert(!_ctx.text_.empty());
+    if (_ctx.text_.empty()) {
+      if (_ctx.dst_.indices_count_ > 0) {
+        _ctx.dst_.indices_->zero(0, _ctx.dst_.indices_count_);
+        _ctx.dst_.indices_count_ = 0;
+      }
+      if (_ctx.dst_.vertices_count_ > 0) {
+        _ctx.dst_.vertices_->zero(0, _ctx.dst_.vertices_count_);
+        _ctx.dst_.vertices_count_ = 0;
+      }
+      return false;
+    }
 
     constexpr size_t font_scale = 64;
     std::lock_guard lk(_ctx.font_->baking_mutex_);
