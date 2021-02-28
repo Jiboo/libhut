@@ -40,37 +40,39 @@ atlas_pool::atlas_pool(display &_display, const image_params &_params) : display
   if (params_.size_ == u16vec2{0, 0}) {
     params_.size_ = {_display.limits().maxImageDimension2D, _display.limits().maxImageDimension2D};
   }
-  add_bin();
+  add_page();
 }
 
-void atlas_pool::add_bin() {
-  bins_.emplace_back(std::make_shared<hut::image>(display_, params_));
+void atlas_pool::add_page() {
+  pages_.emplace_back(std::make_shared<hut::image>(display_, params_));
 }
 
 shared_subimage atlas_pool::alloc(const u16vec2 &_bounds) {
   assert(_bounds.x > 0);
   assert(_bounds.y > 0);
   auto padded = _bounds + padding;
-  for (uint i = 0; i < bins_.size(); i++) {
-    auto packed = bins_[i].packer_.pack(padded);
+  assert(padded.x < params_.size_.x);
+  assert(padded.y < params_.size_.y);
+  for (uint i = 0; i < pages_.size(); i++) {
+    auto packed = pages_[i].packer_.pack(padded);
     if (packed)
-      return std::make_shared<subimage>(this, i, make_bbox_with_origin_size(*packed, padded));
+      return std::make_shared<subimage>(this, i, make_bbox_with_origin_size(*packed, _bounds));
   }
-  add_bin();
-  auto packed = bins_.back().packer_.pack(padded);
+  add_page();
+  auto packed = pages_.back().packer_.pack(padded);
   assert(packed.has_value());
-  return std::make_shared<subimage>(this, bins_.size() - 1, make_bbox_with_origin_size(packed.value(), padded));
+  return std::make_shared<subimage>(this, pages_.size() - 1, make_bbox_with_origin_size(packed.value(), _bounds));
 }
 
 shared_subimage atlas_pool::pack(const u16vec2 &_bounds, uint8_t *_data, uint _src_row_pitch) {
   auto result = alloc(_bounds);
-  auto &l = bins_[result->bin_index_];
-  l.image_->update(result->bounds_ - u16vec4{0, 0, padding}, _data, _src_row_pitch);
+  auto &l = pages_[result->page_];
+  l.image_->update(result->bounds_, _data, _src_row_pitch);
   return result;
 }
 
 void atlas_pool::free(subimage &_subimage) {
   assert(_subimage.pool_ == this);
-  auto &l = bins_[_subimage.bin_index_];
+  auto &l = pages_[_subimage.page_];
   l.packer_.offer(_subimage.bounds_);
 }

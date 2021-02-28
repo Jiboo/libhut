@@ -36,11 +36,24 @@
 
 namespace hut {
 
+template<typename TUVType>
+TUVType encode_atlas_page_xy(TUVType _in, uint _atlas_page) {
+  switch (_atlas_page) {
+    case  0: _in.x *= +1; _in.y *= +1; break;
+    case  1: _in.x *= +1; _in.y *= -1; break;
+    case  2: _in.x *= -1; _in.y *= +1; break;
+    case  3: _in.x *= -1; _in.y *= -1; break;
+    default:
+      throw std::runtime_error("can't use default_vertex_updater_for_glyph for storing atlas_page, not enough bits");
+  }
+  return _in;
+}
+
 template<typename TVertexType>
 struct default_vertex_updater_for_glyph {
-  void operator()(void*, vec2 _pos, vec2 _uv, TVertexType &_v) const {
+  void operator()(void*, vec2 _pos, vec2 _uv, uint _atlas_page, TVertexType &_v) const {
     _v.pos_ = _pos;
-    _v.uv_ = _uv;
+    _v.uv_ = encode_atlas_page_xy(_uv, _atlas_page);
   };
 };
 
@@ -135,10 +148,11 @@ class shaper {
 
         size_t vertices_offset = 4 * drawn_codepoints;
         TVertexType *vertice = vertices + vertices_offset;
-        updater(_updater_param, {x0, y0}, {s0, t0}, vertice[0]);
-        updater(_updater_param, {x0, y1}, {s0, t1}, vertice[1]);
-        updater(_updater_param, {x1, y0}, {s1, t0}, vertice[2]);
-        updater(_updater_param, {x1, y1}, {s1, t1}, vertice[3]);
+        auto page = glyph.subimage_->page();
+        updater(_updater_param, {x0, y0}, {s0, t0}, page, vertice[0]);
+        updater(_updater_param, {x0, y1}, {s0, t1}, page, vertice[1]);
+        updater(_updater_param, {x1, y0}, {s1, t0}, page, vertice[2]);
+        updater(_updater_param, {x1, y1}, {s1, t1}, page, vertice[3]);
 
         TIndexType *indice = indices + 6 * drawn_codepoints;
         indice[0] = vertices_offset + 0;

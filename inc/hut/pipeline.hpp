@@ -29,6 +29,7 @@
 
 #include "hut_shaders_refl.hpp"
 
+#include "hut/atlas_pool.hpp"
 #include "hut/buffer_pool.hpp"
 #include "hut/color.hpp"
 #include "hut/display.hpp"
@@ -86,6 +87,16 @@ private:
   std::vector<VkDescriptorSet> descriptors_;
   std::unordered_map<uint, attachments> attachments_;
 
+  struct per_descriptor_atlas_info {
+    shared_sampler sampler_;
+    uint last_bound_;
+  };
+  struct per_atlas_info {
+    std::unordered_map<uint, per_descriptor_atlas_info> descriptors_info_;
+    uint binding_;
+  };
+  std::unordered_map<shared_atlas, per_atlas_info> atlas_infos_;
+
   void init_pools(const pipeline_params &_params) {
     std::array<VkDescriptorPoolSize, 2> descriptor_pools {
       VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 0},
@@ -94,8 +105,8 @@ private:
 
     for (auto binding : combined_bindings_) {
       switch (binding.descriptorType) {
-        case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER: descriptor_pools[0].descriptorCount++; break;
-        case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER: descriptor_pools[1].descriptorCount++; break;
+        case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER: descriptor_pools[0].descriptorCount += binding.descriptorCount; break;
+        case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER: descriptor_pools[1].descriptorCount += binding.descriptorCount; break;
         default: assert(false);
       }
     }
@@ -108,16 +119,31 @@ private:
     create_info.poolSizeCount = descriptor_pools[1].descriptorCount == 0 ? 1 : 2;
     create_info.pPoolSizes = descriptor_pools.data();
     create_info.maxSets = _params.max_sets_;
+    create_info.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
 
     if (vkCreateDescriptorPool(window_.display_.device_, &create_info, nullptr, &descriptor_pool_) != VK_SUCCESS)
       throw std::runtime_error("failed to create descriptor pool!");
   }
 
   void init_descriptor_layout() {
+    std::vector<VkDescriptorBindingFlagsEXT> bindings_flags(combined_bindings_.size(), 0);
+    for (size_t i = 0; i < combined_bindings_.size(); i++) {
+      const VkDescriptorSetLayoutBinding &binding = combined_bindings_[i];
+      if (binding.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER && binding.descriptorCount > 1)
+        bindings_flags[i] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+    }
+
+    VkDescriptorSetLayoutBindingFlagsCreateInfo bindings_flags_info = {};
+    bindings_flags_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
+    bindings_flags_info.bindingCount = bindings_flags.size();
+    bindings_flags_info.pBindingFlags = bindings_flags.data();
+
     VkDescriptorSetLayoutCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     create_info.bindingCount = combined_bindings_.size();
     create_info.pBindings = combined_bindings_.data();
+    create_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+    create_info.pNext = &bindings_flags_info;
 
     if (vkCreateDescriptorSetLayout(window_.display_.device_, &create_info, nullptr, &descriptor_layout_) != VK_SUCCESS)
       throw std::runtime_error("failed to create descriptor set layout!");
@@ -347,6 +373,7 @@ public:
     std::vector<VkDescriptorImageInfo> images_;
     std::vector<VkDescriptorBufferInfo> buffers_;
     VkDescriptorSet dst_ = VK_NULL_HANDLE;
+    uint descriptor_index_ = 0;
 
     void buffer(uint _binding, const shared_ubo &_ubo) {
       VkDescriptorBufferInfo info = {};
@@ -366,10 +393,10 @@ public:
       writes_.emplace_back(write);
     }
 
-    void texture(uint _binding, const shared_image &_mask, const shared_sampler &_sampler) {
+    void texture(uint _binding, const shared_image &_image, const shared_sampler &_sampler) {
       VkDescriptorImageInfo info = {};
       info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-      info.imageView = _mask->view_;
+      info.imageView = _image->view_;
       info.sampler = _sampler->sampler_;
       images_.emplace_back(info);
 
@@ -381,6 +408,26 @@ public:
       write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
       write.descriptorCount = 1;
       write.pImageInfo = &images_.back();
+      writes_.emplace_back(write);
+    }
+
+    void atlas(uint _binding, const shared_atlas &_atlas, const shared_sampler &_sampler) {
+      for (auto &page : _atlas->pages_) {
+        VkDescriptorImageInfo info = {};
+        info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        info.imageView = page.image_->view_;
+        info.sampler = _sampler->sampler_;
+        images_.emplace_back(info);
+      }
+
+      VkWriteDescriptorSet write = {};
+      write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      write.dstSet = dst_;
+      write.dstBinding = _binding;
+      write.dstArrayElement = 0;
+      write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+      write.descriptorCount = _atlas->page_count();
+      write.pImageInfo = &images_.back() - (_atlas->page_count() - 1);
       writes_.emplace_back(write);
     }
   };
@@ -399,17 +446,63 @@ public:
     write_continue(_binding + 1, _context, std::forward<TRest>(_rest)...);
   }
 
+  template<typename... TRest>
+  void write_continue(int _binding, descriptor_write_context &_context, const shared_atlas &_atlas, const shared_sampler &_sampler, const TRest&... _rest) {
+    _context.atlas(_binding, _atlas, _sampler);
+    write_continue(_binding + 1, _context, std::forward<TRest>(_rest)...);
+
+    auto &atlas_info = atlas_infos_[_atlas];
+    atlas_info.binding_ = _binding;
+    auto &desc_info = atlas_info.descriptors_info_[_context.descriptor_index_];
+    desc_info.sampler_ = _sampler;
+    desc_info.last_bound_ = _atlas->page_count();
+  }
+
   void write(uint _descriptor_index, const shared_ubo &_ubo, const TExtraAttachments&... _attachments) {
     HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
     assert(_descriptor_index < descriptors_.size());
     attachments_.emplace(_descriptor_index, attachments{_ubo, std::forward_as_tuple(_attachments...)});
 
     descriptor_write_context filler;
-    filler.dst_ = *(descriptors_.data() + _descriptor_index);
+    filler.descriptor_index_ = _descriptor_index;
+    filler.dst_ = descriptors_[_descriptor_index];
     filler.buffer(0, _ubo);
     write_continue(1, filler, std::forward<TExtraAttachments>(_attachments)...);
 
     HUT_PVK(vkUpdateDescriptorSets, window_.display_.device_, filler.writes_.size(), filler.writes_.data(), 0, nullptr);
+  }
+
+  void update_atlas(uint _descriptor_index, const shared_atlas &_atlas) {
+    assert(descriptor_attached(_descriptor_index));
+    assert(atlas_infos_.find(_atlas) != atlas_infos_.end());
+    auto &atlas_status = atlas_infos_[_atlas];
+    assert(atlas_status.descriptors_info_.find(_descriptor_index) != atlas_status.descriptors_info_.end());
+    auto &desc_info = atlas_status.descriptors_info_[_descriptor_index];
+    uint new_count = _atlas->page_count();
+
+    assert(desc_info.last_bound_ <= new_count);
+    uint diff = new_count - desc_info.last_bound_;
+    if (diff > 0) {
+      std::vector<VkDescriptorImageInfo> image_infos(diff);
+      for (uint i = 0; i < diff; i++) {
+        VkDescriptorImageInfo &info = image_infos[i];
+        info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        info.imageView = _atlas->pages_[desc_info.last_bound_ + i].image_->view_;
+        info.sampler = desc_info.sampler_->sampler_;
+      }
+
+      VkWriteDescriptorSet write = {};
+      write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      write.dstSet = descriptors_[_descriptor_index];
+      write.dstBinding = atlas_status.binding_;
+      write.dstArrayElement = desc_info.last_bound_;
+      write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+      write.descriptorCount = image_infos.size();
+      write.pImageInfo = image_infos.data();
+
+      HUT_PVK(vkUpdateDescriptorSets, window_.display_.device_, 1, &write, 0, nullptr);
+      desc_info.last_bound_ = new_count;
+    }
   }
 
   bool descriptor_attached(uint _descriptor_index) {
@@ -488,12 +581,14 @@ public:
   }
 };
 
-using rgb      = pipeline<proj_ubo, uint16_t, hut_shaders::rgb_vert_spv_refl, hut_shaders::rgb_frag_spv_refl>;
-using rgba     = pipeline<proj_ubo, uint16_t, hut_shaders::rgba_vert_spv_refl, hut_shaders::rgba_frag_spv_refl>;
-using tex      = pipeline<proj_ubo, uint16_t, hut_shaders::tex_vert_spv_refl, hut_shaders::tex_frag_spv_refl, const shared_image &, const shared_sampler &>;
-using tex_rgb  = pipeline<proj_ubo, uint16_t, hut_shaders::tex_rgb_vert_spv_refl, hut_shaders::tex_rgb_frag_spv_refl, const shared_image &, const shared_sampler &>;
-using tex_rgba = pipeline<proj_ubo, uint16_t, hut_shaders::tex_rgba_vert_spv_refl, hut_shaders::tex_rgba_frag_spv_refl, const shared_image &, const shared_sampler &>;
-using tex_mask = pipeline<proj_ubo, uint16_t, hut_shaders::tex_mask_vert_spv_refl, hut_shaders::tex_mask_frag_spv_refl, const shared_image &, const shared_sampler &>;
-using box_rgba = pipeline<proj_ubo, uint16_t, hut_shaders::box_rgba_vert_spv_refl, hut_shaders::box_rgba_frag_spv_refl>;
+using rgb        = pipeline<proj_ubo, uint16_t, hut_shaders::rgb_vert_spv_refl, hut_shaders::rgb_frag_spv_refl>;
+using rgba       = pipeline<proj_ubo, uint16_t, hut_shaders::rgba_vert_spv_refl, hut_shaders::rgba_frag_spv_refl>;
+using tex        = pipeline<proj_ubo, uint16_t, hut_shaders::tex_vert_spv_refl, hut_shaders::tex_frag_spv_refl, const shared_image &, const shared_sampler &>;
+using atlas      = pipeline<proj_ubo, uint16_t, hut_shaders::atlas_vert_spv_refl, hut_shaders::atlas_frag_spv_refl, const shared_atlas &, const shared_sampler &>;
+using tex_rgb    = pipeline<proj_ubo, uint16_t, hut_shaders::tex_rgb_vert_spv_refl, hut_shaders::tex_rgb_frag_spv_refl, const shared_image &, const shared_sampler &>;
+using tex_rgba   = pipeline<proj_ubo, uint16_t, hut_shaders::tex_rgba_vert_spv_refl, hut_shaders::tex_rgba_frag_spv_refl, const shared_image &, const shared_sampler &>;
+using tex_mask   = pipeline<proj_ubo, uint16_t, hut_shaders::tex_mask_vert_spv_refl, hut_shaders::tex_mask_frag_spv_refl, const shared_image &, const shared_sampler &>;
+using atlas_mask = pipeline<proj_ubo, uint16_t, hut_shaders::atlas_mask_vert_spv_refl, hut_shaders::atlas_mask_frag_spv_refl, const shared_atlas &, const shared_sampler &>;
+using box_rgba   = pipeline<proj_ubo, uint16_t, hut_shaders::box_rgba_vert_spv_refl, hut_shaders::box_rgba_frag_spv_refl>;
 
 }  // namespace hut

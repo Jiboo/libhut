@@ -423,14 +423,28 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
 #endif
   }
 
-  VkPhysicalDeviceFeatures enabled_features = {};
-  enabled_features.samplerAnisotropy = device_features_.samplerAnisotropy;
+  VkPhysicalDeviceFeatures core_features = {};
+  core_features.samplerAnisotropy = device_features_.samplerAnisotropy;
+  core_features.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
+
+  VkPhysicalDeviceDescriptorIndexingFeatures bindings_features = {};
+  bindings_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+  bindings_features.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+  bindings_features.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
+  bindings_features.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+  bindings_features.descriptorBindingPartiallyBound = VK_TRUE;
+
+  VkPhysicalDeviceFeatures2 device_features = {};
+  device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  device_features.pNext = &bindings_features;
+  device_features.features = core_features;
 
   VkDeviceCreateInfo device_info = {};
   device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
   device_info.pQueueCreateInfos = queue_create_infos.data();
   device_info.queueCreateInfoCount = (uint32_t)queue_create_infos.size();
-  device_info.pEnabledFeatures = &enabled_features;
+  device_info.pEnabledFeatures = nullptr;
+  device_info.pNext = &device_features;
   device_info.enabledExtensionCount = (uint32_t)extensions.size();
   device_info.ppEnabledExtensionNames = extensions.data();
   device_info.enabledLayerCount = (uint32_t)layers.size();

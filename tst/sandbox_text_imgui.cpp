@@ -71,26 +71,26 @@ int main(int, char**) {
   shared_ref<proj_ubo> ubo = d.alloc_ubo(b, default_ubo);
 
   shared_atlas r8_atlas = std::make_shared<atlas_pool>(d, image_params{.size_ = {1024, 1024}, .format_ = VK_FORMAT_R8_UNORM});
-  auto tmask_pipeline = std::make_unique<tex_mask>(w);
-  tmask_pipeline->write(0, ubo, r8_atlas->image(0), samp);
+  auto pipeline = std::make_unique<atlas_mask>(w);
+  pipeline->write(0, ubo, r8_atlas, samp);
 
-  auto text_instances = b->allocate<tex_mask::instance>(1);
+  auto text_instances = b->allocate<atlas_mask::instance>(1);
   vec2 text_translate = {  1, 101};
   vec3 text_scale = {1,1,1};
   vec4 text_color = {1, 1, 1, 1};
-  text_instances->set(tex_mask::instance{make_transform_mat4(text_translate, text_scale), text_color});
+  text_instances->set(atlas_mask::instance{make_transform_mat4(text_translate, text_scale), text_color});
 
-  auto atlas_instances = b->allocate<tex_mask::instance>(1);
-  auto atlas_vertices = b->allocate<tex_mask::vertex>(4);
+  auto atlas_instances = b->allocate<atlas_mask::instance>(1);
+  auto atlas_vertices = b->allocate<atlas_mask::vertex>(4);
   auto atlas_indices = b->allocate<uint16_t>(6);
   atlas_indices->set({0, 1, 2, 2, 1, 3});
   atlas_vertices->set({
-    tex_mask::vertex{{0, 0}, {0, 0}},
-    tex_mask::vertex{{0, 1}, {0, 1}},
-    tex_mask::vertex{{1, 0}, {1, 0}},
-    tex_mask::vertex{{1, 1}, {1, 1}},
+    atlas_mask::vertex{{0, 0}, {0, 0}},
+    atlas_mask::vertex{{0, 1}, {0, 1}},
+    atlas_mask::vertex{{1, 0}, {1, 0}},
+    atlas_mask::vertex{{1, 1}, {1, 1}},
   });
-  atlas_instances->set(tex_mask::instance{make_transform_mat4({0, 200}, {r8_atlas->image(0)->size(), 1}), {1, 1, 1, 1}});
+  atlas_instances->set(atlas_mask::instance{make_transform_mat4({0, 200}, {r8_atlas->image(0)->size(), 1}), {1, 1, 1, 1}});
 
   std::vector<shared_font> fonts {
     std::make_shared<font>(d, demo_woff2::Roboto_Regular_woff2.data(), demo_woff2::Roboto_Regular_woff2.size(), r8_atlas, true),
@@ -101,6 +101,7 @@ int main(int, char**) {
     std::make_shared<font>(d, demo_woff2::Roboto_Bold_woff2.data(), demo_woff2::Roboto_Bold_woff2.size(), r8_atlas, true),
     std::make_shared<font>(d, demo_woff2::Roboto_BoldItalic_woff2.data(), demo_woff2::Roboto_BoldItalic_woff2.size(), r8_atlas, true),
     std::make_shared<font>(d, demo_woff2::ProggyClean_woff2.data(), demo_woff2::ProggyClean_woff2.size(), r8_atlas, true),
+    std::make_shared<font>(d, demo_woff2::materialdesignicons_webfont_woff2.data(), demo_woff2::materialdesignicons_webfont_woff2.size(), r8_atlas, true),
   };
   std::vector<const char*> font_names {
     "Roboto_Regular_woff2",
@@ -111,10 +112,12 @@ int main(int, char**) {
     "Roboto_Bold_woff2",
     "Roboto_BoldItalic_woff2",
     "ProggyClean_woff2",
+    "materialdesignicons_webfont_woff2",
   };
   int font_selection = 0;
+  int atlas_page = 0;
 
-  using myshaper = shaper<uint16_t, tex_mask::vertex>;
+  using myshaper = shaper<uint16_t, atlas_mask::vertex>;
   myshaper s;
   myshaper::result sresult;
 
@@ -130,6 +133,7 @@ int main(int, char**) {
       "buffers bound (https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#VUID-vkCmdDrawIndexed-None-04007)";
 
   w.on_draw.connect([&](VkCommandBuffer _buffer) {
+    pipeline->update_atlas(0, r8_atlas);
     ImGui_ImplHut_NewFrame();
     ImGui::NewFrame();
 
@@ -142,14 +146,15 @@ int main(int, char**) {
       ImGui::InputFloat3("scale,", &text_scale[0]);
       ImGui::InputFloat("font size,", &font_size);
       ImGui::Combo("font", &font_selection, font_names.data(), font_names.size());
+      ImGui::SliderInt("atlas page", &atlas_page, 0, r8_atlas->page_count() - 1);
 
       static ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput;
       ImGui::InputTextMultiline("##source", text, IM_ARRAYSIZE(text), ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 16), flags);
 
       myshaper::context ctx{b, sresult, fonts[font_selection], (u8)font_size, text};
       s.bake(ctx);
-      tmask_pipeline->draw(_buffer, 0, sresult.indices_, sresult.indices_count_, text_instances, sresult.vertices_);
-      tmask_pipeline->draw(_buffer, 0, atlas_indices, atlas_instances, atlas_vertices);
+      pipeline->draw(_buffer, 0, sresult.indices_, sresult.indices_count_, text_instances, sresult.vertices_);
+      pipeline->draw(_buffer, 0, atlas_indices, atlas_instances, atlas_vertices);
 
       ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
       ImGui::End();
@@ -165,7 +170,14 @@ int main(int, char**) {
     d.post([&](auto){
       w.invalidate(true);
       w.clear_color(clear_color);
-      text_instances->set(tex_mask::instance{make_transform_mat4(text_translate, text_scale), text_color});
+      text_instances->set(atlas_mask::instance{make_transform_mat4(text_translate, text_scale), text_color});
+
+      atlas_vertices->set({
+        atlas_mask::vertex{{0, 0}, encode_atlas_page_xy(vec2{0, 0}, atlas_page)},
+        atlas_mask::vertex{{0, 1}, encode_atlas_page_xy(vec2{0, 1}, atlas_page)},
+        atlas_mask::vertex{{1, 0}, encode_atlas_page_xy(vec2{1, 0}, atlas_page)},
+        atlas_mask::vertex{{1, 1}, encode_atlas_page_xy(vec2{1, 1}, atlas_page)},
+      });
     });
 
     return false;

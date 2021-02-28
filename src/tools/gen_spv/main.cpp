@@ -220,7 +220,10 @@ string format_name_vk(SpvReflectInterfaceVariable *_input) {
       os << "_SFLOAT"; break;
 
     default:
-      os << "_UNORM";
+      if (_input->numeric.scalar.width > 16)
+        os << (_input->numeric.scalar.signedness ? "_SINT" : "_UINT");
+      else
+        os << "_UNORM";
       break;
   }
 
@@ -266,7 +269,12 @@ string format_name_cpp(SpvReflectInterfaceVariable *_input, unsigned _columns = 
     if (_input->numeric.vector.component_count > 3)
       os << "a" << _input->numeric.scalar.width;
 
-    os << (fp ? "_sfloat" : "_unorm");
+    if (fp)
+      os << "_sfloat";
+    else if (_input->numeric.scalar.width > 16)
+      os << (_input->numeric.scalar.signedness ? "_sint" : "_uint");
+    else
+      os << "_unorm";
 
     format = os.str();
   }
@@ -321,6 +329,8 @@ void reflect_bindings(ostream &_os, const SpvReflectShaderModule &_mod) {
   _os << "  constexpr static std::array<VkDescriptorSetLayoutBinding, " << bindings_count
       << "> descriptor_bindings_ {\n";
   for (auto *binding : bindings) {
+    if (binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER && binding->type_description->op == SpvOpTypeRuntimeArray && binding->count == 1)
+      throw std::runtime_error("missing size on sampler array (specify a dimension size), or 1 specified (if only one is needed don't use an array)");
     _os << "    VkDescriptorSetLayoutBinding{.binding = " << binding->binding
         << ", .descriptorType = " << descriptor_type_vk(binding->descriptor_type)
         << ", .descriptorCount = " << binding->count

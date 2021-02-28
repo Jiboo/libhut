@@ -283,10 +283,6 @@ if(HUT_COMPILE_DEMOS)
 
   set(HUT_DEMO_GENERATED_RES ${HUT_GEN_DIR}/demo_png.cpp ${HUT_GEN_DIR}/demo_woff2.cpp ${HUT_GEN_DIR}/demo_shaders.cpp)
 
-  add_executable(demo tst/demo.cpp ${HUT_DEMO_GENERATED_RES})
-  target_link_libraries(demo hut)
-  add_dependencies(demo gen_demo_shaders)
-
   add_executable(demo_3d tst/demo_3d.cpp) # try to keep the demo3d "res" free, to use it as gauge for hut size
   target_link_libraries(demo_3d hut)
   add_dependencies(demo_3d gen_demo_shaders)
@@ -303,6 +299,9 @@ if(HUT_COMPILE_DEMOS)
 
     add_executable(sandbox_emoji tst/sandbox_emoji_imgui.cpp ${HUT_DEMO_GENERATED_RES})
     target_link_libraries(sandbox_emoji hut_imgui_impl)
+
+    add_executable(sandbox_atlas tst/sandbox_atlas_imgui.cpp ${HUT_DEMO_GENERATED_RES})
+    target_link_libraries(sandbox_atlas hut_imgui_impl)
   endif()
 endif()
 

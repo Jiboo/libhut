@@ -70,7 +70,7 @@ int main(int, char**) {
   default_ubo.proj_ = ortho<float>(0, w.size().x, 0, w.size().y);
   shared_ref<proj_ubo> ubo = d.alloc_ubo(b, default_ubo);
 
-  shared_atlas b8g8r8a8_atlas = std::make_shared<atlas_pool>(d, image_params{.size_ = {1024, 1024}, .format_ = VK_FORMAT_B8G8R8A8_UNORM});
+  shared_atlas b8g8r8a8_atlas = std::make_shared<atlas_pool>(d, image_params{.size_ = {256, 256}, .format_ = VK_FORMAT_B8G8R8A8_UNORM});
   auto pipeline = std::make_unique<atlas>(w);
   pipeline->write(0, ubo, b8g8r8a8_atlas, samp);
 
@@ -93,9 +93,11 @@ int main(int, char**) {
 
   std::vector<shared_font> fonts {
     std::make_shared<font>(d, demo_woff2::TwemojiMozilla_woff2.data(), demo_woff2::TwemojiMozilla_woff2.size(), b8g8r8a8_atlas, true),
+    std::make_shared<font>(d, demo_woff2::materialdesignicons_webfont_woff2.data(), demo_woff2::materialdesignicons_webfont_woff2.size(), b8g8r8a8_atlas, true),
   };
   std::vector<const char*> font_names {
     "TwemojiMozilla_woff2",
+    "materialdesignicons_webfont_woff2",
   };
   int font_selection = 0;
   int atlas_page = 0;
@@ -126,7 +128,6 @@ int main(int, char**) {
       ImGui::SliderInt("atlas page", &atlas_page, 0, b8g8r8a8_atlas->page_count() - 1);
 
       ImGui::InputScalar("emoji utf32 code", ImGuiDataType_U32, &c32_emoji, nullptr, nullptr, "%08X", ImGuiInputTextFlags_CharsHexadecimal);
-      ImGui::DragInt("utf32", (int*)&c32_emoji, 1, 0x1f600, 0x1fFFF);
       *to_utf8(c8_emoji, c32_emoji) = '\0';
 
       myshaper::context ctx {b, sresult, fonts[font_selection], (uint8_t)font_size, (char*)c8_emoji};
@@ -149,6 +150,7 @@ int main(int, char**) {
     d.post([&](auto){
       w.invalidate(true);
       w.clear_color(clear_color);
+
       text_instances->set(atlas::instance{make_transform_mat4(text_translate, text_scale)});
 
       atlas_vertices->set({

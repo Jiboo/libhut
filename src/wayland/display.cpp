@@ -832,6 +832,10 @@ void display::keyboard_repeat_thread(keyboard_repeat_context *_ctx) {
       _ctx->cv_.wait(lock);
     if (_ctx->key_) {
       auto *w = _ctx->display_.keyboard_current_.second;
+      if (!w) {
+        _ctx->key_ = 0;
+        continue;
+      }
       auto now = clock::now();
       auto elapsed = now - _ctx->start_;
       if (elapsed < _ctx->delay_) {

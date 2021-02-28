@@ -82,6 +82,7 @@ void ImPacker(const char *_name = "Packer", u16vec2 _bounds = {8*1024, 8*1024}) 
   static float total_add_time = 0;
   static std::vector<float> rem_timings;
   static float total_rem_time = 0;
+  static auto padding = ivec2{0, 0};
 
   auto rand_norm = [&](){
     std::uniform_real_distribution<> dis(0.0, 1.0);
@@ -105,14 +106,14 @@ void ImPacker(const char *_name = "Packer", u16vec2 _bounds = {8*1024, 8*1024}) 
   auto add_one = [&]() {
     auto rect_size = rand_size();
     auto before = clock_t::now();
-    auto rect = packer.pack(rect_size);
+    auto rect = packer.pack(rect_size + u16vec2(padding));
     auto after = clock_t::now();
     auto time = std::chrono::duration_cast<dur_t>(after - before).count();
     total_add_time += time;
     add_timings.emplace_back(time);
     if (rect) {
       surface += rect_size.x * rect_size.y;
-      packed.emplace_back(make_bbox_with_origin_size(rect.value(), rect_size));
+      packed.emplace_back(make_bbox_with_origin_size(rect.value(), rect_size - u16vec2(padding)));
     }
     return rect.has_value();
   };
@@ -147,6 +148,7 @@ void ImPacker(const char *_name = "Packer", u16vec2 _bounds = {8*1024, 8*1024}) 
     while (add_one());
   }
   ImGui::SameLine();
+  ImGui::InputInt2("Padding", &padding.x);
   ImGui::Text("Packed %zu/%zu (with %zu rem), %f%% surface, %fms total add (%fms/op), %fms total rem (%fms/op)",
               packed.size(), add_timings.size(), rem_timings.size(),
               surface / float(_bounds.x * _bounds.y) * 100,
@@ -154,6 +156,7 @@ void ImPacker(const char *_name = "Packer", u16vec2 _bounds = {8*1024, 8*1024}) 
               total_rem_time, total_rem_time / rem_timings.size());
   ImGui::PlotHistogram("Add", add_timings.data(), add_timings.size(), 0, nullptr, FLT_MAX, FLT_MAX, ImVec2(0, 200));
   ImGui::PlotHistogram("Rem", rem_timings.data(), rem_timings.size(), 0, nullptr, FLT_MAX, FLT_MAX, ImVec2(0, 200));
+
 
   ImDrawList* draw_list = ImGui::GetWindowDrawList();
   ImVec2 p = ImGui::GetCursorScreenPos();
