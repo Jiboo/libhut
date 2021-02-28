@@ -74,11 +74,11 @@ protected:
 
     buffer &target_;
     alloc staging_;
-    uint offset_;
     span<uint8_t> data_;
+    uint offset_;
 
     updator(buffer &_target, alloc _staging, span<uint8_t> _data, uint _offset)
-        : target_(_target), staging_(_staging), offset_(_offset), data_(_data) {
+        : target_(_target), staging_(_staging), data_(_data), offset_(_offset) {
     }
 
   public:
@@ -109,7 +109,7 @@ protected:
       _other.alloc_.reset();
     }
     ~ref() {
-      pool().do_free(alloc_);
+      do_free(alloc_);
     }
 
     ref &operator=(const ref&) = delete;
@@ -199,7 +199,7 @@ protected:
   buffer *grow(uint new_size);
   void free_buffer(buffer &_buff);
   alloc do_alloc(uint _size, uint _align = 4);
-  void do_free(const alloc &_alloc);
+  static void do_free(const alloc &_alloc);
   void do_update(buffer &_buf, uint _offset, uint _size, const void *_data);
   updator prepare_update(buffer &_buf, uint _offset, uint _size);
   void finalize_update(updator &_update);

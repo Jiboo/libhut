@@ -157,7 +157,6 @@ void ImPacker(const char *_name = "Packer", u16vec2 _bounds = {8*1024, 8*1024}) 
   ImGui::PlotHistogram("Add", add_timings.data(), add_timings.size(), 0, nullptr, FLT_MAX, FLT_MAX, ImVec2(0, 200));
   ImGui::PlotHistogram("Rem", rem_timings.data(), rem_timings.size(), 0, nullptr, FLT_MAX, FLT_MAX, ImVec2(0, 200));
 
-
   ImDrawList* draw_list = ImGui::GetWindowDrawList();
   ImVec2 p = ImGui::GetCursorScreenPos();
 

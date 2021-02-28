@@ -237,7 +237,7 @@ bool ImGui_ImplHut_CreateDeviceObjects() {
   hut::image_params atlas_params;
   atlas_params.size_ = {width, height};
   atlas_params.format_ = VK_FORMAT_R8G8B8A8_UNORM;
-  g_ctx.images_[0] = hut::image::load_raw(*g_ctx.display_, pixels, atlas_params);
+  g_ctx.images_[0] = hut::image::load_raw(*g_ctx.display_, pixels, width * 4, atlas_params);
   io.Fonts->TexID = (ImTextureID)0;
 
   g_ctx.pipeline_ = std::make_unique<imgui_pipeline>(*g_ctx.window_);

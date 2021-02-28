@@ -179,16 +179,6 @@ inline vec<4, T, Q> make_bbox_with_origin_size(const vec<2, T, Q> &_offset, cons
   return vec<4, T, Q>{_offset.x, _offset.y, _offset.x + _size.x, _offset.y + _size.y};
 }
 
-template<typename T, qualifier Q = defaultp>
-inline vec<4, T, Q> bbox_transform_relative(const vec<4, T, Q> &_big, const vec<4, T, Q> &_small) { // FIXME JBL: Naming, dunno what's this operation, _small is in coordinate space of _big ( (0,0) means topleft corner of _big), to be in _big coordinate space
-  return vec<4, T, Q>{
-      _big.x + _small.x,
-      _big.y + _small.y,
-      _big.z - _small.z,
-      _big.w - _small.w
-  };
-}
-
 inline mat4 make_transform_mat4(vec2 _translate, vec3 _scale) {
   mat4 m(1);
   m = translate(m, vec3(_translate, 0));

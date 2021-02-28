@@ -70,9 +70,9 @@ int main(int, char**) {
   default_ubo.proj_ = ortho<float>(0, w.size().x, 0, w.size().y);
   shared_ref<proj_ubo> ubo = d.alloc_ubo(b, default_ubo);
 
-  shared_atlas r8_atlas = std::make_shared<atlas_pool>(d, image_params{.size_ = {1024, 1024}, .format_ = VK_FORMAT_R8_UNORM});
+  shared_atlas atlas = std::make_shared<atlas_pool>(d, image_params{.size_ = {1024, 1024}, .format_ = VK_FORMAT_R8_UNORM});
   auto pipeline = std::make_unique<atlas_mask>(w);
-  pipeline->write(0, ubo, r8_atlas, samp);
+  pipeline->write(0, ubo, atlas, samp);
 
   auto text_instances = b->allocate<atlas_mask::instance>(1);
   vec2 text_translate = {  1, 101};
@@ -90,18 +90,18 @@ int main(int, char**) {
     atlas_mask::vertex{{1, 0}, {1, 0}},
     atlas_mask::vertex{{1, 1}, {1, 1}},
   });
-  atlas_instances->set(atlas_mask::instance{make_transform_mat4({0, 200}, {r8_atlas->image(0)->size(), 1}), {1, 1, 1, 1}});
+  atlas_instances->set(atlas_mask::instance{make_transform_mat4({0, 200}, {atlas->image(0)->size(), 1}), {1, 1, 1, 1}});
 
   std::vector<shared_font> fonts {
-    std::make_shared<font>(d, demo_woff2::Roboto_Regular_woff2.data(), demo_woff2::Roboto_Regular_woff2.size(), r8_atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_Medium_woff2.data(), demo_woff2::Roboto_Medium_woff2.size(), r8_atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_Thin_woff2.data(), demo_woff2::Roboto_Thin_woff2.size(), r8_atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_Light_woff2.data(), demo_woff2::Roboto_Light_woff2.size(), r8_atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_Italic_woff2.data(), demo_woff2::Roboto_Italic_woff2.size(), r8_atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_Bold_woff2.data(), demo_woff2::Roboto_Bold_woff2.size(), r8_atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_BoldItalic_woff2.data(), demo_woff2::Roboto_BoldItalic_woff2.size(), r8_atlas, true),
-    std::make_shared<font>(d, demo_woff2::ProggyClean_woff2.data(), demo_woff2::ProggyClean_woff2.size(), r8_atlas, true),
-    std::make_shared<font>(d, demo_woff2::materialdesignicons_webfont_woff2.data(), demo_woff2::materialdesignicons_webfont_woff2.size(), r8_atlas, true),
+    std::make_shared<font>(d, demo_woff2::Roboto_Regular_woff2.data(), demo_woff2::Roboto_Regular_woff2.size(), atlas, true),
+    std::make_shared<font>(d, demo_woff2::Roboto_Medium_woff2.data(), demo_woff2::Roboto_Medium_woff2.size(), atlas, true),
+    std::make_shared<font>(d, demo_woff2::Roboto_Thin_woff2.data(), demo_woff2::Roboto_Thin_woff2.size(), atlas, true),
+    std::make_shared<font>(d, demo_woff2::Roboto_Light_woff2.data(), demo_woff2::Roboto_Light_woff2.size(), atlas, true),
+    std::make_shared<font>(d, demo_woff2::Roboto_Italic_woff2.data(), demo_woff2::Roboto_Italic_woff2.size(), atlas, true),
+    std::make_shared<font>(d, demo_woff2::Roboto_Bold_woff2.data(), demo_woff2::Roboto_Bold_woff2.size(), atlas, true),
+    std::make_shared<font>(d, demo_woff2::Roboto_BoldItalic_woff2.data(), demo_woff2::Roboto_BoldItalic_woff2.size(), atlas, true),
+    std::make_shared<font>(d, demo_woff2::ProggyClean_woff2.data(), demo_woff2::ProggyClean_woff2.size(), atlas, true),
+    std::make_shared<font>(d, demo_woff2::materialdesignicons_webfont_woff2.data(), demo_woff2::materialdesignicons_webfont_woff2.size(), atlas, true),
   };
   std::vector<const char*> font_names {
     "Roboto_Regular_woff2",
@@ -133,7 +133,7 @@ int main(int, char**) {
       "buffers bound (https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#VUID-vkCmdDrawIndexed-None-04007)";
 
   w.on_draw.connect([&](VkCommandBuffer _buffer) {
-    pipeline->update_atlas(0, r8_atlas);
+    pipeline->update_atlas(0, atlas);
     ImGui_ImplHut_NewFrame();
     ImGui::NewFrame();
 
@@ -146,7 +146,7 @@ int main(int, char**) {
       ImGui::InputFloat3("scale,", &text_scale[0]);
       ImGui::InputFloat("font size,", &font_size);
       ImGui::Combo("font", &font_selection, font_names.data(), font_names.size());
-      ImGui::SliderInt("atlas page", &atlas_page, 0, r8_atlas->page_count() - 1);
+      ImGui::SliderInt("atlas page", &atlas_page, 0, atlas->page_count() - 1);
 
       static ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput;
       ImGui::InputTextMultiline("##source", text, IM_ARRAYSIZE(text), ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 16), flags);

@@ -87,13 +87,28 @@ class atlas_pool {
       return result;
     }
 
-    void update(uint8_t *_data, uint _dataPitch) {
-      pool_->pages_[page_].image_->update(bounds_, _data, _dataPitch);
+    void update(u16vec4 _bounds, uint8_t *_data, uint _dataPitch) {
+      auto update_size = bbox_size(_bounds);
+      auto update_origin = bbox_origin(_bounds);
+      auto subimage_origin = bbox_origin(bounds_);
+      auto image_bounds = make_bbox_with_origin_size(subimage_origin + update_origin, update_size);
+      pool_->pages_[page_].image_->update(image_bounds, _data, _dataPitch);
     }
 
-    void update(u16vec4 _bounds, uint8_t *_data, uint _dataPitch) {
-      auto transformed = bbox_transform_relative(bounds_, _bounds);
-      pool_->pages_[page_].image_->update(transformed, _data, _dataPitch);
+    void update(uint8_t *_data, uint _dataPitch) {
+      update(bounds_, _data, _dataPitch);
+    }
+
+    image::updator prepare_update(u16vec4 _bounds) {
+      auto update_size = bbox_size(_bounds);
+      auto update_origin = bbox_origin(_bounds);
+      auto subimage_origin = bbox_origin(bounds_);
+      auto image_bounds = make_bbox_with_origin_size(subimage_origin + update_origin, update_size);
+      return pool_->pages_[page_].image_->prepare_update(image_bounds);
+    }
+
+    image::updator prepare_update() {
+      return pool_->pages_[page_].image_->prepare_update(bounds_);
     }
   };
 

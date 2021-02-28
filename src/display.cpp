@@ -708,6 +708,10 @@ void display::flush_staged() {
 
   HUT_PVK(vkBeginCommandBuffer, staging_cb_, &beginInfo);
 
+  for (auto &postflush : postflush_jobs_)
+    postflush();
+  postflush_jobs_.clear();
+
 #ifdef HUT_DEBUG_STAGING
   std::cout << "[staging] done, staging pool status:" << std::endl;
   staging_->debug();

@@ -129,118 +129,30 @@ std::shared_ptr<image> image::load_png(display &_display, span<const uint8_t> _d
   auto width = png_get_image_width(png_ptr, info_ptr);
   auto height = png_get_image_height(png_ptr, info_ptr);
 
-  png_read_update_info(png_ptr, info_ptr);
-  uint offsetAlignment = std::max(VkDeviceSize(4), _display.device_props_.limits.optimalBufferCopyOffsetAlignment);
-  uint rowAlignment = _display.device_props_.limits.optimalBufferCopyRowPitchAlignment;
-  uint stride = align(width, rowAlignment);
-  uint row_byte_size = stride * channels;
-  uint byte_size = row_byte_size * height;
-
-  VkImageSubresourceLayers subResource = {};
-  subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  subResource.baseArrayLayer = 0;
-  subResource.mipLevel = 0;
-  subResource.layerCount = 1;
-
   image_params params;
   params.size_ = {width, height};
   params.format_ = format;
   auto dst = std::make_shared<image>(_display, params);
-  shared_ref<u8> staging;
-  {
-    std::lock_guard lk(_display.staging_mutex_);
-    staging = _display.staging_->allocate<u8>(byte_size, offsetAlignment);
-  }
+  auto update = dst->prepare_update();
 
-  auto dataBytes = staging->buff().permanent_map_ + staging->offset_bytes();
   png_bytep rows[height];
-  for (uint y = 0; y < height; y++) {
-    rows[y] = dataBytes + y * row_byte_size;
-  }
+  for (uint y = 0; y < height; y++)
+    rows[y] = update.data() + y * update.staging_row_pitch();
   png_read_image(png_ptr, rows);
-
-  display::buffer2image_copy copy = {};
-  copy.imageExtent = {width, height, 1};
-  copy.imageOffset = {0, 0, 0};
-  copy.bufferRowLength = stride;
-  copy.bufferImageHeight = height;
-  copy.bufferOffset = staging->offset_bytes();
-  copy.imageSubresource = subResource;
-  copy.source = staging->vkBuffer();
-  copy.destination = dst->image_;
-  copy.pixelSize = channels;
-
-  display::image_transition pre = {};
-  pre.destination = dst->image_;
-  pre.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  pre.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-  display::image_transition post = {};
-  post.destination = dst->image_;
-  post.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-  post.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-  std::lock_guard lk(_display.staging_mutex_);
-  _display.staging_jobs_++;
-  _display.preflush([&_display, pre, post, copy, staging = std::move(staging)] {
-    _display.stage_transition(pre);
-    _display.stage_copy(copy);
-    _display.stage_transition(post);
-    _display.staging_jobs_--;
-  });
   png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
 
   return dst;
 }
 
-std::shared_ptr<image> image::load_raw(display &_display, span<const uint8_t> _data, const image_params &_params) {
+std::shared_ptr<image> image::load_raw(display &_display, span<const uint8_t> _data, uint _data_row_pitch, const image_params &_params) {
   HUT_PROFILE_SCOPE(PIMAGE, "image::load_raw");
   auto dst = std::make_shared<image>(_display, _params);
-
-  uint offsetAlignment = std::max(VkDeviceSize(4), _display.device_props_.limits.optimalBufferCopyOffsetAlignment);
-  {
-    shared_ref<u8> staging;
-    {
-      std::lock_guard lk(_display.staging_mutex_);
-      staging = _display.staging_->allocate<u8>(_data.size_bytes(), offsetAlignment);
-    }
-
-    auto dataBytes = staging->buff().permanent_map_ + staging->offset_bytes();
-    memcpy(dataBytes, _data.data(), _data.size_bytes());
-
-    VkImageSubresourceLayers subResource = {};
-    subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    subResource.baseArrayLayer = 0;
-    subResource.layerCount = 1;
-    subResource.mipLevel = 0;
-
-    display::buffer2image_copy copy = {};
-    copy.imageExtent = {_params.size_.x, _params.size_.y, 1};
-    copy.imageOffset = {0, 0, 0};
-    copy.bufferRowLength = _params.size_.x;
-    copy.bufferImageHeight = _params.size_.y;
-    copy.bufferOffset = staging->offset_bytes();
-    copy.imageSubresource = subResource;
-    copy.source = staging->vkBuffer();
-    copy.destination = dst->image_;
-    copy.pixelSize = dst->pixel_size_;
-
-    display::image_transition pre = {};
-    pre.destination = dst->image_;
-    pre.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    pre.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    display::image_transition post = {};
-    post.destination = dst->image_;
-    post.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    post.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-    std::lock_guard lk(_display.staging_mutex_);
-    _display.staging_jobs_++;
-    _display.preflush([&_display, pre, post, copy, staging = std::move(staging)] {
-      _display.stage_transition(pre);
-      _display.stage_copy(copy);
-      _display.stage_transition(post);
-      _display.staging_jobs_--;
-    });
+  auto update = dst->prepare_update();
+  auto row_byte_size = dst->pixel_size() * _params.size_.x;
+  for (uint y = 0; y < _params.size_.y; y++) {
+    auto *dst_row = update.data() + y * update.staging_row_pitch();
+    auto *src_row = _data.data() + y * _data_row_pitch;
+    memcpy(dst_row, src_row, row_byte_size);
   }
   return dst;
 }
@@ -337,28 +249,36 @@ VkMemoryRequirements image::create(display &_display, const image_params &_param
   return memReq;
 }
 
-void image::update(u16vec4 coords, uint8_t *_data, uint _src_row_pitch) {
-  assert(coords[2] > coords[0]);
-  assert(coords[3] > coords[1]);
-  uint width = coords[2] - coords[0];
-  uint height = coords[3] - coords[1];
-  uint buffer_align = display_.device_props_.limits.optimalBufferCopyRowPitchAlignment;
-  uint offset_align = std::max(VkDeviceSize(4), display_.device_props_.limits.optimalBufferCopyOffsetAlignment);
-  uint row_byte_size = width * pixel_size_;
-  uint buffer_row_pitch = align(row_byte_size, buffer_align);
-  auto byte_size = height * buffer_row_pitch;
-
-  shared_ref<u8> staging;
-  {
-    std::lock_guard lk(display_.staging_mutex_);
-    staging = display_.staging_->allocate<u8>(byte_size, offset_align);
-  }
-  auto dataBytes = staging->buff().permanent_map_ + staging->offset_bytes();
-  for (uint i = 0; i < height; i++) {
+void image::update(u16vec4 _coords, uint8_t *_data, uint _src_row_pitch) {
+  auto update = prepare_update(_coords);
+  auto size = bbox_size(_coords);
+  uint row_byte_size = size.x * pixel_size_;
+  for (uint i = 0; i < size.y; i++) {
     uint8_t *src = _data + _src_row_pitch * i;
-    uint8_t *dst = dataBytes + buffer_row_pitch * i;
+    uint8_t *dst = update.data_.data() + update.staging_row_pitch_ * i;
     memcpy(dst, src, row_byte_size);
   }
+}
+
+image::updator image::prepare_update(u16vec4 _coords) {
+  auto size = bbox_size(_coords);
+  uint buffer_align = display_.device_props_.limits.optimalBufferCopyRowPitchAlignment;
+  uint offset_align = std::max(VkDeviceSize(4), display_.device_props_.limits.optimalBufferCopyOffsetAlignment);
+  uint row_byte_size = size.x * pixel_size_;
+  uint buffer_row_pitch = align(row_byte_size, buffer_align);
+  auto byte_size = size.y * buffer_row_pitch;
+
+  std::lock_guard lk(display_.staging_mutex_);
+  auto staging = display_.staging_->do_alloc(byte_size, offset_align);
+  return updator(*this, staging, span<uint8_t>{staging.buffer_->permanent_map_ + staging.offset_, byte_size}, buffer_row_pitch, _coords);
+}
+
+void image::finalize_update(image::updator &_update) {
+  auto size = bbox_size(_update.coords_);
+  auto origin = bbox_origin(_update.coords_);
+  uint buffer_align = display_.device_props_.limits.optimalBufferCopyRowPitchAlignment;
+  uint row_byte_size = size.x * pixel_size_;
+  uint buffer_row_pitch = align(row_byte_size, buffer_align);
 
   VkImageSubresourceLayers subResource = {};
   subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -375,23 +295,26 @@ void image::update(u16vec4 coords, uint8_t *_data, uint _src_row_pitch) {
   post.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
   post.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   display::buffer2image_copy copy = {};
-  copy.imageExtent = {(uint)width, (uint)height, 1};
-  copy.imageOffset = {coords[0], coords[1], 0};
+  copy.imageExtent = {(uint)size.x, (uint)size.y, 1};
+  copy.imageOffset = {origin.x, origin.y, 0};
   copy.bufferRowLength = buffer_row_pitch / pixel_size_;
-  copy.bufferImageHeight = height;
-  copy.bufferOffset = staging->offset_bytes();
+  copy.bufferImageHeight = size.y;
+  copy.bufferOffset = _update.staging_.offset_;
   copy.imageSubresource = subResource;
-  copy.source = staging->vkBuffer();
+  copy.source = _update.staging_.buffer_->buffer_;
   copy.destination = image_;
   copy.pixelSize = pixel_size_;
 
   std::lock_guard lk(display_.staging_mutex_);
   display_.staging_jobs_++;
-  display_.preflush([this, pre, post, copy, staging = std::move(staging)]() {
+  display_.preflush([this, pre, post, copy]() {
     display_.stage_transition(pre);
     display_.stage_copy(copy);
     display_.stage_transition(post);
     display_.staging_jobs_--;
+  });
+  display_.postflush([staging = _update.staging_]() {
+    buffer_pool::do_free(staging);
   });
 }
 

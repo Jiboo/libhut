@@ -321,9 +321,13 @@ class display {
   std::mutex staging_mutex_;
   using flush_callback = std::function<void()>;
   std::vector<flush_callback> preflush_jobs_;
+  std::vector<flush_callback> postflush_jobs_;
 
   inline void preflush(const flush_callback &_callback) {
     preflush_jobs_.emplace_back(_callback);
+  }
+  inline void postflush(const flush_callback &_callback) {
+    postflush_jobs_.emplace_back(_callback);
   }
 
   struct buffer_copy : public VkBufferCopy {

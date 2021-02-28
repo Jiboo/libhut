@@ -48,27 +48,8 @@ buffer_pool::~buffer_pool() {
 
 void buffer_pool::do_update(buffer &_buf, uint _offset, uint _size, const void *_data) {
   HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::do_update {}", _size);
-  shared_ref<u8> staging;
-  {
-    std::lock_guard lk(display_.staging_mutex_);
-    staging = display_.staging_->allocate<u8>(_size, 4);
-  }
-
-  memcpy(staging->buff().permanent_map_ + staging->offset_bytes(), _data, _size);
-
-  display::buffer_copy copy = {};
-  copy.size = _size;
-  copy.srcOffset = staging->offset_bytes();
-  copy.dstOffset = _offset;
-  copy.source = staging->vkBuffer();
-  copy.destination = _buf.buffer_;
-
-  std::lock_guard lk(display_.staging_mutex_);
-  display_.staging_jobs_++;
-  display_.preflush([this, copy, staging = std::move(staging)]() {
-    display_.stage_copy(copy);
-    display_.staging_jobs_--;
-  });
+  auto update = prepare_update(_buf, _offset, _size);
+  memcpy(update.data(), _data, _size);
 }
 
 buffer_pool::updator buffer_pool::prepare_update(buffer &_buf, uint _offset, uint _size) {
@@ -89,10 +70,12 @@ void buffer_pool::finalize_update(updator &_update) {
 
   std::lock_guard lk(display_.staging_mutex_);
   display_.staging_jobs_++;
-  display_.preflush([this, copy, staging = _update.staging_]() {
+  display_.preflush([this, copy]() {
     display_.stage_copy(copy);
-    do_free(staging);
     display_.staging_jobs_--;
+  });
+  display_.postflush([staging = _update.staging_]() {
+    do_free(staging);
   });
 }
 

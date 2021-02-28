@@ -55,13 +55,36 @@ class image {
   friend class window;
 
  public:
+  class updator {
+    friend image;
+
+    image &target_;
+    buffer_pool::alloc staging_;
+    span<uint8_t> data_;
+    uint staging_row_pitch_;
+    u16vec4 coords_;
+
+    updator(image &_target, buffer_pool::alloc _staging, span<uint8_t> _data, uint _staging_row_pitch, u16vec4 _coords)
+        : target_(_target), staging_(_staging), data_(_data), staging_row_pitch_(_staging_row_pitch), coords_(_coords) {
+    }
+
+   public:
+    ~updator() { target_.finalize_update(*this); }
+
+    uint8_t *data() { return data_.data(); }
+    size_t size_bytes() { return data_.size_bytes(); }
+    uint staging_row_pitch() { return staging_row_pitch_; }
+  };
+
   static std::shared_ptr<image> load_png(display &, span<const uint8_t> _data);
-  static std::shared_ptr<image> load_raw(display &, span<const uint8_t> _data, const image_params &_params);
+  static std::shared_ptr<image> load_raw(display &, span<const uint8_t> _data, uint _data_row_pitch, const image_params &_params);
 
   image(display &_display, const image_params &_params);
   ~image();
 
   void update(u16vec4 _coords, uint8_t *_data, uint _srcRowPitch);
+  updator prepare_update(u16vec4 _coords);
+  updator prepare_update() { return prepare_update(make_bbox_with_origin_size({0,0}, params_.size_)); }
 
   [[nodiscard]] uint pixel_size() const { return pixel_size_; }
   [[nodiscard]] u16vec2 size() const { return params_.size_; }
@@ -69,6 +92,8 @@ class image {
  private:
   static VkMemoryRequirements create(display &_display, const image_params &_params,
                              VkImage *_image, VkDeviceMemory *_imageMemory);
+
+  void finalize_update(updator &_update);
 
   display &display_;
   image_params params_;
