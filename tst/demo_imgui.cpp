@@ -126,10 +126,10 @@ int main(int, char**) {
     return false;
   });
 
-  d.dispatch();
+  int error_code = d.dispatch();
 
   ImGui_ImplHut_Shutdown();
   ImGui::DestroyContext();
 
-  return EXIT_SUCCESS;
+  return error_code;
 }

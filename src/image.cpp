@@ -148,11 +148,19 @@ std::shared_ptr<image> image::load_raw(display &_display, span<const uint8_t> _d
   HUT_PROFILE_SCOPE(PIMAGE, "image::load_raw");
   auto dst = std::make_shared<image>(_display, _params);
   auto update = dst->prepare_update();
-  auto row_byte_size = dst->pixel_size() * _params.size_.x;
-  for (uint y = 0; y < _params.size_.y; y++) {
-    auto *dst_row = update.data() + y * update.staging_row_pitch();
-    auto *src_row = _data.data() + y * _data_row_pitch;
-    memcpy(dst_row, src_row, row_byte_size);
+
+  assert(update.data_.size() >= _data.size());
+
+  if (_data_row_pitch == 0) {
+    memcpy(update.data(), _data.data(), _data.size());
+  }
+  else {
+    auto row_byte_size = dst->pixel_size() * _params.size_.x;
+    for (uint y = 0; y < _params.size_.y; y++) {
+      auto *dst_row = update.data() + y * update.staging_row_pitch();
+      auto *src_row = _data.data() + y * _data_row_pitch;
+      memcpy(dst_row, src_row, row_byte_size);
+    }
   }
   return dst;
 }
@@ -203,7 +211,7 @@ image::image(display &_display, const image_params &_params)
   display_.staging_jobs_++;
   display_.preflush([this, pre, post, clear]() {
     display_.stage_transition(pre);
-    if (this->pixel_size_ != 0)
+    if (!block_format(params_.format_))
       display_.stage_clear(clear);
     display_.stage_transition(post);
     display_.staging_jobs_--;
@@ -250,6 +258,7 @@ VkMemoryRequirements image::create(display &_display, const image_params &_param
 }
 
 void image::update(u16vec4 _coords, uint8_t *_data, uint _src_row_pitch) {
+  assert(pixel_size_);
   auto update = prepare_update(_coords);
   auto size = bbox_size(_coords);
   uint row_byte_size = size.x * pixel_size_;
@@ -297,7 +306,7 @@ void image::finalize_update(image::updator &_update) {
   display::buffer2image_copy copy = {};
   copy.imageExtent = {(uint)size.x, (uint)size.y, 1};
   copy.imageOffset = {origin.x, origin.y, 0};
-  copy.bufferRowLength = buffer_row_pitch / pixel_size_;
+  copy.bufferRowLength = pixel_size_ ? buffer_row_pitch / pixel_size_ : 0;
   copy.bufferImageHeight = size.y;
   copy.bufferOffset = _update.staging_.offset_;
   copy.imageSubresource = subResource;

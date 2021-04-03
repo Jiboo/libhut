@@ -447,6 +447,36 @@ public:
   }
 
   template<typename... TRest>
+  void write_continue(int _binding, descriptor_write_context &_context, const shared_image &_image0, const shared_image &_image1, const shared_sampler &_sampler, const TRest&... _rest) {
+    _context.images_.reserve(_context.images_.size() + 2);
+    _context.writes_.reserve(_context.writes_.size() + 2);
+    _context.texture(_binding, _image0, _sampler);
+    _context.texture(_binding + 1, _image1, _sampler);
+    write_continue(_binding + 2, _context, std::forward<TRest>(_rest)...);
+  }
+
+  template<typename... TRest>
+  void write_continue(int _binding, descriptor_write_context &_context, const shared_image &_image0, const shared_image &_image1, const shared_image &_image2, const shared_sampler &_sampler, const TRest&... _rest) {
+    _context.images_.reserve(_context.images_.size() + 3);
+    _context.writes_.reserve(_context.writes_.size() + 3);
+    _context.texture(_binding, _image0, _sampler);
+    _context.texture(_binding + 1, _image1, _sampler);
+    _context.texture(_binding + 2, _image2, _sampler);
+    write_continue(_binding + 3, _context, std::forward<TRest>(_rest)...);
+  }
+
+  template<typename... TRest>
+  void write_continue(int _binding, descriptor_write_context &_context, const shared_image &_image0, const shared_image &_image1, const shared_image &_image2, const shared_image &_image3, const shared_sampler &_sampler, const TRest&... _rest) {
+    _context.images_.reserve(_context.images_.size() + 4);
+    _context.writes_.reserve(_context.writes_.size() + 4);
+    _context.texture(_binding, _image0, _sampler);
+    _context.texture(_binding + 1, _image1, _sampler);
+    _context.texture(_binding + 2, _image2, _sampler);
+    _context.texture(_binding + 3, _image3, _sampler);
+    write_continue(_binding + 4, _context, std::forward<TRest>(_rest)...);
+  }
+
+  template<typename... TRest>
   void write_continue(int _binding, descriptor_write_context &_context, const shared_atlas &_atlas, const shared_sampler &_sampler, const TRest&... _rest) {
     _context.atlas(_binding, _atlas, _sampler);
     write_continue(_binding + 1, _context, std::forward<TRest>(_rest)...);

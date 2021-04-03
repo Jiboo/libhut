@@ -513,11 +513,11 @@ int main(int argc, char **argv) {
         case SPV_REFLECT_SHADER_STAGE_VERTEX_BIT: reflect_vertex_shader(output_h, module); break;
         case SPV_REFLECT_SHADER_STAGE_FRAGMENT_BIT: reflect_fragment_shader(output_h, module); break;
         default:
-          throw runtime_error(sstream("reflecing on unsuported vertex stage ") << module.shader_stage);
+          throw runtime_error(sstream("reflecting on unsupported vertex stage ") << module.shader_stage);
       }
     }
     catch(const exception &_ex) {
-      throw runtime_error(sstream("exception while reflecing on ") << input_path << ": " << _ex.what());
+      throw runtime_error(sstream("exception while reflecting on ") << input_path << ": " << _ex.what());
     }
 
     output_h << "\n  constexpr static auto &bytecode_ = " << bundle_namespace << "::" << symbol << ";\n";

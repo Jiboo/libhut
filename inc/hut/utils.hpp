@@ -226,21 +226,14 @@ class event {
     cbs_.emplace_back(_callback);
   }
 
-  void once(const callback &_callback) {
-    onces_.emplace_back(_callback);
-  }
-
   bool fire(const TArgTypes &... _args) {
     bool handled = false;
 
     for (auto &cb : cbs_) {
       handled |= cb(_args...);
+      if (handled)
+        break;
     }
-
-    for (auto &cb : onces_) {
-      handled |= cb(_args...);
-    }
-    onces_.clear();
 
     return handled;
   }
@@ -250,7 +243,7 @@ class event {
   }
 
  protected:
-  std::vector<callback> cbs_, onces_;
+  std::vector<callback> cbs_;
 };
 
 class sstream {

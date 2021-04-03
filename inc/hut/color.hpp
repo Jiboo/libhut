@@ -44,9 +44,31 @@ inline uint format_size(VkFormat _format) {
     case VK_FORMAT_R8G8B8A8_UNORM:
     case VK_FORMAT_B8G8R8A8_UNORM:
     case VK_FORMAT_D32_SFLOAT: return 4;
+
+    case VK_FORMAT_BC7_SRGB_BLOCK:
+    case VK_FORMAT_BC7_UNORM_BLOCK: return 1; // 16px in 16bytes
+
     default:
       assert(false);
       return 0;
+  }
+}
+
+inline bool block_format(VkFormat _format) {
+  switch (_format) {
+    case VK_FORMAT_R8_UNORM:
+    case VK_FORMAT_R8G8_UNORM:
+    case VK_FORMAT_R8G8B8_UNORM:
+    case VK_FORMAT_R8G8B8A8_UNORM:
+    case VK_FORMAT_B8G8R8A8_UNORM:
+    case VK_FORMAT_D32_SFLOAT: return false;
+
+    case VK_FORMAT_BC7_SRGB_BLOCK:
+    case VK_FORMAT_BC7_UNORM_BLOCK: return true;
+
+    default:
+      assert(false);
+      return false;
   }
 }
 

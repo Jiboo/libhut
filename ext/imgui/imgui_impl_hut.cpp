@@ -301,11 +301,14 @@ bool ImGui_ImplHut_HandleOnMouse(uint8_t _button, hut::mouse_event_type _type, g
     g_ctx.window_->cursor(hut_cursor_type(ImGui::GetMouseCursor()));
   }
 
-  return false;
+  return ImGui::GetIO().WantCaptureMouse;
 }
 
 bool ImGui_ImplHut_HandleOnKey(hut::keycode _kcode, hut::keysym _ksym, bool _down) {
   ImGuiIO& io = ImGui::GetIO();
+
+  if (!io.WantCaptureKeyboard)
+    return false;
 
 #if !defined(NDEBUG) && 0
     char kcode_name[64];
@@ -327,7 +330,7 @@ bool ImGui_ImplHut_HandleOnKey(hut::keycode _kcode, hut::keysym _ksym, bool _dow
   static_assert(hut::KSYM_LAST_VALUE <= IM_ARRAYSIZE(io.KeysDown));
   io.KeysDown[_ksym] = _down;
 
-  return false;
+  return ImGui::GetIO().WantCaptureKeyboard;
 }
 
 bool ImGui_ImplHut_HandleOnKMods(hut::modifiers _mods) {
@@ -352,6 +355,9 @@ bool ImGui_ImplHut_HandleOnKMods(hut::modifiers _mods) {
 bool ImGui_ImplHut_HandleOnChar(char32_t _utf32_char) {
   ImGuiIO& io = ImGui::GetIO();
 
+  if (!io.WantCaptureKeyboard)
+    return false;
+
   char8_t buffer[5];
   char8_t *end = hut::to_utf8(buffer, _utf32_char);
   *end = 0;
@@ -360,6 +366,6 @@ bool ImGui_ImplHut_HandleOnChar(char32_t _utf32_char) {
   std::cout << "OnChar " << (char*)buffer << " (0x" << std::hex << (uint32_t)_utf32_char << std::dec << "), " << std::endl;
 #endif
 
-  io.AddInputCharactersUTF8((const char*)buffer);
-  return false;
+  io.AddInputCharactersUTF8((const char *) buffer);
+  return true;
 }
