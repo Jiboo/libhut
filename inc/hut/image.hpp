@@ -41,11 +41,14 @@ class display;
 struct image_params {
   u16vec2 size_;
   VkFormat format_;
+  u16 levels_ = 1;
+  u16 layers_ = 1;
   VkImageTiling tiling_ = VkImageTiling::VK_IMAGE_TILING_LINEAR;
   VkImageUsageFlags usage_ = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
   VkImageAspectFlags aspect_ = VK_IMAGE_ASPECT_COLOR_BIT;
   VkMemoryPropertyFlags properties_ = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
   VkSampleCountFlagBits samples_ = VK_SAMPLE_COUNT_1_BIT;
+  VkImageCreateFlags flags_ = 0;
 };
 
 class image {
@@ -55,6 +58,12 @@ class image {
   friend class window;
 
  public:
+  struct subresource {
+    u16vec4 coords_;
+    u16 level_ = 0;
+    u16 layer_ = 0;
+  };
+
   class updator {
     friend image;
 
@@ -62,10 +71,10 @@ class image {
     buffer_pool::alloc staging_;
     span<uint8_t> data_;
     uint staging_row_pitch_;
-    u16vec4 coords_;
+    subresource subres_;
 
-    updator(image &_target, buffer_pool::alloc _staging, span<uint8_t> _data, uint _staging_row_pitch, u16vec4 _coords)
-        : target_(_target), staging_(_staging), data_(_data), staging_row_pitch_(_staging_row_pitch), coords_(_coords) {
+    updator(image &_target, buffer_pool::alloc _staging, span<uint8_t> _data, uint _staging_row_pitch, subresource _subres)
+        : target_(_target), staging_(_staging), data_(_data), staging_row_pitch_(_staging_row_pitch), subres_(_subres) {
     }
 
    public:
@@ -82,12 +91,14 @@ class image {
   image(display &_display, const image_params &_params);
   ~image();
 
-  void update(u16vec4 _coords, uint8_t *_data, uint _srcRowPitch);
-  updator prepare_update(u16vec4 _coords);
-  updator prepare_update() { return prepare_update(make_bbox_with_origin_size({0,0}, params_.size_)); }
+  void update(subresource _subres, uint8_t *_data, uint _srcRowPitch);
+  updator prepare_update(subresource _subres);
+  updator prepare_update() { return prepare_update({make_bbox_with_origin_size({0,0}, params_.size_)}); }
 
   [[nodiscard]] uint pixel_size() const { return pixel_size_; }
   [[nodiscard]] u16vec2 size() const { return params_.size_; }
+  [[nodiscard]] u16 levels() const { return params_.levels_; }
+  [[nodiscard]] u16 layers() const { return params_.layers_; }
 
  private:
   static VkMemoryRequirements create(display &_display, const image_params &_params,

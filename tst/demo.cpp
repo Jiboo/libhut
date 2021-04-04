@@ -253,7 +253,7 @@ int main(int, char **) {
     w.invalidate(true);  // will force to call on_draw on the next frame
 
     {
-      auto update = tex1->prepare_update({100, 100, 200, 200});
+      auto update = tex1->prepare_update({{100, 100, 200, 200}});
       for (int y = 0; y < 100; y++) {
         auto *row = (u8vec4 *) (update.data() + y * update.staging_row_pitch());
         for (int x = 0; x < 100; x++)

@@ -150,6 +150,8 @@ std::shared_ptr<image> image::load_raw(display &_display, span<const uint8_t> _d
   auto update = dst->prepare_update();
 
   assert(update.data_.size() >= _data.size());
+  assert(_params.levels_ == 1);
+  assert(_params.layers_ == 1);
 
   if (_data_row_pitch == 0) {
     memcpy(update.data(), _data.data(), _data.size());
@@ -180,13 +182,13 @@ image::image(display &_display, const image_params &_params)
   VkImageViewCreateInfo viewInfo = {};
   viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
   viewInfo.image = image_;
-  viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+  viewInfo.viewType = (params_.flags_ & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT) ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
   viewInfo.format = _params.format_;
   viewInfo.subresourceRange.aspectMask = _params.aspect_;
   viewInfo.subresourceRange.baseMipLevel = 0;
-  viewInfo.subresourceRange.levelCount = 1;
+  viewInfo.subresourceRange.levelCount = _params.levels_;
   viewInfo.subresourceRange.baseArrayLayer = 0;
-  viewInfo.subresourceRange.layerCount = 1;
+  viewInfo.subresourceRange.layerCount = _params.layers_;
 
   if (vkCreateImageView(_display.device_, &viewInfo, nullptr, &view_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create texture image view!");
@@ -195,6 +197,12 @@ image::image(display &_display, const image_params &_params)
   if ((_params.usage_ & (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)) == 0)
     return;
 
+  VkImageSubresourceRange range;
+  range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  range.baseMipLevel = 0;
+  range.levelCount = _params.levels_;
+  range.baseArrayLayer = 0;
+  range.layerCount = _params.layers_;
   display::image_transition pre = {};
   pre.destination = image_;
   pre.oldLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
@@ -209,11 +217,11 @@ image::image(display &_display, const image_params &_params)
 
   std::lock_guard lk(display_.staging_mutex_);
   display_.staging_jobs_++;
-  display_.preflush([this, pre, post, clear]() {
-    display_.stage_transition(pre);
+  display_.preflush([this, pre, post, clear, range]() {
+    display_.stage_transition(pre, range);
     if (!block_format(params_.format_))
-      display_.stage_clear(clear);
-    display_.stage_transition(post);
+      display_.stage_clear(clear, range);
+    display_.stage_transition(post, range);
     display_.staging_jobs_--;
   });
 }
@@ -226,14 +234,15 @@ VkMemoryRequirements image::create(display &_display, const image_params &_param
   imageInfo.extent.width = _params.size_.x;
   imageInfo.extent.height = _params.size_.y;
   imageInfo.extent.depth = 1;
-  imageInfo.mipLevels = 1;
-  imageInfo.arrayLayers = 1;
+  imageInfo.mipLevels = _params.levels_;
+  imageInfo.arrayLayers = _params.layers_;
   imageInfo.format = _params.format_;
   imageInfo.tiling = _params.tiling_;
   imageInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
   imageInfo.usage = _params.usage_;
   imageInfo.samples = _params.samples_;
   imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  imageInfo.flags = _params.flags_;
 
   if (vkCreateImage(_display.device_, &imageInfo, nullptr, _image) != VK_SUCCESS) {
     throw std::runtime_error("failed to create image!");
@@ -257,10 +266,10 @@ VkMemoryRequirements image::create(display &_display, const image_params &_param
   return memReq;
 }
 
-void image::update(u16vec4 _coords, uint8_t *_data, uint _src_row_pitch) {
+void image::update(subresource _subres, uint8_t *_data, uint _src_row_pitch) {
   assert(pixel_size_);
-  auto update = prepare_update(_coords);
-  auto size = bbox_size(_coords);
+  auto update = prepare_update(_subres);
+  auto size = bbox_size(_subres.coords_);
   uint row_byte_size = size.x * pixel_size_;
   for (uint i = 0; i < size.y; i++) {
     uint8_t *src = _data + _src_row_pitch * i;
@@ -269,8 +278,8 @@ void image::update(u16vec4 _coords, uint8_t *_data, uint _src_row_pitch) {
   }
 }
 
-image::updator image::prepare_update(u16vec4 _coords) {
-  auto size = bbox_size(_coords);
+image::updator image::prepare_update(subresource _subres) {
+  auto size = bbox_size(_subres.coords_);
   uint buffer_align = display_.device_props_.limits.optimalBufferCopyRowPitchAlignment;
   uint offset_align = std::max(VkDeviceSize(4), display_.device_props_.limits.optimalBufferCopyOffsetAlignment);
   uint row_byte_size = size.x * pixel_size_;
@@ -279,21 +288,28 @@ image::updator image::prepare_update(u16vec4 _coords) {
 
   std::lock_guard lk(display_.staging_mutex_);
   auto staging = display_.staging_->do_alloc(byte_size, offset_align);
-  return updator(*this, staging, span<uint8_t>{staging.buffer_->permanent_map_ + staging.offset_, byte_size}, buffer_row_pitch, _coords);
+  return updator(*this, staging, span<uint8_t>{staging.buffer_->permanent_map_ + staging.offset_, byte_size}, buffer_row_pitch, _subres);
 }
 
 void image::finalize_update(image::updator &_update) {
-  auto size = bbox_size(_update.coords_);
-  auto origin = bbox_origin(_update.coords_);
+  auto size = bbox_size(_update.subres_.coords_);
+  auto origin = bbox_origin(_update.subres_.coords_);
   uint buffer_align = display_.device_props_.limits.optimalBufferCopyRowPitchAlignment;
   uint row_byte_size = size.x * pixel_size_;
   uint buffer_row_pitch = align(row_byte_size, buffer_align);
 
-  VkImageSubresourceLayers subResource = {};
-  subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  subResource.baseArrayLayer = 0;
-  subResource.mipLevel = 0;
-  subResource.layerCount = 1;
+  VkImageSubresourceLayers subresLayers = {};
+  subresLayers.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  subresLayers.baseArrayLayer = _update.subres_.layer_;
+  subresLayers.mipLevel = _update.subres_.level_;
+  subresLayers.layerCount = 1;
+
+  VkImageSubresourceRange subresRange = {};
+  subresRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  subresRange.baseArrayLayer = _update.subres_.layer_;
+  subresRange.baseMipLevel = _update.subres_.level_;
+  subresRange.layerCount = 1;
+  subresRange.levelCount = 1;
 
   display::image_transition pre = {};
   pre.destination = image_;
@@ -309,17 +325,17 @@ void image::finalize_update(image::updator &_update) {
   copy.bufferRowLength = pixel_size_ ? buffer_row_pitch / pixel_size_ : 0;
   copy.bufferImageHeight = size.y;
   copy.bufferOffset = _update.staging_.offset_;
-  copy.imageSubresource = subResource;
+  copy.imageSubresource = subresLayers;
   copy.source = _update.staging_.buffer_->buffer_;
   copy.destination = image_;
   copy.pixelSize = pixel_size_;
 
   std::lock_guard lk(display_.staging_mutex_);
   display_.staging_jobs_++;
-  display_.preflush([this, pre, post, copy]() {
-    display_.stage_transition(pre);
+  display_.preflush([this, pre, post, copy, subresRange]() {
+    display_.stage_transition(pre, subresRange);
     display_.stage_copy(copy);
-    display_.stage_transition(post);
+    display_.stage_transition(post, subresRange);
     display_.staging_jobs_--;
   });
   display_.postflush([staging = _update.staging_]() {

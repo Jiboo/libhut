@@ -362,12 +362,13 @@ class display {
     VkImageLayout oldLayout, newLayout;
   };
 
-  void stage_transition(const image_transition &_info);
   void stage_copy(const buffer_copy &_info);
   void stage_zero(const buffer_zero &_info);
+
   void stage_copy(const image_copy &_info);
   void stage_copy(const buffer2image_copy &_info);
-  void stage_clear(const image_clear &_info);
+  void stage_transition(const image_transition &_info, VkImageSubresourceRange _range);
+  void stage_clear(const image_clear &_info, VkImageSubresourceRange _range);
 
   std::list<callback> posted_jobs_;
   std::mutex posted_mutex_;

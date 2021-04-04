@@ -178,14 +178,14 @@ endif()
 message("Configuring shader generation...")
 ###########################################################
 
-function(gen_spv_bundle)
+function(hut_gen_spv_bundle)
   cmake_parse_arguments(HUT_GEN_SPV_BUNDLE "" "NAMESPACE;OUTDIR" "SHADER_SOURCES" ${ARGN})
   if (NOT HUT_GEN_SPV_BUNDLE_NAMESPACE)
-    message(FATAL "No namespace specified for gen_spv_bundle")
+    message(FATAL "No namespace specified for hut_gen_spv_bundle")
   elseif(NOT HUT_GEN_SPV_BUNDLE_OUTDIR)
-    message(FATAL "No output directory specified for gen_spv_bundle")
+    message(FATAL "No output directory specified for hut_gen_spv_bundle")
   elseif(NOT HUT_GEN_SPV_BUNDLE_SHADER_SOURCES)
-    message(FATAL "No shader source list provided for gen_spv_bundle")
+    message(FATAL "No shader source list provided for hut_gen_spv_bundle")
   endif()
 
   foreach(shader_source ${HUT_GEN_SPV_BUNDLE_SHADER_SOURCES})
@@ -201,24 +201,22 @@ function(gen_spv_bundle)
             COMMENT "Generating SPIR-V for ${shader_source}")
   endforeach()
 
-  set(bundle_target_name "bundle_${HUT_GEN_SPV_BUNDLE_NAMESPACE}")
-  set(bundle_gen_name "gen_${HUT_GEN_SPV_BUNDLE_NAMESPACE}")
-
-  add_custom_target(${bundle_target_name} DEPENDS ${HUT_GEN_SPV_BUNDLE_SHADER_OBJECTS}
-          COMMENT "Checked if shaders bundle ${HUT_GEN_SPV_BUNDLE_NAMESPACE} need recompilation")
-
-  add_custom_command(OUTPUT ${HUT_GEN_SPV_BUNDLE_OUTDIR}/${HUT_GEN_SPV_BUNDLE_NAMESPACE}.cpp
+  add_custom_command(OUTPUT ${HUT_GEN_SPV_BUNDLE_OUTDIR}/${HUT_GEN_SPV_BUNDLE_NAMESPACE}.cpp ${HUT_GEN_SPV_BUNDLE_OUTDIR}/${HUT_GEN_SPV_BUNDLE_NAMESPACE}.hpp
           COMMAND $<TARGET_FILE:gen_res> ${HUT_GEN_SPV_BUNDLE_NAMESPACE} ${HUT_GEN_SPV_BUNDLE_OUTDIR} ${HUT_GEN_SPV_BUNDLE_SHADER_OBJECTS}
           DEPENDS gen_res ${HUT_GEN_SPV_BUNDLE_SHADER_OBJECTS}
-          COMMENT "Generating ${HUT_GEN_SPV_BUNDLE_NAMESPACE}.cpp")
+          COMMENT "Generating ${HUT_GEN_SPV_BUNDLE_NAMESPACE}.cpp/hpp")
 
   add_custom_command(OUTPUT ${HUT_GEN_SPV_BUNDLE_OUTDIR}/${HUT_GEN_SPV_BUNDLE_NAMESPACE}_refl.hpp
           COMMAND $<TARGET_FILE:gen_spv> ${HUT_GEN_SPV_BUNDLE_NAMESPACE}_refl ${HUT_GEN_SPV_BUNDLE_OUTDIR} ${HUT_GEN_SPV_BUNDLE_SHADER_OBJECTS}
-          DEPENDS ${HUT_GEN_SPV_BUNDLE_SHADER_OBJECTS} gen_spv
+          DEPENDS gen_spv ${HUT_GEN_SPV_BUNDLE_SHADER_OBJECTS}
           COMMENT "Generating SPIR-V reflection for ${HUT_GEN_SPV_BUNDLE_NAMESPACE}")
 
-  add_custom_target(${bundle_gen_name} DEPENDS ${HUT_GEN_SPV_BUNDLE_OUTDIR}/${HUT_GEN_SPV_BUNDLE_NAMESPACE}.cpp ${HUT_GEN_SPV_BUNDLE_OUTDIR}/${HUT_GEN_SPV_BUNDLE_NAMESPACE}_refl.hpp
-          COMMENT "Checked if ${HUT_GEN_SPV_BUNDLE_NAMESPACE}.cpp need regeneration")
+  set(HUT_BUNDLE_${HUT_GEN_SPV_BUNDLE_NAMESPACE}_FILES
+      ${HUT_GEN_SPV_BUNDLE_SHADER_OBJECTS}
+      ${HUT_GEN_SPV_BUNDLE_OUTDIR}/${HUT_GEN_SPV_BUNDLE_NAMESPACE}.cpp
+      ${HUT_GEN_SPV_BUNDLE_OUTDIR}/${HUT_GEN_SPV_BUNDLE_NAMESPACE}.hpp
+      ${HUT_GEN_SPV_BUNDLE_OUTDIR}/${HUT_GEN_SPV_BUNDLE_NAMESPACE}_refl.hpp
+      PARENT_SCOPE)
 endfunction()
 
 add_executable(gen_res src/tools/gen_res/main.cpp)
@@ -235,8 +233,7 @@ set(HUT_INCLUDES ${HUT_INCLUDES} ${HUT_GEN_DIR})
 
 file(GLOB HUT_SHADER_SOURCES res/spv/*.frag res/spv/*.vert)
 
-gen_spv_bundle(NAMESPACE hut_shaders OUTDIR ${HUT_GEN_DIR} SHADER_SOURCES ${HUT_SHADER_SOURCES})
-set(HUT_SOURCES ${HUT_SOURCES} ${HUT_GEN_DIR}/hut_shaders.cpp)
+hut_gen_spv_bundle(NAMESPACE hut_shaders OUTDIR ${HUT_GEN_DIR} SHADER_SOURCES ${HUT_SHADER_SOURCES})
 
 ###########################################################
 message("Configuring library build targets...")
@@ -248,16 +245,16 @@ file(GLOB HUT_COMMON_SOURCES src/*.cpp ${HUT_GEN_DIR}/*.cpp)
 set(HUT_SOURCES ${HUT_SOURCES} ${HUT_COMMON_SOURCES})
 
 set(HUT_INCLUDES ${HUT_INCLUDES} inc)
-add_library(hut STATIC ${HUT_HEADERS} ${HUT_SOURCES})
+add_library(hut STATIC ${HUT_HEADERS} ${HUT_SOURCES} ${HUT_BUNDLE_hut_shaders_FILES})
 target_link_libraries(hut ${HUT_LIBS})
 target_compile_definitions(hut PUBLIC ${HUT_DEFINITIONS})
 target_include_directories(hut PUBLIC ${HUT_INCLUDES})
 target_precompile_headers(hut PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/inc/hut/utils.hpp>")
-add_dependencies(hut gen_hut_shaders)
 message("HUT_DEFINITIONS: ${HUT_DEFINITIONS}")
 message("HUT_INCLUDES: ${HUT_INCLUDES}")
 message("HUT_LIBS: ${HUT_LIBS}")
 message("HUT_SOURCES: ${HUT_SOURCES}")
+message("HUT_BUNDLE_hut_shaders_FILES: ${HUT_BUNDLE_hut_shaders_FILES}")
 
 add_subdirectory(ext)
 
@@ -279,14 +276,14 @@ if(HUT_COMPILE_DEMOS)
       COMMENT "Generating demo_woff2.cpp")
 
   file(GLOB HUT_DEMO_SHADERS_SOURCE tst/spv/*.vert tst/spv/*.frag)
-  gen_spv_bundle(NAMESPACE demo_shaders OUTDIR ${HUT_GEN_DIR} SHADER_SOURCES ${HUT_DEMO_SHADERS_SOURCE})
+  hut_gen_spv_bundle(NAMESPACE demo_shaders OUTDIR ${HUT_GEN_DIR} SHADER_SOURCES ${HUT_DEMO_SHADERS_SOURCE})
 
-  set(HUT_DEMO_GENERATED_RES ${HUT_GEN_DIR}/demo_png.cpp ${HUT_GEN_DIR}/demo_woff2.cpp ${HUT_GEN_DIR}/demo_shaders.cpp)
+  set(HUT_DEMO_GENERATED_RES ${HUT_GEN_DIR}/demo_png.cpp ${HUT_GEN_DIR}/demo_woff2.cpp)
 
-  add_executable(demo tst/demo.cpp ${HUT_DEMO_GENERATED_RES})
+  add_executable(demo tst/demo.cpp ${HUT_DEMO_GENERATED_RES} ${HUT_BUNDLE_demo_shaders_FILES})
   target_link_libraries(demo hut)
 
-  add_executable(demo_3d tst/demo_3d.cpp ${HUT_GEN_DIR}/demo_shaders.cpp) # try to keep the demo3d "res" free, to use it as gauge for hut size
+  add_executable(demo_3d tst/demo_3d.cpp ${HUT_BUNDLE_demo_shaders_FILES})
   target_link_libraries(demo_3d hut)
 
   if (HUT_ENABLE_IMGUI)

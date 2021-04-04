@@ -538,7 +538,7 @@ std::ostream &operator<<(std::ostream &_os, const VkExtent3D _extent) {
   return _os << "extent " << glm::uvec3{_extent.width, _extent.height, _extent.depth};
 }
 
-void display::stage_transition(const image_transition &_info) {
+void display::stage_transition(const image_transition &_info, VkImageSubresourceRange _range) {
   VkImageMemoryBarrier barrier = {};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
   barrier.oldLayout = _info.oldLayout;
@@ -546,11 +546,7 @@ void display::stage_transition(const image_transition &_info) {
   barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.image = _info.destination;
-  barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  barrier.subresourceRange.baseMipLevel = 0;
-  barrier.subresourceRange.levelCount = 1;
-  barrier.subresourceRange.baseArrayLayer = 0;
-  barrier.subresourceRange.layerCount = 1;
+  barrier.subresourceRange = _range;
 
   VkPipelineStageFlagBits srcStage, dstStage;
 
@@ -655,22 +651,14 @@ void display::stage_copy(const buffer2image_copy &_info) {
                         staging_cb_, _info.source, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &_info);
 }
 
-void display::stage_clear(const image_clear &_info) {
+void display::stage_clear(const image_clear &_info, VkImageSubresourceRange _range) {
 #ifdef HUT_DEBUG_STAGING
   std::cout << "[staging] image_clear " << _info.destination << std::endl;
 #endif
-
-  VkImageSubresourceRange range = {};
-  range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  range.baseArrayLayer = 0;
-  range.layerCount = 1;
-  range.baseMipLevel = 0;
-  range.levelCount = 1;
-
   HUT_PVK_NAMED_ALIASED(vkCmdClearColorImage,
                         ("dst", "color"),
                         ((void*)_info.destination, color3_32(_info.color)),
-                        staging_cb_, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &_info.color, 1, &range);
+                        staging_cb_, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &_info.color, 1, &_range);
 }
 
 void display::flush_staged() {

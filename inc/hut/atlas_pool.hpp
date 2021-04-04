@@ -92,7 +92,7 @@ class atlas_pool {
       auto update_origin = bbox_origin(_bounds);
       auto subimage_origin = bbox_origin(bounds_);
       auto image_bounds = make_bbox_with_origin_size(subimage_origin + update_origin, update_size);
-      pool_->pages_[page_].image_->update(image_bounds, _data, _dataPitch);
+      pool_->pages_[page_].image_->update({image_bounds}, _data, _dataPitch);
     }
 
     void update(uint8_t *_data, uint _dataPitch) {
@@ -104,11 +104,11 @@ class atlas_pool {
       auto update_origin = bbox_origin(_bounds);
       auto subimage_origin = bbox_origin(bounds_);
       auto image_bounds = make_bbox_with_origin_size(subimage_origin + update_origin, update_size);
-      return pool_->pages_[page_].image_->prepare_update(image_bounds);
+      return pool_->pages_[page_].image_->prepare_update({image_bounds});
     }
 
     image::updator prepare_update() {
-      return pool_->pages_[page_].image_->prepare_update(bounds_);
+      return pool_->pages_[page_].image_->prepare_update({bounds_});
     }
   };
 

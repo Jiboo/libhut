@@ -67,7 +67,7 @@ shared_subimage atlas_pool::alloc(const u16vec2 &_bounds) {
 shared_subimage atlas_pool::pack(const u16vec2 &_bounds, uint8_t *_data, uint _src_row_pitch) {
   auto result = alloc(_bounds);
   auto &l = pages_[result->page_];
-  l.image_->update(result->bounds_, _data, _src_row_pitch);
+  l.image_->update({result->bounds_}, _data, _src_row_pitch);
   return result;
 }
 
