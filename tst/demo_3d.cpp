@@ -71,7 +71,7 @@ int main(int, char **) {
 
   vp_ubo default_ubo{
     perspective(glm::radians(45.0f), w.size().x / (float) w.size().y, 0.001f, 1000.0f),
-    lookAt(vec3{0, 0, -5}, vec3{0, 0, 0}, vec3{0, 1, 0}),
+    lookAt(vec3{0, 0, 5}, vec3{0, 0, 0}, vec3{0, -1, 0}),
   };
   shared_ref<vp_ubo> ubo = d.alloc_ubo(b, default_ubo);
 
@@ -80,15 +80,15 @@ int main(int, char **) {
   auto rgb3d_vertices = b->allocate<rgb3d::vertex>(8);
   rgb3d_vertices->set({
     // back
-    rgb3d::vertex{{-1, -1, 1}, {1, 0, 0}},
-    rgb3d::vertex{{ 1, -1, 1}, {0, 1, 0}},
-    rgb3d::vertex{{ 1,  1, 1}, {0, 0, 1}},
-    rgb3d::vertex{{-1,  1, 1}, {1, 1, 1}},
+    rgb3d::vertex{{-1, -1, 1}, {0, 0, 0}},
+    rgb3d::vertex{{ 1, -1, 1}, {1, 0, 0}},
+    rgb3d::vertex{{ 1,  1, 1}, {0, 1, 0}},
+    rgb3d::vertex{{-1,  1, 1}, {1, 1, 0}},
     // front
-    rgb3d::vertex{{-1, -1, -1}, {1, 1, 1}},
-    rgb3d::vertex{{ 1, -1, -1}, {0, 0, 1}},
-    rgb3d::vertex{{ 1,  1, -1}, {0, 1, 0}},
-    rgb3d::vertex{{-1,  1, -1}, {1, 0, 0}},
+    rgb3d::vertex{{-1, -1, -1}, {0, 0, 1}},
+    rgb3d::vertex{{ 1, -1, -1}, {1, 0, 1}},
+    rgb3d::vertex{{ 1,  1, -1}, {0, 1, 1}},
+    rgb3d::vertex{{-1,  1, -1}, {1, 1, 1}},
   });
   rgb3d_instances->set({
     rgb3d::instance{glm::identity<mat4>()},

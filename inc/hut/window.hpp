@@ -39,6 +39,7 @@
 #endif
 
 #include "hut/display.hpp"
+#include "hut/render_target.hpp"
 #include "hut/utils.hpp"
 
 namespace hut {
@@ -61,10 +62,10 @@ class display;
 
 struct window_params {
   enum flag {
+    FDEPTH = render_target_params::flag::FDEPTH,
+    FMULTISAMPLING = render_target_params::flag::FMULTISAMPLING,
     FSYSTEM_DECORATIONS,
     FVSYNC,
-    FDEPTH,
-    FMULTISAMPLING,
     FTRANSPARENT,
     FFULLSCREEN,
     FLAG_LAST_VALUE = FFULLSCREEN,
@@ -76,7 +77,7 @@ struct window_params {
   uvec2 min_size_ = {0, 0}, max_size_ = {0, 0};
 };
 
-class window {
+class window : public render_target {
   friend class display;
   template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
 
@@ -116,7 +117,7 @@ class window {
   void title(const std::string &);
   void cursor(cursor_type _c);
   void clear_color(const vec4 &_color) {
-    clear_color_ = _color;
+    render_target_params_.clear_color_ = {_color.r, _color.g, _color.b, _color.a};
     invalidate(true);
   }
 
@@ -139,27 +140,20 @@ class window {
 
   VkPresentModeKHR present_mode_;
   VkSurfaceFormatKHR surface_format_;
-  VkRenderPass renderpass_ = VK_NULL_HANDLE;
 
   VkExtent2D swapchain_extents_;
   VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
   std::vector<VkImage> swapchain_images_;
   std::vector<VkImageView> swapchain_imageviews_;
-  std::vector<VkFramebuffer> swapchain_fbos_;
   std::vector<VkCommandBuffer> primary_cbs_;
   std::vector<VkCommandBuffer> cbs_;
   std::vector<uint8_t> dirty_;
-
-  shared_image depth_;
-  shared_image msaa_rendertarget_;
-  VkSampleCountFlagBits sample_count_ = VK_SAMPLE_COUNT_1_BIT;
 
   VkSemaphore sem_available_ = VK_NULL_HANDLE;
   VkSemaphore sem_rendered_ = VK_NULL_HANDLE;
 
   uvec2 size_, pos_;
   uvec2 previous_size_, previous_pos_; // used to save rect before maximize/fullscreen
-  vec4 clear_color_ = {0.0f, 0.0f, 0.0f, 1.0f};
   display::time_point last_frame_ = display::clock::now();
   bool minimized_ = false;
   bool has_system_decorations_ = false;
@@ -167,7 +161,6 @@ class window {
   std::shared_ptr<drop_target_interface> drop_target_interface_;
 
   void init_vulkan_surface();
-  void rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb);
   void destroy_vulkan();
   void redraw(display::time_point);
 

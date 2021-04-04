@@ -79,7 +79,7 @@ void hut::handle_toplevel_decoration_configure(void *_data, zxdg_toplevel_decora
 }
 
 window::window(display &_display, const window_params &_init_params)
-  : display_(_display), params_(_init_params), size_(bbox_size(_init_params.position_)) {
+  : render_target(_display), display_(_display), params_(_init_params), size_(bbox_size(_init_params.position_)) {
   static const xdg_surface_listener xdg_surface_listeners = {
     handle_xdg_configure,
   };

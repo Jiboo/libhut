@@ -538,59 +538,93 @@ std::ostream &operator<<(std::ostream &_os, const VkExtent3D _extent) {
   return _os << "extent " << glm::uvec3{_extent.width, _extent.height, _extent.depth};
 }
 
-void display::stage_transition(const image_transition &_info, VkImageSubresourceRange _range) {
+void display::transition_image(VkCommandBuffer _cb, VkImage _image, VkImageSubresourceRange _range, VkImageLayout _oldLayout, VkImageLayout _newLayout) {
   VkImageMemoryBarrier barrier = {};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  barrier.oldLayout = _info.oldLayout;
-  barrier.newLayout = _info.newLayout;
+  barrier.oldLayout = _oldLayout;
+  barrier.newLayout = _newLayout;
   barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = _info.destination;
+  barrier.image = _image;
   barrier.subresourceRange = _range;
 
   VkPipelineStageFlagBits srcStage, dstStage;
 
-  if (_info.oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED && _info.newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+  if (_oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED &&
+      _newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
     srcStage = VK_PIPELINE_STAGE_HOST_BIT;
     dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-  } else if (_info.oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED && _info.newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+  } else if (_oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED &&
+             _newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     srcStage = VK_PIPELINE_STAGE_HOST_BIT;
     dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-  } else if (_info.oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
-             _info.newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-  } else if (_info.oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED &&
-             _info.newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+  } else if (_oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED &&
+             _newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     srcStage = VK_PIPELINE_STAGE_HOST_BIT;
     dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-  } else if (_info.oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
-             _info.newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+
+  } else if (_oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
+             _newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
     barrier.dstAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     srcStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     dstStage = VK_PIPELINE_STAGE_HOST_BIT;
+  } else if (_oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+             _newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+
+  } else if (_oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
+             _newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+    barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    srcStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  } else if (_oldLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL &&
+             _newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+
+  } else if (_oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
+             _newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
+    barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    srcStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+  } else if (_oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
+             _newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    srcStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+
   } else {
     throw std::invalid_argument("unsupported layout transition!");
   }
 
+  HUT_PVK_NAMED_ALIASED(vkCmdPipelineBarrier,
+                        ("dest", "from", "to"),
+                        ((void*)_info.destination, _info.oldLayout, _info.newLayout),
+                        _cb, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+}
+
+void display::stage_transition(const image_transition &_info, VkImageSubresourceRange _range) {
 #ifdef HUT_DEBUG_STAGING
   std::cout << "[staging] transition " << _info.destination << " from " << _info.oldLayout << " to "
             <<  _info.newLayout << std::endl;
 #endif
 
-  HUT_PVK_NAMED_ALIASED(vkCmdPipelineBarrier,
-                        ("dest", "from", "to"),
-                        ((void*)_info.destination, _info.oldLayout, _info.newLayout),
-                        staging_cb_, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+  transition_image(staging_cb_, _info.destination, _range, _info.oldLayout, _info.newLayout);
 }
 
 void display::stage_copy(const buffer_copy &_info) {

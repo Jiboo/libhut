@@ -233,7 +233,9 @@ struct drop_target_interface {
 #endif
 
 class display {
+  friend class render_target;
   friend class window;
+  friend class offscreen;
   friend class buffer_pool;
   friend class image;
   friend class sampler;
@@ -369,6 +371,8 @@ class display {
   void stage_copy(const buffer2image_copy &_info);
   void stage_transition(const image_transition &_info, VkImageSubresourceRange _range);
   void stage_clear(const image_clear &_info, VkImageSubresourceRange _range);
+
+  static void transition_image(VkCommandBuffer _cb, VkImage _image, VkImageSubresourceRange _range, VkImageLayout _oldLayout, VkImageLayout _newLayout);
 
   std::list<callback> posted_jobs_;
   std::mutex posted_mutex_;

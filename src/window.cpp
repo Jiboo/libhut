@@ -68,14 +68,6 @@ void window::destroy_vulkan() {
   if (sem_rendered_ != VK_NULL_HANDLE)
     HUT_PVK(vkDestroySemaphore, display_.device_, sem_rendered_, nullptr);
 
-  if (renderpass_ != VK_NULL_HANDLE)
-    HUT_PVK(vkDestroyRenderPass, display_.device_, renderpass_, nullptr);
-
-  for (auto &fbo : swapchain_fbos_) {
-    if (fbo != VK_NULL_HANDLE)
-      HUT_PVK(vkDestroyFramebuffer, display_.device_, fbo, nullptr);
-  }
-
   for (auto &view : swapchain_imageviews_) {
     if (view != VK_NULL_HANDLE)
       HUT_PVK(vkDestroyImageView, display_.device_, view, nullptr);
@@ -142,49 +134,6 @@ void window::init_vulkan_surface() {
         surface_format_ = it;
       }
     }
-  }
-
-  if (params_.flags_ & window_params::FMULTISAMPLING) {
-    VkSampleCountFlags counts = display_.limits().framebufferColorSampleCounts & display_.limits().framebufferDepthSampleCounts;
-    if (counts & VK_SAMPLE_COUNT_8_BIT) sample_count_ = VK_SAMPLE_COUNT_8_BIT;
-    else if (counts & VK_SAMPLE_COUNT_4_BIT) sample_count_ = VK_SAMPLE_COUNT_4_BIT;
-    else if (counts & VK_SAMPLE_COUNT_2_BIT) sample_count_ = VK_SAMPLE_COUNT_2_BIT;
-
-    if (sample_count_ != VK_SAMPLE_COUNT_1_BIT) {
-      image_params params;
-      params.size_ = size_;
-      params.format_ = surface_format_.format;
-      params.tiling_ = VK_IMAGE_TILING_OPTIMAL;
-      params.usage_ = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-      params.aspect_ = VK_IMAGE_ASPECT_COLOR_BIT;
-      params.samples_ = sample_count_;
-      msaa_rendertarget_ = std::make_shared<image>(display_, params);
-    }
-  }
-
-  if (params_.flags_ & window_params::FDEPTH) {
-    VkFormat depth_format = VK_FORMAT_UNDEFINED;
-    VkFormat depth_candidates[] = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
-    for (VkFormat format : depth_candidates) {
-      VkFormatProperties props;
-      HUT_PVK(vkGetPhysicalDeviceFormatProperties, pdevice, format, &props);
-
-      if (props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
-        depth_format = format;
-        break;
-      }
-    }
-    if (depth_format == VK_FORMAT_UNDEFINED)
-      throw std::runtime_error("failed to find compatible depth buffer!");
-
-    image_params params;
-    params.size_ = size_;
-    params.format_ = depth_format;
-    params.tiling_ = VK_IMAGE_TILING_OPTIMAL;
-    params.usage_ = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    params.aspect_ = VK_IMAGE_ASPECT_DEPTH_BIT;
-    params.samples_ = sample_count_;
-    depth_ = std::make_shared<image>(display_, params);
   }
 
   uint32_t modes_count;
@@ -268,120 +217,14 @@ void window::init_vulkan_surface() {
       throw std::runtime_error("failed to create image views!");
   }
 
-  VkSubpassDependency dependency = {};
-  dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-  dependency.dstSubpass = 0;
-  dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.srcAccessMask = 0;
-  dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-  VkAttachmentDescription colorAttachment = {};
-  colorAttachment.format = surface_format_.format;
-  colorAttachment.samples = sample_count_;
-  colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  colorAttachment.finalLayout = msaa_rendertarget_ ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-  std::vector<VkAttachmentDescription> passAttachments {colorAttachment};
-
-  if (depth_) {
-    VkAttachmentDescription depthAttachment = {};
-    depthAttachment.format = depth_->params_.format_;
-    depthAttachment.samples = sample_count_;
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    passAttachments.emplace_back(depthAttachment);
-  }
-
-  if (msaa_rendertarget_) {
-    VkAttachmentDescription colorAttachmentResolve{};
-    colorAttachmentResolve.format = surface_format_.format;
-    colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    passAttachments.emplace_back(colorAttachmentResolve);
-  }
-
-  VkAttachmentReference colorAttachmentRef = {};
-  colorAttachmentRef.attachment = 0;
-  colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-  VkAttachmentReference depthAttachmentRef = {};
-  depthAttachmentRef.attachment = 1;
-  depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-  VkAttachmentReference colorAttachmentResolveRef{};
-  colorAttachmentResolveRef.attachment = 2;
-  colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-  VkSubpassDescription subpass = {};
-  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-  subpass.colorAttachmentCount = 1;
-  subpass.pColorAttachments = &colorAttachmentRef;
-  subpass.pDepthStencilAttachment = depth_ ? &depthAttachmentRef : nullptr;
-  subpass.pResolveAttachments = msaa_rendertarget_ ? &colorAttachmentResolveRef : nullptr;
-
-  VkRenderPassCreateInfo renderPassInfo = {};
-  renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-  renderPassInfo.attachmentCount = passAttachments.size();
-  renderPassInfo.pAttachments = passAttachments.data();
-  renderPassInfo.subpassCount = 1;
-  renderPassInfo.pSubpasses = &subpass;
-  renderPassInfo.dependencyCount = 1;
-  renderPassInfo.pDependencies = &dependency;
-
-  if (renderpass_ != VK_NULL_HANDLE)
-    HUT_PVK(vkDestroyRenderPass, display_.device_, renderpass_, nullptr);
-  if (HUT_PVK(vkCreateRenderPass, display_.device_, &renderPassInfo, nullptr, &renderpass_) != VK_SUCCESS)
-    throw std::runtime_error("failed to create render pass!");
-
-  for (auto &fbo : swapchain_fbos_) {
-    if (fbo != VK_NULL_HANDLE)
-      HUT_PVK(vkDestroyFramebuffer, display_.device_, fbo, nullptr);
-  }
-  swapchain_fbos_.resize(swapchain_images_.size());
-
-  std::vector<VkImageView> fbAttachments;
-  for (size_t i = 0; i < swapchain_fbos_.size(); i++) {
-    fbAttachments.clear();
-
-    if (msaa_rendertarget_)
-      fbAttachments.emplace_back(msaa_rendertarget_->view_);
-    else
-      fbAttachments.emplace_back(swapchain_imageviews_[i]);
-
-    if (depth_)
-      fbAttachments.emplace_back(depth_->view_);
-
-    if (msaa_rendertarget_)
-      fbAttachments.emplace_back(swapchain_imageviews_[i]);
-
-    VkFramebufferCreateInfo framebufferInfo = {};
-    framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    framebufferInfo.renderPass = renderpass_;
-    framebufferInfo.attachmentCount = fbAttachments.size();
-    framebufferInfo.pAttachments = fbAttachments.data();
-    framebufferInfo.width = swapchain_extents_.width;
-    framebufferInfo.height = swapchain_extents_.height;
-    framebufferInfo.layers = 1;
-
-    if (HUT_PVK(vkCreateFramebuffer, display_.device_, &framebufferInfo, nullptr, &swapchain_fbos_[i]) != VK_SUCCESS)
-      throw std::runtime_error("failed to create framebuffer!");
-  }
+  render_target_params pass_params;
+  pass_params.size_ = {swapchain_extents_.width, swapchain_extents_.height};
+  pass_params.format_ = surface_format_.format;
+  if (params_.flags_ & window_params::FMULTISAMPLING)
+    pass_params.flags_ |= render_target_params::FMULTISAMPLING;
+  if (params_.flags_ & window_params::FDEPTH)
+    pass_params.flags_ |= render_target_params::FDEPTH;
+  reinit_pass(pass_params, swapchain_imageviews_);
 
   if (!primary_cbs_.empty())
     HUT_PVK(vkFreeCommandBuffers, display_.device_, display_.commandg_pool_, primary_cbs_.size(), primary_cbs_.data());
@@ -432,7 +275,9 @@ void window::redraw(display::time_point _tp) {
   if (dirty_[imageIndex]) {
     HUT_PVK(vkDeviceWaitIdle, display_.device_);
     dirty_[imageIndex] = false;
-    rebuild_cb(swapchain_fbos_[imageIndex], primary_cbs_[imageIndex]);
+    begin_rebuild_cb(fbos_[imageIndex], primary_cbs_[imageIndex]);
+    HUT_PROFILE_EVENT_NAMED_ALIASED(this, on_draw, (), (), primary_cbs_[imageIndex]);
+    end_rebuild_cb(primary_cbs_[imageIndex]);
   }
 
   HUT_PROFILE_EVENT(this, on_frame, _tp - last_frame_);
@@ -491,54 +336,4 @@ void window::redraw(display::time_point _tp) {
     done = display::clock::now();
   }
   last_frame_ = done;
-}
-
-void window::rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
-  HUT_PROFILE_SCOPE(PWINDOW, "window::rebuild_cb");
-  VkCommandBufferBeginInfo beginInfo = {};
-  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-  beginInfo.pInheritanceInfo = nullptr;  // Optional
-
-  HUT_PVK(vkBeginCommandBuffer, _cb, &beginInfo);
-
-  VkRenderPassBeginInfo renderPassInfo = {};
-  renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-  renderPassInfo.renderPass = renderpass_;
-  renderPassInfo.framebuffer = _fbo;
-  renderPassInfo.renderArea.offset = {0, 0};
-  renderPassInfo.renderArea.extent = swapchain_extents_;
-
-  std::vector<VkClearValue> clearColors = {
-      VkClearValue{.color = {{clear_color_.r, clear_color_.g, clear_color_.b, clear_color_.a}}}
-  };
-  if (depth_)
-    clearColors.emplace_back(VkClearValue{.depthStencil = {1.f, 0}});
-
-  renderPassInfo.clearValueCount = clearColors.size();
-  renderPassInfo.pClearValues = clearColors.data();
-
-  HUT_PVK(vkCmdBeginRenderPass, _cb, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);  // FIXME
-  // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS
-  // to enable secondary command buffers
-
-  VkRect2D scissor = {};
-  scissor.offset = {0, 0};
-  scissor.extent = {size_.x, size_.y};
-  HUT_PVK(vkCmdSetScissor, _cb, 0, 1, &scissor);
-
-  VkViewport viewport = {};
-  viewport.x = 0.0f;
-  viewport.y = 0.0f;
-  viewport.width = (float)size_.x;
-  viewport.height = (float)size_.y;
-  viewport.minDepth = 0.0f;
-  viewport.maxDepth = 1.0f;
-  HUT_PVK(vkCmdSetViewport, _cb, 0, 1, &viewport);
-
-  HUT_PROFILE_EVENT_NAMED_ALIASED(this, on_draw, (), (), _cb);
-
-  HUT_PVK(vkCmdEndRenderPass, _cb);
-  if (HUT_PVK(vkEndCommandBuffer, _cb) != VK_SUCCESS)
-    throw std::runtime_error("failed to record command buffer!");
 }

@@ -153,7 +153,7 @@ std::shared_ptr<image> image::load_raw(display &_display, span<const uint8_t> _d
   assert(_params.levels_ == 1);
   assert(_params.layers_ == 1);
 
-  if (_data_row_pitch == 0) {
+  if (_data_row_pitch == update.staging_row_pitch()) {
     memcpy(update.data(), _data.data(), _data.size());
   }
   else {
@@ -300,16 +300,16 @@ void image::finalize_update(image::updator &_update) {
 
   VkImageSubresourceLayers subresLayers = {};
   subresLayers.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  subresLayers.baseArrayLayer = _update.subres_.layer_;
   subresLayers.mipLevel = _update.subres_.level_;
+  subresLayers.baseArrayLayer = _update.subres_.layer_;
   subresLayers.layerCount = 1;
 
   VkImageSubresourceRange subresRange = {};
   subresRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  subresRange.baseArrayLayer = _update.subres_.layer_;
   subresRange.baseMipLevel = _update.subres_.level_;
-  subresRange.layerCount = 1;
   subresRange.levelCount = 1;
+  subresRange.baseArrayLayer = _update.subres_.layer_;
+  subresRange.layerCount = 1;
 
   display::image_transition pre = {};
   pre.destination = image_;

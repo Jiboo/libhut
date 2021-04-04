@@ -55,7 +55,9 @@ class image {
   friend class display;
   friend class font;
   template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
+  friend class render_target;
   friend class window;
+  friend class offscreen;
 
  public:
   struct subresource {

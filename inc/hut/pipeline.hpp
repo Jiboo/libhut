@@ -75,7 +75,8 @@ private:
     extra_attachments extras_;
   };
 
-  window &window_;
+  VkDevice device_ref_;
+  VkRenderPass render_pass_;
 
   VkShaderModule vert_ = VK_NULL_HANDLE;
   VkShaderModule frag_ = VK_NULL_HANDLE;
@@ -121,7 +122,7 @@ private:
     create_info.maxSets = _params.max_sets_;
     create_info.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
 
-    if (vkCreateDescriptorPool(window_.display_.device_, &create_info, nullptr, &descriptor_pool_) != VK_SUCCESS)
+    if (vkCreateDescriptorPool(device_ref_, &create_info, nullptr, &descriptor_pool_) != VK_SUCCESS)
       throw std::runtime_error("failed to create descriptor pool!");
   }
 
@@ -145,7 +146,7 @@ private:
     create_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
     create_info.pNext = &bindings_flags_info;
 
-    if (vkCreateDescriptorSetLayout(window_.display_.device_, &create_info, nullptr, &descriptor_layout_) != VK_SUCCESS)
+    if (vkCreateDescriptorSetLayout(device_ref_, &create_info, nullptr, &descriptor_layout_) != VK_SUCCESS)
       throw std::runtime_error("failed to create descriptor set layout!");
   }
 
@@ -155,7 +156,7 @@ private:
     vert_create_info.codeSize = TVertexRefl::bytecode_.size();
     vert_create_info.pCode = (uint32_t*)TVertexRefl::bytecode_.data();
 
-    if (vkCreateShaderModule(window_.display_.device_, &vert_create_info, nullptr, &vert_) != VK_SUCCESS)
+    if (vkCreateShaderModule(device_ref_, &vert_create_info, nullptr, &vert_) != VK_SUCCESS)
       throw std::runtime_error("[sample] failed to create vertex module!");
 
     VkShaderModuleCreateInfo frag_create_info = {};
@@ -163,7 +164,7 @@ private:
     frag_create_info.codeSize = TFragRefl::bytecode_.size();
     frag_create_info.pCode = (uint32_t*)TFragRefl::bytecode_.data();
 
-    if (vkCreateShaderModule(window_.display_.device_, &frag_create_info, nullptr, &frag_) != VK_SUCCESS)
+    if (vkCreateShaderModule(device_ref_, &frag_create_info, nullptr, &frag_) != VK_SUCCESS)
       throw std::runtime_error("[sample] failed to create fragment module!");
   }
 
@@ -176,7 +177,7 @@ private:
     layout_create_info.setLayoutCount = 1;
     layout_create_info.pSetLayouts = set_layouts;
 
-    if (vkCreatePipelineLayout(window_.display_.device_, &layout_create_info, nullptr, &layout_) != VK_SUCCESS)
+    if (vkCreatePipelineLayout(device_ref_, &layout_create_info, nullptr, &layout_) != VK_SUCCESS)
       throw std::runtime_error("[sample] failed to create pipeline layout!");
   }
 
@@ -313,42 +314,43 @@ private:
     pipelineInfo.pDynamicState = &dynamic_states_create_info;
     pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.layout = layout_;
-    pipelineInfo.renderPass = window_.renderpass_;
+    pipelineInfo.renderPass = render_pass_;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;  // Optional
 
-    if (vkCreateGraphicsPipelines(window_.display_.device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_) != VK_SUCCESS)
+    if (vkCreateGraphicsPipelines(device_ref_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_) != VK_SUCCESS)
       throw std::runtime_error("failed to create graphics pipeline!");
   }
 
 public:
-  explicit pipeline(window &_window, const pipeline_params &_params = {})
-      : window_(_window) {
+  explicit pipeline(render_target &_target, const pipeline_params &_params = {})
+      : device_ref_(_target.display_.device_), render_pass_(_target.renderpass_) {
     HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
+    assert(render_pass_ != VK_NULL_HANDLE);
+
     init_pools(_params);
     init_descriptor_layout();
     alloc_next_descriptors(1);
     init_shaders();
     init_pipeline_layout();
-    init_pipeline(_window.size(), _window.sample_count_, _params);
+    init_pipeline(_target.render_target_params_.size_, _target.sample_count_, _params);
   }
 
   virtual ~pipeline() {
-    VkDevice device = window_.display_.device_;
-    HUT_PVK(vkDeviceWaitIdle, device);
+    HUT_PVK(vkDeviceWaitIdle, device_ref_);
     if (descriptor_layout_ != VK_NULL_HANDLE)
-      HUT_PVK(vkDestroyDescriptorSetLayout, device, descriptor_layout_, nullptr);
+      HUT_PVK(vkDestroyDescriptorSetLayout, device_ref_, descriptor_layout_, nullptr);
     if (descriptor_pool_ != VK_NULL_HANDLE)
-      HUT_PVK(vkDestroyDescriptorPool, device, descriptor_pool_, nullptr);
+      HUT_PVK(vkDestroyDescriptorPool, device_ref_, descriptor_pool_, nullptr);
     if (pipeline_ != VK_NULL_HANDLE)
-      HUT_PVK(vkDestroyPipeline, device, pipeline_, nullptr);
+      HUT_PVK(vkDestroyPipeline, device_ref_, pipeline_, nullptr);
     if (layout_ != VK_NULL_HANDLE)
-      HUT_PVK(vkDestroyPipelineLayout ,device, layout_, nullptr);
+      HUT_PVK(vkDestroyPipelineLayout ,device_ref_, layout_, nullptr);
     if (vert_ != VK_NULL_HANDLE)
-      HUT_PVK(vkDestroyShaderModule, device, vert_, nullptr);
+      HUT_PVK(vkDestroyShaderModule, device_ref_, vert_, nullptr);
     if (frag_ != VK_NULL_HANDLE)
-      HUT_PVK(vkDestroyShaderModule, device, frag_, nullptr);
+      HUT_PVK(vkDestroyShaderModule, device_ref_, frag_, nullptr);
   }
 
   void alloc_next_descriptors(uint _count) {
@@ -364,7 +366,7 @@ public:
     alloc_info.descriptorSetCount = _count;
     alloc_info.pSetLayouts = layouts;
 
-    if (vkAllocateDescriptorSets(window_.display_.device_, &alloc_info, descriptors_.data() + current_count) != VK_SUCCESS)
+    if (vkAllocateDescriptorSets(device_ref_, &alloc_info, descriptors_.data() + current_count) != VK_SUCCESS)
       throw std::runtime_error("failed to allocate descriptor set!");
   }
 
@@ -499,7 +501,7 @@ public:
     filler.buffer(0, _ubo);
     write_continue(1, filler, std::forward<TExtraAttachments>(_attachments)...);
 
-    HUT_PVK(vkUpdateDescriptorSets, window_.display_.device_, filler.writes_.size(), filler.writes_.data(), 0, nullptr);
+    HUT_PVK(vkUpdateDescriptorSets, device_ref_, filler.writes_.size(), filler.writes_.data(), 0, nullptr);
   }
 
   void update_atlas(uint _descriptor_index, const shared_atlas &_atlas) {
@@ -530,7 +532,7 @@ public:
       write.descriptorCount = image_infos.size();
       write.pImageInfo = image_infos.data();
 
-      HUT_PVK(vkUpdateDescriptorSets, window_.display_.device_, 1, &write, 0, nullptr);
+      HUT_PVK(vkUpdateDescriptorSets, device_ref_, 1, &write, 0, nullptr);
       desc_info.last_bound_ = new_count;
     }
   }
