@@ -38,7 +38,7 @@
 using namespace hut;
 
 window::window(display &_display, const window_params &_init_params)
-  : display_(_display), params_(_init_params), size_(bbox_size(_init_params.position_)) {
+  : render_target(_display), display_(_display), params_(_init_params), size_(bbox_size(_init_params.position_)) {
 
   DWORD winExStyle = WS_EX_APPWINDOW;
   DWORD winStyle = WS_POPUP;
