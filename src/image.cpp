@@ -213,7 +213,7 @@ image::image(display &_display, const image_params &_params)
   post.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   display::image_clear clear = {};
   clear.destination = image_;
-  clear.color = VkClearColorValue{};
+  clear.color = {};
 
   std::lock_guard lk(display_.staging_mutex_);
   display_.staging_jobs_++;

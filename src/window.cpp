@@ -218,7 +218,7 @@ void window::init_vulkan_surface() {
   }
 
   render_target_params pass_params;
-  pass_params.size_ = {swapchain_extents_.width, swapchain_extents_.height};
+  pass_params.box_ = {0, 0, swapchain_extents_.width, swapchain_extents_.height};
   pass_params.format_ = surface_format_.format;
   if (params_.flags_ & window_params::FMULTISAMPLING)
     pass_params.flags_ |= render_target_params::FMULTISAMPLING;

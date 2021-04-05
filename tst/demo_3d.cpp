@@ -166,8 +166,8 @@ int main(int, char **) {
     else if (_type == MMOVE && button_clicked) {
       vec2 offset {_pos - down_pos};
 
-      camera_rot += offset / vec2(w.size()) * float(M_PI);
-      constexpr float max_y = M_PI_2 - 0.01;
+      camera_rot += offset / vec2(w.size()) * float(std::numbers::pi);
+      constexpr float max_y = std::numbers::pi/2 - 0.01;
       camera_rot.y = clamp(camera_rot.y, -max_y, max_y);
       down_pos = _pos;
 

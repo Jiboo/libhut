@@ -57,6 +57,10 @@ render_target::~render_target() {
 void render_target::reinit_pass(const render_target_params &_init_params, std::span<VkImageView> _images) {
   HUT_PROFILE_SCOPE(PWINDOW, "render_target::reinit");
   render_target_params_ = _init_params;
+  const auto size = bbox_size(_init_params.box_);
+  const auto offset = bbox_origin(_init_params.box_);
+
+  assert(size.x > 0 && size.y > 0);
 
   if (render_target_params_.flags_ & render_target_params::FMULTISAMPLING) {
     VkSampleCountFlags counts = display_.limits().framebufferColorSampleCounts & display_.limits().framebufferDepthSampleCounts;
@@ -66,7 +70,7 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
 
     if (sample_count_ != VK_SAMPLE_COUNT_1_BIT) {
       image_params params;
-      params.size_ = _init_params.size_;
+      params.size_ = size;
       params.format_ = _init_params.format_;
       params.tiling_ = VK_IMAGE_TILING_OPTIMAL;
       params.usage_ = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -93,7 +97,7 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
       throw std::runtime_error("failed to find compatible depth buffer!");
 
     image_params params;
-    params.size_ = _init_params.size_;
+    params.size_ = size;
     params.format_ = depth_format;
     params.tiling_ = VK_IMAGE_TILING_OPTIMAL;
     params.usage_ = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
@@ -210,8 +214,8 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
     framebufferInfo.renderPass = renderpass_;
     framebufferInfo.attachmentCount = fbAttachments.size();
     framebufferInfo.pAttachments = fbAttachments.data();
-    framebufferInfo.width = _init_params.size_.x;
-    framebufferInfo.height = _init_params.size_.y;
+    framebufferInfo.width = offset.x + size.x;
+    framebufferInfo.height = offset.y + size.y;
     framebufferInfo.layers = 1;
 
     if (HUT_PVK(vkCreateFramebuffer, display_.device_, &framebufferInfo, nullptr, &fbos_[i]) != VK_SUCCESS)
@@ -221,6 +225,9 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
 
 void render_target::begin_rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
   HUT_PROFILE_SCOPE(PWINDOW, "window::rebuild_cb");
+  auto offset = bbox_origin(render_target_params_.box_);
+  auto size = bbox_size(render_target_params_.box_);
+
   VkCommandBufferBeginInfo beginInfo = {};
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
@@ -232,8 +239,8 @@ void render_target::begin_rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
   renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
   renderPassInfo.renderPass = renderpass_;
   renderPassInfo.framebuffer = _fbo;
-  renderPassInfo.renderArea.offset = {0, 0};
-  renderPassInfo.renderArea.extent = {render_target_params_.size_.x, render_target_params_.size_.y};
+  renderPassInfo.renderArea.offset = {offset.x, offset.y};
+  renderPassInfo.renderArea.extent = {size.x, size.y};
 
   std::vector<VkClearValue> clearColors = {
       VkClearValue{.color = render_target_params_.clear_color_}
@@ -249,15 +256,15 @@ void render_target::begin_rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
   // to enable secondary command buffers
 
   VkRect2D scissor = {};
-  scissor.offset = {0, 0};
-  scissor.extent = {render_target_params_.size_.x, render_target_params_.size_.y};
+  scissor.offset = {offset.x, offset.y};
+  scissor.extent = {size.x, size.y};
   HUT_PVK(vkCmdSetScissor, _cb, 0, 1, &scissor);
 
   VkViewport viewport = {};
-  viewport.x = 0.0f;
-  viewport.y = 0.0f;
-  viewport.width = (float)render_target_params_.size_.x;
-  viewport.height = (float)render_target_params_.size_.y;
+  viewport.x = offset.x;
+  viewport.y = offset.y;
+  viewport.width = size.x;
+  viewport.height = size.y;
   viewport.minDepth = 0.0f;
   viewport.maxDepth = 1.0f;
   HUT_PVK(vkCmdSetViewport, _cb, 0, 1, &viewport);

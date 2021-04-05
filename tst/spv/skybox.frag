@@ -3,10 +3,10 @@
 
 layout (binding = 1) uniform samplerCube cube_sampler;
 
-layout(location = 0) in vec3 in_v_uvw;
+layout(location = 0) in vec3 in_uvw;
 
 layout(location = 0) out vec4 out_color;
 
 void main() {
-    out_color = texture(cube_sampler, in_v_uvw);
+    out_color = texture(cube_sampler, in_uvw);
 }

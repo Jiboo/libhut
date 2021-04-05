@@ -58,7 +58,7 @@ namespace hut {
     using draw_callback = std::function<void(VkCommandBuffer)>;
     void draw(const draw_callback &_callback);
 
-    void download(uint8_t *_dst, uint _data_row_pitch);
+    void download(uint8_t *_dst, uint _dst_row_pitch, image::subresource _src = {});
   protected:
     offscreen_params params_;
     shared_image target_;

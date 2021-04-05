@@ -181,8 +181,11 @@ private:
       throw std::runtime_error("[sample] failed to create pipeline layout!");
   }
 
-  void init_pipeline(uvec2 _default_size, VkSampleCountFlagBits _samples, const pipeline_params &_params) {
+  void init_pipeline(u16vec4 _default_viewport, VkSampleCountFlagBits _samples, const pipeline_params &_params) {
     HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
+    auto size = bbox_size(_default_viewport);
+    auto origin = bbox_origin(_default_viewport);
+
     VkPipelineShaderStageCreateInfo vert_stage_info = {};
     vert_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vert_stage_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -215,16 +218,16 @@ private:
     assembly_create_info.primitiveRestartEnable = VK_FALSE;
 
     VkViewport viewport = {};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = (float)_default_size.x;
-    viewport.height = (float)_default_size.y;
+    viewport.x = origin.x;
+    viewport.y = size.y;
+    viewport.width = size.x;
+    viewport.height = size.y;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
     VkRect2D scissor = {};
-    scissor.offset = {0, 0};
-    scissor.extent = {_default_size.x, _default_size.y};
+    scissor.offset = {origin.x, origin.y};
+    scissor.extent = {size.x, size.y};
 
     VkPipelineViewportStateCreateInfo viewport_create_info = {};
     viewport_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -334,7 +337,7 @@ public:
     alloc_next_descriptors(1);
     init_shaders();
     init_pipeline_layout();
-    init_pipeline(_target.render_target_params_.size_, _target.sample_count_, _params);
+    init_pipeline(_target.render_target_params_.box_, _target.sample_count_, _params);
   }
 
   virtual ~pipeline() {
