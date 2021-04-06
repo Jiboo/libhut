@@ -54,7 +54,7 @@ struct image_params {
 class image {
   friend class display;
   friend class font;
-  template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
+  template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
   friend class render_target;
   friend class window;
   friend class offscreen;
@@ -121,7 +121,7 @@ class image {
 using shared_image = std::shared_ptr<image>;
 
 class sampler {
-  template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
+  template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
 
   VkSampler sampler_;
   VkDevice device_;

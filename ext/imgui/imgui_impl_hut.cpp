@@ -37,7 +37,7 @@
 
 #include "hut_imgui_shaders_refl.hpp"
 
-using imgui_pipeline = hut::pipeline<hut::proj_ubo, ImDrawIdx, hut::hut_imgui_shaders::imgui_vert_spv_refl, hut::hut_imgui_shaders::imgui_frag_spv_refl, const hut::shared_image &, const hut::shared_sampler &>;
+using imgui_pipeline = hut::pipeline<ImDrawIdx, hut::hut_imgui_shaders::imgui_vert_spv_refl, hut::hut_imgui_shaders::imgui_frag_spv_refl, const hut::shared_ref<hut::proj_ubo>&, const hut::shared_image&, const hut::shared_sampler&>;
 
 struct hut_imgui_mesh {
   imgui_pipeline::shared_indices indices_;

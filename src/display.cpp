@@ -614,7 +614,7 @@ void display::transition_image(VkCommandBuffer _cb, VkImage _image, VkImageSubre
 
   HUT_PVK_NAMED_ALIASED(vkCmdPipelineBarrier,
                         ("dest", "from", "to"),
-                        ((void*)_info.destination, _info.oldLayout, _info.newLayout),
+                        ((void*)_image, _oldLayout, _newLayout),
                         _cb, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 

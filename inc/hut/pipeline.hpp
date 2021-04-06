@@ -39,10 +39,6 @@
 
 namespace hut {
 
-struct proj_ubo {
-  mat4 proj_ {1};
-};
-
 struct pipeline_params {
   VkPrimitiveTopology topology_ = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
   VkCompareOp depthCompare_ = VK_COMPARE_OP_LESS_OR_EQUAL;
@@ -52,15 +48,13 @@ struct pipeline_params {
   uint32_t max_sets_ = 16;
 };
 
-template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments>
+template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments>
 class pipeline {
 public:
-  using ubo = TUBO;
   using indice = TIndice;
   using vertex = typename TVertexRefl::vertex;
   using instance = typename TVertexRefl::instance;
 
-  using shared_ubo = shared_ref<ubo>;
   using shared_indices = shared_ref<indice>;
   using shared_vertices = shared_ref<vertex>;
   using shared_instances = shared_ref<instance>;
@@ -71,7 +65,6 @@ private:
   static constexpr auto combined_bindings_ = combine(TVertexRefl::descriptor_bindings_, TFragRefl::descriptor_bindings_);
 
   struct attachments {
-    shared_ubo ubo_buffer_;
     extra_attachments extras_;
   };
 
@@ -110,6 +103,11 @@ private:
         case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER: descriptor_pools[1].descriptorCount += binding.descriptorCount; break;
         default: assert(false);
       }
+    }
+
+    if (descriptor_pools[0].descriptorCount == 0 && descriptor_pools[1].descriptorCount ==0) {
+      assert(_params.max_sets_ == 0); // Force user to explicitly specify that this pipeline has no descriptor sets
+      return;
     }
 
     for (auto &pool : descriptor_pools)
@@ -200,15 +198,16 @@ private:
 
     VkPipelineShaderStageCreateInfo shader_create_infos[] = {vert_stage_info, frag_stage_info};
 
-    constexpr static std::array<VkVertexInputBindingDescription, 2> vertices_binding_ = {
-        VkVertexInputBindingDescription{.binding = 0, .stride = sizeof(vertex),   .inputRate = VK_VERTEX_INPUT_RATE_VERTEX},
-        VkVertexInputBindingDescription{.binding = 1, .stride = sizeof(instance), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE},
-    };
+    std::vector<VkVertexInputBindingDescription> vertices_bindings;
+    if (sizeof(vertex) >= 4)
+      vertices_bindings.emplace_back(VkVertexInputBindingDescription{.binding = 0, .stride = sizeof(vertex),   .inputRate = VK_VERTEX_INPUT_RATE_VERTEX});
+    if (sizeof(instance) >= 4)
+      vertices_bindings.emplace_back(VkVertexInputBindingDescription{.binding = 1, .stride = sizeof(instance), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE});
 
     VkPipelineVertexInputStateCreateInfo vertex_create_info = {};
     vertex_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertex_create_info.vertexBindingDescriptionCount = sizeof(instance) <= 1 ? 1 : 2;
-    vertex_create_info.pVertexBindingDescriptions = vertices_binding_.data();
+    vertex_create_info.vertexBindingDescriptionCount = vertices_bindings.size();
+    vertex_create_info.pVertexBindingDescriptions = vertices_bindings.data();
     vertex_create_info.vertexAttributeDescriptionCount = (uint32_t)TVertexRefl::vertices_description_.size();
     vertex_create_info.pVertexAttributeDescriptions = TVertexRefl::vertices_description_.data();
 
@@ -334,7 +333,8 @@ public:
 
     init_pools(_params);
     init_descriptor_layout();
-    alloc_next_descriptors(1);
+    if (_params.max_sets_ > 0)
+      alloc_next_descriptors(1);
     init_shaders();
     init_pipeline_layout();
     init_pipeline(_target.render_target_params_.box_, _target.sample_count_, _params);
@@ -380,7 +380,8 @@ public:
     VkDescriptorSet dst_ = VK_NULL_HANDLE;
     uint descriptor_index_ = 0;
 
-    void buffer(uint _binding, const shared_ubo &_ubo) {
+    template<typename TUBO>
+    void buffer(uint _binding, const shared_ref<TUBO> &_ubo) {
       VkDescriptorBufferInfo info = {};
       info.buffer = _ubo->alloc_.buffer_->buffer_;
       info.offset = _ubo->alloc_.offset_;
@@ -441,14 +442,14 @@ public:
 
   template<typename TBufferType, typename... TRest>
   void write_continue(int _binding, descriptor_write_context &_context, const shared_ref<TBufferType> &_buffer, const TRest&... _rest) {
-    _context.buffer(_binding);
-    write_continue(_binding + 1, _context, std::forward<TRest>(_rest)...);
+    _context.buffer(_binding, _buffer);
+    write_continue(_binding + 1, _context, std::forward<const TRest&>(_rest)...);
   }
 
   template<typename... TRest>
   void write_continue(int _binding, descriptor_write_context &_context, const shared_image &_image, const shared_sampler &_sampler, const TRest&... _rest) {
     _context.texture(_binding, _image, _sampler);
-    write_continue(_binding + 1, _context, std::forward<TRest>(_rest)...);
+    write_continue(_binding + 1, _context, std::forward<const TRest&>(_rest)...);
   }
 
   template<typename... TRest>
@@ -457,7 +458,7 @@ public:
     _context.writes_.reserve(_context.writes_.size() + 2);
     _context.texture(_binding, _image0, _sampler);
     _context.texture(_binding + 1, _image1, _sampler);
-    write_continue(_binding + 2, _context, std::forward<TRest>(_rest)...);
+    write_continue(_binding + 2, _context, std::forward<const TRest&>(_rest)...);
   }
 
   template<typename... TRest>
@@ -467,7 +468,7 @@ public:
     _context.texture(_binding, _image0, _sampler);
     _context.texture(_binding + 1, _image1, _sampler);
     _context.texture(_binding + 2, _image2, _sampler);
-    write_continue(_binding + 3, _context, std::forward<TRest>(_rest)...);
+    write_continue(_binding + 3, _context, std::forward<const TRest&>(_rest)...);
   }
 
   template<typename... TRest>
@@ -478,13 +479,13 @@ public:
     _context.texture(_binding + 1, _image1, _sampler);
     _context.texture(_binding + 2, _image2, _sampler);
     _context.texture(_binding + 3, _image3, _sampler);
-    write_continue(_binding + 4, _context, std::forward<TRest>(_rest)...);
+    write_continue(_binding + 4, _context, std::forward<const TRest&>(_rest)...);
   }
 
   template<typename... TRest>
   void write_continue(int _binding, descriptor_write_context &_context, const shared_atlas &_atlas, const shared_sampler &_sampler, const TRest&... _rest) {
     _context.atlas(_binding, _atlas, _sampler);
-    write_continue(_binding + 1, _context, std::forward<TRest>(_rest)...);
+    write_continue(_binding + 1, _context, std::forward<const TRest&>(_rest)...);
 
     auto &atlas_info = atlas_infos_[_atlas];
     atlas_info.binding_ = _binding;
@@ -493,16 +494,15 @@ public:
     desc_info.last_bound_ = _atlas->page_count();
   }
 
-  void write(uint _descriptor_index, const shared_ubo &_ubo, const TExtraAttachments&... _attachments) {
+  void write(uint _descriptor_index, const TExtraAttachments&... _attachments) {
     HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
     assert(_descriptor_index < descriptors_.size());
-    attachments_.emplace(_descriptor_index, attachments{_ubo, std::forward_as_tuple(_attachments...)});
+    attachments_.emplace(_descriptor_index, attachments{std::forward_as_tuple(_attachments...)});
 
     descriptor_write_context filler;
     filler.descriptor_index_ = _descriptor_index;
     filler.dst_ = descriptors_[_descriptor_index];
-    filler.buffer(0, _ubo);
-    write_continue(1, filler, std::forward<TExtraAttachments>(_attachments)...);
+    write_continue(0, filler, std::forward<const TExtraAttachments&>(_attachments)...);
 
     HUT_PVK(vkUpdateDescriptorSets, device_ref_, filler.writes_.size(), filler.writes_.data(), 0, nullptr);
   }
@@ -577,6 +577,10 @@ public:
     HUT_PVK(vkCmdBindIndexBuffer, _buffer, _indices->buff().buffer_, _indices->alloc_.offset_, VK_INDEX_TYPE_UINT16);
   }
 
+  void draw(VkCommandBuffer _buffer, uint _vertex_count, uint _instances_count, uint _vertex_offset, uint _instances_offset)  {
+    HUT_PVK(vkCmdDraw, _buffer, _vertex_count, _instances_count, _vertex_offset, _instances_offset);
+  }
+
   void draw_indexed(VkCommandBuffer _buffer, uint _indices_count, uint _instances_count, uint _indices_offset, uint _vertex_offset, uint _instances_offset)  {
     HUT_PVK(vkCmdDrawIndexed, _buffer, _indices_count, _instances_count, _indices_offset, _vertex_offset, _instances_offset);
   }
@@ -616,14 +620,18 @@ public:
   }
 };
 
-using rgb        = pipeline<proj_ubo, uint16_t, hut_shaders::rgb_vert_spv_refl, hut_shaders::rgb_frag_spv_refl>;
-using rgba       = pipeline<proj_ubo, uint16_t, hut_shaders::rgba_vert_spv_refl, hut_shaders::rgba_frag_spv_refl>;
-using tex        = pipeline<proj_ubo, uint16_t, hut_shaders::tex_vert_spv_refl, hut_shaders::tex_frag_spv_refl, const shared_image &, const shared_sampler &>;
-using atlas      = pipeline<proj_ubo, uint16_t, hut_shaders::tex_vert_spv_refl, hut_shaders::atlas_frag_spv_refl, const shared_atlas &, const shared_sampler &>;
-using tex_rgb    = pipeline<proj_ubo, uint16_t, hut_shaders::tex_rgb_vert_spv_refl, hut_shaders::tex_rgb_frag_spv_refl, const shared_image &, const shared_sampler &>;
-using tex_rgba   = pipeline<proj_ubo, uint16_t, hut_shaders::tex_rgba_vert_spv_refl, hut_shaders::tex_rgba_frag_spv_refl, const shared_image &, const shared_sampler &>;
-using tex_mask   = pipeline<proj_ubo, uint16_t, hut_shaders::tex_mask_vert_spv_refl, hut_shaders::tex_mask_frag_spv_refl, const shared_image &, const shared_sampler &>;
-using atlas_mask = pipeline<proj_ubo, uint16_t, hut_shaders::tex_mask_vert_spv_refl, hut_shaders::atlas_mask_frag_spv_refl, const shared_atlas &, const shared_sampler &>;
-using box_rgba   = pipeline<proj_ubo, uint16_t, hut_shaders::box_rgba_vert_spv_refl, hut_shaders::box_rgba_frag_spv_refl>;
+struct proj_ubo {
+  mat4 proj_ {1};
+};
+
+using rgb        = pipeline<uint16_t, hut_shaders::rgb_vert_spv_refl, hut_shaders::rgb_frag_spv_refl, const shared_ref<proj_ubo> &>;
+using rgba       = pipeline<uint16_t, hut_shaders::rgba_vert_spv_refl, hut_shaders::rgba_frag_spv_refl, const shared_ref<proj_ubo> &>;
+using tex        = pipeline<uint16_t, hut_shaders::tex_vert_spv_refl, hut_shaders::tex_frag_spv_refl, const shared_ref<proj_ubo> &, const shared_image &, const shared_sampler &>;
+using atlas      = pipeline<uint16_t, hut_shaders::tex_vert_spv_refl, hut_shaders::atlas_frag_spv_refl, const shared_ref<proj_ubo> &, const shared_atlas &, const shared_sampler &>;
+using tex_rgb    = pipeline<uint16_t, hut_shaders::tex_rgb_vert_spv_refl, hut_shaders::tex_rgb_frag_spv_refl, const shared_ref<proj_ubo> &, const shared_image &, const shared_sampler &>;
+using tex_rgba   = pipeline<uint16_t, hut_shaders::tex_rgba_vert_spv_refl, hut_shaders::tex_rgba_frag_spv_refl, const shared_ref<proj_ubo> &, const shared_image &, const shared_sampler &>;
+using tex_mask   = pipeline<uint16_t, hut_shaders::tex_mask_vert_spv_refl, hut_shaders::tex_mask_frag_spv_refl, const shared_ref<proj_ubo> &, const shared_image &, const shared_sampler &>;
+using atlas_mask = pipeline<uint16_t, hut_shaders::tex_mask_vert_spv_refl, hut_shaders::atlas_mask_frag_spv_refl, const shared_ref<proj_ubo> &, const shared_atlas &, const shared_sampler &>;
+using box_rgba   = pipeline<uint16_t, hut_shaders::box_rgba_vert_spv_refl, hut_shaders::box_rgba_frag_spv_refl, const shared_ref<proj_ubo> &>;
 
 }  // namespace hut

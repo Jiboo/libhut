@@ -49,7 +49,7 @@ namespace hut {
   };
 
   class offscreen : public render_target {
-    template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
+    template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
 
   public:
     explicit offscreen(const shared_image &_dest, const offscreen_params &_init_params = {});

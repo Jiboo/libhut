@@ -57,7 +57,7 @@ using span = std::span<TType, TExtent>;
 
 class buffer_pool;
 class display;
-template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> class pipeline;
+template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> class pipeline;
 class font;
 template<typename TIndexType, typename TVertexType, typename TUpdater> class shaper;
 class image;

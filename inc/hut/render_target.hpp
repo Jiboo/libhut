@@ -52,7 +52,7 @@ namespace hut {
   };
 
   class render_target {
-    template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
+    template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
 
   public:
     explicit render_target(display &_display);

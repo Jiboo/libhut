@@ -44,7 +44,7 @@ protected:
   friend class display;
   template<typename TIndexType, typename TVertexType, typename TUpdater> friend class shaper;
   friend class image;
-  template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
+  template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
   friend class offscreen;
 
   struct buffer {
@@ -94,7 +94,7 @@ protected:
   class ref {
     friend class image;
     friend class buffer_pool;
-    template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
+    template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
 
     alloc alloc_;
 

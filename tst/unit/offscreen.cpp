@@ -46,6 +46,7 @@ TEST(offscreen, offscreen_noop) {
   hut::image_params params;
   params.size_ = {4, 4};
   params.format_ = VK_FORMAT_R8G8B8A8_UNORM;
+  params.usage_ |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
   auto img = std::make_shared<hut::image>(d, params);
 
   auto ofs = std::make_shared<hut::offscreen>(img);

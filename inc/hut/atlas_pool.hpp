@@ -34,7 +34,7 @@ namespace hut {
 
 class atlas_pool {
   friend class font;
-  template<typename TUBO, typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
+  template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
 
  private:
   constexpr static u16vec2 padding = {1, 1};
