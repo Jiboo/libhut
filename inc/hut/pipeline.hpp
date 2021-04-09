@@ -62,8 +62,6 @@ public:
 private:
   using extra_attachments = std::tuple<TExtraAttachments...>;
 
-  static constexpr auto combined_bindings_ = combine(TVertexRefl::descriptor_bindings_, TFragRefl::descriptor_bindings_);
-
   struct attachments {
     extra_attachments extras_;
   };
@@ -78,6 +76,7 @@ private:
   VkPipeline pipeline_ = VK_NULL_HANDLE;
   VkDescriptorPool descriptor_pool_ = VK_NULL_HANDLE;
 
+  std::vector<VkDescriptorSetLayoutBinding> bindings_;
   std::vector<VkDescriptorSet> descriptors_;
   std::unordered_map<uint, attachments> attachments_;
 
@@ -91,13 +90,33 @@ private:
   };
   std::unordered_map<shared_atlas, per_atlas_info> atlas_infos_;
 
+  void init_bindings() {
+    const auto &vert_bindings = TVertexRefl::descriptor_bindings_;
+
+    for (auto vert_binding : vert_bindings) {
+      bindings_.emplace_back(vert_binding);
+    }
+
+    for (auto frag_binding : TFragRefl::descriptor_bindings_) {
+      bool in_vert_stage = false;
+      for (int i = 0; i < vert_bindings.size(); i++) {
+        if (frag_binding.binding == vert_bindings[i].binding) {
+          bindings_[i].stageFlags |= frag_binding.stageFlags;
+          in_vert_stage = true;
+        }
+      }
+      if (!in_vert_stage)
+        bindings_.emplace_back(frag_binding);
+    }
+  }
+
   void init_pools(const pipeline_params &_params) {
     std::array<VkDescriptorPoolSize, 2> descriptor_pools {
       VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 0},
       VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 0},
     };
 
-    for (auto binding : combined_bindings_) {
+    for (auto binding : bindings_) {
       switch (binding.descriptorType) {
         case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER: descriptor_pools[0].descriptorCount += binding.descriptorCount; break;
         case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER: descriptor_pools[1].descriptorCount += binding.descriptorCount; break;
@@ -125,10 +144,10 @@ private:
   }
 
   void init_descriptor_layout() {
-    std::vector<VkDescriptorBindingFlagsEXT> bindings_flags(combined_bindings_.size(), 0);
-    for (size_t i = 0; i < combined_bindings_.size(); i++) {
-      const VkDescriptorSetLayoutBinding &binding = combined_bindings_[i];
-      if (binding.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER && binding.descriptorCount > 1)
+    std::vector<VkDescriptorBindingFlagsEXT> bindings_flags(bindings_.size(), 0);
+    for (size_t i = 0; i < bindings_.size(); i++) {
+      const VkDescriptorSetLayoutBinding &binding = bindings_[i];
+      if (binding.descriptorCount > 1)
         bindings_flags[i] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
     }
 
@@ -139,8 +158,8 @@ private:
 
     VkDescriptorSetLayoutCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    create_info.bindingCount = combined_bindings_.size();
-    create_info.pBindings = combined_bindings_.data();
+    create_info.bindingCount = bindings_.size();
+    create_info.pBindings = bindings_.data();
     create_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
     create_info.pNext = &bindings_flags_info;
 
@@ -331,6 +350,7 @@ public:
     HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
     assert(render_pass_ != VK_NULL_HANDLE);
 
+    init_bindings();
     init_pools(_params);
     init_descriptor_layout();
     if (_params.max_sets_ > 0)

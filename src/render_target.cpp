@@ -163,7 +163,7 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
   depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
   VkAttachmentReference colorAttachmentResolveRef{};
-  colorAttachmentResolveRef.attachment = 2;
+  colorAttachmentResolveRef.attachment = depth_ ? 2 : 1;
   colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
   VkSubpassDescription subpass = {};

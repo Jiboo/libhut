@@ -51,7 +51,7 @@ offscreen::offscreen(const shared_image &_target, const offscreen_params &_init_
     pass_params.flags_ |= render_target_params::FMULTISAMPLING;
   if (params_.flags_ & offscreen_params::FDEPTH)
     pass_params.flags_ |= render_target_params::FDEPTH;
-  pass_params.initial_layout_ = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  pass_params.initial_layout_ = VK_IMAGE_LAYOUT_UNDEFINED;
   pass_params.final_layout_ = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
   reinit_pass(pass_params, std::span<VkImageView>{&_target->view_, 1});

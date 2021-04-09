@@ -197,7 +197,7 @@ inline mat4 make_transform_mat4(vec2 _translate, float _rot_angle, vec2 _rot_cen
 }
 
 template<typename T>
-inline T align(T _input, T _align) {
+inline T align(T _input, unsigned _align) {
   if (_align == 0)
     return _input;
 

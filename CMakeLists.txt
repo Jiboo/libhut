@@ -31,7 +31,7 @@ if(NOT WIN32)
 endif()
 
 ###########################################################
-message("Checking for required dependencies...")
+# message("Checking for required dependencies...")
 ###########################################################
 
 add_subdirectory(dep/glslang)
@@ -66,7 +66,7 @@ if(CMAKE_BUILD_TYPE MATCHES DEBUG)
 endif()
 
 ###########################################################
-message("Checking for optional dependencies...")
+# message("Checking for optional dependencies...")
 ###########################################################
 
 if (NOT WIN32 AND HUT_ENABLE_PROFILING)
@@ -175,7 +175,7 @@ if(NOT HUT_PLATFORM)
 endif()
 
 ###########################################################
-message("Configuring shader generation...")
+# message("Configuring shader generation...")
 ###########################################################
 
 function(hut_gen_spv_bundle)
@@ -236,7 +236,7 @@ file(GLOB HUT_SHADER_SOURCES res/spv/*.frag res/spv/*.vert)
 hut_gen_spv_bundle(NAMESPACE hut_shaders OUTDIR ${HUT_GEN_DIR} SHADER_SOURCES ${HUT_SHADER_SOURCES})
 
 ###########################################################
-message("Configuring library build targets...")
+# message("Configuring library build targets...")
 ###########################################################
 
 set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DVK_USE_PLATFORM_${HUT_PLATFORM}_KHR)
@@ -250,16 +250,16 @@ target_link_libraries(hut ${HUT_LIBS})
 target_compile_definitions(hut PUBLIC ${HUT_DEFINITIONS})
 target_include_directories(hut PUBLIC ${HUT_INCLUDES})
 target_precompile_headers(hut PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/inc/hut/utils.hpp>")
-message("HUT_DEFINITIONS: ${HUT_DEFINITIONS}")
-message("HUT_INCLUDES: ${HUT_INCLUDES}")
-message("HUT_LIBS: ${HUT_LIBS}")
-message("HUT_SOURCES: ${HUT_SOURCES}")
-message("HUT_BUNDLE_hut_shaders_FILES: ${HUT_BUNDLE_hut_shaders_FILES}")
+#message("HUT_DEFINITIONS: ${HUT_DEFINITIONS}")
+#message("HUT_INCLUDES: ${HUT_INCLUDES}")
+#message("HUT_LIBS: ${HUT_LIBS}")
+#message("HUT_SOURCES: ${HUT_SOURCES}")
+#message("HUT_BUNDLE_hut_shaders_FILES: ${HUT_BUNDLE_hut_shaders_FILES}")
 
 add_subdirectory(ext)
 
 ###########################################################
-message("Configuring demo build targets...")
+# message("Configuring demo build targets...")
 ###########################################################
 
 if(HUT_COMPILE_DEMOS)
@@ -306,7 +306,7 @@ endif()
 
 if(GTEST_FOUND)
   ###########################################################
-  message("Enabling tests...")
+  # message("Enabling tests...")
   ###########################################################
 
   enable_testing()

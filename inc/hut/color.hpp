@@ -45,6 +45,8 @@ inline uint format_size(VkFormat _format) {
     case VK_FORMAT_B8G8R8A8_UNORM:
     case VK_FORMAT_D32_SFLOAT: return 4;
 
+    case VK_FORMAT_BC5_SNORM_BLOCK:
+    case VK_FORMAT_BC5_UNORM_BLOCK:
     case VK_FORMAT_BC7_SRGB_BLOCK:
     case VK_FORMAT_BC7_UNORM_BLOCK: return 1; // 16px in 16bytes
 
@@ -63,6 +65,8 @@ inline bool block_format(VkFormat _format) {
     case VK_FORMAT_B8G8R8A8_UNORM:
     case VK_FORMAT_D32_SFLOAT: return false;
 
+    case VK_FORMAT_BC5_SNORM_BLOCK:
+    case VK_FORMAT_BC5_UNORM_BLOCK:
     case VK_FORMAT_BC7_SRGB_BLOCK:
     case VK_FORMAT_BC7_UNORM_BLOCK: return true;
 
