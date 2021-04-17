@@ -75,7 +75,7 @@ font::glyph &font::load_glyph(glyph_cache_t &_cache, uint _char_index) {
   if ((render.pixel_mode == FT_PIXEL_MODE_BGRA && atlas_format == VK_FORMAT_B8G8R8A8_UNORM)
     || (render.pixel_mode == FT_PIXEL_MODE_GRAY && atlas_format == VK_FORMAT_R8_UNORM)) {
     // same format as atlas, nothing to do
-    g.subimage_ = atlas_->pack(g.bounds_, render.buffer, render.pitch);
+    g.subimage_ = atlas_->pack(g.bounds_, span<const u8>{render.buffer, render.pitch * render.rows}, render.pitch);
   }
   else if (render.pixel_mode == FT_PIXEL_MODE_GRAY && atlas_format == VK_FORMAT_B8G8R8A8_UNORM) {
     const auto pixel_count = render.width * render.rows;

@@ -40,7 +40,7 @@
 using namespace hut;
 
 struct png_ctx {
-  const uint8_t *data_;
+  const u8 *data_;
   size_t size_;
 };
 
@@ -51,7 +51,7 @@ void png_mem_read(png_structp _png_ptr, png_bytep _target, png_size_t _size) {
   a->data_ += _size;
 }
 
-std::shared_ptr<image> image::load_png(display &_display, span<const uint8_t> _data) {
+std::shared_ptr<image> image::load_png(display &_display, span<const u8> _data) {
   HUT_PROFILE_SCOPE(PIMAGE, "image::load_png");
   if (png_sig_cmp((png_bytep)_data.data(), 0, 8))
     throw std::runtime_error("load_png: invalid data, can't validate PNG signature");
@@ -144,26 +144,14 @@ std::shared_ptr<image> image::load_png(display &_display, span<const uint8_t> _d
   return dst;
 }
 
-std::shared_ptr<image> image::load_raw(display &_display, span<const uint8_t> _data, uint _data_row_pitch, const image_params &_params) {
+std::shared_ptr<image> image::load_raw(display &_display, span<const u8> _data, uint _data_row_pitch, const image_params &_params) {
   HUT_PROFILE_SCOPE(PIMAGE, "image::load_raw");
-  auto dst = std::make_shared<image>(_display, _params);
-  auto update = dst->prepare_update();
-
-  assert(update.data_.size() >= _data.size());
   assert(_params.levels_ == 1);
   assert(_params.layers_ == 1);
 
-  if (_data_row_pitch == update.staging_row_pitch()) {
-    memcpy(update.data(), _data.data(), _data.size());
-  }
-  else {
-    auto row_byte_size = dst->pixel_size() * _params.size_.x;
-    for (uint y = 0; y < _params.size_.y; y++) {
-      auto *dst_row = update.data() + y * update.staging_row_pitch();
-      auto *src_row = _data.data() + y * _data_row_pitch;
-      memcpy(dst_row, src_row, row_byte_size);
-    }
-  }
+  auto dst = std::make_shared<image>(_display, _params);
+  dst->update({u16vec4{0, 0, _params.size_}}, _data, _data_row_pitch);
+
   return dst;
 }
 
@@ -266,15 +254,24 @@ VkMemoryRequirements image::create(display &_display, const image_params &_param
   return memReq;
 }
 
-void image::update(subresource _subres, uint8_t *_data, uint _src_row_pitch) {
+void image::update(subresource _subres, span<const u8> _data, uint _data_row_pitch) {
   assert(pixel_size_);
+
   auto update = prepare_update(_subres);
   auto size = bbox_size(_subres.coords_);
-  uint row_byte_size = size.x * pixel_size_;
-  for (uint i = 0; i < size.y; i++) {
-    uint8_t *src = _data + _src_row_pitch * i;
-    uint8_t *dst = update.data_.data() + update.staging_row_pitch_ * i;
-    memcpy(dst, src, row_byte_size);
+  assert(_data.size_bytes() == (_data_row_pitch * size.y));
+  // FIXME: Catch wrong mip level size inputs
+
+  if (_data_row_pitch == update.staging_row_pitch_) {
+    memcpy(update.data(), _data.data(), _data.size_bytes());
+  }
+  else {
+    auto row_byte_size = pixel_size_ * size.x;
+    for (uint y = 0; y < size.y; y++) {
+      auto *dst_row = update.data() + y * update.staging_row_pitch_;
+      auto *src_row = _data.data() + y * _data_row_pitch;
+      memcpy(dst_row, src_row, row_byte_size);
+    }
   }
 }
 
@@ -288,7 +285,7 @@ image::updator image::prepare_update(subresource _subres) {
 
   std::lock_guard lk(display_.staging_mutex_);
   auto staging = display_.staging_->do_alloc(byte_size, offset_align);
-  return updator(*this, staging, span<uint8_t>{staging.buffer_->permanent_map_ + staging.offset_, byte_size}, buffer_row_pitch, _subres);
+  return updator(*this, staging, span<u8>{staging.buffer_->permanent_map_ + staging.offset_, byte_size}, buffer_row_pitch, _subres);
 }
 
 void image::finalize_update(image::updator &_update) {

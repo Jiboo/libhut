@@ -64,7 +64,7 @@ shared_subimage atlas_pool::alloc(const u16vec2 &_bounds) {
   return std::make_shared<subimage>(this, pages_.size() - 1, make_bbox_with_origin_size(packed.value(), _bounds));
 }
 
-shared_subimage atlas_pool::pack(const u16vec2 &_bounds, uint8_t *_data, uint _src_row_pitch) {
+shared_subimage atlas_pool::pack(const u16vec2 &_bounds, span<const u8> _data, uint _src_row_pitch) {
   auto result = alloc(_bounds);
   auto &l = pages_[result->page_];
   l.image_->update({result->bounds_}, _data, _src_row_pitch);

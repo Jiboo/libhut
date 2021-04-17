@@ -87,7 +87,7 @@ class atlas_pool {
       return result;
     }
 
-    void update(u16vec4 _bounds, uint8_t *_data, uint _dataPitch) {
+    void update(u16vec4 _bounds, span<const u8> _data, uint _dataPitch) {
       auto update_size = bbox_size(_bounds);
       auto update_origin = bbox_origin(_bounds);
       auto subimage_origin = bbox_origin(bounds_);
@@ -95,7 +95,7 @@ class atlas_pool {
       pool_->pages_[page_].image_->update({image_bounds}, _data, _dataPitch);
     }
 
-    void update(uint8_t *_data, uint _dataPitch) {
+    void update(span<const u8> _data, uint _dataPitch) {
       update(bounds_, _data, _dataPitch);
     }
 
@@ -119,7 +119,7 @@ class atlas_pool {
   u16vec2 size() { return params_.size_; }
 
   std::shared_ptr<subimage> alloc(const u16vec2 &_bounds);
-  std::shared_ptr<subimage> pack(const u16vec2 &_bounds, uint8_t *_data, uint _src_row_pitch);
+  std::shared_ptr<subimage> pack(const u16vec2 &_bounds, span<const u8> _data, uint _src_row_pitch);
 
  private:
   void add_page();

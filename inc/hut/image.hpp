@@ -71,29 +71,29 @@ class image {
 
     image &target_;
     buffer_pool::alloc staging_;
-    span<uint8_t> data_;
+    span<u8> data_;
     uint staging_row_pitch_;
     subresource subres_;
 
-    updator(image &_target, buffer_pool::alloc _staging, span<uint8_t> _data, uint _staging_row_pitch, subresource _subres)
+    updator(image &_target, buffer_pool::alloc _staging, span<u8> _data, uint _staging_row_pitch, subresource _subres)
         : target_(_target), staging_(_staging), data_(_data), staging_row_pitch_(_staging_row_pitch), subres_(_subres) {
     }
 
    public:
     ~updator() { target_.finalize_update(*this); }
 
-    uint8_t *data() { return data_.data(); }
+    u8 *data() { return data_.data(); }
     size_t size_bytes() { return data_.size_bytes(); }
     uint staging_row_pitch() { return staging_row_pitch_; }
   };
 
-  static std::shared_ptr<image> load_png(display &, span<const uint8_t> _data);
-  static std::shared_ptr<image> load_raw(display &, span<const uint8_t> _data, uint _data_row_pitch, const image_params &_params);
+  static std::shared_ptr<image> load_png(display &, span<const u8> _data);
+  static std::shared_ptr<image> load_raw(display &, span<const u8> _data, uint _data_row_pitch, const image_params &_params);
 
   image(display &_display, const image_params &_params);
   ~image();
 
-  void update(subresource _subres, uint8_t *_data, uint _srcRowPitch);
+  void update(subresource _subres, span<const u8>, uint _srcRowPitch);
   updator prepare_update(subresource _subres);
   updator prepare_update() { return prepare_update({make_bbox_with_origin_size({0,0}, params_.size_)}); }
 
