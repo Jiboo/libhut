@@ -21,8 +21,8 @@ int main(int argc, char **argv) {
     throw runtime_error(sstream("usage: ") << argv[0] << " <namespace> <output> <list of input...>");
 
   path output_path = argv[2];
-  if (output_path.has_parent_path() && !exists(output_path.parent_path()))
-    create_directories(output_path.parent_path());
+  if (!exists(output_path))
+    create_directories(output_path);
 
   path output_base_path = output_path / argv[1];
   path output_c_path = output_base_path;
