@@ -154,7 +154,7 @@ const char *modifier_name(modifier _m);
 inline std::ostream &operator<<(std::ostream &_os, modifier _a) { return _os << modifier_name(_a); }
 
 struct clipboard_sender {
-  ssize_t write(span<uint8_t>);
+  ssize_t write(std::span<uint8_t>);
 
 #if defined(VK_USE_PLATFORM_WAYLAND_KHR)
   int fd_;
@@ -163,12 +163,12 @@ struct clipboard_sender {
 #endif
 };
 struct clipboard_receiver {
-  ssize_t read(span<uint8_t>);
+  ssize_t read(std::span<uint8_t>);
 
 #if defined(VK_USE_PLATFORM_WAYLAND_KHR)
   int fd_;
 #elif defined(VK_USE_PLATFORM_WIN32_KHR)
-  span<uint8_t> buffer_;
+  std::span<uint8_t> buffer_;
   size_t offset_ = 0;
 #endif
 };
@@ -260,7 +260,7 @@ class display {
   void post(const callback &_callback);
 
   char32_t keycode_idle_char(keycode _in) const;
-  char *keycode_name(span<char> _out, keycode _in) const;
+  char *keycode_name(std::span<char> _out, keycode _in) const;
 
   template <typename T>
   T get_proc(const std::string &_name) {

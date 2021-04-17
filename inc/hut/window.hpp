@@ -227,8 +227,8 @@ class window : public render_target {
   friend LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
 
   void clipboard_write(clipboard_format _format, UINT _win_format);
-  span<uint8_t> parse_html_clipboard(std::string_view _input);
-  std::vector<uint8_t> format_html_clipboard(span<uint8_t> _input);
+  std::span<uint8_t> parse_html_clipboard(std::string_view _input);
+  std::vector<uint8_t> format_html_clipboard(std::span<uint8_t> _input);
 
   HWND window_;
   vec2 mouse_lastmove_ = {0, 0};

@@ -229,7 +229,7 @@ int parse_html_header(std::string_view _input, const char *_name) {
   return result;
 }
 
-span<uint8_t> window::parse_html_clipboard(std::string_view _input) {
+std::span<uint8_t> window::parse_html_clipboard(std::string_view _input) {
   if (!_input.starts_with("Version:0.9"))
     return {};
 
@@ -243,10 +243,10 @@ span<uint8_t> window::parse_html_clipboard(std::string_view _input) {
 
   //std::cout << "parse_html_clipboard limits: " << start << ", " << end << std::endl;
 
-  return span<uint8_t>((uint8_t*)_input.data() + start, (uint8_t*)_input.data() + end);
+  return std::span<uint8_t>((uint8_t*)_input.data() + start, (uint8_t*)_input.data() + end);
 }
 
-std::vector<uint8_t> window::format_html_clipboard(span<uint8_t> _input) {
+std::vector<uint8_t> window::format_html_clipboard(std::span<uint8_t> _input) {
   constexpr std::string_view header = "Version:0.9\n"
                                       "StartHTML:00000000\n"
                                       "EndHTML:00000000\n"
@@ -385,7 +385,7 @@ bool window::clipboard_receive(clipboard_formats _supported_formats, const recei
           auto *buffer = (WCHAR*)locked;
           auto utf8 = display::utf8_wstr(buffer);
           utf8.erase(std::remove(utf8.begin(), utf8.end(), '\r'), utf8.end());
-          clipboard_receiver receiver{span<uint8_t>((uint8_t*)utf8.data(), utf8.size())};
+          clipboard_receiver receiver{std::span<uint8_t>((uint8_t*)utf8.data(), utf8.size())};
           _callback(format, receiver);
         };
         case CF_DIB: {

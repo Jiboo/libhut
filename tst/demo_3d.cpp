@@ -102,7 +102,7 @@ int main(int, char **) {
   skybox_params.format_ = VK_FORMAT_R8G8B8A8_UNORM;
   auto skybox_image = std::make_shared<image>(d, skybox_params);
   u8vec4 pixels[16];
-  span<const u8> pixels_ref {&pixels[0][0], 16 * sizeof(u8vec4)};
+  std::span<const u8> pixels_ref {&pixels[0][0], 16 * sizeof(u8vec4)};
   std::fill(std::begin(pixels), std::end(pixels), u8vec4{0xFF, 0x00, 0x00, 0x80});
   skybox_image->update({{0, 0, 4, 4}, 0, 0}, pixels_ref, 4 * sizeof(u8vec4));
   std::fill(std::begin(pixels), std::end(pixels), u8vec4{0x00, 0xFF, 0x00, 0x80});

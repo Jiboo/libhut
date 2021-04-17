@@ -56,7 +56,7 @@ buffer_pool::updator buffer_pool::prepare_update(buffer &_buf, uint _offset, uin
   HUT_PROFILE_SCOPE(PBUFFER, "buffer_pool::prepare_update {}", _size);
   std::lock_guard lk(display_.staging_mutex_);
   auto staging = display_.staging_->do_alloc(_size, 4);
-  return updator(_buf, staging, span<uint8_t>{staging.buffer_->permanent_map_ + staging.offset_, _size}, _offset);
+  return updator(_buf, staging, std::span<uint8_t>{staging.buffer_->permanent_map_ + staging.offset_, _size}, _offset);
 }
 
 void buffer_pool::finalize_update(updator &_update) {

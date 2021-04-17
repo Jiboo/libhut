@@ -53,7 +53,7 @@ protected:
     binpack::linear1d<uint> suballocator_;
     VkBuffer buffer_;
     VkDeviceMemory memory_;
-    uint8_t *permanent_map_;
+    u8 *permanent_map_;
 
     buffer(buffer_pool &_parent, uint _size) : parent_(_parent), size_(_size), suballocator_(_size) {}
   };
@@ -75,17 +75,17 @@ protected:
 
     buffer &target_;
     alloc staging_;
-    span<uint8_t> data_;
+    std::span<u8> data_;
     uint offset_;
 
-    updator(buffer &_target, alloc _staging, span<uint8_t> _data, uint _offset)
+    updator(buffer &_target, alloc _staging, std::span<u8> _data, uint _offset)
         : target_(_target), staging_(_staging), data_(_data), offset_(_offset) {
     }
 
   public:
     ~updator() { target_.parent_.finalize_update(*this); }
 
-    uint8_t *data() { return data_.data(); }
+    u8 *data() { return data_.data(); }
     size_t size_bytes() { return data_.size_bytes(); }
   };
 

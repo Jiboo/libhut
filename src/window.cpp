@@ -84,7 +84,7 @@ void window::destroy_vulkan() {
   }
 }
 
-VkPresentModeKHR select_best_mode(const span<VkPresentModeKHR> &_modes)
+VkPresentModeKHR select_best_mode(const std::span<VkPresentModeKHR> &_modes)
 {
   VkPresentModeKHR preferred_modes[] = {
       VK_PRESENT_MODE_MAILBOX_KHR,

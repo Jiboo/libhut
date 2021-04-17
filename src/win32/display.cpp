@@ -40,12 +40,12 @@
 
 using namespace hut;
 
-ssize_t clipboard_sender::write(span<uint8_t> _data) {
+ssize_t clipboard_sender::write(std::span<uint8_t> _data) {
   buffer_.insert(buffer_.cend(), _data.begin(), _data.end());
   return _data.size_bytes();
 }
 
-ssize_t clipboard_receiver::read(span<uint8_t> _data) {
+ssize_t clipboard_receiver::read(std::span<uint8_t> _data) {
   size_t remaining = buffer_.size() - offset_;
   size_t reading = std::min(remaining, _data.size());
   memcpy(_data.data(), buffer_.data() + offset_, reading);
@@ -287,7 +287,7 @@ char32_t display::keycode_idle_char(keycode _in) const {
   return to_utf32(MapVirtualKeyA(vsc, MAPVK_VK_TO_CHAR));
 }
 
-char *display::keycode_name(span<char> _out, keycode _in) const {
+char *display::keycode_name(std::span<char> _out, keycode _in) const {
   return _out.data() + GetKeyNameTextA(_in << 16U, _out.data(), _out.size());
 }
 

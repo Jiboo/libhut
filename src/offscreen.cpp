@@ -163,7 +163,7 @@ void offscreen::download(uint8_t *_dst, uint _data_row_pitch, image::subresource
   HUT_PVK(vkEndCommandBuffer, cb_);
   flush_cb();
 
-  span<uint8_t> staging_data{staging.buffer_->permanent_map_ + staging.offset_, byte_size};
+  std::span<uint8_t> staging_data{staging.buffer_->permanent_map_ + staging.offset_, byte_size};
   if (_data_row_pitch == buffer_row_pitch) {
     memcpy(_dst, staging_data.data(), staging_data.size());
   }

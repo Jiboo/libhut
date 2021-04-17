@@ -51,7 +51,7 @@ void hut::handle_toplevel_configure(void *_data, xdg_toplevel *, int32_t _width,
       HUT_PROFILE_EVENT(w, on_resize, new_size);
     }
   }
-  span<xdg_toplevel_state> states {
+  std::span<xdg_toplevel_state> states {
       reinterpret_cast<xdg_toplevel_state*>(_states->data),
       static_cast<std::size_t>(_states->size / sizeof(xdg_toplevel_state))
   };

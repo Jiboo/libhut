@@ -52,9 +52,6 @@ namespace hut {
 using namespace std::chrono_literals;
 using namespace glm;
 
-template<typename TType, size_t TExtent = std::dynamic_extent>
-using span = std::span<TType, TExtent>;
-
 class buffer_pool;
 class display;
 template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> class pipeline;
@@ -133,7 +130,7 @@ inline char8_t *utf8catcodepoint(char8_t *_s, char32_t _c, size_t _n) {
   return _s;
 }
 
-inline char8_t *to_utf8(span<char8_t> _dst, char32_t _src) {
+inline char8_t *to_utf8(std::span<char8_t> _dst, char32_t _src) {
   return utf8catcodepoint(_dst.data(), _src, _dst.size());
 }
 

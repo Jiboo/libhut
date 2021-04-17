@@ -242,7 +242,7 @@ char32_t display::keycode_idle_char(keycode _in) const {
   return xkb_keysym_to_utf32(xkb_upper);
 }
 
-char *display::keycode_name(span<char> _out, keycode _in) const {
+char *display::keycode_name(std::span<char> _out, keycode _in) const {
   const auto xkb_keysym = xkb_state_key_get_one_sym(xkb_state_empty_, _in);
   const auto xkb_upper = xkb_keysym_to_upper(xkb_keysym);
   auto result = xkb_keysym_get_name(xkb_upper, _out.data(), _out.size());
@@ -436,11 +436,11 @@ void registry_remove(void *, wl_registry *, uint32_t) {
   //std::cout << "registry_remove " << _id << std::endl;
 }
 
-ssize_t clipboard_sender::write(span<uint8_t> _data) {
+ssize_t clipboard_sender::write(std::span<uint8_t> _data) {
   return ::write(fd_, _data.data(), _data.size_bytes());
 }
 
-ssize_t clipboard_receiver::read(span<uint8_t> _data) {
+ssize_t clipboard_receiver::read(std::span<uint8_t> _data) {
   return ::read(fd_, _data.data(), _data.size_bytes());
 }
 

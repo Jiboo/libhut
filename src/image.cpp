@@ -51,7 +51,7 @@ void png_mem_read(png_structp _png_ptr, png_bytep _target, png_size_t _size) {
   a->data_ += _size;
 }
 
-std::shared_ptr<image> image::load_png(display &_display, span<const u8> _data) {
+std::shared_ptr<image> image::load_png(display &_display, std::span<const u8> _data) {
   HUT_PROFILE_SCOPE(PIMAGE, "image::load_png");
   if (png_sig_cmp((png_bytep)_data.data(), 0, 8))
     throw std::runtime_error("load_png: invalid data, can't validate PNG signature");
@@ -144,7 +144,7 @@ std::shared_ptr<image> image::load_png(display &_display, span<const u8> _data) 
   return dst;
 }
 
-std::shared_ptr<image> image::load_raw(display &_display, span<const u8> _data, uint _data_row_pitch, const image_params &_params) {
+std::shared_ptr<image> image::load_raw(display &_display, std::span<const u8> _data, uint _data_row_pitch, const image_params &_params) {
   HUT_PROFILE_SCOPE(PIMAGE, "image::load_raw");
   assert(_params.levels_ == 1);
   assert(_params.layers_ == 1);
@@ -254,7 +254,7 @@ VkMemoryRequirements image::create(display &_display, const image_params &_param
   return memReq;
 }
 
-void image::update(subresource _subres, span<const u8> _data, uint _data_row_pitch) {
+void image::update(subresource _subres, std::span<const u8> _data, uint _data_row_pitch) {
   assert(pixel_size_);
 
   auto update = prepare_update(_subres);
@@ -285,7 +285,7 @@ image::updator image::prepare_update(subresource _subres) {
 
   std::lock_guard lk(display_.staging_mutex_);
   auto staging = display_.staging_->do_alloc(byte_size, offset_align);
-  return updator(*this, staging, span<u8>{staging.buffer_->permanent_map_ + staging.offset_, byte_size}, buffer_row_pitch, _subres);
+  return updator(*this, staging, std::span<u8>{staging.buffer_->permanent_map_ + staging.offset_, byte_size}, buffer_row_pitch, _subres);
 }
 
 void image::finalize_update(image::updator &_update) {
