@@ -400,6 +400,12 @@ public:
     VkDescriptorSet dst_ = VK_NULL_HANDLE;
     uint descriptor_index_ = 0;
 
+    explicit descriptor_write_context(size_t _size) {
+      writes_.reserve(_size);
+      images_.reserve(_size);
+      buffers_.reserve(_size);
+    }
+
     template<typename TUBO>
     void buffer(uint _binding, const shared_ref<TUBO> &_ubo) {
       VkDescriptorBufferInfo info = {};
@@ -474,8 +480,6 @@ public:
 
   template<typename... TRest>
   void write_continue(int _binding, descriptor_write_context &_context, const shared_image &_image0, const shared_image &_image1, const shared_sampler &_sampler, const TRest&... _rest) {
-    _context.images_.reserve(_context.images_.size() + 2);
-    _context.writes_.reserve(_context.writes_.size() + 2);
     _context.texture(_binding, _image0, _sampler);
     _context.texture(_binding + 1, _image1, _sampler);
     write_continue(_binding + 2, _context, std::forward<const TRest&>(_rest)...);
@@ -483,8 +487,6 @@ public:
 
   template<typename... TRest>
   void write_continue(int _binding, descriptor_write_context &_context, const shared_image &_image0, const shared_image &_image1, const shared_image &_image2, const shared_sampler &_sampler, const TRest&... _rest) {
-    _context.images_.reserve(_context.images_.size() + 3);
-    _context.writes_.reserve(_context.writes_.size() + 3);
     _context.texture(_binding, _image0, _sampler);
     _context.texture(_binding + 1, _image1, _sampler);
     _context.texture(_binding + 2, _image2, _sampler);
@@ -493,8 +495,6 @@ public:
 
   template<typename... TRest>
   void write_continue(int _binding, descriptor_write_context &_context, const shared_image &_image0, const shared_image &_image1, const shared_image &_image2, const shared_image &_image3, const shared_sampler &_sampler, const TRest&... _rest) {
-    _context.images_.reserve(_context.images_.size() + 4);
-    _context.writes_.reserve(_context.writes_.size() + 4);
     _context.texture(_binding, _image0, _sampler);
     _context.texture(_binding + 1, _image1, _sampler);
     _context.texture(_binding + 2, _image2, _sampler);
@@ -519,7 +519,7 @@ public:
     assert(_descriptor_index < descriptors_.size());
     attachments_.emplace(_descriptor_index, attachments{std::forward_as_tuple(_attachments...)});
 
-    descriptor_write_context filler;
+    descriptor_write_context filler{sizeof...(_attachments)};
     filler.descriptor_index_ = _descriptor_index;
     filler.dst_ = descriptors_[_descriptor_index];
     write_continue(0, filler, std::forward<const TExtraAttachments&>(_attachments)...);

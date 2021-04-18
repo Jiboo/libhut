@@ -37,11 +37,13 @@ inline uint format_size(VkFormat _format) {
   switch (_format) {
     case VK_FORMAT_R8_UNORM: return 1;
 
-    case VK_FORMAT_R8G8_UNORM: return 2;
+    case VK_FORMAT_R8G8_UNORM:
+    case VK_FORMAT_R8G8_SRGB: return 2;
 
     case VK_FORMAT_R8G8B8_UNORM: return 3;
 
     case VK_FORMAT_R8G8B8A8_UNORM:
+    case VK_FORMAT_R8G8B8A8_SRGB:
     case VK_FORMAT_B8G8R8A8_UNORM:
     case VK_FORMAT_D32_SFLOAT: return 4;
 
@@ -60,8 +62,10 @@ inline bool block_format(VkFormat _format) {
   switch (_format) {
     case VK_FORMAT_R8_UNORM:
     case VK_FORMAT_R8G8_UNORM:
+    case VK_FORMAT_R8G8_SRGB:
     case VK_FORMAT_R8G8B8_UNORM:
     case VK_FORMAT_R8G8B8A8_UNORM:
+    case VK_FORMAT_R8G8B8A8_SRGB:
     case VK_FORMAT_B8G8R8A8_UNORM:
     case VK_FORMAT_D32_SFLOAT: return false;
 
