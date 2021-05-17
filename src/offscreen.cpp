@@ -45,6 +45,8 @@ offscreen::offscreen(const shared_image &_target, const offscreen_params &_init_
     params_.subres_.coords_ = make_bbox_with_origin_size(u16vec2{0,0}, target_->size());
 
   render_target_params pass_params;
+  pass_params.clear_color_ = render_target_params_.clear_color_;
+  pass_params.clear_depth_stencil_ = render_target_params_.clear_depth_stencil_;
   pass_params.box_ = params_.subres_.coords_;
   pass_params.format_ = _target->params_.format_;
   if (params_.flags_ & offscreen_params::FMULTISAMPLING)
@@ -121,7 +123,7 @@ void offscreen::download(uint8_t *_dst, uint _data_row_pitch, image::subresource
 
   const uint buffer_align = display_.device_props_.limits.optimalBufferCopyRowPitchAlignment;
   const uint offset_align = std::max(VkDeviceSize(4), display_.device_props_.limits.optimalBufferCopyOffsetAlignment);
-  const uint row_byte_size = size.x * target_->pixel_size();
+  const uint row_byte_size = uint((float)size.x * target_->bpp());
   const uint buffer_row_pitch = align(row_byte_size, buffer_align);
   const auto byte_size = size.y * buffer_row_pitch;
 
@@ -146,7 +148,7 @@ void offscreen::download(uint8_t *_dst, uint _data_row_pitch, image::subresource
   VkBufferImageCopy region;
   region.imageExtent = {(uint)size.x, (uint)size.y, 1};
   region.imageOffset = {origin.x, origin.y, 0};
-  region.bufferRowLength = target_->pixel_size() ? buffer_row_pitch / target_->pixel_size() : 0;
+  region.bufferRowLength = buffer_row_pitch / target_->bpp();
   region.bufferImageHeight = size.y;
   region.imageSubresource = subresLayers;
 

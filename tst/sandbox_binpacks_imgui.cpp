@@ -27,7 +27,7 @@
 
 #include <random>
 
-#include "imgui_impl_hut.h"
+#include "imgui_impl_hut.hpp"
 #include "hut/display.hpp"
 #include "hut/window.hpp"
 #include "hut/pipeline.hpp"

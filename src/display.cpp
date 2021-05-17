@@ -45,6 +45,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT flags
                                                      const char *msg, void * /*userData*/) {
   if (strcmp(layerPrefix, "Loader Message") == 0)
     return VK_FALSE;
+  if (strcmp(layerPrefix, "radv") == 0)
+    return VK_FALSE;
 
   char level;
   switch (flags) {
@@ -426,6 +428,9 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   VkPhysicalDeviceFeatures core_features = {};
   core_features.samplerAnisotropy = device_features_.samplerAnisotropy;
   core_features.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
+  //core_features.textureCompressionBC = VK_TRUE;
+  //core_features.textureCompressionASTC_LDR = VK_TRUE;
+  //core_features.textureCompressionETC2 = VK_TRUE;
 
   VkPhysicalDeviceDescriptorIndexingFeatures bindings_features = {};
   bindings_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
@@ -670,9 +675,8 @@ void display::stage_copy(const image_copy &_info) {
 }
 
 void display::stage_copy(const buffer2image_copy &_info) {
-  uint size = _info.bufferRowLength * _info.bufferImageHeight * _info.pixelSize;
 #ifdef HUT_DEBUG_STAGING
-  std::cout << "[staging] buffer2image_copy " << _info.source << '[' << _info.bufferOffset << "-" << (_info.bufferOffset+size)
+  std::cout << "[staging] buffer2image_copy " << _info.source << '[' << _info.bufferOffset << "-" << (_info.bufferOffset+_info.bytesSize)
             << "] to image " << _info.destination
             << "[" << _info.imageOffset.x << ", " << _info.imageOffset.y << ", "
             << _info.imageExtent.width << ", " << _info.imageExtent.height << "]"
@@ -681,7 +685,7 @@ void display::stage_copy(const buffer2image_copy &_info) {
 
   HUT_PVK_NAMED_ALIASED(vkCmdCopyBufferToImage,
                         ("src", "dst", "srcOffset", "srcSize", "dstOffset", "dstExtent"),
-                        ((void*)_info.source, (void*)_info.destination, _info.bufferOffset, size, offset3_16(_info.imageOffset), extent3_16(_info.imageExtent)),
+                        ((void*)_info.source, (void*)_info.destination, _info.bufferOffset, _info.bytesSize, offset3_16(_info.imageOffset), extent3_16(_info.imageExtent)),
                         staging_cb_, _info.source, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &_info);
 }
 

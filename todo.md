@@ -8,6 +8,8 @@ fix:
 
 refactor:
   - [wl] async clipboard read/write
+  - make libpng optional, and move png loading function to an ext lib
+  - make freetype/harfbuzz (along with hut's font/shaping) optional, and move them to an ext lib
 
 features:
   - [w32] transparent window support

@@ -1,19 +1,14 @@
 cmake_minimum_required(VERSION 3.16)
 project(hut)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_COMPILE_WARNING_MODE HIGH)
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/deps/")
-set(BUILD_SHARED_LIBS OFF) # FIXME JBL: add_library from dependencies makes shared by default without this, leading to missing dlls when launching an EXE because we aren't searching for them in their respective output dir
-
 ###########################################################
 # Configuration
 ###########################################################
 
 set(HUT_COMPILE_DEMOS 1)
 set(HUT_ENABLE_IMGUI TRUE)
+set(HUT_ENABLE_KTX2 TRUE)
+set(HUT_ENABLE_RENDERDOC TRUE)
 
 ###########################################################
 # Debug
@@ -31,8 +26,20 @@ if(NOT WIN32)
 endif()
 
 ###########################################################
+# Compile/link flags
+###########################################################
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_COMPILE_WARNING_MODE HIGH)
+
+###########################################################
 # message("Checking for required dependencies...")
 ###########################################################
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/deps/")
+set(BUILD_SHARED_LIBS OFF) # FIXME JBL: add_library from dependencies makes shared by default without this, leading to missing dlls when launching an EXE because we aren't searching for them in their respective output dir
 
 add_subdirectory(dep/glslang)
 include(dep/spirv_reflect.cmake)
@@ -93,6 +100,15 @@ endif()
 
 if (HUT_ENABLE_IMGUI)
   include(dep/imgui.cmake)
+  set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_IMGUI)
+endif()
+
+if (HUT_ENABLE_KTX2)
+  set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_KTX2)
+endif()
+
+if (HUT_ENABLE_RENDERDOC)
+  set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_RENDERDOC)
 endif()
 
 find_package(GTest)
@@ -250,10 +266,12 @@ target_link_libraries(hut ${HUT_LIBS})
 target_compile_definitions(hut PUBLIC ${HUT_DEFINITIONS})
 target_include_directories(hut PUBLIC ${HUT_INCLUDES})
 target_precompile_headers(hut PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/inc/hut/utils.hpp>")
+
 #message("HUT_DEFINITIONS: ${HUT_DEFINITIONS}")
 #message("HUT_INCLUDES: ${HUT_INCLUDES}")
 #message("HUT_LIBS: ${HUT_LIBS}")
 #message("HUT_SOURCES: ${HUT_SOURCES}")
+#message("HUT_PLATFORM: ${HUT_PLATFORM}")
 #message("HUT_BUNDLE_hut_shaders_FILES: ${HUT_BUNDLE_hut_shaders_FILES}")
 
 add_subdirectory(ext)
@@ -312,7 +330,25 @@ if(GTEST_FOUND)
   enable_testing()
 
   file(GLOB HUT_UNIT_TESTS tst/unit/*.cpp)
+  set(HUT_UNIT_TESTS_DEPS hut ${GTEST_BOTH_LIBRARIES})
+
+  if (HUT_ENABLE_KTX2)
+    file(GLOB_RECURSE HUT_KTX2_UNIT_TESTS_DATA tst/ktx2/*.ktx2)
+    add_custom_command(OUTPUT ${HUT_GEN_DIR}/unittests_ktx2.cpp
+        COMMAND $<TARGET_FILE:gen_res> unittests_ktx2 ${HUT_GEN_DIR} ${HUT_KTX2_UNIT_TESTS_DATA}
+        DEPENDS gen_res ${HUT_KTX2_UNIT_TESTS_DATA}
+        COMMENT "Generating KTX2 unittests data")
+
+    file(GLOB_RECURSE HUT_KTX2_UNIT_TESTS tst/unit/ktx2/*.cpp)
+    set(HUT_UNIT_TESTS ${HUT_UNIT_TESTS} ${HUT_KTX2_UNIT_TESTS} ${HUT_GEN_DIR}/unittests_ktx2.cpp)
+    set(HUT_UNIT_TESTS_DEPS ${HUT_UNIT_TESTS_DEPS} hut_ktx2)
+  endif()
+
+  if (HUT_ENABLE_RENDERDOC)
+    set(HUT_UNIT_TESTS_DEPS ${HUT_UNIT_TESTS_DEPS} hut_renderdoc)
+  endif()
+
   add_executable(hut_unittests ${HUT_UNIT_TESTS})
   add_test(NAME hut_unittests WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} COMMAND unittests)
-  target_link_libraries(hut_unittests hut ${GTEST_BOTH_LIBRARIES})
+  target_link_libraries(hut_unittests ${HUT_UNIT_TESTS_DEPS})
 endif()

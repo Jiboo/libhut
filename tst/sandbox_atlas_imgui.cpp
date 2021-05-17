@@ -27,7 +27,7 @@
 
 #include <random>
 
-#include "imgui_impl_hut.h"
+#include "imgui_impl_hut.hpp"
 #include "demo_woff2.hpp"
 
 #include "hut/atlas_pool.hpp"

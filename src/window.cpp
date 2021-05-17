@@ -218,6 +218,8 @@ void window::init_vulkan_surface() {
   }
 
   render_target_params pass_params;
+  pass_params.clear_color_ = render_target_params_.clear_color_;
+  pass_params.clear_depth_stencil_ = render_target_params_.clear_depth_stencil_;
   pass_params.box_ = {0, 0, swapchain_extents_.width, swapchain_extents_.height};
   pass_params.format_ = surface_format_.format;
   if (params_.flags_ & window_params::FMULTISAMPLING)

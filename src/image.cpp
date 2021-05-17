@@ -164,7 +164,6 @@ image::~image() {
 image::image(display &_display, const image_params &_params)
     : display_(_display), params_(_params) {
   HUT_PROFILE_SCOPE(PIMAGE, "image::image");
-  pixel_size_ = format_size(_params.format_);
   mem_reqs_ = create(_display, _params, &image_, &memory_);
 
   VkImageViewCreateInfo viewInfo = {};
@@ -207,7 +206,7 @@ image::image(display &_display, const image_params &_params)
   display_.staging_jobs_++;
   display_.preflush([this, pre, post, clear, range]() {
     display_.stage_transition(pre, range);
-    if (!block_format(params_.format_))
+    if (params_.tiling_ & VK_IMAGE_TILING_LINEAR) // FIXME
       display_.stage_clear(clear, range);
     display_.stage_transition(post, range);
     display_.staging_jobs_--;
@@ -255,18 +254,17 @@ VkMemoryRequirements image::create(display &_display, const image_params &_param
 }
 
 void image::update(subresource _subres, std::span<const u8> _data, uint _data_row_pitch) {
-  assert(pixel_size_);
-
   auto update = prepare_update(_subres);
   auto size = bbox_size(_subres.coords_);
   assert(_data.size_bytes() == (_data_row_pitch * size.y));
-  // FIXME: Catch wrong mip level size inputs
+  auto mip_size = params_.size_ >> _subres.level_;
+  assert(mip_size.x >= size.x && mip_size.y >= size.y);
 
-  if (_data_row_pitch == update.staging_row_pitch_) {
+  if (_data_row_pitch == update.staging_row_pitch_ || params_.tiling_ == VK_IMAGE_TILING_OPTIMAL) {
     memcpy(update.data(), _data.data(), _data.size_bytes());
   }
   else {
-    auto row_byte_size = pixel_size_ * size.x;
+    uint row_byte_size = size.x * bpp();
     for (uint y = 0; y < size.y; y++) {
       auto *dst_row = update.data() + y * update.staging_row_pitch_;
       auto *src_row = _data.data() + y * _data_row_pitch;
@@ -279,21 +277,18 @@ image::updator image::prepare_update(subresource _subres) {
   auto size = bbox_size(_subres.coords_);
   uint buffer_align = display_.device_props_.limits.optimalBufferCopyRowPitchAlignment;
   uint offset_align = std::max(VkDeviceSize(4), display_.device_props_.limits.optimalBufferCopyOffsetAlignment);
-  uint row_byte_size = size.x * pixel_size_;
-  uint buffer_row_pitch = align(row_byte_size, buffer_align);
-  auto byte_size = size.y * buffer_row_pitch;
+  uint row_byte_size = size.x * bpp();
+  uint staging_row_pitch = align(row_byte_size, buffer_align);
+  auto byte_size = size.y * staging_row_pitch;
 
   std::lock_guard lk(display_.staging_mutex_);
   auto staging = display_.staging_->do_alloc(byte_size, offset_align);
-  return updator(*this, staging, std::span<u8>{staging.buffer_->permanent_map_ + staging.offset_, byte_size}, buffer_row_pitch, _subres);
+  return updator(*this, staging, std::span<u8>{staging.buffer_->permanent_map_ + staging.offset_, byte_size}, staging_row_pitch, _subres);
 }
 
 void image::finalize_update(image::updator &_update) {
   auto size = bbox_size(_update.subres_.coords_);
   auto origin = bbox_origin(_update.subres_.coords_);
-  uint buffer_align = display_.device_props_.limits.optimalBufferCopyRowPitchAlignment;
-  uint row_byte_size = size.x * pixel_size_;
-  uint buffer_row_pitch = align(row_byte_size, buffer_align);
 
   VkImageSubresourceLayers subresLayers = {};
   subresLayers.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -319,13 +314,13 @@ void image::finalize_update(image::updator &_update) {
   display::buffer2image_copy copy = {};
   copy.imageExtent = {(uint)size.x, (uint)size.y, 1};
   copy.imageOffset = {origin.x, origin.y, 0};
-  copy.bufferRowLength = pixel_size_ ? buffer_row_pitch / pixel_size_ : 0;
-  copy.bufferImageHeight = size.y;
+  copy.bufferRowLength = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : (_update.staging_row_pitch_ / bpp());
+  copy.bufferImageHeight = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : size.y;
   copy.bufferOffset = _update.staging_.offset_;
   copy.imageSubresource = subresLayers;
   copy.source = _update.staging_.buffer_->buffer_;
   copy.destination = image_;
-  copy.pixelSize = pixel_size_;
+  copy.bytesSize = _update.size_bytes();
 
   std::lock_guard lk(display_.staging_mutex_);
   display_.staging_jobs_++;

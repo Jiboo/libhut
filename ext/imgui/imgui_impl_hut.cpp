@@ -27,7 +27,7 @@
 
 #include <iostream>
 
-#include "imgui_impl_hut.h"
+#include "imgui_impl_hut.hpp"
 
 #include "hut/buffer_pool.hpp"
 #include "hut/display.hpp"

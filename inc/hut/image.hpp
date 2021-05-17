@@ -32,6 +32,7 @@
 
 #include "hut/buffer_pool.hpp"
 #include "hut/display.hpp"
+#include "hut/color.hpp"
 #include "hut/utils.hpp"
 
 namespace hut {
@@ -97,7 +98,8 @@ class image {
   updator prepare_update(subresource _subres);
   updator prepare_update() { return prepare_update({make_bbox_with_origin_size({0,0}, params_.size_)}); }
 
-  [[nodiscard]] uint pixel_size() const { return pixel_size_; }
+  [[nodiscard]] float bpp() const { return format_bpp(format()); }
+  [[nodiscard]] VkFormat format() const { return params_.format_; }
   [[nodiscard]] u16vec2 size() const { return params_.size_; }
   [[nodiscard]] u16 levels() const { return params_.levels_; }
   [[nodiscard]] u16 layers() const { return params_.layers_; }
@@ -110,7 +112,6 @@ class image {
 
   display &display_;
   image_params params_;
-  uint pixel_size_;
 
   VkImage image_;
   VkDeviceMemory memory_;

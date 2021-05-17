@@ -242,11 +242,12 @@ void render_target::begin_rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
   renderPassInfo.renderArea.offset = {offset.x, offset.y};
   renderPassInfo.renderArea.extent = {size.x, size.y};
 
-  std::vector<VkClearValue> clearColors = {
-      VkClearValue{.color = render_target_params_.clear_color_}
-  };
+  std::vector<VkClearValue> clearColors;
+  clearColors.emplace_back(VkClearValue{.color = render_target_params_.clear_color_});
   if (depth_)
     clearColors.emplace_back(VkClearValue{.depthStencil = render_target_params_.clear_depth_stencil_});
+  if (msaa_rendertarget_)
+    clearColors.emplace_back(VkClearValue{.color = render_target_params_.clear_color_});
 
   renderPassInfo.clearValueCount = clearColors.size();
   renderPassInfo.pClearValues = clearColors.data();

@@ -33,7 +33,7 @@
 
 namespace hut {
 
-inline uint format_size(VkFormat _format) {
+inline float format_bpp(VkFormat _format) {
   switch (_format) {
     case VK_FORMAT_R8_UNORM: return 1;
 
@@ -47,6 +47,11 @@ inline uint format_size(VkFormat _format) {
     case VK_FORMAT_B8G8R8A8_UNORM:
     case VK_FORMAT_D32_SFLOAT: return 4;
 
+    case VK_FORMAT_BC1_RGB_SRGB_BLOCK:
+    case VK_FORMAT_BC1_RGBA_SRGB_BLOCK:
+    case VK_FORMAT_BC1_RGB_UNORM_BLOCK:
+    case VK_FORMAT_BC1_RGBA_UNORM_BLOCK:return 0.5;
+
     case VK_FORMAT_BC5_SNORM_BLOCK:
     case VK_FORMAT_BC5_UNORM_BLOCK:
     case VK_FORMAT_BC7_SRGB_BLOCK:
@@ -58,7 +63,7 @@ inline uint format_size(VkFormat _format) {
   }
 }
 
-inline bool block_format(VkFormat _format) {
+inline u8vec2 format_block_size(VkFormat _format) {
   switch (_format) {
     case VK_FORMAT_R8_UNORM:
     case VK_FORMAT_R8G8_UNORM:
@@ -67,16 +72,20 @@ inline bool block_format(VkFormat _format) {
     case VK_FORMAT_R8G8B8A8_UNORM:
     case VK_FORMAT_R8G8B8A8_SRGB:
     case VK_FORMAT_B8G8R8A8_UNORM:
-    case VK_FORMAT_D32_SFLOAT: return false;
+    case VK_FORMAT_D32_SFLOAT: return {1, 1};
 
+    case VK_FORMAT_BC1_RGB_SRGB_BLOCK:
+    case VK_FORMAT_BC1_RGBA_SRGB_BLOCK:
+    case VK_FORMAT_BC1_RGB_UNORM_BLOCK:
+    case VK_FORMAT_BC1_RGBA_UNORM_BLOCK:
     case VK_FORMAT_BC5_SNORM_BLOCK:
     case VK_FORMAT_BC5_UNORM_BLOCK:
     case VK_FORMAT_BC7_SRGB_BLOCK:
-    case VK_FORMAT_BC7_UNORM_BLOCK: return true;
+    case VK_FORMAT_BC7_UNORM_BLOCK: return {4, 4};
 
     default:
       assert(false);
-      return false;
+      return {1, 1};
   }
 }
 

@@ -309,7 +309,6 @@ struct flagged {
   [[nodiscard]] constexpr explicit operator bool()              const { return active_ != 0; }
 
   constexpr void reset(TUnderlying _underlying) { active_ = _underlying; }
-  constexpr flagged &operator=(TUnderlying _underlying) { reset(_underlying); return *this; }
 
   constexpr void flip(TEnum _flag)  { active_ ^= mask(_flag); }
   constexpr void set(TEnum _flag)   { active_ |= mask(_flag); }

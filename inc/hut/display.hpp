@@ -281,6 +281,9 @@ class display {
   const VkPhysicalDeviceLimits &limits() const {
     return device_props_.limits;
   }
+  VkPhysicalDevice physical_device() const {
+    return pdevice_;
+  }
 
   constexpr static auto GENERAL_FLAGS = VkBufferUsageFlagBits(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
                                                           | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
@@ -346,7 +349,7 @@ class display {
   struct buffer2image_copy : public VkBufferImageCopy {
     VkBuffer source;
     VkImage destination;
-    uint pixelSize;
+    uint bytesSize;
   };
 
   struct image_copy : public VkImageCopy {

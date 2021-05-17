@@ -3,6 +3,10 @@
 #include "hut/offscreen.hpp"
 #include "hut/pipeline.hpp"
 
+#ifdef HUT_ENABLE_RENDERDOC
+#include "hut_renderdoc.hpp"
+#endif
+
 constexpr glm::u8vec4 D = {0, 0, 0, 0}; // Default pixel values after image creation
 constexpr glm::u8vec4 C = {0, 0, 0, 255}; // Cleared for framebuffer
 constexpr glm::u8vec4 W = {255, 255, 255, 255}; // Drawn
@@ -159,7 +163,7 @@ TEST(offscreen, offscreen_download_offset) {
     // Set pixel at [2,2]
     auto updator = img->prepare_update();
     auto *ptr = updator.data();
-    memcpy(ptr + (2 * updator.staging_row_pitch() + 2 * img->pixel_size()), &W, 4);
+    memcpy(ptr + (2 * updator.staging_row_pitch() + 2 * 4), &W, 4);
   }
 
   auto ofs = hut::offscreen(img);
@@ -189,6 +193,10 @@ TEST(offscreen, offscreen_download_offset) {
 
 TEST(offscreen, offscreen_render_offset) {
   hut::display d("offscreen_render_offset");
+
+/*#ifdef HUT_ENABLE_RENDERDOC
+  hut::renderdoc::frame_begin();
+#endif*/
 
   auto buff = d.alloc_buffer(1024*1024);
 
@@ -246,4 +254,8 @@ TEST(offscreen, offscreen_render_offset) {
 
   dump(pixel_data, {0, 0, 4, 4});
   EXPECT_TRUE(std::equal(std::begin(pixel_ref), std::end(pixel_ref), std::begin(pixel_data)));
+
+/*#ifdef HUT_ENABLE_RENDERDOC
+  hut::renderdoc::frame_end("offscreen_render_offset");
+#endif*/
 }
