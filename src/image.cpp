@@ -264,7 +264,9 @@ void image::update(subresource _subres, std::span<const u8> _data, uint _data_ro
     memcpy(update.data(), _data.data(), _data.size_bytes());
   }
   else {
-    uint row_byte_size = size.x * bpp();
+    uint row_bit_size = size.x * bpp();
+    assert(row_bit_size >= 8);
+    uint row_byte_size = row_bit_size / 8;
     for (uint y = 0; y < size.y; y++) {
       auto *dst_row = update.data() + y * update.staging_row_pitch_;
       auto *src_row = _data.data() + y * _data_row_pitch;
@@ -277,7 +279,9 @@ image::updator image::prepare_update(subresource _subres) {
   auto size = bbox_size(_subres.coords_);
   uint buffer_align = display_.device_props_.limits.optimalBufferCopyRowPitchAlignment;
   uint offset_align = std::max(VkDeviceSize(4), display_.device_props_.limits.optimalBufferCopyOffsetAlignment);
-  uint row_byte_size = size.x * bpp();
+  uint row_bit_size = size.x * bpp();
+  assert(row_bit_size >= 8);
+  uint row_byte_size = row_bit_size / 8;
   uint staging_row_pitch = align(row_byte_size, buffer_align);
   auto byte_size = size.y * staging_row_pitch;
 
@@ -314,7 +318,7 @@ void image::finalize_update(image::updator &_update) {
   display::buffer2image_copy copy = {};
   copy.imageExtent = {(uint)size.x, (uint)size.y, 1};
   copy.imageOffset = {origin.x, origin.y, 0};
-  copy.bufferRowLength = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : (_update.staging_row_pitch_ / bpp());
+  copy.bufferRowLength = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : ((_update.staging_row_pitch_ * 8) / bpp());
   copy.bufferImageHeight = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : size.y;
   copy.bufferOffset = _update.staging_.offset_;
   copy.imageSubresource = subresLayers;

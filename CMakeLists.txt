@@ -204,6 +204,8 @@ function(hut_gen_spv_bundle)
     message(FATAL "No shader source list provided for hut_gen_spv_bundle")
   endif()
 
+  file(MAKE_DIRECTORY ${HUT_GEN_SPV_BUNDLE_OUTDIR})
+
   foreach(shader_source ${HUT_GEN_SPV_BUNDLE_SHADER_SOURCES})
     get_filename_component(shader_target ${shader_source} NAME)
     string(REPLACE ".frag" ".frag.spv" shader_target "${shader_target}")

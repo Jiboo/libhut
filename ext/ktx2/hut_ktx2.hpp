@@ -33,6 +33,8 @@
 #include "hut/image.hpp"
 #include "hut/utils.hpp"
 
+#include "khr_df.h"
+
 namespace hut::ktx {
 
 struct load_params {

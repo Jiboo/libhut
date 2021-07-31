@@ -123,7 +123,9 @@ void offscreen::download(uint8_t *_dst, uint _data_row_pitch, image::subresource
 
   const uint buffer_align = display_.device_props_.limits.optimalBufferCopyRowPitchAlignment;
   const uint offset_align = std::max(VkDeviceSize(4), display_.device_props_.limits.optimalBufferCopyOffsetAlignment);
-  const uint row_byte_size = uint((float)size.x * target_->bpp());
+  const uint row_bit_size = size.x * target_->bpp();
+  assert(row_bit_size >= 8);
+  const uint row_byte_size = row_bit_size / 8;
   const uint buffer_row_pitch = align(row_byte_size, buffer_align);
   const auto byte_size = size.y * buffer_row_pitch;
 
@@ -148,7 +150,7 @@ void offscreen::download(uint8_t *_dst, uint _data_row_pitch, image::subresource
   VkBufferImageCopy region;
   region.imageExtent = {(uint)size.x, (uint)size.y, 1};
   region.imageOffset = {origin.x, origin.y, 0};
-  region.bufferRowLength = buffer_row_pitch / target_->bpp();
+  region.bufferRowLength = (buffer_row_pitch * 8) / target_->bpp();
   region.bufferImageHeight = size.y;
   region.imageSubresource = subresLayers;
 

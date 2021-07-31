@@ -98,7 +98,7 @@ class image {
   updator prepare_update(subresource _subres);
   updator prepare_update() { return prepare_update({make_bbox_with_origin_size({0,0}, params_.size_)}); }
 
-  [[nodiscard]] float bpp() const { return format_bpp(format()); }
+  [[nodiscard]] u8 bpp() const { return info(params_.format_).bpp(); }
   [[nodiscard]] VkFormat format() const { return params_.format_; }
   [[nodiscard]] u16vec2 size() const { return params_.size_; }
   [[nodiscard]] u16 levels() const { return params_.levels_; }

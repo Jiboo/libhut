@@ -380,9 +380,11 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   HUT_PVK(vkGetPhysicalDeviceProperties, prefered_device, &device_props_);
   HUT_PVK(vkGetPhysicalDeviceFeatures, prefered_device, &device_features_);
 
+#ifdef HUT_ENABLE_VALIDATION_DEBUG
   std::cout << "[hut] selected device " << device_props_.deviceName << " using Vulkan "
     << VK_VERSION_MAJOR(device_props_.apiVersion) << '.'
     << VK_VERSION_MINOR(device_props_.apiVersion) << std::endl;
+#endif
 
   pdevice_ = prefered_device;
   iqueueg_ = prefered_rate.iqueueg_;

@@ -224,10 +224,13 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
   for (u16 level = 0; level < iparams.levels_; level++) {
     const auto &level_range = levels[level];
     u16vec2 level_size = iparams.size_ >> level;
-    u32 byte_stride = level_size.x * img->bpp();
+    u32 bit_stride = level_size.x * img->bpp();
+    assert(bit_stride > 8);
+    u32 byte_stride = bit_stride / 8;
+    auto layer_byte_length = byte_stride * level_size.y;
+    assert(level_range.uncompressed_byte_length_ == layer_byte_length * iparams.layers_);
+
     for (u16 layer = 0; layer < iparams.layers_; layer++) {
-      auto layer_byte_length = byte_stride * level_size.y;
-      assert(level_range.uncompressed_byte_length_ == layer_byte_length * iparams.layers_);
       auto layer_byte_offset = _input.data() + level_range.byte_offset_ + layer_byte_length * layer;
       auto subres = image::subresource{u16vec4{0, 0, level_size}, level, layer};
       img->update(subres, std::span<const u8>(layer_byte_offset, layer_byte_length), byte_stride);

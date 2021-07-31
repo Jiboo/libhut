@@ -173,7 +173,7 @@ private:
     vert_create_info.codeSize = TVertexRefl::bytecode_.size();
     vert_create_info.pCode = (uint32_t*)TVertexRefl::bytecode_.data();
 
-    if (vkCreateShaderModule(device_ref_, &vert_create_info, nullptr, &vert_) != VK_SUCCESS)
+    if (HUT_PVK(vkCreateShaderModule, device_ref_, &vert_create_info, nullptr, &vert_) != VK_SUCCESS)
       throw std::runtime_error("[sample] failed to create vertex module!");
 
     VkShaderModuleCreateInfo frag_create_info = {};
@@ -181,7 +181,7 @@ private:
     frag_create_info.codeSize = TFragRefl::bytecode_.size();
     frag_create_info.pCode = (uint32_t*)TFragRefl::bytecode_.data();
 
-    if (vkCreateShaderModule(device_ref_, &frag_create_info, nullptr, &frag_) != VK_SUCCESS)
+    if (HUT_PVK(vkCreateShaderModule, device_ref_, &frag_create_info, nullptr, &frag_) != VK_SUCCESS)
       throw std::runtime_error("[sample] failed to create fragment module!");
   }
 
@@ -340,7 +340,7 @@ private:
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;  // Optional
 
-    if (vkCreateGraphicsPipelines(device_ref_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_) != VK_SUCCESS)
+    if (HUT_PVK(vkCreateGraphicsPipelines, device_ref_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_) != VK_SUCCESS)
       throw std::runtime_error("failed to create graphics pipeline!");
   }
 
@@ -515,7 +515,6 @@ public:
   }
 
   void write(uint _descriptor_index, const TExtraAttachments&... _attachments) {
-    HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
     assert(_descriptor_index < descriptors_.size());
     attachments_.emplace(_descriptor_index, attachments{std::forward_as_tuple(_attachments...)});
 
