@@ -1,16 +1,15 @@
 # - Try to find libbacktrace
 # Once done, this will define
 #
-#   BACKTRACE_FOUND - System has XKBCommon
-#   BACKTRACE_INCLUDE_DIRS - The XKBCommon include directories
-#   BACKTRACE_LIBRARIES - The libraries needed to use XKBCommon
-#   BACKTRACE_DEFINITIONS - Compiler switches required for using XKBCommon
+#   BACKTRACE_FOUND - System has Backtrace
+#   BACKTRACE_INCLUDE_DIRS - The Backtrace include directories
+#   BACKTRACE_LIBRARIES - The libraries needed to use Backtrace
+#   BACKTRACE_DEFINITIONS - Compiler switches required for using Backtrace
 
 find_path(BACKTRACE_INCLUDE_DIR NAMES backtrace.h )
 find_library(BACKTRACE_LIBRARY NAMES backtrace)
 
 set(BACKTRACE_LIBRARIES ${BACKTRACE_LIBRARY})
-set(BACKTRACE_LIBRARY_DIRS ${BACKTRACE_LIBRARY_DIRS})
 set(BACKTRACE_INCLUDE_DIRS ${BACKTRACE_INCLUDE_DIR})
 
 include(FindPackageHandleStandardArgs)

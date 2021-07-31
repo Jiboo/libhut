@@ -14,4 +14,4 @@ endif()
 
 add_library(hut_renderdoc STATIC ${HUT_RENDERDOC_HEADERS} ${HUT_RENDERDOC_SOURCES})
 target_link_libraries(hut_renderdoc dl)
-target_include_directories(hut_renderdoc PUBLIC ${HUT_RENDERDOC_INCLUDES})
+target_include_directories(hut_renderdoc PUBLIC ${HUT_RENDERDOC_INCLUDES} ${RENDERDOC_INCLUDE_DIRS})

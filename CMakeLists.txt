@@ -5,7 +5,7 @@ project(hut)
 # Configuration
 ###########################################################
 
-set(HUT_COMPILE_DEMOS 1)
+set(HUT_COMPILE_DEMOS TRUE)
 set(HUT_ENABLE_IMGUI TRUE)
 set(HUT_ENABLE_KTX2 TRUE)
 set(HUT_ENABLE_RENDERDOC TRUE)
@@ -108,7 +108,13 @@ if (HUT_ENABLE_KTX2)
 endif()
 
 if (HUT_ENABLE_RENDERDOC)
-  set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_RENDERDOC)
+  find_package(Renderdoc)
+  if (RENDERDOC_FOUND)
+    set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_RENDERDOC)
+  else()
+    set(HUT_ENABLE_RENDERDOC FALSE)
+    message("Couldn't find renderdoc on system, disabling")
+  endif()
 endif()
 
 find_package(GTest)
