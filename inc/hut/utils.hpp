@@ -277,17 +277,11 @@ inline void hash_combine(std::size_t &_seed, const T &_v, Rest &&..._rest) {
   hash_combine(_seed, std::forward<Rest>(_rest)...);
 }
 
-template<typename T>
-constexpr T bit_width(T _in) {
-  // FIXME JBL: Not in mingw64
-  return std::numeric_limits<T>::digits - std::countl_zero(_in);
-}
-
 template<typename TEnum, TEnum TEnd, typename TUnderlying = uint32_t>
 struct flagged {
   static constexpr size_t underlying_bits = sizeof(TUnderlying) * 8;
   static constexpr TUnderlying mask(TEnum _flag) { return 1U << _flag; }
-  static_assert(bit_width(mask(TEnd)) <= underlying_bits, "underlying type too small to hold values to end");
+  static_assert(std::bit_width(mask(TEnd)) <= underlying_bits, "underlying type too small to hold values to end");
 
   using enum_type = TEnum;
   using underlying_type = TUnderlying;

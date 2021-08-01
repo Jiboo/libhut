@@ -28,7 +28,7 @@
 #pragma once
 
 #include <bit>
-#include <list>
+#include <optional>
 
 #include "hut/utils.hpp"
 

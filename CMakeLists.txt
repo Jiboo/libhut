@@ -117,7 +117,7 @@ if (HUT_ENABLE_RENDERDOC)
   endif()
 endif()
 
-find_package(GTest)
+find_package(GTest CONFIG)
 if(GTEST_FOUND)
   set(HUT_INCLUDES_TEST ${HUT_INCLUDES} ${GTEST_INCLUDE_DIR})
 endif()

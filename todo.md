@@ -12,6 +12,7 @@ refactor:
   - make freetype/harfbuzz (along with hut's font/shaping) optional, and move them to an ext lib
 
 features:
+  - [vk] specialization constants for shaders (pipeline params?)
   - [w32] transparent window support
   - [wl][w32] clipboard image support
   - [w32] drap&drop URI/text
