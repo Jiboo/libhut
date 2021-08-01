@@ -1,9 +1,9 @@
 [submodule "dep/imgui"]
 	path = dep/imgui
-	url = https://github.com/ocornut/imgui.git
+	url = git@github.com:ocornut/imgui.git
 [submodule "dep/glslang"]
 	path = dep/glslang
-	url = https://github.com/KhronosGroup/glslang
+	url = git@github.com:KhronosGroup/glslang.git
 [submodule "dep/SPIRV-Reflect"]
 	path = dep/SPIRV-Reflect
-	url = https://github.com/KhronosGroup/SPIRV-Reflect.git
+	url = git@github.com:KhronosGroup/SPIRV-Reflect.git
