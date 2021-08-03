@@ -128,7 +128,7 @@ class sampler {
   VkDevice device_;
 
 public:
-  explicit sampler(display &_display, bool _hiquality = true);
+  explicit sampler(display &_display, bool _hiquality = true, float _maxLod = 0.f);
   sampler(display &_display, VkSamplerCreateInfo *_info);
   ~sampler();
 };

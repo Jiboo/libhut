@@ -132,6 +132,7 @@ void window::init_vulkan_surface() {
     for (const auto &it : formats) {
       if (it.format == VK_FORMAT_B8G8R8A8_UNORM && it.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
         surface_format_ = it;
+        break;
       }
     }
   }
