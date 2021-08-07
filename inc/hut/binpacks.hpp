@@ -143,7 +143,7 @@ struct linear1d {
       accumulated_size += blocks_[i].size_;
       iend = i;
     }
-    for (ssize_t i = _index - 1; i >= 0; i--) {
+    for (ssize_t i = ssize_t(_index) - 1; i >= 0; i--) {
       if (blocks_[i].used_)
         break;
       accumulated_size += blocks_[i].size_;

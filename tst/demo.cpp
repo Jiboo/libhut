@@ -40,18 +40,27 @@
 using namespace hut;
 
 struct my_drop_target_interface : hut::drop_target_interface {
-  virtual void on_enter(dragndrop_actions _actions, clipboard_formats _formats) {
+  clipboard_format preferred = FTEXT_PLAIN;
+
+  void on_enter(dragndrop_actions _actions, clipboard_formats _formats) override {
     std::cout << "my_drop_target_interface::on_enter" << std::endl;
     assert(_formats & FTEXT_PLAIN);
     assert(_actions & DNDCOPY);
+
+    if (_formats & FTEXT_HTML) preferred = FTEXT_HTML;
   }
 
-  virtual move_result on_move(vec2 _pos) {
+  move_result on_move(vec2 _pos) override {
     //std::cout << "my_drop_target_interface::on_move" << std::endl;
-    return {hut::DNDCOPY, hut::DNDCOPY, hut::FTEXT_PLAIN};
+    if (_pos.x < 100)
+      return {hut::DNDCOPY, hut::DNDCOPY, hut::FTEXT_PLAIN};
+    else if (_pos.y < 100)
+      return {hut::DNDCOPY, hut::DNDCOPY, hut::FTEXT_HTML};
+    else
+      return {hut::DNDNONE, hut::DNDNONE, hut::FTEXT_HTML};
   }
 
-  virtual void on_drop(dragndrop_action, clipboard_receiver &_receiver) {
+  void on_drop(dragndrop_action, clipboard_receiver &_receiver) override {
     std::cout << "my_drop_target_interface::on_drop" << std::endl;
     uint8_t buffer[1024];
     while (auto read_bytes = _receiver.read(buffer)) {
@@ -60,7 +69,7 @@ struct my_drop_target_interface : hut::drop_target_interface {
     }
   }
 
-  virtual void on_leave() {
+  void on_leave() override {
     std::cout << "my_drop_target_interface::on_leave" << std::endl;
   }
 };
@@ -86,7 +95,7 @@ int main(int, char **) {
   indices->set({0, 1, 2, 2, 1, 3});
 
   proj_ubo default_ubo;
-  default_ubo.proj_ = ortho<float>(0, w.size().x, 0, w.size().y);
+  default_ubo.proj_ = ortho<float>(0.f, float(w.size().x), 0.f, float(w.size().y));
   shared_ref<proj_ubo> ubo = d.alloc_ubo(b, default_ubo);
 
   auto rgb_pipeline = std::make_unique<rgb>(w);
@@ -320,7 +329,7 @@ int main(int, char **) {
     static auto startTime = display::clock::now();
 
     auto currentTime = display::clock::now();
-    float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
+    float time = std::chrono::duration<float>(currentTime - startTime).count();
 
     float angle = radians(time * 10);
     if (tex1_ready) {
@@ -342,7 +351,7 @@ int main(int, char **) {
     icons_instances->update_subone(1, transparency_offset, sizeof(float), &blink);
 
     {
-      int font_size = round((sin(time * 2) + 1) * 14 + 8);
+      int font_size = (int)round((sin(time * 2) + 1) * 14 + 8);
       char buff[64];
       snprintf(buff, sizeof(buff), "The The quick brown %d foxes, jump over the lazy dog. fi", font_size);
       if (roboto && s.bake(myshaper::context{b, hello_world, roboto, (u8)font_size, buff}))
@@ -372,7 +381,7 @@ int main(int, char **) {
   w.on_resize.connect([&](const uvec2 &_size) {
     //std::cout << "resize " << to_string(_size) << std::endl;
     proj_ubo new_ubo;
-    new_ubo.proj_ = ortho<float>(0, _size.x, 0, _size.y);
+    new_ubo.proj_ = ortho<float>(0.f, float(_size.x), 0.f, float(_size.y));
 
     ubo->set(new_ubo);
     return false;
@@ -385,43 +394,63 @@ int main(int, char **) {
 
   w.on_key.connect([&](keycode, keysym _key, bool _press) {
     std::cout << "w keysym " << _press << '\t' << keysym_name(_key) << std::endl;
-    if (_key == KSYM_ESC && !_press)
+    if (_key == KSYM_ESC && !_press) {
       w.close();
-    else if (_key == KSYM_UP && !_press)
+      return true;
+    }
+    else if (_key == KSYM_UP && !_press) {
       w.pause();
-    else if (_key == KSYM_LEFT && !_press)
+      return true;
+    }
+    else if (_key == KSYM_LEFT && !_press) {
       w.maximize(false);
-    else if (_key == KSYM_RIGHT && !_press)
+      return true;
+    }
+    else if (_key == KSYM_RIGHT && !_press) {
       w.maximize(true);
-    return true;
+      return true;
+    }
+    return false;
   });
 
-  w2.on_key.connect([&w2, &d](keycode, keysym _key, bool _press) {
+  w2.on_key.connect([&w2](keycode, keysym _key, bool _press) {
     std::cout << "w2 keysym " << _press << '\t' << keysym_name(_key) << std::endl;
-    if (_key == KSYM_ESC && !_press)
+    if (_key == KSYM_ESC && !_press) {
       w2.close();
-    else if (_key == KSYM_UP && !_press)
+      return true;
+    }
+    else if (_key == KSYM_UP && !_press) {
       w2.pause();
-    else if (_key == KSYM_LEFT && !_press)
+      return true;
+    }
+    else if (_key == KSYM_LEFT && !_press) {
       w2.maximize(false);
-    else if (_key == KSYM_RIGHT && !_press)
+      return true;
+    }
+    else if (_key == KSYM_RIGHT && !_press) {
       w2.maximize(true);
-    else if (_key == KSYM_F11 && !_press)
+      return true;
+    }
+    else if (_key == KSYM_F11 && !_press) {
       w2.fullscreen(true);
-    else if (_key == KSYM_F12 && !_press)
+      return true;
+    }
+    else if (_key == KSYM_F12 && !_press) {
       w2.fullscreen(false);
-    return true;
+      return true;
+    }
+    return false;
   });
 
   w.on_char.connect([](char32_t c) {
     std::cout << "char '" << (char*)to_utf8(c).data() << "' (0x" << std::hex << uint32_t(c) << std::dec << ')' << std::endl;
-    return true;
+    return false;
   });
 
   w.on_mouse.connect([](uint8_t _button, mouse_event_type _type, vec2 _pos) {
     if (_type != MMOVE)
       std::cout << "mouse " << std::to_string(_button) << ", type: " << _type << ", pos: " << to_string(_pos) << std::endl;
-    return true;
+    return false;
   });
 
   w.on_close.connect([] {
@@ -457,7 +486,7 @@ int main(int, char **) {
       w.cursor(static_cast<cursor_type>(current_cursor));
       std::cout << "current cursor " << cursor_css_name(static_cast<cursor_type>(current_cursor)) << std::endl;
     }
-    return true;
+    return false;
   });
 
   w.dragndrop_target(std::make_shared<my_drop_target_interface>());
@@ -474,7 +503,7 @@ int main(int, char **) {
         }
       });
     }
-    return true;
+    return false;
   });
 
   w.on_key.connect([&w](keycode, keysym _key, bool _pressed) {
@@ -491,6 +520,7 @@ int main(int, char **) {
           _sender.write({(uint8_t*)text_plain, strlen(text_plain)});
         }
       });
+      return true;
     }
     if (_key == KSYM_V && _pressed) {
       w.clipboard_receive(clipboard_formats{} | FTEXT_PLAIN | FTEXT_HTML, [](clipboard_format _mime, clipboard_receiver &_receiver) {
@@ -503,31 +533,39 @@ int main(int, char **) {
         }
         std::cout << std::endl;
       });
+      return true;
     }
 
     if (_key == KSYM_P && _pressed) {
       profiling::threads_data::request_dump();
+      return true;
     }
 
-    return true;
+    return false;
   });
 
   w2.on_mouse.connect([&w2](uint8_t _button, mouse_event_type _type, vec2 _coords) {
     edge coords_edge;
-    if (_coords.x < 50)
+    if (_coords.x < 50.f)
       coords_edge |= LEFT;
-    if (_coords.y < 50)
+    if (_coords.y < 50.f)
       coords_edge |= TOP;
-    if (w2.size().x - _coords.x < 50)
+    if (w2.size().x - _coords.x < 50.f)
       coords_edge |= RIGHT;
-    if (w2.size().y - _coords.y < 50)
+    if (w2.size().y - _coords.y < 50.f)
       coords_edge |= BOTTOM;
     w2.cursor(edge_cursor(coords_edge));
-    if (!coords_edge)
-      w2.interactive_move();
-    else
-      w2.interactive_resize(coords_edge);
-    return true;
+
+    static bool clicked = false;
+    if (_type == MDOWN && _button == 1) clicked = true;
+    else if (_type == MUP && _button == 1) clicked = false;
+    else if (_type == MMOVE && clicked) {
+      if (!coords_edge)
+        w2.interactive_move();
+      else
+        w2.interactive_resize(coords_edge);
+    }
+    return false;
   });
 
   auto result = d.dispatch();

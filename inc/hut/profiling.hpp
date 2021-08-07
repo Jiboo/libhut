@@ -516,7 +516,6 @@ constexpr size_t frame_history = 20;
 struct thread_data {
   cpu_frames completed_{frame_history};
 
-  std::mutex stacktrace_cache_mutex_;
   std::unordered_map<uint32_t, stacktrace> stacktrace_cache_;
 };
 
@@ -534,11 +533,10 @@ struct threads_data {
     if (tls_data_ != nullptr)
       return *tls_data_;
 
-    auto allocated = std::make_unique<thread_data>();
-    tls_data_ = allocated.get();
-
     std::scoped_lock lock{ mapping_mutex_ };
-    threads_mapping_.emplace(_id, std::move(allocated));
+    auto inserted = threads_mapping_.emplace(_id, std::make_unique<thread_data>());
+    assert(inserted.second);
+    tls_data_ = inserted.first->second.get();
     return *tls_data_;
   }
 
@@ -594,15 +592,10 @@ struct threads_data {
           }
 
           _os << "\":{\"name\":\"";
-          if constexpr (true) {
-            escape_json(_os, itcache->second.name_);
-            _os << " at ";
-            escape_json(_os, itcache->second.source_file_);
-            _os << ':' << itcache->second.line_;
-          }
-          else {
-            _os << frame.address();
-          }
+          escape_json(_os, itcache->second.name_);
+          _os << " at ";
+          escape_json(_os, itcache->second.source_file_);
+          _os << ':' << itcache->second.line_;
           if (i != (size - 1))
             _os << "\",\"parent\":\"" << entry.first << '_' << (i + 1);
           _os << "\"}";

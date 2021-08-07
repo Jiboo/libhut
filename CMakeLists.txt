@@ -16,14 +16,13 @@ set(HUT_ENABLE_RENDERDOC TRUE)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if(NOT WIN32)
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -v")
 #set(HUT_ENABLE_PROFILING TRUE)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION_DEBUG)
+#set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_DEBUG_WL_DATA_LISTENERS)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_DEBUG_STAGING)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_PREFER_NONDESCRETE_DEVICES)
-endif()
 
 ###########################################################
 # Compile/link flags
@@ -39,9 +38,13 @@ set(CMAKE_COMPILE_WARNING_MODE HIGH)
 ###########################################################
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/deps/")
-set(BUILD_SHARED_LIBS OFF) # FIXME JBL: add_library from dependencies makes shared by default without this, leading to missing dlls when launching an EXE because we aren't searching for them in their respective output dir
 
 add_subdirectory(dep/glslang)
+set(GLSLANG_VALIDATOR_FLAGS "")
+if(CMAKE_BUILD_TYPE MATCHES DEBUG)
+  set(GLSLANG_VALIDATOR_FLAGS "${GLSLANG_VALIDATOR_FLAGS} -g")
+endif()
+
 include(dep/spirv_reflect.cmake)
 
 find_package(Threads REQUIRED)
@@ -67,19 +70,54 @@ find_package(HarfBuzz REQUIRED)
 set(HUT_INCLUDES ${HUT_INCLUDES} ${HARFBUZZ_INCLUDE_DIRS})
 set(HUT_LIBS ${HUT_LIBS} ${HARFBUZZ_LIBRARIES})
 
-set(GLSLANG_VALIDATOR_FLAGS "")
-if(CMAKE_BUILD_TYPE MATCHES DEBUG)
-  set(GLSLANG_VALIDATOR_FLAGS "${GLSLANG_VALIDATOR_FLAGS} -g")
+find_package(Wayland REQUIRED COMPONENTS wayland-client wayland-cursor)
+
+find_package(XkbCommon REQUIRED)
+set(HUT_INCLUDES ${HUT_INCLUDES} ${XKBCOMMON_INCLUDE_DIRS})
+set(HUT_DEFINITIONS ${HUT_DEFINITIONS} ${XKBCOMMON_DEFINITIONS})
+set(HUT_LIBS ${HUT_LIBS} ${XKBCOMMON_LIBRARIES})
+
+find_package(PkgConfig REQUIRED)
+pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
+pkg_get_variable(WAYLAND_SCANNER wayland-scanner wayland_scanner)
+if (NOT WAYLAND_PROTOCOLS_DIR)
+  message(FATAL_ERROR "Couldn't locate wayland-protocols directory, might need to install")
 endif()
+if (NOT WAYLAND_SCANNER)
+  message(FATAL_ERROR "Couldn't locate wayland-scanner, might need to install")
+endif()
+
+set(WAYLAND_GEN_DIR ${CMAKE_BINARY_DIR}/wayland)
+file(MAKE_DIRECTORY ${WAYLAND_GEN_DIR})
+set(HUT_WAYLAND_GENERATED "")
+
+set(XDG_SHELL_PROTOCOL ${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml)
+set(XDG_SHELL_CLIENT_INCLUDE ${WAYLAND_GEN_DIR}/xdg-shell-client-protocol.h)
+set(XDG_SHELL_SOURCE ${WAYLAND_GEN_DIR}/xdg-shell-protocol.c)
+add_custom_command(
+        OUTPUT ${XDG_SHELL_CLIENT_INCLUDE}
+        COMMAND ${WAYLAND_SCANNER} client-header ${XDG_SHELL_PROTOCOL} ${XDG_SHELL_CLIENT_INCLUDE}
+        DEPENDS ${XDG_SHELL_PROTOCOL})
+add_custom_command(
+        OUTPUT ${XDG_SHELL_SOURCE}
+        COMMAND ${WAYLAND_SCANNER} private-code ${XDG_SHELL_PROTOCOL} ${XDG_SHELL_SOURCE}
+        DEPENDS ${XDG_SHELL_PROTOCOL})
+list(APPEND HUT_WAYLAND_GENERATED ${XDG_SHELL_CLIENT_INCLUDE} ${XDG_SHELL_SOURCE})
+
+set(HUT_INCLUDES ${HUT_INCLUDES} ${WAYLAND_GEN_DIR})
+set(HUT_INCLUDES ${HUT_INCLUDES} ${WAYLAND_INCLUDE_DIRS})
+set(HUT_LIBS ${HUT_LIBS} ${WAYLAND_LIBRARIES})
+file(GLOB HUT_WAYLAND_SOURCES src/wayland/*.cpp)
+set(HUT_SOURCES ${HUT_SOURCES} ${HUT_WAYLAND_SOURCES} ${HUT_WAYLAND_GENERATED})
 
 ###########################################################
 # message("Checking for optional dependencies...")
 ###########################################################
 
-if (NOT WIN32 AND HUT_ENABLE_PROFILING)
+if (HUT_ENABLE_PROFILING)
   find_package(fmt) #TODO Replace with std::format
   find_package(Boost)
-  find_package(Backtrace)
+  find_package(Backtrace) #TODO Replace with std::stacktrace
 
   if (fmt_FOUND AND Boost_FOUND)
     set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_PROFILING)
@@ -117,83 +155,10 @@ if (HUT_ENABLE_RENDERDOC)
   endif()
 endif()
 
-find_package(GTest CONFIG)
+enable_testing()
+find_package(GTest REQUIRED)
 if(GTEST_FOUND)
   set(HUT_INCLUDES_TEST ${HUT_INCLUDES} ${GTEST_INCLUDE_DIR})
-endif()
-
-find_package(Wayland COMPONENTS wayland-client wayland-cursor)
-
-if(Wayland_FOUND)
-  message("Using Wayland as backend, checking for other dependencies..")
-
-  find_package(XkbCommon REQUIRED)
-  set(HUT_INCLUDES ${HUT_INCLUDES} ${XKBCOMMON_INCLUDE_DIRS})
-  set(HUT_DEFINITIONS ${HUT_DEFINITIONS} ${XKBCOMMON_DEFINITIONS})
-  set(HUT_LIBS ${HUT_LIBS} ${XKBCOMMON_LIBRARIES})
-
-  find_package(PkgConfig REQUIRED)
-  pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
-  pkg_get_variable(WAYLAND_SCANNER wayland-scanner wayland_scanner)
-  if (NOT WAYLAND_PROTOCOLS_DIR)
-    message(FATAL_ERROR "Couldn't locate wayland-protocols directory, might need to install")
-  else()
-    message("Found wayland-protocols: ${WAYLAND_PROTOCOLS_DIR}")
-  endif()
-  if (NOT WAYLAND_SCANNER)
-    message(FATAL_ERROR "Couldn't locate wayland-scanner, might need to install")
-  else()
-    message("Found wayland-scanner: ${WAYLAND_SCANNER}")
-  endif()
-
-  set(WAYLAND_GEN_DIR ${CMAKE_BINARY_DIR}/wayland)
-  file(MAKE_DIRECTORY ${WAYLAND_GEN_DIR})
-  set(HUT_WAYLAND_GENERATED "")
-
-  set(XDG_SHELL_PROTOCOL ${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml)
-  set(XDG_SHELL_CLIENT_INCLUDE ${WAYLAND_GEN_DIR}/xdg-shell-client-protocol.h)
-  set(XDG_SHELL_SOURCE ${WAYLAND_GEN_DIR}/xdg-shell-protocol.c)
-  add_custom_command(
-    OUTPUT ${XDG_SHELL_CLIENT_INCLUDE}
-    COMMAND ${WAYLAND_SCANNER} client-header ${XDG_SHELL_PROTOCOL} ${XDG_SHELL_CLIENT_INCLUDE}
-    DEPENDS ${XDG_SHELL_PROTOCOL})
-  add_custom_command(
-    OUTPUT ${XDG_SHELL_SOURCE}
-    COMMAND ${WAYLAND_SCANNER} private-code ${XDG_SHELL_PROTOCOL} ${XDG_SHELL_SOURCE}
-    DEPENDS ${XDG_SHELL_PROTOCOL})
-  list(APPEND HUT_WAYLAND_GENERATED ${XDG_SHELL_CLIENT_INCLUDE} ${XDG_SHELL_SOURCE})
-
-  set(XDG_DECORATION_PROTOCOL ${WAYLAND_PROTOCOLS_DIR}/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml)
-  set(XDG_DECORATION_CLIENT_INCLUDE ${WAYLAND_GEN_DIR}/xdg-decoration-client-protocol-v1.h)
-  set(XDG_DECORATION_SOURCE ${WAYLAND_GEN_DIR}/xdg-decoration-protocol-v1.c)
-  add_custom_command(
-      OUTPUT ${XDG_DECORATION_CLIENT_INCLUDE}
-      COMMAND ${WAYLAND_SCANNER} client-header ${XDG_DECORATION_PROTOCOL} ${XDG_DECORATION_CLIENT_INCLUDE}
-      DEPENDS ${XDG_DECORATION_PROTOCOL})
-  add_custom_command(
-      OUTPUT ${XDG_DECORATION_SOURCE}
-      COMMAND ${WAYLAND_SCANNER} private-code ${XDG_DECORATION_PROTOCOL} ${XDG_DECORATION_SOURCE}
-      DEPENDS ${XDG_DECORATION_PROTOCOL})
-  list(APPEND HUT_WAYLAND_GENERATED ${XDG_DECORATION_CLIENT_INCLUDE} ${XDG_DECORATION_SOURCE})
-
-  set(HUT_INCLUDES ${HUT_INCLUDES} ${WAYLAND_GEN_DIR})
-  set(HUT_INCLUDES ${HUT_INCLUDES} ${WAYLAND_INCLUDE_DIRS})
-  set(HUT_LIBS ${HUT_LIBS} ${WAYLAND_LIBRARIES})
-  file(GLOB HUT_WAYLAND_SOURCES src/wayland/*.cpp)
-  set(HUT_SOURCES ${HUT_SOURCES} ${HUT_WAYLAND_SOURCES} ${HUT_WAYLAND_GENERATED})
-  set(HUT_PLATFORM WAYLAND)
-elseif(WIN32)
-  message("Using WIN32 as backend")
-  set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -D_CRT_SECURE_NO_WARNINGS=1 -DNOMINMAX=1) # glm related
-  set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -D_SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING=1) # string to_utf8(char32_t)
-  set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DWIN32_LEAN_AND_MEAN=1)
-  file(GLOB HUT_WIN32_SOURCES src/win32/*.cpp)
-  set(HUT_SOURCES ${HUT_SOURCES} ${HUT_WIN32_SOURCES})
-  set(HUT_PLATFORM WIN32)
-endif()
-
-if(NOT HUT_PLATFORM)
-  message(FATAL_ERROR "Couldn't find a suitable backend")
 endif()
 
 ###########################################################
@@ -263,7 +228,7 @@ hut_gen_spv_bundle(NAMESPACE hut_shaders OUTDIR ${HUT_GEN_DIR} SHADER_SOURCES ${
 # message("Configuring library build targets...")
 ###########################################################
 
-set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DVK_USE_PLATFORM_${HUT_PLATFORM}_KHR)
+set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DVK_USE_PLATFORM_WAYLAND_KHR)
 file(GLOB_RECURSE HUT_HEADERS inc/hut/*.hpp ${HUT_GEN_DIR}/*.hpp)
 file(GLOB HUT_COMMON_SOURCES src/*.cpp ${HUT_GEN_DIR}/*.cpp)
 set(HUT_SOURCES ${HUT_SOURCES} ${HUT_COMMON_SOURCES})
@@ -279,7 +244,6 @@ target_precompile_headers(hut PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT
 #message("HUT_INCLUDES: ${HUT_INCLUDES}")
 #message("HUT_LIBS: ${HUT_LIBS}")
 #message("HUT_SOURCES: ${HUT_SOURCES}")
-#message("HUT_PLATFORM: ${HUT_PLATFORM}")
 #message("HUT_BUNDLE_hut_shaders_FILES: ${HUT_BUNDLE_hut_shaders_FILES}")
 
 add_subdirectory(ext)
@@ -334,8 +298,6 @@ if(GTEST_FOUND)
   ###########################################################
   # message("Enabling tests...")
   ###########################################################
-
-  enable_testing()
 
   file(GLOB HUT_UNIT_TESTS tst/unit/*.cpp)
   set(HUT_UNIT_TESTS_DEPS hut ${GTEST_BOTH_LIBRARIES})

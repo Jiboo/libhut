@@ -41,6 +41,7 @@ namespace hut {
 
 struct pipeline_params {
   VkPrimitiveTopology topology_ = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  VkPolygonMode polygonMode_ = VK_POLYGON_MODE_FILL;
   VkCompareOp depthCompare_ = VK_COMPARE_OP_LESS_OR_EQUAL;
   VkCullModeFlagBits cullMode_ = VK_CULL_MODE_NONE;
   VkFrontFace frontFace_ = VK_FRONT_FACE_COUNTER_CLOCKWISE;
@@ -82,7 +83,7 @@ private:
 
   struct per_descriptor_atlas_info {
     shared_sampler sampler_;
-    uint last_bound_;
+    uint last_bound_ = 0;
   };
   struct per_atlas_info {
     std::unordered_map<uint, per_descriptor_atlas_info> descriptors_info_;
@@ -174,7 +175,7 @@ private:
     vert_create_info.pCode = (uint32_t*)TVertexRefl::bytecode_.data();
 
     if (HUT_PVK(vkCreateShaderModule, device_ref_, &vert_create_info, nullptr, &vert_) != VK_SUCCESS)
-      throw std::runtime_error("[sample] failed to create vertex module!");
+      throw std::runtime_error("failed to create vertex module!");
 
     VkShaderModuleCreateInfo frag_create_info = {};
     frag_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -182,7 +183,7 @@ private:
     frag_create_info.pCode = (uint32_t*)TFragRefl::bytecode_.data();
 
     if (HUT_PVK(vkCreateShaderModule, device_ref_, &frag_create_info, nullptr, &frag_) != VK_SUCCESS)
-      throw std::runtime_error("[sample] failed to create fragment module!");
+      throw std::runtime_error("failed to create fragment module!");
   }
 
   void init_pipeline_layout() {
@@ -195,7 +196,7 @@ private:
     layout_create_info.pSetLayouts = set_layouts;
 
     if (vkCreatePipelineLayout(device_ref_, &layout_create_info, nullptr, &layout_) != VK_SUCCESS)
-      throw std::runtime_error("[sample] failed to create pipeline layout!");
+      throw std::runtime_error("failed to create pipeline layout!");
   }
 
   void init_pipeline(u16vec4 _default_viewport, VkSampleCountFlagBits _samples, const pipeline_params &_params) {
@@ -258,7 +259,7 @@ private:
     rasterizer_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizer_create_info.depthClampEnable = VK_FALSE;
     rasterizer_create_info.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer_create_info.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer_create_info.polygonMode = _params.polygonMode_;
     rasterizer_create_info.lineWidth = 1.0f;
     rasterizer_create_info.cullMode = _params.cullMode_;
     rasterizer_create_info.frontFace = _params.frontFace_;

@@ -83,9 +83,10 @@ class image {
    public:
     ~updator() { target_.finalize_update(*this); }
 
-    u8 *data() { return data_.data(); }
-    size_t size_bytes() { return data_.size_bytes(); }
-    uint staging_row_pitch() { return staging_row_pitch_; }
+    [[nodiscard]] const u8 *data() const { return data_.data(); }
+    [[nodiscard]] u8 *data() { return data_.data(); }
+    [[nodiscard]] size_t size_bytes() const { return data_.size_bytes(); }
+    [[nodiscard]] uint staging_row_pitch() const { return staging_row_pitch_; }
   };
 
   static std::shared_ptr<image> load_png(display &, std::span<const u8> _data);
@@ -121,6 +122,27 @@ class image {
 
 using shared_image = std::shared_ptr<image>;
 
+struct sampler_params {
+  VkFilter filter_ = VK_FILTER_LINEAR;
+  bool anisotropy_ = true;
+  VkSamplerAddressMode addressMode_ = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+  glm::vec2 lodRange_ = {0, 0};
+  float lodBias_ = 0;
+
+  sampler_params &fast() {
+    filter_ = VK_FILTER_NEAREST;
+    anisotropy_ = false;
+    return *this;
+  }
+
+  sampler_params &lod(float _max, float _min = 0, float _bias = 0) {
+    lodRange_.x = _min;
+    lodRange_.y = _max;
+    lodBias_ = _bias;
+    return *this;
+  }
+};
+
 class sampler {
   template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
 
@@ -128,8 +150,7 @@ class sampler {
   VkDevice device_;
 
 public:
-  explicit sampler(display &_display, bool _hiquality = true, float _maxLod = 0.f);
-  sampler(display &_display, VkSamplerCreateInfo *_info);
+  explicit sampler(display &_display, const sampler_params & _params = {});
   ~sampler();
 };
 

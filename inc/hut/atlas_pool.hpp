@@ -79,7 +79,7 @@ class atlas_pool {
 
     [[nodiscard]] vec4 texcoords() const {
       vec4 result;
-      uvec2 atlas_size = pool_->params_.size_;
+      vec2 atlas_size = pool_->params_.size_;
       result[0] = float(bounds_[0]) / atlas_size.x;
       result[1] = float(bounds_[1]) / atlas_size.y;
       result[2] = float(bounds_[2]) / atlas_size.x;
@@ -115,8 +115,8 @@ class atlas_pool {
   atlas_pool(display &_display, const image_params &_params);
 
   shared_image image(uint _page) { return pages_[_page].image_; }
-  size_t page_count() { return pages_.size(); }
-  u16vec2 size() { return params_.size_; }
+  [[nodiscard]] size_t page_count() const { return pages_.size(); }
+  [[nodiscard]] u16vec2 size() const { return params_.size_; }
 
   std::shared_ptr<subimage> alloc(const u16vec2 &_bounds);
   std::shared_ptr<subimage> pack(const u16vec2 &_bounds, std::span<const u8> _data, uint _src_row_pitch);
@@ -129,7 +129,7 @@ class atlas_pool {
     shared_image image_;
     binpack::shelve<u16, binpack::shelve_separator_align<u16, 8>> packer_;
 
-    page_data(const shared_image &_image) : image_(_image), packer_(_image->size()) {}
+    explicit page_data(const shared_image &_image) : image_(_image), packer_(_image->size()) {}
   };
 
   display &display_;

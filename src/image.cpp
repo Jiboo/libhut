@@ -181,7 +181,7 @@ image::image(display &_display, const image_params &_params)
     throw std::runtime_error("failed to create texture image view!");
   }
 
-  if ((_params.usage_ & (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)) == 0)
+  if ((_params.usage_ & VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0)
     return;
 
   VkImageSubresourceRange range;
@@ -339,31 +339,26 @@ void image::finalize_update(image::updator &_update) {
   });
 }
 
-sampler::sampler(display &_display, VkSamplerCreateInfo *_info) : device_(_display.device_) {
-  if (vkCreateSampler(device_, _info, nullptr, &sampler_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create texture sampler!");
-  }
-}
-
-sampler::sampler(display &_display, bool _hiquality, float _maxLod) : device_(_display.device_) {
+sampler::sampler(display &_display, const sampler_params &_params) : device_(_display.device_) {
   VkSamplerCreateInfo samplerInfo = {};
   samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-  samplerInfo.magFilter = _hiquality ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
-  samplerInfo.minFilter = _hiquality ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
-  samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-  samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-  samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-  bool enable_filtering = _hiquality && _display.device_features_.samplerAnisotropy;
+  samplerInfo.magFilter = _params.filter_;
+  samplerInfo.minFilter = _params.filter_;
+  samplerInfo.addressModeU = _params.addressMode_;
+  samplerInfo.addressModeV = _params.addressMode_;
+  samplerInfo.addressModeW = _params.addressMode_;
+  bool enable_filtering = _params.anisotropy_ && _display.device_features_.samplerAnisotropy;
   samplerInfo.anisotropyEnable = enable_filtering ? VK_TRUE : VK_FALSE;
   samplerInfo.maxAnisotropy = enable_filtering ? _display.device_props_.limits.maxSamplerAnisotropy : 0;
   samplerInfo.borderColor = VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
   samplerInfo.unnormalizedCoordinates = VK_FALSE;
   samplerInfo.compareEnable = VK_FALSE;
   samplerInfo.compareOp = VK_COMPARE_OP_NEVER;
-  samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-  samplerInfo.mipLodBias = 0.0f;
-  samplerInfo.minLod = 0.0f;
-  samplerInfo.maxLod = _maxLod;
+  samplerInfo.mipmapMode = _params.filter_ == VK_FILTER_NEAREST ?
+      VK_SAMPLER_MIPMAP_MODE_NEAREST : VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  samplerInfo.mipLodBias = _params.lodBias_;
+  samplerInfo.minLod = _params.lodRange_.x;
+  samplerInfo.maxLod = _params.lodRange_.y;
   if (vkCreateSampler(device_, &samplerInfo, nullptr, &sampler_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create texture sampler!");
   }

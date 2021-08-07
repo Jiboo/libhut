@@ -69,8 +69,8 @@ class font {
 
   FT_Face face_;
   FT_Library library_;
+  FT_Int32 load_flags_;
   shared_atlas atlas_;
-  uint load_flags_;
   std::unordered_map<uint8_t, cache> caches_;
   std::mutex baking_mutex_;
 

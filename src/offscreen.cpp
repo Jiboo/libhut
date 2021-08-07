@@ -27,7 +27,6 @@
 
 #include <algorithm>
 #include <iostream>
-#include <thread>
 
 #include "hut/color.hpp"
 #include "hut/display.hpp"

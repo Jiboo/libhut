@@ -25,28 +25,16 @@
  * SOFTWARE.
  */
 
-#include "hut_renderdoc.hpp"
+#pragma once
 
-#include <cassert>
+#include <memory>
 
-#include <filesystem>
+#include "hut/image.hpp"
 
-#include <dlfcn.h>
+namespace hut::imgdec {
 
-#include "renderdoc_app.h"
+#ifdef HUT_ENABLE_IMGDEC_LIBSPNG
+  std::shared_ptr<image> load_png(display &, std::span<const u8> _data);
+#endif  // HUT_ENABLE_IMGDEC_LIBSPNG
 
-namespace hut::renderdoc {
-
-  RENDERDOC_API_1_4_1 *details::init() {
-    if (void *mod = dlopen("librenderdoc.so", RTLD_NOW | RTLD_NOLOAD)) {
-      RENDERDOC_API_1_4_1 *rdoc_api;
-      pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI) dlsym(mod, "RENDERDOC_GetAPI");
-      if (RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_4_1, (void **) &rdoc_api) == 1) {
-        details::configure(rdoc_api);
-        return rdoc_api;
-      }
-    }
-    return nullptr;
-  }
-
-} // ns hut::renderdoc
+} // ns hut::imgdec

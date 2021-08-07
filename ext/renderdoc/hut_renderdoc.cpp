@@ -31,9 +31,23 @@
 
 #include <filesystem>
 
+#include <dlfcn.h>
+
 #include "renderdoc_app.h"
 
 namespace hut::renderdoc {
+
+  RENDERDOC_API_1_4_1 *details::init() {
+    if (void *mod = dlopen("librenderdoc.so", RTLD_NOW | RTLD_NOLOAD)) {
+      RENDERDOC_API_1_4_1 *rdoc_api;
+      pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI) dlsym(mod, "RENDERDOC_GetAPI");
+      if (RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_4_1, (void **) &rdoc_api) == 1) {
+        details::configure(rdoc_api);
+        return rdoc_api;
+      }
+    }
+    return nullptr;
+  }
 
   RENDERDOC_API_1_4_1 *renderdoc_get() {
     static RENDERDOC_API_1_4_1 *rdoc_api = details::init();

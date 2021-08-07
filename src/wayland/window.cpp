@@ -36,12 +36,12 @@
 
 using namespace hut;
 
-void hut::handle_xdg_configure(void *_data, xdg_surface *, uint32_t _serial) {
+void window::handle_xdg_configure(void *_data, xdg_surface *, uint32_t _serial) {
   auto *w = static_cast<window*>(_data);
   xdg_surface_ack_configure(w->window_, _serial);
 }
 
-void hut::handle_toplevel_configure(void *_data, xdg_toplevel *, int32_t _width, int32_t _height, wl_array *_states) {
+void window::handle_toplevel_configure(void *_data, xdg_toplevel *, int32_t _width, int32_t _height, wl_array *_states) {
   auto *w = static_cast<window*>(_data);
   if (_width > 0 && _height > 0) {
     uvec2 new_size{_width, _height};
@@ -56,7 +56,7 @@ void hut::handle_toplevel_configure(void *_data, xdg_toplevel *, int32_t _width,
       static_cast<std::size_t>(_states->size / sizeof(xdg_toplevel_state))
   };
   bool minimized = std::find(states.begin(), states.end(), XDG_TOPLEVEL_STATE_ACTIVATED) == states.end();
-  // FIXME: This doesn't really represent minimized state, loosing focus also lose this state
+  // FIXME: This doesn't really represents minimized state, loosing focus also lose this state
   if (!minimized && w->minimized_) {
     w->minimized_ = false;
     HUT_PROFILE_EVENT(w, on_resume);
@@ -67,15 +67,10 @@ void hut::handle_toplevel_configure(void *_data, xdg_toplevel *, int32_t _width,
   }
 }
 
-void hut::handle_toplevel_close(void *_data, xdg_toplevel *) {
+void window::handle_toplevel_close(void *_data, xdg_toplevel *) {
   auto *w = static_cast<window*>(_data);
   if (!HUT_PROFILE_EVENT(w, on_close))
     w->close();
-}
-
-void hut::handle_toplevel_decoration_configure(void *_data, zxdg_toplevel_decoration_v1 *_deco, uint32_t _mode) {
-  auto *w = static_cast<window*>(_data);
-  w->has_system_decorations_ = _mode == ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE;
 }
 
 window::window(display &_display, const window_params &_init_params)
@@ -109,20 +104,10 @@ window::window(display &_display, const window_params &_init_params)
   toplevel_ = xdg_surface_get_toplevel(window_);
   xdg_toplevel_add_listener(toplevel_, &xdg_toplevel_listeners, this);
 
-  has_system_decorations_ = false;
-  if (_init_params.flags_ & window_params::FSYSTEM_DECORATIONS && display_.decoration_manager_) {
-    static const zxdg_toplevel_decoration_v1_listener zxdg_toplevel_decoration_v1_listeners = {
-        handle_toplevel_decoration_configure,
-    };
-    decoration_ = zxdg_decoration_manager_v1_get_toplevel_decoration(display_.decoration_manager_, toplevel_);
-    zxdg_toplevel_decoration_v1_add_listener(decoration_, &zxdg_toplevel_decoration_v1_listeners, this);
-    zxdg_toplevel_decoration_v1_set_mode(decoration_, ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
-    has_system_decorations_ = true;
-  }
   if (_init_params.min_size_ != uvec2{0, 0})
-    xdg_toplevel_set_min_size(toplevel_, _init_params.min_size_.x, _init_params.min_size_.y);
+    xdg_toplevel_set_min_size(toplevel_, int(_init_params.min_size_.x), int(_init_params.min_size_.y));
   if (_init_params.max_size_ != uvec2{0, 0})
-    xdg_toplevel_set_max_size(toplevel_, _init_params.max_size_.x, _init_params.max_size_.y);
+    xdg_toplevel_set_max_size(toplevel_, int(_init_params.max_size_.x), int(_init_params.max_size_.y));
 
   wl_surface_commit(wayland_surface_);
   init_vulkan_surface();
@@ -138,7 +123,6 @@ void window::close() {
     display_.pointer_current_ = {nullptr, nullptr};
 
     destroy_vulkan();
-    if (decoration_) zxdg_toplevel_decoration_v1_destroy(decoration_);
     xdg_toplevel_destroy(toplevel_);
     xdg_surface_destroy(window_);
     wl_surface_destroy(wayland_surface_);
@@ -192,28 +176,61 @@ void window::cursor(cursor_type _c) {
   display_.cursor(_c);
 }
 
-void hut::clipboard_data_source_handle_send(void *_data, wl_data_source *_source, const char *_mime, int32_t _fd) {
+void window::clipboard_data_source_handle_send(void *_data, wl_data_source *_source, const char *_mime, int32_t _fd) {
+#ifdef HUT_DEBUG_WL_DATA_LISTENERS
+  std::cout << "clipboard_data_source_handle_send " << _source << std::endl;
+#endif
+
   auto *w = (window*)_data;
   auto format = mime_type_format(_mime);
   if (format) {
-    clipboard_sender sender{_fd};
-    w->current_clipboard_sender_(*format, sender);
+    auto &ctx = w->clipboard_sender_context_;
+    assert(ctx.selection_ == _source);
+    auto &writers = ctx.writers_;
+    auto writerit = writers.emplace(writers.end());
+    assert(writers.size() < 8);
+    writerit->sender_.open(_fd);
+    writerit->thread_ = std::thread([w, cb = ctx.callback_, writerit, f = format.value()]() {
+      cb(f, writerit->sender_);
+      writerit->sender_.close();
+      w->display_.post([w, writerit](auto) {
+        w->clipboard_sender_context_.writers_.erase(writerit);
+      });
+    });
   }
-  ::close(_fd);
 }
 
-void hut::clipboard_data_source_handle_cancelled(void *_data, wl_data_source *_source) {
-  wl_data_source_destroy(_source);
+void window::clipboard_data_source_handle_cancelled(void *_data, wl_data_source *_source) {
+#ifdef HUT_DEBUG_WL_DATA_LISTENERS
+  std::cout << "clipboard_data_source_handle_cancelled" << std::endl;
+#endif
+
   auto *w = (window*)_data;
-  w->current_selection_ = nullptr;
+  w->clipboard_sender_context_.clear();
 }
 
-void hut::clipboard_data_source_handle_target(void *_data, wl_data_source *_source, const char *_mime) {}
-void hut::clipboard_data_source_handle_dnd_drop_performed(void *_data, wl_data_source *_source) {}
-void hut::clipboard_data_source_handle_dnd_finished(void *_data, wl_data_source *_source) {}
-void hut::clipboard_data_source_handle_action(void *_data, wl_data_source *_source, uint32_t _action) {}
+void window::clipboard_data_source_handle_target(void *_data, wl_data_source *_source, const char *_mime) {
+#ifdef HUT_DEBUG_WL_DATA_LISTENERS
+  std::cout << "clipboard_data_source_handle_target" << std::endl;
+#endif
+}
+void window::clipboard_data_source_handle_dnd_drop_performed(void *_data, wl_data_source *_source) {
+#ifdef HUT_DEBUG_WL_DATA_LISTENERS
+  std::cout << "clipboard_data_source_handle_dnd_drop_performed" << std::endl;
+#endif
+}
+void window::clipboard_data_source_handle_dnd_finished(void *_data, wl_data_source *_source) {
+#ifdef HUT_DEBUG_WL_DATA_LISTENERS
+  std::cout << "clipboard_data_source_handle_dnd_finished" << std::endl;
+#endif
+}
+void window::clipboard_data_source_handle_action(void *_data, wl_data_source *_source, uint32_t _action) {
+#ifdef HUT_DEBUG_WL_DATA_LISTENERS
+  std::cout << "clipboard_data_source_handle_action" << std::endl;
+#endif
+}
 
-void window::clipboard_offer(clipboard_formats _supported_formats, const send_clipboard_data &_callback) {
+void window::clipboard_offer(clipboard_formats _supported_formats, send_clipboard_data &&_callback) {
   static const wl_data_source_listener wl_data_source_listeners = {
     clipboard_data_source_handle_target,
     clipboard_data_source_handle_send,
@@ -226,25 +243,30 @@ void window::clipboard_offer(clipboard_formats _supported_formats, const send_cl
   if (!display_.data_device_manager_ || !display_.data_device_)
     return;
 
-  if (current_selection_) {
-    wl_data_source_destroy(current_selection_);
-    current_selection_ = nullptr;
-  }
-
   if (!_supported_formats)
     return;
 
-  current_clipboard_sender_ = _callback;
-  current_selection_ = wl_data_device_manager_create_data_source(display_.data_device_manager_);
-  wl_data_source_add_listener(current_selection_, &wl_data_source_listeners, this);
+  auto *source = wl_data_device_manager_create_data_source(display_.data_device_manager_);
+  clipboard_sender_context_.reset(source, std::move(_callback));
+
+#ifdef HUT_DEBUG_WL_DATA_LISTENERS
+  std::cout << "window::clipboard_offer " << source << std::endl;
+#endif
+
+  wl_data_source_add_listener(source, &wl_data_source_listeners, this);
   for (auto mime : _supported_formats) {
-    wl_data_source_offer(current_selection_, format_mime_type(mime));
+    wl_data_source_offer(source, format_mime_type(mime));
   }
 
-  wl_data_device_set_selection(display_.data_device_, current_selection_, display_.last_serial_);
+  assert(display_.current_serial_ != 0);
+  wl_data_device_set_selection(display_.data_device_, source, display_.current_serial_);
 }
 
-bool window::clipboard_receive(clipboard_formats _supported_formats, const receive_clipboard_data &_callback) {
+bool window::clipboard_receive(clipboard_formats _supported_formats, receive_clipboard_data &&_callback) {
+#ifdef HUT_DEBUG_WL_DATA_LISTENERS
+  std::cout << "window::clipboard_receive" << std::endl;
+#endif
+
   if (display_.last_offer_from_clipboard_ == nullptr)
     return false;
 
@@ -258,12 +280,15 @@ bool window::clipboard_receive(clipboard_formats _supported_formats, const recei
       wl_data_offer_receive(offer, format_mime_type(mime), fds[1]);
       ::close(fds[1]);
 
-      wl_display_flush(display_.display_);
-      wl_display_roundtrip(display_.display_);
-
-      clipboard_receiver receiver{fds[0]};
-      _callback(mime, receiver);
-      ::close(fds[0]);
+      auto reader = async_readers_.emplace(async_readers_.end());
+      assert(async_readers_.size() < 8);
+      reader->receiver_.open(fds[0]);
+      reader->thread_ = std::thread([this, cb = std::move(_callback), mime, reader]() {
+        cb(mime, reader->receiver_);
+        this->display_.post([this, reader](auto) {
+          this->async_readers_.erase(reader);
+        });
+      });
       return true;
     }
   }
@@ -271,55 +296,79 @@ bool window::clipboard_receive(clipboard_formats _supported_formats, const recei
   return false;
 }
 
-void hut::drag_data_source_handle_send(void *_data, wl_data_source *_source, const char *_mime, int32_t _fd) {
-  //std::cout << "drag_data_source_handle_send " << _source << ", " << _mime << std::endl;
+void window::drag_data_source_handle_send(void *_data, wl_data_source *_source, const char *_mime, int32_t _fd) {
+#ifdef HUT_DEBUG_WL_DATA_LISTENERS
+  std::cout << "drag_data_source_handle_send " << _source << ", " << _mime << std::endl;
+#endif
   auto *w = (window*)_data;
   auto format = mime_type_format(_mime);
   if (format) {
-    clipboard_sender sender{_fd};
-    w->current_dragndrop_sender_(w->last_drag_action_handled_, *format, sender);
+    auto it = w->dragndrop_async_writers_.find(_source);
+    assert(it != w->dragndrop_async_writers_.end());
+    auto writer = it->second;
+    writer->sender_.open(_fd);
+    writer->thread_ = std::thread([f = format.value(), writer](){
+      writer->callback_(writer->last_drag_action_handled_, f, writer->sender_);
+      writer->sender_.close();
+    });
   }
-  ::close(_fd);
 }
 
-void hut::drag_data_source_handle_target(void *_data, wl_data_source *_source, const char *_mime) {
+void window::drag_data_source_handle_target(void *_data, wl_data_source *_source, const char *_mime) {
+#ifdef HUT_DEBUG_WL_DATA_LISTENERS
   //std::cout << "drag_data_source_handle_target " << _source << ", " << (_mime ? _mime : "<nullptr>") << std::endl;
+#endif
   auto *w = (window*)_data;
-  if (_mime == nullptr)
-    w->last_drag_action_handled_ = DNDNONE;
+  if (_mime == nullptr) {
+    auto it = w->dragndrop_async_writers_.find(_source);
+    assert(it != w->dragndrop_async_writers_.end());
+    it->second->last_drag_action_handled_ = DNDNONE;
+  }
 }
 
-void hut::drag_data_source_handle_action(void *_data, wl_data_source *_source, uint32_t _action) {
-  //std::cout << "drag_data_source_handle_action " << _source << ", " << _action << std::endl;
+void window::drag_data_source_handle_action(void *_data, wl_data_source *_source, uint32_t _action) {
+#ifdef HUT_DEBUG_WL_DATA_LISTENERS
+  std::cout << "drag_data_source_handle_action " << _source << ", " << _action << std::endl;
+#endif
 
   auto *w = (window*)_data;
+  auto it = w->dragndrop_async_writers_.find(_source);
+  assert(it != w->dragndrop_async_writers_.end());
   if (_action == WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY)
-    w->last_drag_action_handled_ = DNDCOPY;
+    it->second->last_drag_action_handled_ = DNDCOPY;
   else if (_action == WL_DATA_DEVICE_MANAGER_DND_ACTION_MOVE)
-    w->last_drag_action_handled_ = DNDMOVE;
+    it->second->last_drag_action_handled_ = DNDMOVE;
 }
 
-void hut::drag_data_source_handle_cancelled(void *_data, wl_data_source *_source) {
-  //std::cout << "drag_data_source_handle_cancelled " << _source << std::endl;
+void window::drag_data_source_handle_cancelled(void *_data, wl_data_source *_source) {
+#ifdef HUT_DEBUG_WL_DATA_LISTENERS
+  std::cout << "drag_data_source_handle_cancelled " << _source << std::endl;
+#endif
   auto *w = (window*)_data;
-  assert(_source == w->current_drag_source_);
+  auto it = w->dragndrop_async_writers_.find(_source);
+  assert(it != w->dragndrop_async_writers_.end());
   wl_data_source_destroy(_source);
-  w->current_drag_source_ = nullptr;
+  w->dragndrop_async_writers_.erase(it);
 }
 
-void hut::drag_data_source_handle_dnd_drop_performed(void *_data, wl_data_source *_source) {
-  //std::cout << "drag_data_source_handle_dnd_drop_performed " << _source << std::endl;
+void window::drag_data_source_handle_dnd_drop_performed(void *_data, wl_data_source *_source) {
+#ifdef HUT_DEBUG_WL_DATA_LISTENERS
+  std::cout << "drag_data_source_handle_dnd_drop_performed " << _source << std::endl;
+#endif
 }
 
-void hut::drag_data_source_handle_dnd_finished(void *_data, wl_data_source *_source) {
-  //std::cout << "drag_data_source_handle_dnd_finished " << _source << std::endl;
+void window::drag_data_source_handle_dnd_finished(void *_data, wl_data_source *_source) {
+#ifdef HUT_DEBUG_WL_DATA_LISTENERS
+  std::cout << "drag_data_source_handle_dnd_finished " << _source << std::endl;
+#endif
   auto *w = (window*)_data;
-  assert(_source == w->current_drag_source_);
+  auto it = w->dragndrop_async_writers_.find(_source);
+  assert(it != w->dragndrop_async_writers_.end());
   wl_data_source_destroy(_source);
-  w->current_drag_source_ = nullptr;
+  w->dragndrop_async_writers_.erase(it);
 }
 
-void window::dragndrop_start(dragndrop_actions _supported_actions, clipboard_formats _supported_formats, const send_dragndrop_data &_callback) {
+void window::dragndrop_start(dragndrop_actions _supported_actions, clipboard_formats _supported_formats, send_dragndrop_data &&_callback) {
   static const wl_data_source_listener wl_data_source_listeners = {
     drag_data_source_handle_target,
     drag_data_source_handle_send,
@@ -334,14 +383,16 @@ void window::dragndrop_start(dragndrop_actions _supported_actions, clipboard_for
   if (!_supported_formats)
     return;
 
-  assert(last_pointer_button_press_serial_ != 0);
-  assert(current_drag_source_ == nullptr);
+  auto *source = wl_data_device_manager_create_data_source(display_.data_device_manager_);
+  auto data = std::make_shared<dragndrop_async_writer>();
+  data->callback_ = std::move(_callback);
+  assert(dragndrop_async_writers_.find(source) == dragndrop_async_writers_.end());
+  dragndrop_async_writers_[source] = data;
+  assert(dragndrop_async_writers_.size() < 8);
 
-  current_dragndrop_sender_ = _callback;
-  current_drag_source_ = wl_data_device_manager_create_data_source(display_.data_device_manager_);
-  wl_data_source_add_listener(current_drag_source_, &wl_data_source_listeners, this);
+  wl_data_source_add_listener(source, &wl_data_source_listeners, this);
   for (auto mime : _supported_formats) {
-    wl_data_source_offer(current_drag_source_, format_mime_type(mime));
+    wl_data_source_offer(source, format_mime_type(mime));
   }
   uint32_t wl_actions = 0;
   for (auto action : _supported_actions) {
@@ -351,17 +402,19 @@ void window::dragndrop_start(dragndrop_actions _supported_actions, clipboard_for
       case DNDMOVE: wl_actions |= WL_DATA_DEVICE_MANAGER_DND_ACTION_MOVE; break;
     }
   }
-  wl_data_source_set_actions(current_drag_source_, wl_actions);
+  wl_data_source_set_actions(source, wl_actions);
   display_.cursor(CGRABBING);
-  wl_data_device_start_drag(display_.data_device_, current_drag_source_, wayland_surface_, nullptr, last_pointer_button_press_serial_);
+
+  assert(display_.last_mouse_click_serial_ != 0);
+  wl_data_device_start_drag(display_.data_device_, source, wayland_surface_, nullptr, display_.last_mouse_click_serial_);
 }
 
 void window::interactive_resize(edge _edge) {
-  // TODO Assert called from on_mouse (move) event
-  xdg_toplevel_resize(toplevel_, display_.seat_, display_.last_serial_, _edge.active_);
+  assert(display_.last_mouse_click_serial_ != 0);
+  xdg_toplevel_resize(toplevel_, display_.seat_, display_.last_mouse_click_serial_, _edge.active_);
 }
 
 void window::interactive_move() {
-  // TODO Assert called from on_mouse (move) event
-  xdg_toplevel_move(toplevel_, display_.seat_, display_.last_serial_);
+  assert(display_.last_mouse_click_serial_ != 0);
+  xdg_toplevel_move(toplevel_, display_.seat_, display_.last_mouse_click_serial_);
 }

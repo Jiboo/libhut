@@ -294,6 +294,10 @@ struct flagged {
   constexpr flagged(TEnum _init) { set(_init); }
   constexpr flagged(std::initializer_list<TEnum> _inits) { for (auto flag : _inits) set(flag); }
 
+  constexpr flagged& operator=(const flagged &_other) { active_ = _other.active_; return *this; }
+  constexpr flagged& operator=(TUnderlying _init) { active_ = _init; return *this; }
+  constexpr flagged& operator=(TEnum _init) { set(_init); return *this; }
+
   [[nodiscard]] constexpr bool query(TEnum _flag)      const { return active_ & mask(_flag); }
   [[nodiscard]] constexpr bool operator[](TEnum _flag) const { return query(_flag); }
   [[nodiscard]] constexpr bool operator&(TEnum _flag)  const { return query(_flag); }

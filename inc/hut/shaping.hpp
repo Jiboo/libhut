@@ -89,7 +89,7 @@ class shaper {
     shared_buffer &buff_;
     result &dst_;
     const shared_font &font_;
-    uint8_t size_;
+    uint8_t size_ = 0;
     const std::string_view text_;
   };
 

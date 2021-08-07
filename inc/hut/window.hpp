@@ -30,13 +30,7 @@
 #include <chrono>
 #include <string>
 
-#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
 #include <wayland-client.h>
-#elif defined(VK_USE_PLATFORM_WIN32_KHR)
-#include <windows.h>
-#else
-#error "can't find a suitable VK_USE_PLATFORM macro"
-#endif
 
 #include "hut/display.hpp"
 #include "hut/render_target.hpp"
@@ -64,7 +58,6 @@ struct window_params {
   enum flag {
     FDEPTH = render_target_params::flag::FDEPTH,
     FMULTISAMPLING = render_target_params::flag::FMULTISAMPLING,
-    FSYSTEM_DECORATIONS,
     FVSYNC,
     FTRANSPARENT,
     FFULLSCREEN,
@@ -72,7 +65,7 @@ struct window_params {
   };
   using flags = flagged<flag, flag::FLAG_LAST_VALUE>;
 
-  flags flags_ {FVSYNC, FSYSTEM_DECORATIONS};
+  flags flags_ {FVSYNC};
   uvec4 position_ = {0, 0, 800, 600};
   uvec2 min_size_ = {0, 0}, max_size_ = {0, 0};
 };
@@ -98,8 +91,6 @@ class window : public render_target {
   explicit window(display &_display, const window_params &_init_params = {});
   ~window();
 
-  [[nodiscard]] bool has_system_decorations() const { return has_system_decorations_; }
-
   void close();
   void pause();
 
@@ -122,15 +113,15 @@ class window : public render_target {
   }
 
   using send_clipboard_data = std::function<void(clipboard_format /*_selected_format*/, clipboard_sender &)>;
-  void clipboard_offer(clipboard_formats _supported_formats, const send_clipboard_data &_callback);
+  void clipboard_offer(clipboard_formats _supported_formats, send_clipboard_data &&_callback);
 
   using receive_clipboard_data = std::function<void(clipboard_format /*selected_format*/, clipboard_receiver &)>;
-  bool clipboard_receive(clipboard_formats _supported_formats, const receive_clipboard_data &_callback);
+  bool clipboard_receive(clipboard_formats _supported_formats, receive_clipboard_data &&_callback);
 
   void dragndrop_target(const std::shared_ptr<drop_target_interface> &_received) { drop_target_interface_ = _received; }
 
   using send_dragndrop_data = std::function<void(dragndrop_action /*_action*/, clipboard_format /*_selected_format*/, clipboard_sender &)>;
-  void dragndrop_start(dragndrop_actions _supported_actions, clipboard_formats _supported_formats, const send_dragndrop_data &_callback);
+  void dragndrop_start(dragndrop_actions _supported_actions, clipboard_formats _supported_formats, send_dragndrop_data &&_callback);
 
  protected:
   display &display_;
@@ -156,7 +147,6 @@ class window : public render_target {
   uvec2 previous_size_, previous_pos_; // used to save rect before maximize/fullscreen
   display::time_point last_frame_ = display::clock::now();
   bool minimized_ = false;
-  bool has_system_decorations_ = false;
 
   std::shared_ptr<drop_target_interface> drop_target_interface_;
 
@@ -165,78 +155,80 @@ class window : public render_target {
   void redraw(display::time_point);
 
  protected:
-#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
-  friend void registry_handler(void*, wl_registry*, uint32_t, const char*, uint32_t);
-  friend void seat_handler(void*, wl_seat*, uint32_t);
-  friend void handle_xdg_configure(void*, xdg_surface*, uint32_t);
-  friend void handle_toplevel_decoration_configure(void*, zxdg_toplevel_decoration_v1*, uint32_t);
-  friend void handle_toplevel_configure(void*, xdg_toplevel*, int32_t, int32_t, wl_array*);
-  friend void handle_toplevel_close(void*, xdg_toplevel*);
-  friend void pointer_handle_enter(void*, wl_pointer*, uint32_t, wl_surface*, wl_fixed_t, wl_fixed_t);
-  friend void pointer_handle_leave(void*, wl_pointer*, uint32_t, wl_surface*);
-  friend void pointer_handle_motion(void*, wl_pointer*, uint32_t, wl_fixed_t, wl_fixed_t);
-  friend void pointer_handle_button(void*, wl_pointer*, uint32_t, uint32_t, uint32_t, uint32_t);
-  friend void pointer_handle_axis(void*, wl_pointer*, uint32_t, uint32_t, wl_fixed_t);
-  friend void pointer_handle_frame(void*, wl_pointer*);
-  friend void pointer_handle_axis_source(void*, wl_pointer*, uint32_t);
-  friend void pointer_handle_axis_stop(void*, wl_pointer*, uint32_t, uint32_t);
-  friend void pointer_handle_axis_discrete(void*, wl_pointer*, uint32_t, int32_t);
-  friend void keyboard_handle_keymap(void*, wl_keyboard*, uint32_t, int, uint32_t);
-  friend void keyboard_handle_enter(void*, wl_keyboard*, uint32_t, wl_surface*, wl_array*);
-  friend void keyboard_handle_leave(void*, wl_keyboard*, uint32_t, wl_surface*);
-  friend void keyboard_handle_key(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t);
-  friend void keyboard_handle_modifiers(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
-  friend void keyboard_handle_repeat_info(void*, wl_keyboard*, int32_t, int32_t);
-  friend void clipboard_data_source_handle_target(void*, wl_data_source*, const char*);
-  friend void clipboard_data_source_handle_send(void*, wl_data_source*, const char*, int32_t);
-  friend void clipboard_data_source_handle_cancelled(void*, wl_data_source*);
-  friend void clipboard_data_source_handle_dnd_drop_performed(void*, wl_data_source*);
-  friend void clipboard_data_source_handle_dnd_finished(void*, wl_data_source*);
-  friend void clipboard_data_source_handle_action(void*, wl_data_source*, uint32_t);
-  friend void drag_data_source_handle_target(void*, wl_data_source*, const char*);
-  friend void drag_data_source_handle_send(void*, wl_data_source*, const char*, int32_t);
-  friend void drag_data_source_handle_cancelled(void*, wl_data_source*);
-  friend void drag_data_source_handle_dnd_drop_performed(void*, wl_data_source*);
-  friend void drag_data_source_handle_dnd_finished(void*, wl_data_source*);
-  friend void drag_data_source_handle_action(void*, wl_data_source*, uint32_t);
-  friend void data_offer_handle_offer(void*, wl_data_offer*, const char*);
-  friend void data_offer_handle_source_actions(void*, wl_data_offer*, uint32_t);
-  friend void data_offer_handle_action(void*, wl_data_offer*, uint32_t);
-  friend void data_device_handle_data_offer(void*, wl_data_device*, wl_data_offer*);
-  friend void data_device_handle_enter(void*, wl_data_device*, uint32_t, wl_surface*, wl_fixed_t, wl_fixed_t, wl_data_offer*);
-  friend void data_device_handle_leave(void*, wl_data_device*);
-  friend void data_device_handle_motion(void*, wl_data_device*, uint32_t, wl_fixed_t, wl_fixed_t);
-  friend void data_device_handle_drop(void*, wl_data_device*);
-  friend void data_device_handle_selection(void*, wl_data_device*, wl_data_offer*);
+  static void handle_xdg_configure(void*, xdg_surface*, uint32_t);
+  static void handle_toplevel_configure(void*, xdg_toplevel*, int32_t, int32_t, wl_array*);
+  static void handle_toplevel_close(void*, xdg_toplevel*);
+  static void clipboard_data_source_handle_target(void*, wl_data_source*, const char*);
+  static void clipboard_data_source_handle_send(void*, wl_data_source*, const char*, int32_t);
+  static void clipboard_data_source_handle_cancelled(void*, wl_data_source*);
+  static void clipboard_data_source_handle_dnd_drop_performed(void*, wl_data_source*);
+  static void clipboard_data_source_handle_dnd_finished(void*, wl_data_source*);
+  static void clipboard_data_source_handle_action(void*, wl_data_source*, uint32_t);
+  static void drag_data_source_handle_target(void*, wl_data_source*, const char*);
+  static void drag_data_source_handle_send(void*, wl_data_source*, const char*, int32_t);
+  static void drag_data_source_handle_cancelled(void*, wl_data_source*);
+  static void drag_data_source_handle_dnd_drop_performed(void*, wl_data_source*);
+  static void drag_data_source_handle_dnd_finished(void*, wl_data_source*);
+  static void drag_data_source_handle_action(void*, wl_data_source*, uint32_t);
 
   wl_surface *wayland_surface_;
   xdg_surface *window_;
   xdg_toplevel *toplevel_;
-  wl_data_source *current_selection_ = nullptr, *current_drag_source_ = nullptr;
-  zxdg_toplevel_decoration_v1 *decoration_ = nullptr;
 
   std::atomic_bool invalidated_ = true;
   vec2 mouse_lastmove_ = {0, 0};
   cursor_type current_cursor_type_ = CDEFAULT;
-  send_clipboard_data current_clipboard_sender_;
-  send_dragndrop_data current_dragndrop_sender_;
-  uint32_t last_pointer_button_press_serial_ = 0;
-  dragndrop_action last_drag_action_handled_ = DNDNONE;
 
-#elif defined(VK_USE_PLATFORM_WIN32_KHR)
-  friend LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _umsg, WPARAM _wparam, LPARAM _lparam);
+  struct dragndrop_async_writer {
+    send_dragndrop_data callback_;
+    std::thread thread_;
+    clipboard_sender sender_;
+    dragndrop_action last_drag_action_handled_ = DNDNONE;
 
-  void clipboard_write(clipboard_format _format, UINT _win_format);
-  std::span<uint8_t> parse_html_clipboard(std::string_view _input);
-  std::vector<uint8_t> format_html_clipboard(std::span<uint8_t> _input);
+    ~dragndrop_async_writer() {
+      sender_.close();
+      if (thread_.joinable())
+        thread_.join();
+    }
+  };
+  std::unordered_map<wl_data_source*, std::shared_ptr<dragndrop_async_writer>> dragndrop_async_writers_;
 
-  HWND window_;
-  vec2 mouse_lastmove_ = {0, 0};
-  bool button_pressed_ = false;
-  cursor_type current_cursor_type_ = CDEFAULT;
-  send_clipboard_data current_clipboard_sender_;
-  clipboard_formats current_clipboard_formats_;
-#endif
+  struct clipboard_async_writer {
+    std::thread thread_;
+    clipboard_sender sender_;
+
+    ~clipboard_async_writer() {
+      sender_.close();
+      if (thread_.joinable())
+        thread_.join();
+    }
+  };
+  struct clipboard_sender_context {
+    send_clipboard_data callback_;
+    wl_data_source *selection_ = nullptr;
+    std::list<clipboard_async_writer> writers_;
+
+    ~clipboard_sender_context() { clear(); }
+
+    void clear() {
+      for (auto &writer : writers_) {
+        writer.sender_.close();
+        if (writer.thread_.joinable())
+          writer.thread_.join();
+      }
+      if (selection_) {
+        wl_data_source_destroy(selection_);
+      }
+      selection_ = nullptr;
+    }
+    void reset(wl_data_source *_selection, send_clipboard_data &&_callback) {
+      clear();
+      selection_ = _selection;
+      callback_ = std::move(_callback);
+    }
+  };
+  clipboard_sender_context clipboard_sender_context_;
+  std::list<display::async_reader> async_readers_;
 };
 
 }  // namespace hut

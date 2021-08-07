@@ -123,13 +123,13 @@ void window::init_vulkan_surface() {
 
   uint32_t formats_count;
   HUT_PVK(vkGetPhysicalDeviceSurfaceFormatsKHR, pdevice, surface_, &formats_count, nullptr);
-  std::vector<VkSurfaceFormatKHR> formats(formats_count);
-  HUT_PVK(vkGetPhysicalDeviceSurfaceFormatsKHR, pdevice, surface_, &formats_count, formats.data());
-  surface_format_ = formats[0];
-  if (formats.size() == 1 && formats[0].format == VK_FORMAT_UNDEFINED) {
+  std::vector<VkSurfaceFormatKHR> surface_formats(formats_count);
+  HUT_PVK(vkGetPhysicalDeviceSurfaceFormatsKHR, pdevice, surface_, &formats_count, surface_formats.data());
+  surface_format_ = surface_formats[0];
+  if (surface_formats.size() == 1 && surface_formats[0].format == VK_FORMAT_UNDEFINED) {
     surface_format_ = {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
   } else {
-    for (const auto &it : formats) {
+    for (const auto &it : surface_formats) {
       if (it.format == VK_FORMAT_B8G8R8A8_UNORM && it.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
         surface_format_ = it;
         break;

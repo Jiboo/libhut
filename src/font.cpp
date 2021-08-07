@@ -38,7 +38,7 @@ font::font(display &_display, const uint8_t *_addr, size_t _size, const shared_a
   : library_(_display.ft_library_), atlas_(_atlas) {
   HUT_PROFILE_SCOPE(PFONT, "font::font");
   load_flags_ = FT_LOAD_COLOR | (_hinting ? FT_LOAD_FORCE_AUTOHINT : FT_LOAD_NO_HINTING);
-  auto result = FT_New_Memory_Face(library_, _addr, _size, 0, &face_);
+  auto result = FT_New_Memory_Face(library_, _addr, FT_Long(_size), 0, &face_);
   if (result != 0)
     throw std::runtime_error(sstream("couldn't load font: ") << result);
   if (FT_HAS_COLOR(face_))
@@ -78,7 +78,6 @@ font::glyph &font::load_glyph(glyph_cache_t &_cache, uint _char_index) {
     g.subimage_ = atlas_->pack(g.bounds_, std::span<const u8>{render.buffer, render.pitch * render.rows}, render.pitch);
   }
   else if (render.pixel_mode == FT_PIXEL_MODE_GRAY && atlas_format == VK_FORMAT_B8G8R8A8_UNORM) {
-    const auto pixel_count = render.width * render.rows;
     g.subimage_ = atlas_->alloc(g.bounds_);
     auto update = g.subimage_->prepare_update();
     auto *src = render.buffer;
