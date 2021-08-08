@@ -35,15 +35,15 @@ namespace hut::imgdec {
 
 #ifdef HUT_ENABLE_IMGDEC_LIBSPNG
   std::shared_ptr<image> load_png(display &_display, std::span<const u8> _data) {
-    spng_ctx *ctx = spng_ctx_new(0);
-    spng_set_png_buffer(ctx, _data.data(), _data.size_bytes());
+    auto ctx = std::unique_ptr<spng_ctx, decltype(&spng_ctx_free)>(spng_ctx_new(0), spng_ctx_free);
+    spng_set_png_buffer(ctx.get(), _data.data(), _data.size_bytes());
 
     spng_ihdr ihdr = {};
-    if (spng_get_ihdr(ctx, &ihdr) != SPNG_OK)
+    if (spng_get_ihdr(ctx.get(), &ihdr) != SPNG_OK)
       return nullptr;
 
     uint8_t rendering_intent = 0;
-    bool has_srgb = spng_get_srgb(ctx, &rendering_intent) == 0;
+    bool has_srgb = spng_get_srgb(ctx.get(), &rendering_intent) == 0;
 
     spng_format decode_format;
     switch (ihdr.color_type) {
@@ -81,20 +81,18 @@ namespace hut::imgdec {
       return nullptr;
 
     auto updator = result->prepare_update();
-    if (spng_decode_image(ctx, updator.data(), updator.size_bytes(), SPNG_FMT_RGBA8, SPNG_DECODE_PROGRESSIVE) != SPNG_OK)
+    if (spng_decode_image(ctx.get(), updator.data(), updator.size_bytes(),
+                          SPNG_FMT_RGBA8, SPNG_DECODE_PROGRESSIVE) != SPNG_OK)
       return nullptr;
 
     auto img_row_pitch = updator.image_row_pitch();
     for (uint row = 0; row < ihdr.height; row++) {
       u8 *target = updator.data() + (row * updator.staging_row_pitch());
-      auto errcode = spng_decode_row(ctx, target, img_row_pitch);
-      if (errcode != SPNG_OK && errcode != SPNG_EOI) {
-        auto strerr = spng_strerror(errcode);
+      auto errcode = spng_decode_row(ctx.get(), target, img_row_pitch);
+      if (errcode != SPNG_OK && errcode != SPNG_EOI)
         return nullptr;
-      }
     }
 
-    spng_ctx_free(ctx);
     return result;
   }
 #endif  // HUT_ENABLE_IMGDEC_LIBSPNG
