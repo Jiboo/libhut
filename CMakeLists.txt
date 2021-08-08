@@ -4,18 +4,16 @@ project(hut)
 ###########################################################
 # Configuration
 ###########################################################
-
-set(HUT_COMPILE_DEMOS TRUE)
-set(HUT_ENABLE_IMGUI TRUE)
-set(HUT_ENABLE_KTX2 TRUE)
-set(HUT_ENABLE_RENDERDOC TRUE)
+option(HUT_COMPILE_DEMOS "Compile all demos, can take some time due to shader/resources pipelines" TRUE)
+option(HUT_ENABLE_IMGUI "Enable the imgui extension, which is used for some tests and playgrounds" TRUE)
+option(HUT_ENABLE_KTX2 "Enable the ktx2 io extension library" TRUE)
+option(HUT_ENABLE_RENDERDOC "Enable the renderdoc extension allowing to trigger captures from code" TRUE)
+option(HUT_ENABLE_IMGDEC "Enable the image loading extension" TRUE)
 
 ###########################################################
 # Debug
 ###########################################################
-
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
+#set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -v")
 #set(HUT_ENABLE_PROFILING TRUE)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION)
@@ -27,16 +25,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 ###########################################################
 # Compile/link flags
 ###########################################################
-
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_COMPILE_WARNING_MODE HIGH)
 
 ###########################################################
-# message("Checking for required dependencies...")
+# Checking for required dependencies...
 ###########################################################
-
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/deps/")
 
 add_subdirectory(dep/glslang)
@@ -56,7 +52,7 @@ set(HUT_LIBS ${HUT_LIBS} ${Vulkan_LIBRARIES})
 
 find_package(GLM REQUIRED)
 set(HUT_INCLUDES ${HUT_INCLUDES} ${GLM_INCLUDE_DIRS})
-set(HUT_DEFINITIONS ${HUT_DEFINITIONS} "-DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_RADIANS -DGLM_FORCE_LEFT_HANDED")
+set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_RADIANS -DGLM_FORCE_LEFT_HANDED)
 
 find_package(PNG REQUIRED)
 set(HUT_INCLUDES ${HUT_INCLUDES} ${PNG_INCLUDE_DIRS})
@@ -111,9 +107,8 @@ file(GLOB HUT_WAYLAND_SOURCES src/wayland/*.cpp)
 set(HUT_SOURCES ${HUT_SOURCES} ${HUT_WAYLAND_SOURCES} ${HUT_WAYLAND_GENERATED})
 
 ###########################################################
-# message("Checking for optional dependencies...")
+# Checking for optional dependencies...
 ###########################################################
-
 if (HUT_ENABLE_PROFILING)
   find_package(fmt) #TODO Replace with std::format
   find_package(Boost)
@@ -141,6 +136,10 @@ if (HUT_ENABLE_IMGUI)
   set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_IMGUI)
 endif()
 
+if (HUT_ENABLE_IMGDEC)
+  set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_IMGDEC)
+endif()
+
 if (HUT_ENABLE_KTX2)
   set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_KTX2)
 endif()
@@ -162,9 +161,8 @@ if(GTEST_FOUND)
 endif()
 
 ###########################################################
-# message("Configuring shader generation...")
+# Shader generation helpers
 ###########################################################
-
 function(hut_gen_spv_bundle)
   cmake_parse_arguments(HUT_GEN_SPV_BUNDLE "" "NAMESPACE;OUTDIR" "SHADER_SOURCES" ${ARGN})
   if (NOT HUT_GEN_SPV_BUNDLE_NAMESPACE)
@@ -208,6 +206,9 @@ function(hut_gen_spv_bundle)
       PARENT_SCOPE)
 endfunction()
 
+###########################################################
+# Resource generation and shader reflection
+###########################################################
 add_executable(gen_res src/tools/gen_res/main.cpp)
 target_link_libraries(gen_res)
 target_include_directories(gen_res PRIVATE inc)
@@ -216,6 +217,9 @@ add_executable(gen_spv src/tools/gen_spv/main.cpp)
 target_link_libraries(gen_spv spirv_reflect)
 target_include_directories(gen_spv PRIVATE inc)
 
+###########################################################
+# hut library
+###########################################################
 set(HUT_GEN_DIR "${CMAKE_BINARY_DIR}/gen")
 file(MAKE_DIRECTORY ${HUT_GEN_DIR})
 set(HUT_INCLUDES ${HUT_INCLUDES} ${HUT_GEN_DIR})
@@ -223,10 +227,6 @@ set(HUT_INCLUDES ${HUT_INCLUDES} ${HUT_GEN_DIR})
 file(GLOB HUT_SHADER_SOURCES res/spv/*.frag res/spv/*.vert)
 
 hut_gen_spv_bundle(NAMESPACE hut_shaders OUTDIR ${HUT_GEN_DIR} SHADER_SOURCES ${HUT_SHADER_SOURCES})
-
-###########################################################
-# message("Configuring library build targets...")
-###########################################################
 
 set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DVK_USE_PLATFORM_WAYLAND_KHR)
 file(GLOB_RECURSE HUT_HEADERS inc/hut/*.hpp ${HUT_GEN_DIR}/*.hpp)
@@ -244,14 +244,12 @@ target_precompile_headers(hut PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT
 #message("HUT_INCLUDES: ${HUT_INCLUDES}")
 #message("HUT_LIBS: ${HUT_LIBS}")
 #message("HUT_SOURCES: ${HUT_SOURCES}")
-#message("HUT_BUNDLE_hut_shaders_FILES: ${HUT_BUNDLE_hut_shaders_FILES}")
 
 add_subdirectory(ext)
 
 ###########################################################
-# message("Configuring demo build targets...")
+# Demo targets
 ###########################################################
-
 if(HUT_COMPILE_DEMOS)
   file(GLOB HUT_DEMO_PNG tst/png/*.png)
   add_custom_command(OUTPUT ${HUT_GEN_DIR}/demo_png.cpp
@@ -270,11 +268,13 @@ if(HUT_COMPILE_DEMOS)
 
   set(HUT_DEMO_GENERATED_RES ${HUT_GEN_DIR}/demo_png.cpp ${HUT_GEN_DIR}/demo_woff2.cpp)
 
-  add_executable(demo tst/demo.cpp ${HUT_DEMO_GENERATED_RES} ${HUT_BUNDLE_demo_shaders_FILES})
-  target_link_libraries(demo hut)
-
   add_executable(demo_3d tst/demo_3d.cpp ${HUT_BUNDLE_demo_shaders_FILES})
   target_link_libraries(demo_3d hut)
+
+  if (HUT_ENABLE_IMGDEC)
+    add_executable(demo tst/demo.cpp ${HUT_DEMO_GENERATED_RES} ${HUT_BUNDLE_demo_shaders_FILES})
+    target_link_libraries(demo hut hut_imgdec)
+  endif()
 
   if (HUT_ENABLE_IMGUI)
     add_executable(demo_imgui tst/demo_imgui.cpp ${HUT_DEMO_GENERATED_RES})
@@ -294,11 +294,10 @@ if(HUT_COMPILE_DEMOS)
   endif()
 endif()
 
+###########################################################
+# Unit tests
+###########################################################
 if(GTEST_FOUND)
-  ###########################################################
-  # message("Enabling tests...")
-  ###########################################################
-
   file(GLOB HUT_UNIT_TESTS tst/unit/*.cpp)
   set(HUT_UNIT_TESTS_DEPS hut ${GTEST_BOTH_LIBRARIES})
 

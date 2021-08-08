@@ -87,9 +87,9 @@ class image {
     [[nodiscard]] u8 *data() { return data_.data(); }
     [[nodiscard]] size_t size_bytes() const { return data_.size_bytes(); }
     [[nodiscard]] uint staging_row_pitch() const { return staging_row_pitch_; }
+    [[nodiscard]] uint image_row_pitch() const { return target_.bpp() * bbox_size(subres_.coords_).x / 8; }
   };
 
-  static std::shared_ptr<image> load_png(display &, std::span<const u8> _data);
   static std::shared_ptr<image> load_raw(display &, std::span<const u8> _data, uint _data_row_pitch, const image_params &_params);
 
   image(display &_display, const image_params &_params);

@@ -1,18 +1,18 @@
-# - Try to find librenderdoc
+# - Try to find libspng
 # Once done, this will define
 #
-#   RENDERDOC_FOUND - System has Renderdoc
-#   RENDERDOC_INCLUDE_DIRS - The Renderdoc include directories
-#   RENDERDOC_LIBRARIES - The libraries needed to use Renderdoc
-#   RENDERDOC_DEFINITIONS - Compiler switches required for using Renderdoc
+#   SIMPLEPNG_FOUND - System has spng
+#   SIMPLEPNG_INCLUDE_DIRS - The spng include directories
+#   SIMPLEPNG_LIBRARIES - The libraries needed to use spng
+#   SIMPLEPNG_DEFINITIONS - Compiler switches required for using spng
 
-find_path(RENDERDOC_INCLUDE_DIR NAMES renderdoc_app.h )
-find_library(RENDERDOC_LIBRARY NAMES renderdoc)
+find_path(SIMPLEPNG_INCLUDE_DIR NAMES spng.h)
+find_library(SIMPLEPNG_LIBRARY NAMES spng)
 
-set(RENDERDOC_LIBRARIES ${RENDERDOC_LIBRARY})
-set(RENDERDOC_INCLUDE_DIRS ${RENDERDOC_INCLUDE_DIR})
+set(SIMPLEPNG_LIBRARIES ${SIMPLEPNG_LIBRARY})
+set(SIMPLEPNG_INCLUDE_DIRS ${SIMPLEPNG_INCLUDE_DIR})
 
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(Renderdoc DEFAULT_MSG RENDERDOC_LIBRARY RENDERDOC_INCLUDE_DIR)
+find_package_handle_standard_args(SimplePNG DEFAULT_MSG SIMPLEPNG_LIBRARY SIMPLEPNG_INCLUDE_DIR)
 
-mark_as_advanced(RENDERDOC_LIBRARY RENDERDOC_INCLUDE_DIR)
+mark_as_advanced(SIMPLEPNG_LIBRARY SIMPLEPNG_INCLUDE_DIR)

@@ -9,3 +9,7 @@ endif()
 if (HUT_ENABLE_RENDERDOC)
   add_subdirectory(renderdoc)
 endif()
+
+if (HUT_ENABLE_IMGDEC)
+  add_subdirectory(imgdec)
+endif()

@@ -34,6 +34,8 @@
 #include "hut/shaping.hpp"
 #include "hut/window.hpp"
 
+#include "hut_imgdec.hpp"
+
 #include "demo_woff2.hpp"
 #include "demo_png.hpp"
 
@@ -250,7 +252,7 @@ int main(int, char **) {
   std::atomic_bool tex1_ready = false, tex2_ready = false;
 
   std::thread load_res([&]() {
-    tex1 = image::load_png(d, demo_png::tex1_png);
+    tex1 = imgdec::load_png(d, demo_png::tex1_png);
     tex_pipeline->write(0, ubo, tex1, samp);
     tex_rgb_pipeline->write(0, ubo, tex1, samp);
     tex_rgba_pipeline->write(0, ubo, tex1, samp);
@@ -271,7 +273,7 @@ int main(int, char **) {
       w.invalidate(true);  // will force to call on_draw on the next frame
     }
 
-    tex2 = image::load_png(d, demo_png::tex2_png);
+    tex2 = imgdec::load_png(d, demo_png::tex2_png);
     tex_pipeline->write(1, ubo, tex2, samp);
     tex_rgb_pipeline->write(1, ubo, tex2, samp);
     tex_rgba_pipeline->write(1, ubo, tex2, samp);
