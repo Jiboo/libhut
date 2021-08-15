@@ -253,10 +253,13 @@ class sstream {
   std::ostringstream stream_;
 
  public:
-  template <typename T>
-  explicit sstream(const T &_base) {
-    stream_ << _base;
-  }
+  sstream() noexcept = default;
+  sstream(const sstream &) = delete;
+  sstream(sstream &&_base) noexcept : stream_(std::move(_base.stream_)) {}
+
+  explicit sstream(const char *_base) { stream_ << _base; }
+  explicit sstream(const std::string &_base) { stream_ << _base; }
+  explicit sstream(const std::string_view _base) { stream_ << _base; }
 
   template <typename T>
   sstream &operator<<(const T &_rhs) {
@@ -268,8 +271,16 @@ class sstream {
     return stream_.str();
   }
 
+  std::string_view view() const {
+    return stream_.view();
+  }
+
   operator std::string() const {
     return str();
+  }
+
+  operator std::string_view() const {
+    return view();
   }
 };
 

@@ -125,7 +125,7 @@ using shared_image = std::shared_ptr<image>;
 struct sampler_params {
   VkFilter filter_ = VK_FILTER_LINEAR;
   bool anisotropy_ = true;
-  VkSamplerAddressMode addressMode_ = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+  VkSamplerAddressMode addressMode_ = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
   glm::vec2 lodRange_ = {0, 0};
   float lodBias_ = 0;
 
