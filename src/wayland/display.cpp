@@ -48,11 +48,10 @@ void display::pointer_handle_enter(void *_data, wl_pointer *_pointer, uint32_t _
     assert(w);
     d->pointer_current_ = {_surface, w};
     w->mouse_lastmove_ = coords;
-    d->current_serial_ = _serial;
+    d->last_serial_ = _serial;
     d->last_mouse_enter_serial_ = _serial;
     d->cursor(w->current_cursor_type_);
     HUT_PROFILE_EVENT_NAMED(w, on_mouse, ("button", "mouse_event_type", "coords"), 0, MMOVE, coords);
-    d->current_serial_ = 0;
   }
 }
 
@@ -61,11 +60,10 @@ void display::pointer_handle_leave(void *_data, wl_pointer *_pointer, uint32_t _
   auto *d = static_cast<display*>(_data);
   if (_pointer == d->pointer_) {
     d->pointer_current_ = {nullptr, nullptr};
-    d->last_mouse_enter_serial_ = 0;
   }
 }
 
-void display::pointer_handle_motion(void *_data, wl_pointer *_pointer, uint32_t, wl_fixed_t _sx, wl_fixed_t _sy) {
+void display::pointer_handle_motion(void *_data, wl_pointer *_pointer, uint32_t _time, wl_fixed_t _sx, wl_fixed_t _sy) {
   //std::cout << "pointer_handle_motion " << _pointer << ", " << wl_fixed_to_double(_sx) << ", " << wl_fixed_to_double(_sy) << std::endl;
   auto *d = static_cast<display*>(_data);
   if (_pointer == d->pointer_) {
@@ -75,26 +73,26 @@ void display::pointer_handle_motion(void *_data, wl_pointer *_pointer, uint32_t,
       w->mouse_lastmove_ = coords;
 
       HUT_PROFILE_EVENT_NAMED(w, on_mouse, ("button", "mouse_event_type", "coords"), 0, MMOVE, coords);
+      HUT_PROFILE_EVENT(w, on_time, _time);
     }
   }
 }
 
-void display::pointer_handle_button(void *_data, wl_pointer *_pointer, uint32_t _serial, uint32_t, uint32_t _button, uint32_t _state) {
+void display::pointer_handle_button(void *_data, wl_pointer *_pointer, uint32_t _serial, uint32_t _time, uint32_t _button, uint32_t _state) {
   //std::cout << "pointer_handle_button " << _pointer << ", " << _button << ", " << _state << std::endl;
   auto *d = static_cast<display*>(_data);
   if (_pointer == d->pointer_) {
     auto *w = d->pointer_current_.second;
     if (w) {
-      d->last_mouse_click_serial_ = _state ? _serial : 0;
-      d->current_serial_ = _serial;
+      d->last_mouse_click_serial_ = _serial;
+      d->last_serial_ = _serial;
       HUT_PROFILE_EVENT_NAMED(w, on_mouse, ("button", "mouse_event_type", "coords"), _button - BTN_MOUSE + 1,
                               _state ? MDOWN : MUP, w->mouse_lastmove_);
-      d->current_serial_ = 0;
     }
   }
 }
 
-void display::pointer_handle_axis(void *_data, wl_pointer *_pointer, uint32_t, uint32_t, wl_fixed_t _value) {
+void display::pointer_handle_axis(void *_data, wl_pointer *_pointer, uint32_t _time, uint32_t _axis, wl_fixed_t _value) {
   //std::cout << "pointer_handle_axis " << _pointer << ", " << _axis << ", " << wl_fixed_to_double(_value) << std::endl;
   auto *d = static_cast<display*>(_data);
   if (_pointer == d->pointer_) {
@@ -286,9 +284,8 @@ void display::keyboard_handle_enter(void *_data, wl_keyboard *_keyboard, uint32_
     auto *w = wit->second;
     assert(w);
     d->keyboard_current_ = {_surface, w};
-    d->current_serial_ = _serial;
+    d->last_serial_ = _serial;
     HUT_PROFILE_EVENT(w, on_focus);
-    d->current_serial_ = 0;
   }
 }
 
@@ -299,15 +296,14 @@ void display::keyboard_handle_leave(void *_data, wl_keyboard *_keyboard, uint32_
   if (_keyboard == d->keyboard_) {
     d->keyboard_current_ = {nullptr, nullptr};
     if (wit != d->windows_.end()) {
-      d->current_serial_ = _serial;
+      d->last_serial_ = _serial;
       HUT_PROFILE_EVENT(wit->second, on_blur);
       d->keyboard_repeat(0);
-      d->current_serial_ = 0;
     }
   }
 }
 
-void display::keyboard_handle_key(void *_data, wl_keyboard *_keyboard, uint32_t _serial, uint32_t, uint32_t _key, uint32_t _state) {
+void display::keyboard_handle_key(void *_data, wl_keyboard *_keyboard, uint32_t _serial, uint32_t _time, uint32_t _key, uint32_t _state) {
   //std::cout << "keyboard_handle_key " << _keyboard << ", " << _key << ", " << _state << std::endl;
   auto *d = static_cast<display*>(_data);
   if (_keyboard == d->keyboard_) {
@@ -318,7 +314,7 @@ void display::keyboard_handle_key(void *_data, wl_keyboard *_keyboard, uint32_t 
     const auto upper_ksym = xkb_keysym_to_upper(ksym);
     const auto hut_ksym = display::map_xkb_keysym(upper_ksym);
 
-    d->current_serial_ = _serial;
+    d->last_serial_ = _serial;
     HUT_PROFILE_EVENT_NAMED(w, on_key, ("kcode", "ksym", "down"), kcode, hut_ksym, _state != 0);
     if (_state != 0) {
       const auto utf32 = xkb_keysym_to_utf32(ksym);
@@ -332,7 +328,6 @@ void display::keyboard_handle_key(void *_data, wl_keyboard *_keyboard, uint32_t 
     else {
       d->keyboard_repeat(0);
     }
-    d->current_serial_ = 0;
   }
 }
 
@@ -358,9 +353,8 @@ void display::keyboard_handle_modifiers(void *_data, wl_keyboard *_keyboard, uin
 
   auto *w = d->keyboard_current_.second;
   if (_keyboard == d->keyboard_ && w) {
-    d->current_serial_ = _serial;
+    d->last_serial_ = _serial;
     HUT_PROFILE_EVENT(w, on_kmods, mod_mask);
-    d->current_serial_ = 0;
   }
 }
 
@@ -417,7 +411,7 @@ void display::registry_handler(void *_data, wl_registry *_registry, uint32_t _id
     d->compositor_ = static_cast<wl_compositor*>(wl_registry_bind(_registry, _id, &wl_compositor_interface, 4));
   }
   else if (strcmp(_interface, xdg_wm_base_interface.name) == 0) {
-    d->xdg_wm_base_ = static_cast<xdg_wm_base*>(wl_registry_bind(_registry, _id, &xdg_wm_base_interface, 3));
+    d->xdg_wm_base_ = static_cast<xdg_wm_base*>(wl_registry_bind(_registry, _id, &xdg_wm_base_interface, 1));
     xdg_wm_base_add_listener(d->xdg_wm_base_, &xdg_wm_base_listeners, _data);
   }
   else if (strcmp(_interface, wl_seat_interface.name) == 0) {
@@ -442,7 +436,7 @@ void clipboard_sender::open(int _fd) {
   fd_ = _fd;
 }
 
-ssize_t clipboard_sender::write(std::span<uint8_t> _data) {
+ssize_t clipboard_sender::write(std::span<const uint8_t> _data) {
   assert(fd_ != 0);
   return ::write(fd_, _data.data(), _data.size_bytes());
 }
@@ -479,7 +473,7 @@ void display::data_offer_handle_offer(void *_data, wl_data_offer *_offer, const 
   auto format = mime_type_format(_mime);
   if (format) {
 #ifdef HUT_DEBUG_WL_DATA_LISTENERS
-    std::cout << "data_offer_handle_offer got " << format_mime_type(*format) << std::endl;
+    std::cout << "data_offer_handle_offer got " << *format << std::endl;
 #endif
     d->offer_params_[_offer].formats_ |= *format;
   }
@@ -561,7 +555,6 @@ void display::data_device_handle_leave(void *_data, wl_data_device *_device) {
 #endif
   auto *d = static_cast<display*>(_data);
   if (d->current_drop_target_interface_) {
-    d->current_drop_target_interface_->on_leave();
     d->current_drop_target_interface_.reset();
   }
 }
@@ -578,6 +571,11 @@ void display::data_device_handle_motion(void *_data, wl_data_device *_device, ui
     vec2 pos {wl_fixed_to_double(_x), wl_fixed_to_double(_y)};
     auto move_result = d->current_drop_target_interface_->on_move(pos);
 
+    switch(move_result.preferred_action_) {
+      case DNDCOPY: d->cursor(CCOPY); break;
+      case DNDMOVE: d->cursor(CMOVE); break;
+      case DNDNONE: d->cursor(CNO_DROP); break;
+    }
     if (move_result.preferred_action_ == DNDNONE) {
 #ifdef HUT_DEBUG_WL_DATA_LISTENERS
       std::cout << "data_device_handle_motion canceling" << std::endl;
@@ -598,7 +596,6 @@ void display::data_device_handle_motion(void *_data, wl_data_device *_device, ui
       wl_data_offer_set_actions(offer, possible, preferred);
       wl_data_offer_accept(offer, d->drag_enter_serial_, format_mime_type(move_result.preferred_format_));
       params.drop_format_ = move_result.preferred_format_;
-
 #ifdef HUT_DEBUG_WL_DATA_LISTENERS
       //std::cout << "data_device_handle_motion set " << possible << ", " << preferred << ", " << format_mime_type(move_result.preferred_format_) << std::endl;
 #endif
@@ -794,6 +791,10 @@ void display::post_empty_event() {
   wl_callback_destroy(wl_display_sync(display_));
 }
 
+void display::roundtrip() {
+  wl_display_dispatch(display_);
+}
+
 int display::dispatch() {
   if (windows_.empty())
     throw std::runtime_error("dispatch called without any window");
@@ -823,16 +824,19 @@ int display::dispatch() {
 }
 
 void display::cursor_frame(wl_cursor *_cursor, size_t _frame) {
-  assert(_frame < _cursor->image_count);
-  wl_cursor_image* image = _cursor->images[_frame];
-  wl_buffer *buffer = wl_cursor_image_get_buffer(image);
-  wl_surface_attach(cursor_surface_, buffer, 0, 0);
-  wl_surface_damage(cursor_surface_, 0, 0, int32_t(image->width), int32_t(image->height));
-  wl_surface_commit(cursor_surface_);
-
-  assert(last_mouse_enter_serial_ != 0);
-  wl_pointer_set_cursor(pointer_, last_mouse_enter_serial_, cursor_surface_,
-                        int(image->hotspot_x), int(image->hotspot_y));
+  if (_cursor != nullptr) {
+    assert(_frame < _cursor->image_count);
+    wl_cursor_image* image = _cursor->images[_frame];
+    wl_buffer *buffer = wl_cursor_image_get_buffer(image);
+    wl_surface_attach(cursor_surface_, buffer, 0, 0);
+    wl_surface_damage(cursor_surface_, 0, 0, int32_t(image->width), int32_t(image->height));
+    wl_surface_commit(cursor_surface_);
+    wl_pointer_set_cursor(pointer_, last_mouse_enter_serial_, cursor_surface_,
+                          int(image->hotspot_x), int(image->hotspot_y));
+  }
+  else {
+    wl_pointer_set_cursor(pointer_, last_mouse_enter_serial_, nullptr, 0, 0);
+  }
 }
 
 void display::cursor(cursor_type _c) {
@@ -848,6 +852,10 @@ void display::cursor(cursor_type _c) {
     else {
       animate_cursor(result);
     }
+  }
+  else if (_c == CNONE) {
+    animate_cursor(nullptr);
+    cursor_frame(nullptr, 0);
   }
 }
 

@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "hut_ktx2.hpp"
-#include "unittests_ktx2.hpp"
+#include "ktx2_tst_data.hpp"
 
 #ifdef HUT_ENABLE_RENDERDOC
 #include "hut_renderdoc.hpp"
@@ -10,7 +10,7 @@
 TEST(ktx2, tex_rgba8888_ktx2) {
   hut::display d("ktx2");
 
-  auto result = hut::ktx::load(d, hut::unittests_ktx2::tex_rgba8888_ktx2);
+  auto result = hut::ktx::load(d, hut::ktx2_tst_data::tex_rgba8888_ktx2);
   d.flush_staged();
 
   ASSERT_TRUE(result.has_value());
@@ -30,7 +30,7 @@ TEST(ktx2, tex_bc1_ktx2) {
 
   hut::ktx::load_params kparams;
   kparams.tiling_ = VK_IMAGE_TILING_OPTIMAL;
-  auto result = hut::ktx::load(d, hut::unittests_ktx2::tex_bc1_ktx2, kparams);
+  auto result = hut::ktx::load(d, hut::ktx2_tst_data::tex_bc1_ktx2, kparams);
   d.flush_staged();
 
   ASSERT_TRUE(result.has_value());
@@ -49,7 +49,7 @@ TEST(ktx2, tex_2layers_bc1_ktx2) {
   hut::display d("ktx2");
   hut::ktx::load_params kparams;
   kparams.tiling_ = VK_IMAGE_TILING_OPTIMAL;
-  auto result = hut::ktx::load(d, hut::unittests_ktx2::tex_2layers_bc1_ktx2, kparams);
+  auto result = hut::ktx::load(d, hut::ktx2_tst_data::tex_2layers_bc1_ktx2, kparams);
   d.flush_staged();
 
   ASSERT_TRUE(result.has_value());
@@ -64,7 +64,7 @@ TEST(ktx2, tex_cubemap_bc1_ktx2) {
   hut::display d("ktx2");
   hut::ktx::load_params kparams;
   kparams.tiling_ = VK_IMAGE_TILING_OPTIMAL;
-  auto result = hut::ktx::load(d, hut::unittests_ktx2::tex_cubemap_bc1_ktx2, kparams);
+  auto result = hut::ktx::load(d, hut::ktx2_tst_data::tex_cubemap_bc1_ktx2, kparams);
   d.flush_staged();
 
   ASSERT_TRUE(result.has_value());

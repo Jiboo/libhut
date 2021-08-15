@@ -25,28 +25,25 @@
  * SOFTWARE.
  */
 
-#pragma once
+#include <gtest/gtest.h>
 
-#include <cstdint>
-
-#include <glm/glm.hpp>
-#include "imgui.h"
-#include "hut/window.hpp"
 #include "hut/display.hpp"
+#include "hut/window.hpp"
 
-IMGUI_IMPL_API bool     ImGui_ImplHut_Init(hut::display *_d, hut::window* _w, bool _install_callbacks);
-IMGUI_IMPL_API void     ImGui_ImplHut_Shutdown();
-IMGUI_IMPL_API void     ImGui_ImplHut_NewFrame();
-IMGUI_IMPL_API void     ImGui_ImplHut_RenderDrawData(VkCommandBuffer _buffer, ImDrawData* _draw_data);
+using namespace hut;
 
-// Use if you want to reset your rendering device without losing Dear ImGui state.
-IMGUI_IMPL_API bool     ImGui_ImplHut_CreateDeviceObjects();
-IMGUI_IMPL_API void     ImGui_ImplHut_InvalidateDeviceObjects();
-
-// Callbacks (installed by default if you enable 'install_callbacks' during initialization)
-// You can also handle inputs yourself and use those as a reference.
-IMGUI_IMPL_API bool     ImGui_ImplHut_HandleOnResize(hut::uvec2 _size);
-IMGUI_IMPL_API bool     ImGui_ImplHut_HandleOnMouse(uint8_t _button, hut::mouse_event_type _type, hut::vec2 _pos);
-IMGUI_IMPL_API bool     ImGui_ImplHut_HandleOnKey(hut::keycode _kcode, hut::keysym _ksym, bool _down);
-IMGUI_IMPL_API bool     ImGui_ImplHut_HandleOnKMods(hut::modifiers _mods);
-IMGUI_IMPL_API bool     ImGui_ImplHut_HandleOnChar(char32_t _utf32_char);
+TEST(window, fastkill) {
+  {
+    display d("hut fastkill test");
+    window w(d);
+  }
+  {
+    display d("hut fastkill test");
+    window w1(d);
+    window w2(d);
+    {
+      window w3(d);
+    }
+    window w4(d);
+  }
+}

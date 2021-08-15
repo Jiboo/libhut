@@ -4,23 +4,28 @@ project(hut)
 ###########################################################
 # Configuration
 ###########################################################
-option(HUT_COMPILE_DEMOS "Compile all demos, can take some time due to shader/resources pipelines" TRUE)
-option(HUT_ENABLE_IMGUI "Enable the imgui extension, which is used for some tests and playgrounds" TRUE)
-option(HUT_ENABLE_KTX2 "Enable the ktx2 io extension library" TRUE)
-option(HUT_ENABLE_RENDERDOC "Enable the renderdoc extension allowing to trigger captures from code" TRUE)
 option(HUT_ENABLE_IMGDEC "Enable the image loading extension" TRUE)
+  option(HUT_ENABLE_IMGDEC_LIBSPNG "Enable libspng backend" TRUE)
+
+option(HUT_ENABLE_KTX2 "Enable the ktx2 io extension library" TRUE)
+option(HUT_ENABLE_IMGUI "Enable the imgui extension, which is used for some tests and playgrounds" TRUE)
+option(HUT_ENABLE_RENDERDOC "Enable the renderdoc extension allowing to trigger captures from code" TRUE)
+option(HUT_ENABLE_PROFILING "Enable the renderdoc extension allowing to trigger captures from code" TRUE)
+
+option(HUT_COMPILE_SAMPLES "Compile all samples/demos, can take some time due to shader/resources pipelines" TRUE)
+option(HUT_COMPILE_PLAYGROUNDS "Compile all test playgrounds" TRUE)
+option(HUT_COMPILE_UNITTESTS "Compile all unit tests" TRUE)
 
 ###########################################################
 # Debug
-###########################################################
+###########################################################31 oct. 2020 — Flame graphs can be generated from any profile data that contains stack ... Flame charts were first added by Google Chrome's WebKit Web ...
 #set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -v")
-#set(HUT_ENABLE_PROFILING TRUE)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION_DEBUG)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_DEBUG_WL_DATA_LISTENERS)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_DEBUG_STAGING)
-#set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_PREFER_NONDESCRETE_DEVICES)
+#set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_PREFER_NONDESCRETE_DEVICES)31 oct. 2020 — Flame graphs can be generated from any profile data that contains stack ... Flame charts were first added by Google Chrome's WebKit Web ...
 
 ###########################################################
 # Compile/link flags
@@ -199,7 +204,6 @@ function(hut_gen_spv_bundle)
           COMMENT "Generating SPIR-V reflection for ${HUT_GEN_SPV_BUNDLE_NAMESPACE}")
 
   set(HUT_BUNDLE_${HUT_GEN_SPV_BUNDLE_NAMESPACE}_FILES
-      ${HUT_GEN_SPV_BUNDLE_SHADER_OBJECTS}
       ${HUT_GEN_SPV_BUNDLE_OUTDIR}/${HUT_GEN_SPV_BUNDLE_NAMESPACE}.cpp
       ${HUT_GEN_SPV_BUNDLE_OUTDIR}/${HUT_GEN_SPV_BUNDLE_NAMESPACE}.hpp
       ${HUT_GEN_SPV_BUNDLE_OUTDIR}/${HUT_GEN_SPV_BUNDLE_NAMESPACE}_refl.hpp
@@ -245,79 +249,154 @@ target_precompile_headers(hut PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT
 #message("HUT_LIBS: ${HUT_LIBS}")
 #message("HUT_SOURCES: ${HUT_SOURCES}")
 
-add_subdirectory(ext)
-
 ###########################################################
-# Demo targets
+# hut extensions
 ###########################################################
-if(HUT_COMPILE_DEMOS)
-  file(GLOB HUT_DEMO_PNG tst/png/*.png)
-  add_custom_command(OUTPUT ${HUT_GEN_DIR}/demo_png.cpp
-      COMMAND $<TARGET_FILE:gen_res> demo_png ${HUT_GEN_DIR} ${HUT_DEMO_PNG}
-      DEPENDS gen_res ${HUT_DEMO_PNG}
-      COMMENT "Generating demo_png.cpp")
+if (HUT_ENABLE_IMGUI)
+  file(GLOB_RECURSE HUT_IMGUI_HEADERS ext/imgui/*.hpp)
+  file(GLOB_RECURSE HUT_IMGUI_SOURCES ext/imgui/*.cpp)
+  set(HUT_IMGUI_INCLUDES ext/imgui)
 
-  file(GLOB_RECURSE HUT_DEMO_WOFF2 tst/woff2/*.woff2)
-  add_custom_command(OUTPUT ${HUT_GEN_DIR}/demo_woff2.cpp
-      COMMAND $<TARGET_FILE:gen_res> demo_woff2 ${HUT_GEN_DIR} ${HUT_DEMO_WOFF2}
-      DEPENDS gen_res ${HUT_DEMO_WOFF2}
-      COMMENT "Generating demo_woff2.cpp")
+  file(GLOB HUT_IMGUI_SHADERS_SOURCE ext/imgui/*.vert ext/imgui/*.frag)
+  hut_gen_spv_bundle(NAMESPACE hut_imgui_shaders OUTDIR ${HUT_GEN_DIR} SHADER_SOURCES ${HUT_IMGUI_SHADERS_SOURCE})
 
-  file(GLOB HUT_DEMO_SHADERS_SOURCE tst/spv/*.vert tst/spv/*.frag)
-  hut_gen_spv_bundle(NAMESPACE demo_shaders OUTDIR ${HUT_GEN_DIR} SHADER_SOURCES ${HUT_DEMO_SHADERS_SOURCE})
+  add_library(hut_imgui STATIC ${HUT_IMGUI_HEADERS} ${HUT_IMGUI_SOURCES} ${HUT_BUNDLE_hut_imgui_shaders_FILES})
+  target_link_libraries(hut_imgui imgui hut)
+  target_include_directories(hut_imgui PUBLIC ${HUT_IMGUI_INCLUDES} ${HUT_GEN_DIR})
+endif()
 
-  set(HUT_DEMO_GENERATED_RES ${HUT_GEN_DIR}/demo_png.cpp ${HUT_GEN_DIR}/demo_woff2.cpp)
+if (HUT_ENABLE_KTX2)
+  file(GLOB_RECURSE HUT_KTX2_HEADERS ext/ktx2/inc/*.hpp)
+  file(GLOB_RECURSE HUT_KTX2_SOURCES ext/ktx2/src/*.cpp)
+  set(HUT_KTX2_INCLUDES ext/ktx2/inc)
 
-  add_executable(demo_3d tst/demo_3d.cpp ${HUT_BUNDLE_demo_shaders_FILES})
-  target_link_libraries(demo_3d hut)
+  add_library(hut_ktx2 STATIC ${HUT_KTX2_HEADERS} ${HUT_KTX2_SOURCES})
+  target_link_libraries(hut_ktx2 hut)
+  target_include_directories(hut_ktx2 PUBLIC ${HUT_KTX2_INCLUDES})
 
-  if (HUT_ENABLE_IMGDEC)
-    add_executable(demo tst/demo.cpp ${HUT_DEMO_GENERATED_RES} ${HUT_BUNDLE_demo_shaders_FILES})
-    target_link_libraries(demo hut hut_imgdec)
-  endif()
+  if (HUT_COMPILE_UNITTESTS)
+    file(GLOB_RECURSE HUT_KTX2_TST_DATA ext/ktx2/tst/res/*.ktx2)
+    add_custom_command(OUTPUT ${HUT_GEN_DIR}/ktx2_tst_data.cpp
+        COMMAND $<TARGET_FILE:gen_res> ktx2_tst_data ${HUT_GEN_DIR} ${HUT_KTX2_TST_DATA}
+        DEPENDS gen_res ${HUT_KTX2_TST_DATA}
+        COMMENT "Generating KTX2 unittests data")
 
-  if (HUT_ENABLE_IMGUI)
-    add_executable(demo_imgui tst/demo_imgui.cpp ${HUT_DEMO_GENERATED_RES})
-    target_link_libraries(demo_imgui hut_imgui_impl)
-
-    add_executable(sandbox_binpacks tst/sandbox_binpacks_imgui.cpp ${HUT_DEMO_GENERATED_RES})
-    target_link_libraries(sandbox_binpacks hut_imgui_impl)
-
-    add_executable(sandbox_text tst/sandbox_text_imgui.cpp ${HUT_DEMO_GENERATED_RES})
-    target_link_libraries(sandbox_text hut_imgui_impl)
-
-    add_executable(sandbox_emoji tst/sandbox_emoji_imgui.cpp ${HUT_DEMO_GENERATED_RES})
-    target_link_libraries(sandbox_emoji hut_imgui_impl)
-
-    add_executable(sandbox_atlas tst/sandbox_atlas_imgui.cpp ${HUT_DEMO_GENERATED_RES})
-    target_link_libraries(sandbox_atlas hut_imgui_impl)
+    file(GLOB_RECURSE HUT_KTX2_UNIT_TESTS ext/ktx2/tst/*.cpp)
+    set(HUT_UNIT_TESTS ${HUT_UNIT_TESTS} ${HUT_KTX2_UNIT_TESTS} ${HUT_GEN_DIR}/ktx2_tst_data.cpp)
+    set(HUT_UNIT_TESTS_DEPS ${HUT_UNIT_TESTS_DEPS} hut_ktx2)
   endif()
 endif()
 
-###########################################################
-# Unit tests
-###########################################################
-if(GTEST_FOUND)
-  file(GLOB HUT_UNIT_TESTS tst/unit/*.cpp)
-  set(HUT_UNIT_TESTS_DEPS hut ${GTEST_BOTH_LIBRARIES})
+if (HUT_ENABLE_RENDERDOC)
+  file(GLOB_RECURSE HUT_RENDERDOC_HEADERS ext/renderdoc/*.hpp)
+  file(GLOB HUT_RENDERDOC_SOURCES ext/renderdoc/*.cpp)
+  set(HUT_RENDERDOC_INCLUDES ext/renderdoc)
 
-  if (HUT_ENABLE_KTX2)
-    file(GLOB_RECURSE HUT_KTX2_UNIT_TESTS_DATA tst/ktx2/*.ktx2)
-    add_custom_command(OUTPUT ${HUT_GEN_DIR}/unittests_ktx2.cpp
-        COMMAND $<TARGET_FILE:gen_res> unittests_ktx2 ${HUT_GEN_DIR} ${HUT_KTX2_UNIT_TESTS_DATA}
-        DEPENDS gen_res ${HUT_KTX2_UNIT_TESTS_DATA}
-        COMMENT "Generating KTX2 unittests data")
+  add_library(hut_renderdoc STATIC ${HUT_RENDERDOC_HEADERS} ${HUT_RENDERDOC_SOURCES})
+  target_link_libraries(hut_renderdoc dl)
+  target_include_directories(hut_renderdoc PUBLIC ${HUT_RENDERDOC_INCLUDES} ${RENDERDOC_INCLUDE_DIRS})
+endif()
 
-    file(GLOB_RECURSE HUT_KTX2_UNIT_TESTS tst/unit/ktx2/*.cpp)
-    set(HUT_UNIT_TESTS ${HUT_UNIT_TESTS} ${HUT_KTX2_UNIT_TESTS} ${HUT_GEN_DIR}/unittests_ktx2.cpp)
-    set(HUT_UNIT_TESTS_DEPS ${HUT_UNIT_TESTS_DEPS} hut_ktx2)
+if (HUT_ENABLE_IMGDEC)
+  if (HUT_ENABLE_IMGDEC_LIBSPNG)
+    find_package(SimplePNG REQUIRED)
+    set(HUT_IMGDEC_DEFINITIONS ${HUT_IMGDEC_DEFINITIONS} -DHUT_ENABLE_IMGDEC_LIBSPNG)
+    set(HUT_IMGDEC_LIBS ${HUT_IMGDEC_LIBS} spng)
   endif()
+
+  file(GLOB_RECURSE HUT_IMGDEC_HEADERS ext/imgdec/*.hpp)
+  file(GLOB HUT_IMGDEC_SOURCES ext/imgdec/*.cpp)
+  set(HUT_IMGDEC_INCLUDES ext/imgdec)
+
+  add_library(hut_imgdec STATIC ${HUT_IMGDEC_HEADERS} ${HUT_IMGDEC_SOURCES})
+  target_link_libraries(hut_imgdec hut ${HUT_IMGDEC_LIBS})
+  target_compile_definitions(hut_imgdec PUBLIC ${HUT_IMGDEC_DEFINITIONS})
+  target_include_directories(hut_imgdec PUBLIC ${HUT_IMGDEC_INCLUDES})
+endif()
+
+###########################################################
+# hut tests
+###########################################################
+file(GLOB HUT_TST_PNG_SOURCE tst/res/png/*.png)
+set(HUT_TST_PNG ${HUT_GEN_DIR}/tst_png.cpp)
+add_custom_command(OUTPUT ${HUT_TST_PNG}
+    COMMAND $<TARGET_FILE:gen_res> tst_png ${HUT_GEN_DIR} ${HUT_TST_PNG_SOURCE}
+    DEPENDS gen_res ${HUT_TST_PNG_SOURCE}
+    COMMENT "Generating ${HUT_TST_PNG}")
+
+file(GLOB_RECURSE HUT_TST_WOFF2_SOURCE tst/res/woff2/*.woff2)
+set(HUT_TST_WOFF2 ${HUT_GEN_DIR}/tst_woff2.cpp)
+add_custom_command(OUTPUT ${HUT_TST_WOFF2}
+    COMMAND $<TARGET_FILE:gen_res> tst_woff2 ${HUT_GEN_DIR} ${HUT_TST_WOFF2_SOURCE}
+    DEPENDS gen_res ${HUT_TST_WOFF2_SOURCE}
+    COMMENT "Generating ${HUT_TST_WOFF2}")
+
+file(GLOB HUT_TST_SHADERS_SOURCE tst/res/spv/*.vert tst/res/spv/*.frag)
+hut_gen_spv_bundle(NAMESPACE tst_shaders OUTDIR ${HUT_GEN_DIR} SHADER_SOURCES ${HUT_TST_SHADERS_SOURCE})
+set(HUT_TST_SHADERS ${HUT_BUNDLE_tst_shaders_FILES})
+
+if (HUT_COMPILE_SAMPLES)
+  add_executable(hut_sample_3d tst/samples/3d.cpp ${HUT_TST_SHADERS})
+  target_link_libraries(hut_sample_3d hut)
+  target_include_directories(hut_sample_3d PRIVATE tst/common)
+
+  if (HUT_ENABLE_IMGUI)
+    add_executable(hut_sample_imgui tst/samples/imgui.cpp)
+    target_link_libraries(hut_sample_imgui hut_imgui)
+    target_include_directories(hut_sample_imgui PRIVATE tst/common)
+  endif()
+
+  if (HUT_ENABLE_IMGDEC)
+    add_executable(hut_sample_pipelines tst/samples/pipelines.cpp ${HUT_TST_PNG} ${HUT_TST_WOFF2} ${HUT_TST_SHADERS})
+    target_link_libraries(hut_sample_pipelines hut_imgdec)
+    target_include_directories(hut_sample_pipelines PRIVATE tst/common)
+  endif()
+endif()
+
+if (HUT_COMPILE_PLAYGROUNDS)
+  if (HUT_ENABLE_IMGUI)
+    add_executable(hut_playground_events tst/playgrounds/events.cpp)
+    target_link_libraries(hut_playground_events hut_imgui)
+    target_include_directories(hut_playground_events PRIVATE tst/common)
+
+    add_executable(hut_playground_binpacks tst/playgrounds/binpacks.cpp)
+    target_link_libraries(hut_playground_binpacks hut_imgui)
+    target_include_directories(hut_playground_binpacks PRIVATE tst/common)
+
+    add_executable(hut_playground_dragndrop tst/playgrounds/dragndrop.cpp)
+    target_link_libraries(hut_playground_dragndrop hut_imgui)
+    target_include_directories(hut_playground_dragndrop PRIVATE tst/common)
+
+    add_executable(hut_playground_window tst/playgrounds/window.cpp)
+    target_link_libraries(hut_playground_window hut_imgui)
+    target_include_directories(hut_playground_window PRIVATE tst/common)
+
+    add_executable(hut_playground_clipboard tst/playgrounds/clipboard.cpp ${HUT_TST_PNG})
+    target_link_libraries(hut_playground_clipboard hut_imgui)
+    target_include_directories(hut_playground_clipboard PRIVATE tst/common)
+
+    add_executable(hut_playground_text tst/playgrounds/text.cpp ${HUT_TST_WOFF2})
+    target_link_libraries(hut_playground_text hut_imgui)
+    target_include_directories(hut_playground_text PRIVATE tst/common)
+
+    add_executable(hut_playground_emoji tst/playgrounds/emoji.cpp ${HUT_TST_WOFF2})
+    target_link_libraries(hut_playground_emoji hut_imgui)
+    target_include_directories(hut_playground_emoji PRIVATE tst/common)
+  endif()
+endif()
+
+if (HUT_COMPILE_UNITTESTS AND GTEST_FOUND)
+  file(GLOB HUT_TST_UNIT_SOURCE tst/unit/*.cpp)
+
+  set(HUT_UNIT_TESTS ${HUT_UNIT_TESTS} ${HUT_TST_UNIT_SOURCE})
+  set(HUT_UNIT_TESTS_DEPS ${HUT_UNIT_TESTS_DEPS} ${GTEST_BOTH_LIBRARIES})
 
   if (HUT_ENABLE_RENDERDOC)
     set(HUT_UNIT_TESTS_DEPS ${HUT_UNIT_TESTS_DEPS} hut_renderdoc)
   endif()
 
   add_executable(hut_unittests ${HUT_UNIT_TESTS})
-  add_test(NAME hut_unittests WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} COMMAND unittests)
+  add_test(NAME hut_unittests WORKING_DIRECTORY COMMAND unittests)
   target_link_libraries(hut_unittests ${HUT_UNIT_TESTS_DEPS})
+  target_include_directories(hut_sample_pipelines PRIVATE tst/common)
 endif()

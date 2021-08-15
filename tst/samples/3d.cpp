@@ -25,7 +25,6 @@
  * SOFTWARE.
  */
 
-#include <iostream>
 #include <numbers>
 
 #include "hut/display.hpp"
@@ -33,7 +32,7 @@
 #include "hut/font.hpp"
 #include "hut/window.hpp"
 
-#include "demo_shaders_refl.hpp"
+#include "tst_shaders_refl.hpp"
 
 using namespace hut;
 
@@ -42,8 +41,8 @@ struct vp_ubo {
   mat4 view_;
 };
 
-using rgb3d = hut::pipeline<uint16_t, hut::demo_shaders::rgb3d_vert_spv_refl, hut::hut_shaders::rgb_frag_spv_refl, const shared_ref<vp_ubo>&>;
-using skybox = hut::pipeline<uint16_t, hut::demo_shaders::skybox_vert_spv_refl, hut::demo_shaders::skybox_frag_spv_refl, const shared_ref<vp_ubo>&, const shared_image&, const shared_sampler&>;
+using rgb3d = pipeline<uint16_t, tst_shaders::rgb3d_vert_spv_refl, hut_shaders::rgb_frag_spv_refl, const shared_ref<vp_ubo>&>;
+using skybox = pipeline<uint16_t, tst_shaders::skybox_vert_spv_refl, tst_shaders::skybox_frag_spv_refl, const shared_ref<vp_ubo>&, const shared_image&, const shared_sampler&>;
 
 int main(int, char **) {
   display d("hut demo3d");

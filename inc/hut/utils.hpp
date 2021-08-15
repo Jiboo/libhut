@@ -171,6 +171,11 @@ inline vec<2, T, Q> bbox_center(const vec<4, T, Q> &_input) {
   return vec<2, T, Q>{_input[0] + size.x / 2, _input[1] + size.y / 2};
 }
 
+template<typename TBox, typename TPoint, qualifier Q = defaultp>
+bool bbox_contains(const vec<4, TBox, Q> &_box, const vec<2, TPoint, Q> &_point) {
+  return _point.x >= _box.x && _point.x <= _box.z && _point.y >= _box.y && _point.y <= _box.w;
+}
+
 template<typename T, qualifier Q = defaultp>
 inline vec<4, T, Q> make_bbox_with_origin_size(const vec<2, T, Q> &_offset, const vec<2, T, Q> &_size) {
   return vec<4, T, Q>{_offset.x, _offset.y, _offset.x + _size.x, _offset.y + _size.y};
@@ -290,8 +295,8 @@ struct flagged {
   TUnderlying active_ = 0;
 
   constexpr flagged() = default;
-  constexpr flagged(TUnderlying _init) : active_(_init) {}
-  constexpr flagged(TEnum _init) { set(_init); }
+  constexpr explicit flagged(TUnderlying _init) : active_(_init) {}
+  constexpr explicit flagged(TEnum _init) { set(_init); }
   constexpr flagged(std::initializer_list<TEnum> _inits) { for (auto flag : _inits) set(flag); }
 
   constexpr flagged& operator=(const flagged &_other) { active_ = _other.active_; return *this; }
@@ -306,15 +311,21 @@ struct flagged {
   [[nodiscard]] constexpr bool     empty()             const { return active_ == 0; }
   [[nodiscard]] constexpr explicit operator bool()              const { return active_ != 0; }
 
-  constexpr void reset(TUnderlying _underlying) { active_ = _underlying; }
-
+  constexpr void reset(TEnum _flag) { active_ &= ~mask(_flag); }
   constexpr void flip(TEnum _flag)  { active_ ^= mask(_flag); }
   constexpr void set(TEnum _flag)   { active_ |= mask(_flag); }
 
-  constexpr flagged operator|(TEnum _flag) const { flagged result{active_}; result.set(_flag); return result; }
-  constexpr flagged &operator|=(TEnum _flag) { set(_flag); return *this; }
+  constexpr flagged operator|(TEnum _flag) const { return flagged{active_ | mask(_flag)}; }
+  constexpr flagged &operator|=(TEnum _flag) { active_ |= mask(_flag); return *this; }
+  constexpr flagged &operator&=(TEnum _flag) { active_ &= mask(_flag); return *this; }
+
+  constexpr flagged operator|(const flagged &_other) const { return flagged{active_ | _other.active_}; }
+  constexpr flagged &operator|=(const flagged &_other) { active_ |= _other.active_; return *this; }
+  constexpr flagged operator&(const flagged &_other) const { return flagged{active_ & _other.active_}; }
+  constexpr flagged &operator&=(const flagged &_other) { active_ &= _other.active_; return *this; }
 
   constexpr bool operator==(TEnum _flag) const { return active_ == mask(_flag); }
+  constexpr bool operator==(const flagged &_other) const { return active_ == _other.active_; }
 
   struct const_iterator {
     TUnderlying shifted_;
@@ -341,8 +352,11 @@ struct flagged {
 template<typename TEnum, TEnum TEnd, typename TUnderlying = uint32_t>
 inline std::ostream &operator<<(std::ostream &_os, flagged<TEnum, TEnd, TUnderlying> _flags) {
   _os << "(";
-  for (auto flag : _flags)
-    _os << flag;
+  for (auto it = _flags.cbegin(); it != _flags.end(); ++it) {
+    _os << *it;
+    if (auto next = it; ++next != _flags.end())
+      _os << ",";
+  }
   return _os << ")";
 }
 

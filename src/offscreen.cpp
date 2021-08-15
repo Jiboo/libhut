@@ -109,7 +109,7 @@ void offscreen::draw(const draw_callback &_callback) {
   flush_cb();
 }
 
-void offscreen::download(uint8_t *_dst, uint _data_row_pitch, image::subresource _src) {
+void offscreen::download(std::span<u8> _dst, uint _data_row_pitch, image::subresource _src) {
   // Downloading whole image seems more suitable
   if (_src.coords_ == u16vec4{0,0,0,0})
     _src.coords_ = make_bbox_with_origin_size({0,0}, target_->size());
@@ -168,12 +168,14 @@ void offscreen::download(uint8_t *_dst, uint _data_row_pitch, image::subresource
 
   std::span<uint8_t> staging_data{staging.buffer_->permanent_map_ + staging.offset_, byte_size};
   if (_data_row_pitch == buffer_row_pitch) {
-    memcpy(_dst, staging_data.data(), staging_data.size());
+    assert(_dst.size_bytes() >= staging_data.size_bytes());
+    memcpy(_dst.data(), staging_data.data(), staging_data.size());
   }
   else {
+    assert(_dst.size_bytes() >= (size.y * _data_row_pitch));
     for (uint y = 0; y < size.y; y++) {
       auto *src_row = staging_data.data() + y * buffer_row_pitch;
-      auto *dst_row = _dst + y * _data_row_pitch;
+      auto *dst_row = _dst.data() + y * _data_row_pitch;
       memcpy(dst_row, src_row, row_byte_size);
     }
   }

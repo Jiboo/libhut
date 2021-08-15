@@ -25,9 +25,10 @@
  * SOFTWARE.
  */
 
+#include <atomic>
 #include <iostream>
 
-#include "imgui_impl_hut.hpp"
+#include "hut_imgui.hpp"
 
 #include "hut/buffer_pool.hpp"
 #include "hut/display.hpp"
@@ -59,6 +60,8 @@ struct hut_imgui_impl_ctx {
 
   std::string clipboard_buffer_;
 
+  hut::cursor_type last_mouse_cursor_ = hut::CDEFAULT;
+
   void reset() {
     meshes_.clear();
     sampler_.reset();
@@ -66,45 +69,48 @@ struct hut_imgui_impl_ctx {
     ubo_.reset();
     images_.clear();
     buffer_.reset();
+    clipboard_buffer_.clear();
+    last_mouse_cursor_ = hut::CDEFAULT;
   }
 };
 
 static hut_imgui_impl_ctx g_ctx;
 
 const char* GetClipboardText(void* user_data) {
-  // FIXME JBL: Will be broken once clipboard_receive is fully async
   auto &target = g_ctx.clipboard_buffer_;
   target.clear();
-  g_ctx.window_->clipboard_receive(hut::FTEXT_PLAIN,
-   [&](hut::clipboard_format _mime, hut::clipboard_receiver &_receiver) {
-     uint8_t buffer[2048];
-     size_t read_bytes;
-     while ((read_bytes = _receiver.read(buffer))) {
-       target += std::string_view{(char *) buffer, read_bytes};
-#if !defined(NDEBUG) && 0
-       std::cout << "GetClipboardText received " << read_bytes << " bytes" << std::endl;
-#endif
-     }
-   });
+
+  std::atomic_bool done = false;
+  g_ctx.window_->clipboard_receive(hut::clipboard_formats{hut::FTEXT_PLAIN},
+                                   [&](hut::clipboard_format _mime, hut::clipboard_receiver &_receiver) {
+    uint8_t buffer[2048];
+    size_t read_bytes;
+    while ((read_bytes = _receiver.read(buffer))) {
+      target += std::string_view{(char *) buffer, read_bytes};
+    }
+    done = true;
+  });
+
+  // As this function is blocking the main thread, due to the nature of the synchronous clipboard API,
+  // we need to continue to process wayland events to continue processing the clipboard communication
+  while(!done)
+    g_ctx.display_->roundtrip();
 
   return target.data();
 }
 
 void SetClipboardText(void* user_data, const char* text) {
-  g_ctx.window_->clipboard_offer(hut::FTEXT_PLAIN,
+  g_ctx.window_->clipboard_offer(hut::clipboard_formats{hut::FTEXT_PLAIN},
     [buffer{std::string(text)}](hut::clipboard_format _mime, hut::clipboard_sender &_sender) {
     if (_mime == hut::FTEXT_PLAIN) {
-      auto wrote_bytes = _sender.write({(uint8_t *) buffer.data(), buffer.size()});
-#if !defined(NDEBUG) && 0
-      std::cout << "SetClipboardText sent " << wrote_bytes << " bytes" << std::endl;
-#endif
+      _sender.write({(uint8_t *) buffer.data(), buffer.size()});
     }
   });
 }
 
 bool ImGui_ImplHut_Init(hut::display *_d, hut::window* _w, bool _install_callbacks) {
   ImGuiIO& io = ImGui::GetIO();
-  io.BackendPlatformName = io.BackendRendererName = "imgui_impl_hut";
+  io.BackendPlatformName = io.BackendRendererName = "hut_imgui";
   io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
   io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
 
@@ -253,8 +259,14 @@ void ImGui_ImplHut_InvalidateDeviceObjects() {
 
 bool ImGui_ImplHut_HandleOnResize(hut::uvec2 _size) {
   ImGuiIO& io = ImGui::GetIO();
-  const auto win_size = g_ctx.window_->size();
-  io.DisplaySize = {(float)win_size.x, (float)win_size.y};
+  io.DisplaySize = {float(_size.x), float(_size.y)};
+
+  if (g_ctx.ubo_) {
+    hut::proj_ubo new_ubo;
+    new_ubo.proj_ = glm::ortho<float>(0, _size.x, 0, _size.y);
+    g_ctx.ubo_->set(new_ubo);
+  }
+
   return false;
 }
 
@@ -294,11 +306,10 @@ bool ImGui_ImplHut_HandleOnMouse(uint8_t _button, hut::mouse_event_type _type, g
     case hut::MMOVE: /*do nothing*/ break;
   }
 
-  if (io.MouseDrawCursor) {
-    g_ctx.window_->cursor(hut::CNONE);
-  }
-  else {
-    g_ctx.window_->cursor(hut_cursor_type(ImGui::GetMouseCursor()));
+  auto request_cursor = io.MouseDrawCursor ? hut::CNONE : hut_cursor_type(ImGui::GetMouseCursor());
+  if (g_ctx.last_mouse_cursor_ != request_cursor) {
+    g_ctx.last_mouse_cursor_ = request_cursor;
+    g_ctx.window_->cursor(request_cursor);
   }
 
   return ImGui::GetIO().WantCaptureMouse;

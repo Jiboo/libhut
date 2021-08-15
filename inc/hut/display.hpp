@@ -156,7 +156,7 @@ class clipboard_sender {
   void close();
 
 public:
-  ssize_t write(std::span<uint8_t>);
+  ssize_t write(std::span<const uint8_t>);
 };
 
 class clipboard_receiver {
@@ -177,12 +177,13 @@ struct drop_target_interface {
     dragndrop_actions possible_actions_;
     dragndrop_action preferred_action_ = DNDNONE;
     clipboard_format preferred_format_ = FTEXT_PLAIN;
+
+    constexpr bool operator==(const move_result&) const = default;
   };
 
   virtual void on_enter(dragndrop_actions, clipboard_formats) = 0;
   virtual move_result on_move(vec2) = 0;
   virtual void on_drop(dragndrop_action, clipboard_receiver&) = 0;
-  virtual void on_leave() = 0;
 };
 
 class display {
@@ -208,6 +209,7 @@ class display {
 
   void flush();
   void flush_staged();
+  void roundtrip();
   int dispatch();
 
   void post(const callback &_callback);
@@ -412,7 +414,7 @@ class display {
   uint32_t mod_index_alt_ = 0;
   uint32_t mod_index_ctrl_ = 0;
   uint32_t mod_index_shift_ = 0;
-  uint32_t current_serial_ = 0; // Current event serial, used in wayland API requiring it
+  uint32_t last_serial_ = 0;
   uint32_t last_mouse_enter_serial_ = 0;
   uint32_t last_mouse_click_serial_ = 0;
   std::pair<wl_surface*, window*> pointer_current_ {nullptr, nullptr};

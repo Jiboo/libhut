@@ -27,9 +27,6 @@
 
 #include <random>
 
-#include "imgui_impl_hut.hpp"
-#include "demo_woff2.hpp"
-
 #include "hut/display.hpp"
 #include "hut/atlas_pool.hpp"
 #include "hut/font.hpp"
@@ -37,29 +34,18 @@
 #include "hut/shaping.hpp"
 #include "hut/window.hpp"
 
+#include "hut_imgui.hpp"
+#include "tst_woff2.hpp"
+#include "tst_events.hpp"
+
 using namespace hut;
 
 int main(int, char**) {
-  hut::display d("hut demo");
+  display d("hut demo");
 
-  hut::window w(d, window_params {.position_ = {0, 0, 1920, 1080}});
-  w.clear_color({1, 1, 1, 1});
+  window w(d);
+  w.clear_color({0, 0, 0, 1});
   w.title("hut imgui demo");
-
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImGuiIO& io = ImGui::GetIO();
-  ImFontConfig font_cfg{};
-  font_cfg.FontDataOwnedByAtlas = false;
-  //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
-
-  // Setup Dear ImGui style
-  ImGui::StyleColorsDark();
-  //ImGui::StyleColorsClassic();
-
-  // Setup Platform/Renderer backends
-  if (!ImGui_ImplHut_Init(&d, &w, true))
-    return EXIT_FAILURE;
 
   shared_sampler samp = std::make_shared<sampler>(d);
   auto b = d.alloc_buffer(1024*1024);
@@ -93,15 +79,15 @@ int main(int, char**) {
   atlas_instances->set(atlas_mask::instance{make_transform_mat4({0, 200}, {atlas->image(0)->size(), 1}), {1, 1, 1, 1}});
 
   std::vector<shared_font> fonts {
-    std::make_shared<font>(d, demo_woff2::Roboto_Regular_woff2.data(), demo_woff2::Roboto_Regular_woff2.size(), atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_Medium_woff2.data(), demo_woff2::Roboto_Medium_woff2.size(), atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_Thin_woff2.data(), demo_woff2::Roboto_Thin_woff2.size(), atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_Light_woff2.data(), demo_woff2::Roboto_Light_woff2.size(), atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_Italic_woff2.data(), demo_woff2::Roboto_Italic_woff2.size(), atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_Bold_woff2.data(), demo_woff2::Roboto_Bold_woff2.size(), atlas, true),
-    std::make_shared<font>(d, demo_woff2::Roboto_BoldItalic_woff2.data(), demo_woff2::Roboto_BoldItalic_woff2.size(), atlas, true),
-    std::make_shared<font>(d, demo_woff2::ProggyClean_woff2.data(), demo_woff2::ProggyClean_woff2.size(), atlas, true),
-    std::make_shared<font>(d, demo_woff2::materialdesignicons_webfont_woff2.data(), demo_woff2::materialdesignicons_webfont_woff2.size(), atlas, true),
+    std::make_shared<font>(d, tst_woff2::Roboto_Regular_woff2.data(), tst_woff2::Roboto_Regular_woff2.size(), atlas, true),
+    std::make_shared<font>(d, tst_woff2::Roboto_Medium_woff2.data(), tst_woff2::Roboto_Medium_woff2.size(), atlas, true),
+    std::make_shared<font>(d, tst_woff2::Roboto_Thin_woff2.data(), tst_woff2::Roboto_Thin_woff2.size(), atlas, true),
+    std::make_shared<font>(d, tst_woff2::Roboto_Light_woff2.data(), tst_woff2::Roboto_Light_woff2.size(), atlas, true),
+    std::make_shared<font>(d, tst_woff2::Roboto_Italic_woff2.data(), tst_woff2::Roboto_Italic_woff2.size(), atlas, true),
+    std::make_shared<font>(d, tst_woff2::Roboto_Bold_woff2.data(), tst_woff2::Roboto_Bold_woff2.size(), atlas, true),
+    std::make_shared<font>(d, tst_woff2::Roboto_BoldItalic_woff2.data(), tst_woff2::Roboto_BoldItalic_woff2.size(), atlas, true),
+    std::make_shared<font>(d, tst_woff2::ProggyClean_woff2.data(), tst_woff2::ProggyClean_woff2.size(), atlas, true),
+    std::make_shared<font>(d, tst_woff2::materialdesignicons_webfont_woff2.data(), tst_woff2::materialdesignicons_webfont_woff2.size(), atlas, true),
   };
   std::vector<const char*> font_names {
     "Roboto_Regular_woff2",
@@ -132,14 +118,19 @@ int main(int, char**) {
       "declared in the vertex shader entry point's interface must have either valid or VK_NULL_HANDLE"
       "buffers bound (https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#VUID-vkCmdDrawIndexed-None-04007)";
 
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGui::StyleColorsDark();
+  if (!ImGui_ImplHut_Init(&d, &w, true))
+    return EXIT_FAILURE;
+  install_test_events(d, w, ubo);
+
   w.on_draw.connect([&](VkCommandBuffer _buffer) {
     pipeline->update_atlas(0, atlas);
     ImGui_ImplHut_NewFrame();
     ImGui::NewFrame();
 
-    {
-      ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
+    if (ImGui::Begin("Hello, world!")) {
       ImGui::ColorEdit4("clear color", (float*)&clear_color); // Edit 3 floats representing a color
       ImGui::ColorEdit4("text color", (float*)&text_color); // Edit 3 floats representing a color
       ImGui::InputFloat4("translate,", &text_translate[0]);
@@ -157,8 +148,8 @@ int main(int, char**) {
       pipeline->draw(_buffer, 0, atlas_indices, atlas_instances, atlas_vertices);
 
       ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-      ImGui::End();
     }
+    ImGui::End();
 
     ImGui::Render();
     ImGui_ImplHut_RenderDrawData(_buffer, ImGui::GetDrawData());
@@ -180,12 +171,6 @@ int main(int, char**) {
       });
     });
 
-    return false;
-  });
-
-  w.on_key.connect([&](keycode _kcode, keysym _ksym, bool _down) {
-    if (_ksym == KSYM_ESC)
-      w.close();
     return false;
   });
 

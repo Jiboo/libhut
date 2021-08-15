@@ -74,7 +74,7 @@ void window::handle_toplevel_close(void *_data, xdg_toplevel *) {
 }
 
 window::window(display &_display, const window_params &_init_params)
-  : render_target(_display), display_(_display), params_(_init_params), size_(bbox_size(_init_params.position_)) {
+  : render_target(_display), display_(_display), params_(_init_params), size_(_init_params.size_) {
   static const xdg_surface_listener xdg_surface_listeners = {
     handle_xdg_configure,
   };
@@ -90,6 +90,9 @@ window::window(display &_display, const window_params &_init_params)
   info.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
   info.display = _display.display_;
   info.surface = wayland_surface_;
+
+  if (_init_params.flags_ & window_params::FFULLSCREEN)
+    fullscreen();
 
   auto func = _display.get_proc<PFN_vkCreateWaylandSurfaceKHR>("vkCreateWaylandSurfaceKHR");
   VkResult vkr;
@@ -132,8 +135,13 @@ void window::close() {
   }
 }
 
-void window::title(const std::string &_title) {
-  xdg_toplevel_set_title(toplevel_, _title.c_str());
+void window::title(std::string_view _title) {
+  assert(_title.size() < 1024);
+  char buffer[1024];
+  auto min = std::min(_title.size(), sizeof(buffer) - 1);
+  memcpy(buffer, _title.data(), min);
+  buffer[min] = 0;
+  xdg_toplevel_set_title(toplevel_, buffer);
 }
 
 void window::pause() {
@@ -258,8 +266,7 @@ void window::clipboard_offer(clipboard_formats _supported_formats, send_clipboar
     wl_data_source_offer(source, format_mime_type(mime));
   }
 
-  assert(display_.current_serial_ != 0);
-  wl_data_device_set_selection(display_.data_device_, source, display_.current_serial_);
+  wl_data_device_set_selection(display_.data_device_, source, display_.last_serial_);
 }
 
 bool window::clipboard_receive(clipboard_formats _supported_formats, receive_clipboard_data &&_callback) {

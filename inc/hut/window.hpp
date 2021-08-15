@@ -49,8 +49,12 @@ using edge = flagged<side, LAST_SIDE>;
 cursor_type edge_cursor(edge);
 
 enum touch_event_type { TDOWN, TUP, TMOVE };
+const char *touch_event_name(touch_event_type);
+inline std::ostream &operator<<(std::ostream &_os, touch_event_type _c) { return _os << touch_event_name(_c); }
 
 enum mouse_event_type { MDOWN, MUP, MMOVE, MWHEEL_UP, MWHEEL_DOWN };
+const char *mouse_event_name(mouse_event_type);
+inline std::ostream &operator<<(std::ostream &_os, mouse_event_type _c) { return _os << mouse_event_name(_c); }
 
 class display;
 
@@ -66,8 +70,7 @@ struct window_params {
   using flags = flagged<flag, flag::FLAG_LAST_VALUE>;
 
   flags flags_ {FVSYNC};
-  uvec4 position_ = {0, 0, 800, 600};
-  uvec2 min_size_ = {0, 0}, max_size_ = {0, 0};
+  uvec2 size_ = {800, 600}, min_size_ = {0, 0}, max_size_ = {0, 0};
 };
 
 class window : public render_target {
@@ -83,6 +86,8 @@ class window : public render_target {
 
   event<uint8_t /*finger*/, touch_event_type, vec2 /*pos*/> on_touch;
   event<uint8_t /*button*/, mouse_event_type, vec2 /*pos*/> on_mouse;
+
+  event<uint32_t> on_time;
 
   event<modifiers /*mods*/> on_kmods;
   event<keycode, keysym, bool /*down*/> on_key;
@@ -105,7 +110,7 @@ class window : public render_target {
   void interactive_resize(edge);
   void interactive_move();
 
-  void title(const std::string &);
+  void title(std::string_view);
   void cursor(cursor_type _c);
   void clear_color(const vec4 &_color) {
     render_target_params_.clear_color_ = {_color.r, _color.g, _color.b, _color.a};

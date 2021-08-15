@@ -78,7 +78,7 @@ TEST(offscreen, offscreen_download) {
       I, I, I, I, I,
       I, I, I, I, I,
   };
-  ofs.download((uint8_t*)pixel_data, 5*4, hut::image::subresource{{0,0,4,4}});
+  ofs.download(std::span<glm::u8>(&pixel_data[0].x, sizeof(pixel_data)), 5*4, hut::image::subresource{{0,0,4,4}});
 
   // 4*4 copy into a 5*5 buffer, extra pixel should be untouched, the rest is default initialized to transparent on image creation
   glm::u8vec4 pixel_ref[5 * 5] = {
@@ -133,7 +133,7 @@ TEST(offscreen, offscreen_basic) {
   });
 
   glm::u8vec4 pixel_data[4 * 4];
-  ofs.download((uint8_t*)pixel_data, 4*4);
+  ofs.download(std::span<glm::u8>(&pixel_data[0].x, sizeof(pixel_data)), 4*4);
 
   constexpr glm::u8vec4 B = {0, 0, 0, 255};
   constexpr glm::u8vec4 W = {255, 255, 255, 255};
@@ -177,7 +177,7 @@ TEST(offscreen, offscreen_download_offset) {
       I, I, I, I, I,
       I, I, I, I, I,
   };
-  ofs.download((uint8_t*)pixel_data, 5*4, hut::image::subresource{{2,2,4,4}});
+  ofs.download(std::span<glm::u8>(&pixel_data[0].x, sizeof(pixel_data)), 5*4, hut::image::subresource{{2,2,4,4}});
 
   glm::u8vec4 pixel_ref[5 * 5] = {
       W, D, I, I, I,
@@ -242,7 +242,7 @@ TEST(offscreen, offscreen_render_offset) {
       I, I, I, I,
       I, I, I, I,
   };
-  ofs.download((uint8_t*)pixel_data, 4*4, hut::image::subresource{{0,0,4,4}});
+  ofs.download(std::span<glm::u8>(&pixel_data[0].x, sizeof(pixel_data)), 4*4, hut::image::subresource{{0,0,4,4}});
 
   // Draw one white pixel at [2,2] (W), rest of the 3*3 offscreen should have been cleared (C), rest of the 4*4 image should be untouched,
   glm::u8vec4 pixel_ref[4 * 4] = {

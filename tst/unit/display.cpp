@@ -25,47 +25,18 @@
  * SOFTWARE.
  */
 
-#pragma once
-
-#include <chrono>
-#include <string>
+#include <gtest/gtest.h>
 
 #include "hut/display.hpp"
-#include "hut/render_target.hpp"
-#include "hut/image.hpp"
-#include "hut/utils.hpp"
+#include "hut/window.hpp"
 
-namespace hut {
-  struct offscreen_params {
-    enum flag {
-      FDEPTH = render_target_params::flag::FDEPTH,
-      FMULTISAMPLING = render_target_params::flag::FMULTISAMPLING,
-      FLAG_LAST_VALUE = FMULTISAMPLING,
-    };
-    using flags = flagged<flag, flag::FLAG_LAST_VALUE>;
+using namespace hut;
 
-    flags flags_ {};
-    image::subresource subres_ {};
-  };
-
-  class offscreen : public render_target {
-    template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
-
-  public:
-    explicit offscreen(const shared_image &_dest, const offscreen_params &_init_params = {});
-    ~offscreen();
-
-    using draw_callback = std::function<void(VkCommandBuffer)>;
-    void draw(const draw_callback &_callback);
-
-    void download(std::span<u8> _dst, uint _dst_row_pitch, image::subresource _src = {});
-  protected:
-    offscreen_params params_;
-    shared_image target_;
-    VkCommandBuffer cb_ = VK_NULL_HANDLE;
-    VkFence fence_ = VK_NULL_HANDLE;
-
-    void flush_cb();
-  };
-
-}  // namespace hut
+TEST(display, fastkill) {
+  {
+    display d("hut fastkill test");
+  }
+  {
+    display d("hut fastkill tests");
+  }
+}

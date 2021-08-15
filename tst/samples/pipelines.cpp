@@ -36,58 +36,21 @@
 
 #include "hut_imgdec.hpp"
 
-#include "demo_woff2.hpp"
-#include "demo_png.hpp"
+#include "tst_woff2.hpp"
+#include "tst_png.hpp"
+#include "tst_events.hpp"
 
 using namespace hut;
-
-struct my_drop_target_interface : hut::drop_target_interface {
-  clipboard_format preferred = FTEXT_PLAIN;
-
-  void on_enter(dragndrop_actions _actions, clipboard_formats _formats) override {
-    std::cout << "my_drop_target_interface::on_enter" << std::endl;
-    assert(_formats & FTEXT_PLAIN);
-    assert(_actions & DNDCOPY);
-
-    if (_formats & FTEXT_HTML) preferred = FTEXT_HTML;
-  }
-
-  move_result on_move(vec2 _pos) override {
-    //std::cout << "my_drop_target_interface::on_move" << std::endl;
-    if (_pos.x < 100)
-      return {hut::DNDCOPY, hut::DNDCOPY, hut::FTEXT_PLAIN};
-    else if (_pos.y < 100)
-      return {hut::DNDCOPY, hut::DNDCOPY, hut::FTEXT_HTML};
-    else
-      return {hut::DNDNONE, hut::DNDNONE, hut::FTEXT_HTML};
-  }
-
-  void on_drop(dragndrop_action, clipboard_receiver &_receiver) override {
-    std::cout << "my_drop_target_interface::on_drop" << std::endl;
-    uint8_t buffer[1024];
-    while (auto read_bytes = _receiver.read(buffer)) {
-      std::cout << "Dropped " << read_bytes << " bytes: " << std::endl;
-      hexdump(buffer, read_bytes);
-    }
-  }
-
-  void on_leave() override {
-    std::cout << "my_drop_target_interface::on_leave" << std::endl;
-  }
-};
 
 int main(int, char **) {
   std::cout << std::fixed << std::setprecision(1);
 
   display d("hut demo");
-
-  window w(d, window_params{.flags_{window_params::FTRANSPARENT}});
+  window_params wp;
+  wp.flags_.set(window_params::FTRANSPARENT);
+  window w(d, wp);
   w.clear_color({0.1f, 0.1f, 0.1f, 0});
   w.title("hut demo win1");
-
-  window w2(d);
-  w2.clear_color({0, 0, 1, 1});
-  w2.title("hut demo win2");
 
   shared_sampler samp = std::make_shared<sampler>(d);
 
@@ -99,6 +62,8 @@ int main(int, char **) {
   proj_ubo default_ubo;
   default_ubo.proj_ = ortho<float>(0.f, float(w.size().x), 0.f, float(w.size().y));
   shared_ref<proj_ubo> ubo = d.alloc_ubo(b, default_ubo);
+
+  install_test_events(d, w, ubo);
 
   auto rgb_pipeline = std::make_unique<rgb>(w);
   auto rgb_instances = b->allocate<rgb::instance>(2);
@@ -114,9 +79,6 @@ int main(int, char **) {
     rgb::instance{make_transform_mat4({100,   0}, {1,1,1})}
   });
   rgb_pipeline->write(0, ubo);
-
-  auto rgb_pipeline2 = std::make_unique<rgb>(w2);
-  rgb_pipeline2->write(0, ubo);
 
   auto rgba_pipeline = std::make_unique<rgba>(w);
   auto rgba_instances = b->allocate<rgba::instance>(2);
@@ -252,7 +214,7 @@ int main(int, char **) {
   std::atomic_bool tex1_ready = false, tex2_ready = false;
 
   std::thread load_res([&]() {
-    tex1 = imgdec::load_png(d, demo_png::tex1_png);
+    tex1 = imgdec::load_png(d, tst_png::tex1_png);
     tex_pipeline->write(0, ubo, tex1, samp);
     tex_rgb_pipeline->write(0, ubo, tex1, samp);
     tex_rgba_pipeline->write(0, ubo, tex1, samp);
@@ -273,7 +235,7 @@ int main(int, char **) {
       w.invalidate(true);  // will force to call on_draw on the next frame
     }
 
-    tex2 = imgdec::load_png(d, demo_png::tex2_png);
+    tex2 = imgdec::load_png(d, tst_png::tex2_png);
     tex_pipeline->write(1, ubo, tex2, samp);
     tex_rgb_pipeline->write(1, ubo, tex2, samp);
     tex_rgba_pipeline->write(1, ubo, tex2, samp);
@@ -284,8 +246,8 @@ int main(int, char **) {
     tex2_ready = true;
     w.invalidate(true);  // will force to call on_draw on the next frame
 
-    roboto = std::make_shared<font>(d, demo_woff2::Roboto_Regular_woff2.data(), demo_woff2::Roboto_Regular_woff2.size(), r8_atlas, true);
-    material_icons = std::make_shared<font>(d, demo_woff2::materialdesignicons_webfont_woff2.data(), demo_woff2::materialdesignicons_webfont_woff2.size(), r8_atlas, false);
+    roboto = std::make_shared<font>(d, tst_woff2::Roboto_Regular_woff2.data(), tst_woff2::Roboto_Regular_woff2.size(), r8_atlas, true);
+    material_icons = std::make_shared<font>(d, tst_woff2::materialdesignicons_webfont_woff2.data(), tst_woff2::materialdesignicons_webfont_woff2.size(), r8_atlas, false);
     s.bake(myshaper::context{b, icons_test, material_icons, 16, "\uE834\uE835\uE836\uE837"});
     w.invalidate(true);  // will force to call on_draw on the next frame
   });
@@ -315,11 +277,6 @@ int main(int, char **) {
     if (fps_counter)
       tmask_pipeline->draw(_buffer, 0, fps_counter.indices_, fps_counter.indices_count_, fps_instances, fps_counter.vertices_);
 
-    return false;
-  });
-
-  w2.on_draw.connect([&](VkCommandBuffer _buffer) {
-    rgb_pipeline2->draw(_buffer, 0, indices, rgb_instances, rgb_vertices);
     return false;
   });
 
@@ -380,198 +337,7 @@ int main(int, char **) {
     return false;
   });
 
-  w.on_resize.connect([&](const uvec2 &_size) {
-    //std::cout << "resize " << to_string(_size) << std::endl;
-    proj_ubo new_ubo;
-    new_ubo.proj_ = ortho<float>(0.f, float(_size.x), 0.f, float(_size.y));
-
-    ubo->set(new_ubo);
-    return false;
-  });
-
-  w.on_expose.connect([](const uvec4 &) {
-    //std::cout << "expose " << to_string(_bounds) << std::endl;
-    return false;
-  });
-
-  w.on_key.connect([&](keycode, keysym _key, bool _press) {
-    std::cout << "w keysym " << _press << '\t' << keysym_name(_key) << std::endl;
-    if (_key == KSYM_ESC && !_press) {
-      w.close();
-      return true;
-    }
-    else if (_key == KSYM_UP && !_press) {
-      w.pause();
-      return true;
-    }
-    else if (_key == KSYM_LEFT && !_press) {
-      w.maximize(false);
-      return true;
-    }
-    else if (_key == KSYM_RIGHT && !_press) {
-      w.maximize(true);
-      return true;
-    }
-    return false;
-  });
-
-  w2.on_key.connect([&w2](keycode, keysym _key, bool _press) {
-    std::cout << "w2 keysym " << _press << '\t' << keysym_name(_key) << std::endl;
-    if (_key == KSYM_ESC && !_press) {
-      w2.close();
-      return true;
-    }
-    else if (_key == KSYM_UP && !_press) {
-      w2.pause();
-      return true;
-    }
-    else if (_key == KSYM_LEFT && !_press) {
-      w2.maximize(false);
-      return true;
-    }
-    else if (_key == KSYM_RIGHT && !_press) {
-      w2.maximize(true);
-      return true;
-    }
-    else if (_key == KSYM_F11 && !_press) {
-      w2.fullscreen(true);
-      return true;
-    }
-    else if (_key == KSYM_F12 && !_press) {
-      w2.fullscreen(false);
-      return true;
-    }
-    return false;
-  });
-
-  w.on_char.connect([](char32_t c) {
-    std::cout << "char '" << (char*)to_utf8(c).data() << "' (0x" << std::hex << uint32_t(c) << std::dec << ')' << std::endl;
-    return false;
-  });
-
-  w.on_mouse.connect([](uint8_t _button, mouse_event_type _type, vec2 _pos) {
-    if (_type != MMOVE)
-      std::cout << "mouse " << std::to_string(_button) << ", type: " << _type << ", pos: " << to_string(_pos) << std::endl;
-    return false;
-  });
-
-  w.on_close.connect([] {
-    std::cout << "closing window..." << std::endl;
-    return false;
-  });
-
-  w.on_focus.connect([]() {
-    std::cout << "focused" << std::endl;
-    return false;
-  });
-
-  w.on_blur.connect([]() {
-    std::cout << "blurred" << std::endl;
-    return false;
-  });
-
-  w.on_pause.connect([]() {
-    std::cout << "paused" << std::endl;
-    return false;
-  });
-
-  w.on_resume.connect([]() {
-    std::cout << "resumed" << std::endl;
-    return false;
-  });
-
-  w.on_mouse.connect([&w](uint8_t _button, mouse_event_type _type, vec2 _pos) {
-    if (_type == MUP) {
-      static int current_cursor = CDEFAULT;
-      if (++current_cursor > CZOOM_OUT)
-        current_cursor = CDEFAULT;
-      w.cursor(static_cast<cursor_type>(current_cursor));
-      std::cout << "current cursor " << cursor_css_name(static_cast<cursor_type>(current_cursor)) << std::endl;
-    }
-    return false;
-  });
-
-  w.dragndrop_target(std::make_shared<my_drop_target_interface>());
-  w.on_mouse.connect([&w](uint8_t _button, mouse_event_type _type, vec2 _coords) {
-    if (_type == MDOWN && _button == 1) {
-      w.dragndrop_start(hut::DNDCOPY, clipboard_formats{} | FTEXT_HTML | FTEXT_PLAIN, [](dragndrop_action _action, clipboard_format _mime, clipboard_sender &_sender) {
-        static const char text_html[] = R"(<meta http-equiv="content-type" content="text/html; charset=UTF-8"><html><body><b>Hello</b> from <i>libhut</i></body></html>)";
-        static const char text_plain[] = "Hello from libhut";
-        if (_mime == FTEXT_HTML) {
-          _sender.write({(uint8_t*)text_html, strlen(text_html)});
-        }
-        else if (_mime == FTEXT_PLAIN) {
-          _sender.write({(uint8_t*)text_plain, strlen(text_plain)});
-        }
-      });
-    }
-    return false;
-  });
-
-  w.on_key.connect([&w](keycode, keysym _key, bool _pressed) {
-    if (_key == KSYM_C && _pressed) {
-      std::cout << "Offering to clipboard" << std::endl;
-      w.clipboard_offer(clipboard_formats{} | FTEXT_PLAIN | FTEXT_HTML, [](clipboard_format _mime, clipboard_sender &_sender) {
-        std::cout << "Writing to clipboard in " << format_mime_type(_mime) << std::endl;
-        static const char text_html[] = R"(<meta http-equiv="content-type" content="text/html; charset=UTF-8"><html><body><b>Hello</b> from <i>libhut</i></body></html>)";
-        static const char text_plain[] = "Hello from libhut";
-        if (_mime == FTEXT_HTML) {
-          _sender.write({(uint8_t*)text_html, strlen(text_html)});
-        }
-        else if (_mime == FTEXT_PLAIN) {
-          _sender.write({(uint8_t*)text_plain, strlen(text_plain)});
-        }
-      });
-      return true;
-    }
-    if (_key == KSYM_V && _pressed) {
-      w.clipboard_receive(clipboard_formats{} | FTEXT_PLAIN | FTEXT_HTML, [](clipboard_format _mime, clipboard_receiver &_receiver) {
-        std::cout << "Clipboard contents in " << format_mime_type(_mime) << std::endl;
-        uint8_t buffer[2048];
-        size_t read_bytes;
-        while ((read_bytes = _receiver.read(buffer))) {
-          std::cout << "Read " << read_bytes << " bytes from clipboard:" << std::endl;
-          hexdump(buffer, read_bytes);
-        }
-        std::cout << std::endl;
-      });
-      return true;
-    }
-
-    if (_key == KSYM_P && _pressed) {
-      profiling::threads_data::request_dump();
-      return true;
-    }
-
-    return false;
-  });
-
-  w2.on_mouse.connect([&w2](uint8_t _button, mouse_event_type _type, vec2 _coords) {
-    edge coords_edge;
-    if (_coords.x < 50.f)
-      coords_edge |= LEFT;
-    if (_coords.y < 50.f)
-      coords_edge |= TOP;
-    if (w2.size().x - _coords.x < 50.f)
-      coords_edge |= RIGHT;
-    if (w2.size().y - _coords.y < 50.f)
-      coords_edge |= BOTTOM;
-    w2.cursor(edge_cursor(coords_edge));
-
-    static bool clicked = false;
-    if (_type == MDOWN && _button == 1) clicked = true;
-    else if (_type == MUP && _button == 1) clicked = false;
-    else if (_type == MMOVE && clicked) {
-      if (!coords_edge)
-        w2.interactive_move();
-      else
-        w2.interactive_resize(coords_edge);
-    }
-    return false;
-  });
-
   auto result = d.dispatch();
   load_res.join();
-  std::cout << "done!" << std::endl;
   return result;
 }

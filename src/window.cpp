@@ -37,6 +37,26 @@
 
 using namespace hut;
 
+const char *hut::touch_event_name(touch_event_type _type) {
+  switch (_type) {
+    case TDOWN: return "TDOWN";
+    case TUP: return "TUP";
+    case TMOVE: return "TMOVE";
+    default: return "invalid_touch_event_type";
+  }
+}
+
+const char *hut::mouse_event_name(mouse_event_type _type) {
+  switch (_type) {
+    case MDOWN: return "MDOWN";
+    case MUP: return "MUP";
+    case MMOVE: return "MMOVE";
+    case MWHEEL_UP: return "MWHEEL_UP";
+    case MWHEEL_DOWN: return "MWHEEL_DOWN";
+    default: return "invalid_mouse_event_type";
+  }
+}
+
 cursor_type hut::edge_cursor(edge _edge) {
   switch (_edge.active_) {
     case edge(TOP).active_: return CRESIZE_N;
@@ -332,9 +352,15 @@ void window::redraw(display::time_point _tp) {
   auto done = display::clock::now();
   auto diff_frame = done - last_frame_;
   if (diff_frame > max_frame_time) {
+#ifdef HUT_ENABLE_VALIDATION_DEBUG
+    std::cout << "Frame overbudget " << diff_frame << " > " << max_frame_time << std::endl;
+#endif
     profiling::threads_data::request_dump();
   }
-  else if (diff_frame < min_frame_time) {
+  else if (!params_.flags_.query(window_params::FVSYNC) && diff_frame < min_frame_time) {
+#ifdef HUT_ENABLE_VALIDATION_DEBUG
+    std::cout << "Frame underbudget " << diff_frame << " < " << min_frame_time << std::endl;
+#endif
     std::this_thread::sleep_for(min_frame_time - diff_frame);
     done = display::clock::now();
   }

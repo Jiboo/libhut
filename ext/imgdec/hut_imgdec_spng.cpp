@@ -25,15 +25,14 @@
  * SOFTWARE.
  */
 
+#ifdef HUT_ENABLE_IMGDEC_LIBSPNG
+
 #include "hut_imgdec.hpp"
 
-#ifdef HUT_ENABLE_IMGDEC_LIBSPNG
 #include "spng.h"
-#endif  // HUT_ENABLE_IMGDEC_LIBSPNG
 
 namespace hut::imgdec {
 
-#ifdef HUT_ENABLE_IMGDEC_LIBSPNG
   std::shared_ptr<image> load_png(display &_display, std::span<const u8> _data) {
     auto ctx = std::unique_ptr<spng_ctx, decltype(&spng_ctx_free)>(spng_ctx_new(0), spng_ctx_free);
     spng_set_png_buffer(ctx.get(), _data.data(), _data.size_bytes());
@@ -95,6 +94,7 @@ namespace hut::imgdec {
 
     return result;
   }
-#endif  // HUT_ENABLE_IMGDEC_LIBSPNG
 
 } // ns hut::imgdec
+
+#endif  // HUT_ENABLE_IMGDEC_LIBSPNG
