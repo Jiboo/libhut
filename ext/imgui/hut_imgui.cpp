@@ -40,9 +40,16 @@
 
 using imgui_pipeline = hut::pipeline<ImDrawIdx, hut::hut_imgui_shaders::imgui_vert_spv_refl, hut::hut_imgui_shaders::imgui_frag_spv_refl, const hut::shared_ref<hut::proj_ubo>&, const hut::shared_image&, const hut::shared_sampler&>;
 
+constexpr size_t HUT_IMGUI_MAX_DESCRIPTORS = 256;
+
 struct hut_imgui_mesh {
   imgui_pipeline::shared_indices indices_;
   imgui_pipeline::shared_vertices vertices_;
+};
+
+struct tex_binding {
+  hut::shared_image image_;
+  hut::shared_sampler sampler_;
 };
 
 struct hut_imgui_impl_ctx {
@@ -50,13 +57,14 @@ struct hut_imgui_impl_ctx {
   hut::window *window_ = nullptr;
 
   hut::shared_buffer buffer_;
-  hut::shared_sampler sampler_;
   std::unique_ptr<imgui_pipeline> pipeline_;
   hut::shared_ref<hut::proj_ubo> ubo_;
 
   hut::display::time_point last_frame_;
-  std::vector<hut::shared_image> images_;
   std::vector<hut_imgui_mesh> meshes_;
+
+  std::vector<tex_binding> bindings_;
+  std::vector<size_t> reusable_bindings_ids_;
 
   std::string clipboard_buffer_;
 
@@ -64,10 +72,9 @@ struct hut_imgui_impl_ctx {
 
   void reset() {
     meshes_.clear();
-    sampler_.reset();
     pipeline_.reset();
     ubo_.reset();
-    images_.clear();
+    bindings_.clear();
     buffer_.reset();
     clipboard_buffer_.clear();
     last_mouse_cursor_ = hut::CDEFAULT;
@@ -199,7 +206,7 @@ void ImGui_ImplHut_RenderDrawData(VkCommandBuffer _cmd_buffer, ImDrawData* _draw
     for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++) {
       const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
 
-      if (pcmd->UserCallback != NULL && pcmd->UserCallback != ImDrawCallback_ResetRenderState) {
+      if (pcmd->UserCallback != nullptr && pcmd->UserCallback != ImDrawCallback_ResetRenderState) {
         pcmd->UserCallback(cmd_list, pcmd);
       }
       else {
@@ -229,25 +236,30 @@ bool ImGui_ImplHut_CreateDeviceObjects() {
   io.Fonts->GetTexDataAsRGBA32(&data, &width, &height);
 
   g_ctx.buffer_ = g_ctx.display_->alloc_buffer(4*1024*1024);
-  g_ctx.sampler_ = std::make_shared<hut::sampler>(*g_ctx.display_);
 
   hut::proj_ubo default_ubo;
   auto w_size = g_ctx.window_->size();
   default_ubo.proj_ = glm::ortho<float>(0, w_size.x, 0, w_size.y);
   g_ctx.ubo_ = g_ctx.display_->alloc_ubo(g_ctx.buffer_, default_ubo);
 
-  g_ctx.images_.resize(1);
-
   // Upload texture to graphics system
   std::span<uint8_t> pixels {data, size_t(width * height * 4)};
   hut::image_params atlas_params;
   atlas_params.size_ = {width, height};
   atlas_params.format_ = VK_FORMAT_R8G8B8A8_UNORM;
-  g_ctx.images_[0] = hut::image::load_raw(*g_ctx.display_, pixels, width * 4, atlas_params);
-  io.Fonts->TexID = (ImTextureID)0;
+  auto image = hut::image::load_raw(*g_ctx.display_, pixels, width * 4, atlas_params);
+  auto sampler = std::make_shared<hut::sampler>(*g_ctx.display_);
+  io.Fonts->TexID = ImGui_ImplHut_AddImage(std::move(image), std::move(sampler));
 
-  g_ctx.pipeline_ = std::make_unique<imgui_pipeline>(*g_ctx.window_);
-  g_ctx.pipeline_->write(0, g_ctx.ubo_, g_ctx.images_[0], g_ctx.sampler_);
+  hut::pipeline_params pparams;
+  pparams.max_sets_ = HUT_IMGUI_MAX_DESCRIPTORS;
+
+  g_ctx.pipeline_ = std::make_unique<imgui_pipeline>(*g_ctx.window_, pparams);
+  g_ctx.pipeline_->resize_descriptors(g_ctx.bindings_.size());
+  for (uint i = 0; i < g_ctx.bindings_.size(); i++) {
+    auto &binding = g_ctx.bindings_[i];
+    g_ctx.pipeline_->write(i, g_ctx.ubo_, binding.image_, binding.sampler_);
+  }
 
   g_ctx.window_->invalidate(true);
   return true;
@@ -255,6 +267,27 @@ bool ImGui_ImplHut_CreateDeviceObjects() {
 
 void ImGui_ImplHut_InvalidateDeviceObjects() {
   g_ctx.reset();
+}
+
+ImTextureID ImGui_ImplHut_AddImage(hut::shared_image _image, hut::shared_sampler _sampler) {
+  size_t index;
+  if (!g_ctx.reusable_bindings_ids_.empty()) {
+    index = g_ctx.reusable_bindings_ids_.back();
+    g_ctx.reusable_bindings_ids_.pop_back();
+  }
+  else {
+    index = g_ctx.bindings_.size();
+    assert(index < HUT_IMGUI_MAX_DESCRIPTORS);
+    auto &binding = g_ctx.bindings_.emplace_back(tex_binding{std::move(_image), std::move(_sampler)});
+    if (g_ctx.pipeline_)
+      g_ctx.pipeline_->write(index, g_ctx.ubo_, binding.image_, binding.sampler_);
+  }
+
+  return reinterpret_cast<ImTextureID>(index);
+}
+
+void ImGui_ImplHut_RemImage(ImTextureID _id) {
+  g_ctx.reusable_bindings_ids_.emplace_back(reinterpret_cast<size_t>(_id));
 }
 
 bool ImGui_ImplHut_HandleOnResize(hut::uvec2 _size) {
