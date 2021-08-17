@@ -9,8 +9,8 @@ option(HUT_ENABLE_IMGDEC "Enable the image loading extension" TRUE)
 
 option(HUT_ENABLE_KTX2 "Enable the ktx2 io extension library" TRUE)
 option(HUT_ENABLE_IMGUI "Enable the imgui extension, which is used for some tests and playgrounds" TRUE)
-option(HUT_ENABLE_RENDERDOC "Enable the renderdoc extension allowing to trigger captures from code" TRUE)
-option(HUT_ENABLE_PROFILING "Enable the renderdoc extension allowing to trigger captures from code" TRUE)
+option(HUT_ENABLE_RENDERDOC "Enable the renderdoc extension allowing to trigger captures from code" FALSE)
+option(HUT_ENABLE_PROFILING "Enable the renderdoc extension allowing to trigger captures from code" FALSE)
 
 option(HUT_COMPILE_SAMPLES "Compile all samples/demos, can take some time due to shader/resources pipelines" TRUE)
 option(HUT_COMPILE_PLAYGROUNDS "Compile all test playgrounds" TRUE)
