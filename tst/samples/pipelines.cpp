@@ -96,7 +96,7 @@ int main(int, char **) {
   rgba_pipeline->write(0, ubo);
 
   auto tex_pipeline = std::make_unique<tex>(w);
-  tex_pipeline->alloc_next_descriptors(2);
+  tex_pipeline->resize_descriptors(2);
   auto tex1_instances = b->allocate<tex::instance>(2);
   auto tex2_instances = b->allocate<tex::instance>(2);
   auto tex_vertices = b->allocate<tex::vertex>(4);
@@ -108,7 +108,7 @@ int main(int, char **) {
   });
 
   auto tex_rgb_pipeline = std::make_unique<tex_rgb>(w);
-  tex_rgb_pipeline->alloc_next_descriptors(1);
+  tex_rgb_pipeline->resize_descriptors(2);
   auto tex1_rgb_instances = b->allocate<tex_rgb::instance>(2);
   auto tex2_rgb_instances = b->allocate<tex_rgb::instance>(2);
   auto tex_rgb_vertices = b->allocate<tex_rgb::vertex>(4);
@@ -128,7 +128,7 @@ int main(int, char **) {
   });
 
   auto tex_rgba_pipeline = std::make_unique<tex_rgba>(w);
-  tex_rgba_pipeline->alloc_next_descriptors(1);
+  tex_rgba_pipeline->resize_descriptors(2);
   auto tex1_rgba_instances = b->allocate<tex_rgba::instance>(2);
   auto tex2_rgba_instances = b->allocate<tex_rgba::instance>(2);
   auto tex_rgba_vertices = b->allocate<tex_rgba::vertex>(4);

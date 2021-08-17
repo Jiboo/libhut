@@ -46,7 +46,7 @@ struct pipeline_params {
   VkCullModeFlagBits cullMode_ = VK_CULL_MODE_NONE;
   VkFrontFace frontFace_ = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   VkBool32 enableBlending_ = VK_TRUE;
-  uint32_t max_sets_ = 16;
+  uint32_t max_sets_ = 16, initial_sets_ = 1;
 };
 
 template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments>
@@ -355,7 +355,7 @@ public:
     init_pools(_params);
     init_descriptor_layout();
     if (_params.max_sets_ > 0)
-      alloc_next_descriptors(1);
+      resize_descriptors(_params.initial_sets_);
     init_shaders();
     init_pipeline_layout();
     init_pipeline(_target.render_target_params_.box_, _target.sample_count_, _params);
@@ -377,21 +377,28 @@ public:
       HUT_PVK(vkDestroyShaderModule, device_ref_, frag_, nullptr);
   }
 
-  void alloc_next_descriptors(uint _count) {
+  void resize_descriptors(uint _count) {
     uint current_count = descriptors_.size();
-    descriptors_.resize(current_count + _count);
+    if (_count <= current_count)
+      return;
+    uint alloc_needed = _count - current_count;
+    descriptors_.resize(_count);
 
-    VkDescriptorSetLayout layouts[_count];
-    for (uint i = 0; i < _count; i++)
+    VkDescriptorSetLayout layouts[alloc_needed];
+    for (uint i = 0; i < alloc_needed; i++)
       layouts[i] = descriptor_layout_;
     VkDescriptorSetAllocateInfo alloc_info = {};
     alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     alloc_info.descriptorPool = descriptor_pool_;
-    alloc_info.descriptorSetCount = _count;
+    alloc_info.descriptorSetCount = alloc_needed;
     alloc_info.pSetLayouts = layouts;
 
     if (vkAllocateDescriptorSets(device_ref_, &alloc_info, descriptors_.data() + current_count) != VK_SUCCESS)
       throw std::runtime_error("failed to allocate descriptor set!");
+  }
+
+  uint count_descriptors() {
+    return descriptors_.size();
   }
 
   struct descriptor_write_context {
