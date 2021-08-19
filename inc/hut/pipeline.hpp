@@ -27,8 +27,6 @@
 
 #pragma once
 
-#include "hut_shaders_refl.hpp"
-
 #include "hut/atlas_pool.hpp"
 #include "hut/buffer_pool.hpp"
 #include "hut/color.hpp"
@@ -646,19 +644,5 @@ public:
          _vertices, 0);
   }
 };
-
-struct proj_ubo {
-  mat4 proj_ {1};
-};
-
-using rgb        = pipeline<uint16_t, hut_shaders::rgb_vert_spv_refl, hut_shaders::rgb_frag_spv_refl, const shared_ref<proj_ubo> &>;
-using rgba       = pipeline<uint16_t, hut_shaders::rgba_vert_spv_refl, hut_shaders::rgba_frag_spv_refl, const shared_ref<proj_ubo> &>;
-using tex        = pipeline<uint16_t, hut_shaders::tex_vert_spv_refl, hut_shaders::tex_frag_spv_refl, const shared_ref<proj_ubo> &, const shared_image &, const shared_sampler &>;
-using atlas      = pipeline<uint16_t, hut_shaders::tex_vert_spv_refl, hut_shaders::atlas_frag_spv_refl, const shared_ref<proj_ubo> &, const shared_atlas &, const shared_sampler &>;
-using tex_rgb    = pipeline<uint16_t, hut_shaders::tex_rgb_vert_spv_refl, hut_shaders::tex_rgb_frag_spv_refl, const shared_ref<proj_ubo> &, const shared_image &, const shared_sampler &>;
-using tex_rgba   = pipeline<uint16_t, hut_shaders::tex_rgba_vert_spv_refl, hut_shaders::tex_rgba_frag_spv_refl, const shared_ref<proj_ubo> &, const shared_image &, const shared_sampler &>;
-using tex_mask   = pipeline<uint16_t, hut_shaders::tex_mask_vert_spv_refl, hut_shaders::tex_mask_frag_spv_refl, const shared_ref<proj_ubo> &, const shared_image &, const shared_sampler &>;
-using atlas_mask = pipeline<uint16_t, hut_shaders::tex_mask_vert_spv_refl, hut_shaders::atlas_mask_frag_spv_refl, const shared_ref<proj_ubo> &, const shared_atlas &, const shared_sampler &>;
-using box_rgba   = pipeline<uint16_t, hut_shaders::box_rgba_vert_spv_refl, hut_shaders::box_rgba_frag_spv_refl, const shared_ref<proj_ubo> &>;
 
 }  // namespace hut

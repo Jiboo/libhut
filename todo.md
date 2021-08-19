@@ -3,10 +3,12 @@ fix:
   - xdg_toplevel_resize seems to ignore xdg_toplevel_set_min/max_size (repro on mutter and weston)
 
 refactor: 
-  - make freetype/harfbuzz (along with hut's font/shaping) optional, and move them to an ext lib
+  - (nothing yet)
 
 features:
-  - specialization constants for shaders reflection (if not in spirv-reflect, maybe move to spirv-cross)
+  - specialization constants support for shaders reflection
+    - https://github.com/KhronosGroup/SPIRV-Reflect/issues/110
+  - push constants support for shaders reflection
   - [imgdec] support more codecs than png, possible avif hardware decode through vulkan video?
   - [imgdec] add streaming and progressive decoding APIs
   - moar unit tests

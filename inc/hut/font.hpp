@@ -59,7 +59,7 @@ class font {
     inline explicit operator bool() const { return bounds_.x > 0 && bounds_.y > 0; }
   };
 
-  using glyph_cache_t = std::unordered_map<uint , glyph>;
+  using glyph_cache_t = std::unordered_map<uint, glyph>;
   struct cache {
     glyph_cache_t glyphs_;
     hb_font_t *font_ = nullptr;

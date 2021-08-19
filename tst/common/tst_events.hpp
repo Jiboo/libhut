@@ -28,6 +28,8 @@
 #include "hut/window.hpp"
 #include "hut/pipeline.hpp"
 
+#include "tst_pipelines.hpp"
+
 void install_esc_close(hut::window &_win) {
   _win.on_key.connect([&](hut::keycode _kcode, hut::keysym _ksym, bool _down) {
     if (_ksym == hut::KSYM_ESC && !_down)
@@ -65,9 +67,9 @@ void install_resizable_movable(hut::window &_win) {
   });
 }
 
-void install_resizable_ubo(hut::window &_win, hut::shared_ref<hut::proj_ubo> &_ubo) {
+void install_resizable_ubo(hut::window &_win, hut::shared_ref<proj_ubo> &_ubo) {
   _win.on_resize.connect([&](const hut::uvec2 &_size) {
-    hut::proj_ubo new_ubo;
+    proj_ubo new_ubo;
     new_ubo.proj_ = hut::ortho<float>(0.f, float(_size.x), 0.f, float(_size.y));
     _ubo->set(new_ubo);
     return false;
@@ -89,7 +91,7 @@ void install_test_events(hut::display &_display, hut::window &_win) {
   install_continuous_redraw(_display, _win);
 }
 
-void install_test_events(hut::display &_display, hut::window &_win, hut::shared_ref<hut::proj_ubo> &_ubo) {
+void install_test_events(hut::display &_display, hut::window &_win, hut::shared_ref<proj_ubo> &_ubo) {
   install_test_events(_display, _win);
   install_resizable_ubo(_win, _ubo);
 }

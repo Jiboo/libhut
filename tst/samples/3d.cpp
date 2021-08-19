@@ -32,17 +32,9 @@
 #include "hut/font.hpp"
 #include "hut/window.hpp"
 
-#include "tst_shaders_refl.hpp"
+#include "tst_pipelines.hpp"
 
 using namespace hut;
-
-struct vp_ubo {
-  mat4 proj_;
-  mat4 view_;
-};
-
-using rgb3d = pipeline<uint16_t, tst_shaders::rgb3d_vert_spv_refl, hut_shaders::rgb_frag_spv_refl, const shared_ref<vp_ubo>&>;
-using skybox = pipeline<uint16_t, tst_shaders::skybox_vert_spv_refl, tst_shaders::skybox_frag_spv_refl, const shared_ref<vp_ubo>&, const shared_image&, const shared_sampler&>;
 
 int main(int, char **) {
   display d("hut demo3d");

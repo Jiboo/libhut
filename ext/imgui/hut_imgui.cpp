@@ -38,7 +38,11 @@
 
 #include "hut_imgui_shaders_refl.hpp"
 
-using imgui_pipeline = hut::pipeline<ImDrawIdx, hut::hut_imgui_shaders::imgui_vert_spv_refl, hut::hut_imgui_shaders::imgui_frag_spv_refl, const hut::shared_ref<hut::proj_ubo>&, const hut::shared_image&, const hut::shared_sampler&>;
+struct proj_ubo {
+  hut::mat4 proj_ {1};
+};
+
+using imgui_pipeline = hut::pipeline<ImDrawIdx, hut::hut_imgui_shaders::imgui_vert_spv_refl, hut::hut_imgui_shaders::imgui_frag_spv_refl, const hut::shared_ref<proj_ubo>&, const hut::shared_image&, const hut::shared_sampler&>;
 
 constexpr size_t HUT_IMGUI_MAX_DESCRIPTORS = 256;
 
@@ -58,7 +62,7 @@ struct hut_imgui_impl_ctx {
 
   hut::shared_buffer buffer_;
   std::unique_ptr<imgui_pipeline> pipeline_;
-  hut::shared_ref<hut::proj_ubo> ubo_;
+  hut::shared_ref<proj_ubo> ubo_;
 
   hut::display::time_point last_frame_;
   std::vector<hut_imgui_mesh> meshes_;
@@ -237,7 +241,7 @@ bool ImGui_ImplHut_CreateDeviceObjects() {
 
   g_ctx.buffer_ = g_ctx.display_->alloc_buffer(4*1024*1024);
 
-  hut::proj_ubo default_ubo;
+  proj_ubo default_ubo;
   auto w_size = g_ctx.window_->size();
   default_ubo.proj_ = glm::ortho<float>(0, w_size.x, 0, w_size.y);
   g_ctx.ubo_ = g_ctx.display_->alloc_ubo(g_ctx.buffer_, default_ubo);
@@ -295,7 +299,7 @@ bool ImGui_ImplHut_HandleOnResize(hut::uvec2 _size) {
   io.DisplaySize = {float(_size.x), float(_size.y)};
 
   if (g_ctx.ubo_) {
-    hut::proj_ubo new_ubo;
+    proj_ubo new_ubo;
     new_ubo.proj_ = glm::ortho<float>(0, _size.x, 0, _size.y);
     g_ctx.ubo_->set(new_ubo);
   }

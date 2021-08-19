@@ -7,6 +7,8 @@
 #include "hut_renderdoc.hpp"
 #endif
 
+#include "tst_pipelines.hpp"
+
 constexpr glm::u8vec4 D = {0, 0, 0, 0}; // Default pixel values after image creation
 constexpr glm::u8vec4 C = {0, 0, 0, 255}; // Cleared for framebuffer
 constexpr glm::u8vec4 W = {255, 255, 255, 255}; // Drawn
@@ -105,23 +107,23 @@ TEST(offscreen, offscreen_basic) {
   auto img = std::make_shared<hut::image>(d, iparams);
   auto ofs = hut::offscreen(img);
 
-  auto rgb_pipeline = std::make_shared<hut::rgb>(ofs);
+  auto rgb_pipeline = std::make_shared<rgb>(ofs);
   auto indices = buff->allocate<uint16_t>(6);
   indices->set({0, 1, 2, 2, 1, 3});
-  auto vertices = buff->allocate<hut::rgb::vertex>(4);
+  auto vertices = buff->allocate<rgb::vertex>(4);
   vertices->set({
-    hut::rgb::vertex{{0, 0}, {1, 1, 1}},
-    hut::rgb::vertex{{0, 2}, {1, 1, 1}},
-    hut::rgb::vertex{{2, 0}, {1, 1, 1}},
-    hut::rgb::vertex{{2, 2}, {1, 1, 1}},
+    rgb::vertex{{0, 0}, {1, 1, 1}},
+    rgb::vertex{{0, 2}, {1, 1, 1}},
+    rgb::vertex{{2, 0}, {1, 1, 1}},
+    rgb::vertex{{2, 2}, {1, 1, 1}},
   });
-  auto instances = buff->allocate<hut::rgb::instance>(2);
+  auto instances = buff->allocate<rgb::instance>(2);
   instances->set({
-    hut::rgb::instance{hut::make_transform_mat4({0, 0}, {1,1,1})},
-    hut::rgb::instance{hut::make_transform_mat4({2, 2}, {1,1,1})}
+    rgb::instance{hut::make_transform_mat4({0, 0}, {1,1,1})},
+    rgb::instance{hut::make_transform_mat4({2, 2}, {1,1,1})}
   });
 
-  hut::proj_ubo default_ubo;
+  proj_ubo default_ubo;
   default_ubo.proj_ = glm::ortho<float>(0, iparams.size_.x, 0, iparams.size_.y);
   auto ubo = d.alloc_ubo(buff, default_ubo);
   rgb_pipeline->write(0, ubo);
@@ -210,22 +212,22 @@ TEST(offscreen, offscreen_render_offset) {
   oparams.subres_.coords_ = hut::make_bbox_with_origin_size(glm::u16vec2{1, 1}, {2, 2});
   auto ofs = hut::offscreen(img, oparams);
 
-  auto rgb_pipeline = std::make_shared<hut::rgb>(ofs);
+  auto rgb_pipeline = std::make_shared<rgb>(ofs);
   auto indices = buff->allocate<uint16_t>(6);
   indices->set({0, 1, 2, 2, 1, 3});
-  auto vertices = buff->allocate<hut::rgb::vertex>(4);
+  auto vertices = buff->allocate<rgb::vertex>(4);
   vertices->set({
-    hut::rgb::vertex{{0, 0}, {1, 1, 1}},
-    hut::rgb::vertex{{0, 1}, {1, 1, 1}},
-    hut::rgb::vertex{{1, 0}, {1, 1, 1}},
-    hut::rgb::vertex{{1, 2}, {1, 1, 1}},
+    rgb::vertex{{0, 0}, {1, 1, 1}},
+    rgb::vertex{{0, 1}, {1, 1, 1}},
+    rgb::vertex{{1, 0}, {1, 1, 1}},
+    rgb::vertex{{1, 2}, {1, 1, 1}},
   });
-  auto instances = buff->allocate<hut::rgb::instance>(1);
+  auto instances = buff->allocate<rgb::instance>(1);
   instances->set({
-    hut::rgb::instance{hut::make_transform_mat4({0, 0}, {1,1,1})},
+    rgb::instance{hut::make_transform_mat4({0, 0}, {1,1,1})},
   });
 
-  hut::proj_ubo default_ubo;
+  proj_ubo default_ubo;
   default_ubo.proj_ = glm::ortho<float>(0, 3, 0, 3);
   auto ubo = d.alloc_ubo(buff, default_ubo);
   rgb_pipeline->write(0, ubo);
