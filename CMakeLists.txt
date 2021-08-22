@@ -18,14 +18,14 @@ option(HUT_COMPILE_UNITTESTS "Compile all unit tests" TRUE)
 
 ###########################################################
 # Debug
-###########################################################31 oct. 2020 — Flame graphs can be generated from any profile data that contains stack ... Flame charts were first added by Google Chrome's WebKit Web ...
+###########################################################
 #set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -v")
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION_DEBUG)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_DEBUG_WL_DATA_LISTENERS)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_DEBUG_STAGING)
-#set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_PREFER_NONDESCRETE_DEVICES)31 oct. 2020 — Flame graphs can be generated from any profile data that contains stack ... Flame charts were first added by Google Chrome's WebKit Web ...
+#set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_PREFER_NONDESCRETE_DEVICES)
 
 ###########################################################
 # Compile/link flags
@@ -254,11 +254,11 @@ if (HUT_ENABLE_IMGUI)
   set(HUT_IMGUI_INCLUDES ext/imgui)
 
   file(GLOB HUT_IMGUI_SHADERS_SOURCE ext/imgui/*.vert ext/imgui/*.frag)
-  hut_gen_spv_bundle(NAMESPACE hut_imgui_shaders OUTDIR ${HUT_GEN_DIR} SHADER_SOURCES ${HUT_IMGUI_SHADERS_SOURCE})
+  hut_gen_spv_bundle(NAMESPACE imgui OUTDIR ${HUT_GEN_DIR}/imgui SHADER_SOURCES ${HUT_IMGUI_SHADERS_SOURCE})
 
-  add_library(hut_imgui STATIC ${HUT_IMGUI_HEADERS} ${HUT_IMGUI_SOURCES} ${HUT_BUNDLE_hut_imgui_shaders_FILES})
+  add_library(hut_imgui STATIC ${HUT_IMGUI_HEADERS} ${HUT_IMGUI_SOURCES} ${HUT_BUNDLE_imgui_FILES})
   target_link_libraries(hut_imgui imgui hut)
-  target_include_directories(hut_imgui PUBLIC ${HUT_IMGUI_INCLUDES} ${HUT_GEN_DIR})
+  target_include_directories(hut_imgui PUBLIC ${HUT_IMGUI_INCLUDES} ${HUT_GEN_DIR}/imgui)
 endif()
 
 if (HUT_ENABLE_KTX2)
@@ -308,6 +308,19 @@ if (HUT_ENABLE_IMGDEC)
   target_link_libraries(hut_imgdec hut ${HUT_IMGDEC_LIBS})
   target_compile_definitions(hut_imgdec PUBLIC ${HUT_IMGDEC_DEFINITIONS})
   target_include_directories(hut_imgdec PUBLIC ${HUT_IMGDEC_INCLUDES})
+endif()
+
+if (HUT_ENABLE_RENDER2D)
+  file(GLOB_RECURSE HUT_RENDER2D_HEADERS ext/render2d/inc/*.hpp)
+  file(GLOB HUT_RENDER2D_SOURCES ext/render2d/src/*.cpp)
+  set(HUT_RENDER2D_INCLUDES ext/render2d/inc)
+
+  file(GLOB HUT_RENDER2D_SHADERS_SOURCE ext/render2d/spv/*.vert ext/render2d/spv/*.frag)
+  hut_gen_spv_bundle(NAMESPACE render2d OUTDIR ${HUT_GEN_DIR}/render2d SHADER_SOURCES ${HUT_RENDER2D_SHADERS_SOURCE})
+
+  add_library(hut_render2d STATIC ${HUT_RENDER2D_HEADERS} ${HUT_RENDER2D_SOURCES} ${HUT_BUNDLE_render2d_FILES})
+  target_link_libraries(hut_render2d hut)
+  target_include_directories(hut_render2d PUBLIC ${HUT_RENDER2D_INCLUDES} ${HUT_GEN_DIR}/render2d)
 endif()
 
 ###########################################################
@@ -378,6 +391,12 @@ if (HUT_COMPILE_PLAYGROUNDS)
     add_executable(hut_playground_emoji tst/playgrounds/emoji.cpp ${HUT_TST_WOFF2})
     target_link_libraries(hut_playground_emoji hut_imgui)
     target_include_directories(hut_playground_emoji PRIVATE tst/common)
+
+    if (HUT_ENABLE_RENDER2D AND HUT_ENABLE_IMGDEC)
+      add_executable(hut_playground_render2d tst/playgrounds/render2d.cpp ${HUT_TST_WOFF2} ${HUT_TST_PNG})
+      target_link_libraries(hut_playground_render2d hut_render2d hut_imgui hut_imgdec)
+      target_include_directories(hut_playground_render2d PRIVATE tst/common)
+    endif()
   endif()
 endif()
 

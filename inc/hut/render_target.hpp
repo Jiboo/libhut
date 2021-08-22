@@ -51,8 +51,13 @@ namespace hut {
     flags flags_ {};
   };
 
+  namespace render2d {
+    class renderer;
+  }
+
   class render_target {
     template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
+    friend class render2d::renderer;
 
   public:
     explicit render_target(display &_display);
