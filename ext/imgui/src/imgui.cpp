@@ -28,7 +28,7 @@
 #include <atomic>
 #include <iostream>
 
-#include "hut_imgui.hpp"
+#include "hut/imgui/imgui.hpp"
 
 #include "hut/buffer_pool.hpp"
 #include "hut/display.hpp"

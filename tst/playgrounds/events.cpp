@@ -30,7 +30,7 @@
 #include "hut/display.hpp"
 #include "hut/window.hpp"
 
-#include "hut_imgui.hpp"
+#include "hut/imgui/imgui.hpp"
 
 #include "tst_events.hpp"
 
@@ -204,7 +204,9 @@ int main(int, char**) {
     std::cout << "on_char " << (char*)utf8 << std::endl;
     return false;
   });
-  install_test_events(d, w);
+
+  install_resizable_movable(w);
+  install_continuous_redraw(d, w);
 
   d.dispatch();
   ImGui_ImplHut_Shutdown();

@@ -27,16 +27,24 @@
 
 #pragma once
 
-#include <memory>
+#include <optional>
+#include <span>
 
 #include "hut/image.hpp"
-#include "hut/atlas_pool.hpp"
+#include "hut/utils.hpp"
 
-namespace hut::imgdec {
+namespace hut::ktx {
 
-#ifdef HUT_ENABLE_IMGDEC_LIBSPNG
-  shared_image load_png(display &, std::span<const u8> _data);
-  shared_subimage load_png(const shared_atlas&, std::span<const u8> _data);
-#endif  // HUT_ENABLE_IMGDEC_LIBSPNG
+struct load_params {
+  // import defaults from image_params
+  VkImageTiling tiling_ = image_params{}.tiling_;
+  VkImageUsageFlags usage_ = image_params{}.usage_;
+  VkImageAspectFlags aspect_ = image_params{}.aspect_;
+  VkMemoryPropertyFlags properties_ = image_params{}.properties_;
+  VkSampleCountFlagBits samples_ = image_params{}.samples_;
+  VkImageCreateFlags flags_ = image_params{}.flags_;
+};
 
-} // ns hut::imgdec
+std::optional<shared_image> load(display &_display, std::span<const u8> _input, const load_params &_params = {});
+
+} // ns hut::ktx

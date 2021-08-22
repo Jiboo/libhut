@@ -25,9 +25,13 @@
  * SOFTWARE.
  */
 
+#include <cstring>
+
 #include <bit>
 
-#include "hut_ktx2.hpp"
+#include "hut/ktx2/ktx2.hpp"
+
+#include "khr_df.h"
 
 namespace hut::ktx {
 

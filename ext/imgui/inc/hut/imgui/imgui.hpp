@@ -30,7 +30,9 @@
 #include <cstdint>
 
 #include <glm/glm.hpp>
+
 #include "imgui.h"
+
 #include "hut/window.hpp"
 #include "hut/display.hpp"
 

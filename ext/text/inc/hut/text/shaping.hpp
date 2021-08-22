@@ -27,12 +27,14 @@
 
 #pragma once
 
+// FIXME JBL: Ideally don't use these in public headers
 #include <harfbuzz/hb.h>
 #include <harfbuzz/hb-ft.h>
 
 #include "hut/buffer_pool.hpp"
-#include "hut/font.hpp"
 #include "hut/utils.hpp"
+
+#include "hut/text/font.hpp"
 
 namespace hut {
 

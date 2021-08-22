@@ -27,26 +27,55 @@
 
 #pragma once
 
-#include <optional>
-#include <span>
+#include <unordered_map>
+#include <memory>
 
+#include "hut/atlas_pool.hpp"
+#include "hut/buffer_pool.hpp"
 #include "hut/image.hpp"
-#include "hut/utils.hpp"
+#include "hut/pipeline.hpp"
 
-#include "khr_df.h"
+struct FT_FaceRec_;
+typedef FT_FaceRec_* FT_Face;
+struct hb_font_t;
 
-namespace hut::ktx {
+namespace hut {
 
-struct load_params {
-  // import defaults from image_params
-  VkImageTiling tiling_ = image_params{}.tiling_;
-  VkImageUsageFlags usage_ = image_params{}.usage_;
-  VkImageAspectFlags aspect_ = image_params{}.aspect_;
-  VkMemoryPropertyFlags properties_ = image_params{}.properties_;
-  VkSampleCountFlagBits samples_ = image_params{}.samples_;
-  VkImageCreateFlags flags_ = image_params{}.flags_;
+class font {
+  template<typename TIndexType, typename TVertexType, typename TUpdater> friend class shaper;
+
+ public:
+  font(display &_display, const uint8_t *_addr, size_t _size, const shared_atlas &_atlas, bool _hinting = true);
+  ~font();
+
+ private:
+  struct glyph {
+    shared_subimage subimage_;
+    vec4 texcoords_ {0, 0, 0, 0};
+    vec2 bearing_ {0, 0};
+    uvec2 bounds_ {0, 0};
+
+    inline explicit operator bool() const { return bounds_.x > 0 && bounds_.y > 0; }
+  };
+
+  using glyph_cache_t = std::unordered_map<uint, glyph>;
+  struct cache {
+    glyph_cache_t glyphs_;
+    hb_font_t *font_ = nullptr;
+
+    explicit operator bool() const { return font_ != nullptr; }
+  };
+
+  FT_Face face_;
+  i32 load_flags_;
+  shared_atlas atlas_;
+  std::unordered_map<uint8_t, cache> caches_;
+  std::mutex baking_mutex_;
+
+  glyph &load_glyph(glyph_cache_t &_cache, uint _char_index);
+  cache &load_cache(uint8_t _size);
 };
 
-std::optional<shared_image> load(display &_display, std::span<const u8> _input, const load_params &_params = {});
+using shared_font = std::shared_ptr<font>;
 
-} // ns hut::ktx
+}  // namespace hut

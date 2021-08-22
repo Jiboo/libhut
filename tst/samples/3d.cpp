@@ -29,7 +29,6 @@
 
 #include "hut/display.hpp"
 #include "hut/pipeline.hpp"
-#include "hut/font.hpp"
 #include "hut/window.hpp"
 
 #include "tst_pipelines.hpp"

@@ -25,9 +25,7 @@
  * SOFTWARE.
  */
 
-#ifdef HUT_ENABLE_IMGDEC_LIBSPNG
-
-#include "hut_imgdec.hpp"
+#include "hut/imgdec/imgdec.hpp"
 
 #include "spng.h"
 
@@ -129,5 +127,3 @@ namespace hut::imgdec {
   }
 
 } // ns hut::imgdec
-
-#endif  // HUT_ENABLE_IMGDEC_LIBSPNG

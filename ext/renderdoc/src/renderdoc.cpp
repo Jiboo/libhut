@@ -25,15 +25,11 @@
  * SOFTWARE.
  */
 
-#include "hut_renderdoc.hpp"
-
-#include <cassert>
+#include "hut/renderdoc/renderdoc.hpp"
 
 #include <filesystem>
-
 #include <dlfcn.h>
-
-#include "renderdoc_app.h"
+#include <renderdoc_app.h>
 
 namespace hut::renderdoc {
 

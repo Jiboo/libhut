@@ -28,8 +28,6 @@
 #include "hut/window.hpp"
 #include "hut/pipeline.hpp"
 
-#include "tst_pipelines.hpp"
-
 void install_esc_close(hut::window &_win) {
   _win.on_key.connect([&](hut::keycode _kcode, hut::keysym _ksym, bool _down) {
     if (_ksym == hut::KSYM_ESC && !_down)

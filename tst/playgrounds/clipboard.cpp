@@ -32,7 +32,7 @@
 #include "hut/display.hpp"
 #include "hut/window.hpp"
 
-#include "hut_imgui.hpp"
+#include "hut/imgui/imgui.hpp"
 
 #include "tst_png.hpp"
 #include "tst_events.hpp"

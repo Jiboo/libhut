@@ -25,7 +25,7 @@
  * SOFTWARE.
  */
 
-#include "hut_render2d.hpp"
+#include "hut/render2d/render2d.hpp"
 
 #include <utility>
 

@@ -1,16 +1,16 @@
 cmake_minimum_required(VERSION 3.16)
 project(hut)
+enable_testing()
 
 ###########################################################
 # Configuration
 ###########################################################
 option(HUT_ENABLE_IMGDEC "Enable the image loading extension" TRUE)
-  option(HUT_ENABLE_IMGDEC_LIBSPNG "Enable libspng backend" TRUE)
 option(HUT_ENABLE_IMGUI "Enable the imgui extension, which is used for some tests and playgrounds" TRUE)
 option(HUT_ENABLE_KTX2 "Enable the ktx2 io extension library" TRUE)
-option(HUT_ENABLE_PROFILING "Enable the renderdoc extension allowing to trigger captures from code" FALSE)
 option(HUT_ENABLE_RENDER2D "Enable the imgui extension, which is used for some tests and playgrounds" TRUE)
-option(HUT_ENABLE_RENDERDOC "Enable the renderdoc extension allowing to trigger captures from code" FALSE)
+option(HUT_ENABLE_RENDERDOC "Enable the renderdoc extension allowing to trigger captures from code" TRUE)
+option(HUT_ENABLE_TEXT "Enable the text extension allowing to raster glyphs with freetype and layout text with harfbuzz" TRUE)
 
 option(HUT_COMPILE_SAMPLES "Compile all samples/demos, can take some time due to shader/resources pipelines" TRUE)
 option(HUT_COMPILE_PLAYGROUNDS "Compile all test playgrounds" TRUE)
@@ -21,6 +21,7 @@ option(HUT_COMPILE_UNITTESTS "Compile all unit tests" TRUE)
 ###########################################################
 #set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -v")
+#set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_PROFILING)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION_DEBUG)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_DEBUG_WL_DATA_LISTENERS)
@@ -46,6 +47,7 @@ if(CMAKE_BUILD_TYPE MATCHES DEBUG)
   set(GLSLANG_VALIDATOR_FLAGS "${GLSLANG_VALIDATOR_FLAGS} -g")
 endif()
 
+include(dep/imgui.cmake)
 include(dep/spirv_reflect.cmake)
 
 find_package(Threads REQUIRED)
@@ -58,18 +60,6 @@ set(HUT_LIBS ${HUT_LIBS} ${Vulkan_LIBRARIES})
 find_package(GLM REQUIRED)
 set(HUT_INCLUDES ${HUT_INCLUDES} ${GLM_INCLUDE_DIRS})
 set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_RADIANS -DGLM_FORCE_LEFT_HANDED)
-
-find_package(PNG REQUIRED)
-set(HUT_INCLUDES ${HUT_INCLUDES} ${PNG_INCLUDE_DIRS})
-set(HUT_LIBS ${HUT_LIBS} ${PNG_LIBRARIES})
-
-find_package(Freetype REQUIRED)
-set(HUT_INCLUDES ${HUT_INCLUDES} ${FREETYPE_INCLUDE_DIRS})
-set(HUT_LIBS ${HUT_LIBS} ${FREETYPE_LIBRARIES})
-
-find_package(HarfBuzz REQUIRED)
-set(HUT_INCLUDES ${HUT_INCLUDES} ${HARFBUZZ_INCLUDE_DIRS})
-set(HUT_LIBS ${HUT_LIBS} ${HARFBUZZ_LIBRARIES})
 
 find_package(Wayland REQUIRED COMPONENTS wayland-client wayland-cursor)
 
@@ -114,55 +104,25 @@ set(HUT_SOURCES ${HUT_SOURCES} ${HUT_WAYLAND_SOURCES} ${HUT_WAYLAND_GENERATED})
 ###########################################################
 # Checking for optional dependencies...
 ###########################################################
-if (HUT_ENABLE_PROFILING)
-  find_package(fmt) #TODO Replace with std::format
-  find_package(Boost)
+string(FIND "${HUT_DEFINITIONS}" "HUT_ENABLE_PROFILING" HUT_ENABLE_PROFILING)
+if (NOT HUT_ENABLE_PROFILING EQUAL -1)
+  find_package(fmt REQUIRED) #TODO Replace with std::format
+  find_package(Boost REQUIRED)
   find_package(Backtrace) #TODO Replace with std::stacktrace
 
-  if (fmt_FOUND AND Boost_FOUND)
-    set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_PROFILING)
-    set(HUT_INCLUDES ${HUT_INCLUDES} ${Boost_INCLUDE_DIRS})
-    set(HUT_LIBS ${HUT_LIBS} fmt::fmt-header-only)
-    set(HUT_LIBS ${HUT_LIBS} dl) # Dependency of boost-stacktrace
+  set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_PROFILING)
+  set(HUT_INCLUDES ${HUT_INCLUDES} ${Boost_INCLUDE_DIRS})
+  set(HUT_LIBS ${HUT_LIBS} fmt::fmt-header-only)
+  set(HUT_LIBS ${HUT_LIBS} dl) # Dependency of boost-stacktrace
 
-    if (Backtrace_FOUND)
-      set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DBOOST_STACKTRACE_USE_BACKTRACE)
-      set(HUT_INCLUDES ${HUT_INCLUDES} ${BACKTRACE_INCLUDE_DIRS})
-      set(HUT_LIBS ${HUT_LIBS} ${BACKTRACE_LIBRARIES})
-    else()
-      message(WARNING "Defaulting to addr2line, which is slow to generate backtraces, please install https://github.com/ianlancetaylor/libbacktrace")
-      set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DBOOST_STACKTRACE_USE_ADDR2LINE)
-    endif()
-  endif()
-endif()
-
-if (HUT_ENABLE_IMGUI)
-  include(dep/imgui.cmake)
-  set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_IMGUI)
-endif()
-
-if (HUT_ENABLE_IMGDEC)
-  set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_IMGDEC)
-endif()
-
-if (HUT_ENABLE_KTX2)
-  set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_KTX2)
-endif()
-
-if (HUT_ENABLE_RENDERDOC)
-  find_package(Renderdoc)
-  if (RENDERDOC_FOUND)
-    set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_RENDERDOC)
+  if (Backtrace_FOUND)
+    set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DBOOST_STACKTRACE_USE_BACKTRACE)
+    set(HUT_INCLUDES ${HUT_INCLUDES} ${BACKTRACE_INCLUDE_DIRS})
+    set(HUT_LIBS ${HUT_LIBS} ${BACKTRACE_LIBRARIES})
   else()
-    set(HUT_ENABLE_RENDERDOC FALSE)
-    message("Couldn't find renderdoc on system, disabling")
+    message(WARNING "Defaulting to addr2line, which is slow to generate backtraces, please install https://github.com/ianlancetaylor/libbacktrace")
+    set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DBOOST_STACKTRACE_USE_ADDR2LINE)
   endif()
-endif()
-
-enable_testing()
-find_package(GTest REQUIRED)
-if(GTEST_FOUND)
-  set(HUT_INCLUDES_TEST ${HUT_INCLUDES} ${GTEST_INCLUDE_DIR})
 endif()
 
 ###########################################################
@@ -171,11 +131,11 @@ endif()
 function(hut_gen_spv_bundle)
   cmake_parse_arguments(HUT_GEN_SPV_BUNDLE "" "NAMESPACE;OUTDIR" "SHADER_SOURCES" ${ARGN})
   if (NOT HUT_GEN_SPV_BUNDLE_NAMESPACE)
-    message(FATAL "No namespace specified for hut_gen_spv_bundle")
+    message(FATAL_ERROR "No namespace specified for hut_gen_spv_bundle")
   elseif(NOT HUT_GEN_SPV_BUNDLE_OUTDIR)
-    message(FATAL "No output directory specified for hut_gen_spv_bundle")
+    message(FATAL_ERROR "No output directory specified for hut_gen_spv_bundle")
   elseif(NOT HUT_GEN_SPV_BUNDLE_SHADER_SOURCES)
-    message(FATAL "No shader source list provided for hut_gen_spv_bundle")
+    message(FATAL_ERROR "No shader source list provided for hut_gen_spv_bundle")
   endif()
 
   file(MAKE_DIRECTORY ${HUT_GEN_SPV_BUNDLE_OUTDIR})
@@ -224,13 +184,9 @@ target_include_directories(gen_spv PRIVATE inc)
 ###########################################################
 # hut library
 ###########################################################
-set(HUT_GEN_DIR "${CMAKE_BINARY_DIR}/gen")
-file(MAKE_DIRECTORY ${HUT_GEN_DIR})
-set(HUT_INCLUDES ${HUT_INCLUDES} ${HUT_GEN_DIR})
-
 set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DVK_USE_PLATFORM_WAYLAND_KHR)
-file(GLOB_RECURSE HUT_HEADERS inc/hut/*.hpp ${HUT_GEN_DIR}/*.hpp)
-file(GLOB HUT_COMMON_SOURCES src/*.cpp ${HUT_GEN_DIR}/*.cpp)
+file(GLOB_RECURSE HUT_HEADERS inc/hut/*.hpp)
+file(GLOB HUT_COMMON_SOURCES src/*.cpp)
 set(HUT_SOURCES ${HUT_SOURCES} ${HUT_COMMON_SOURCES})
 
 set(HUT_INCLUDES ${HUT_INCLUDES} inc)
@@ -248,156 +204,146 @@ target_precompile_headers(hut PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT
 ###########################################################
 # hut extensions
 ###########################################################
-if (HUT_ENABLE_IMGUI)
-  file(GLOB_RECURSE HUT_IMGUI_HEADERS ext/imgui/*.hpp)
-  file(GLOB_RECURSE HUT_IMGUI_SOURCES ext/imgui/*.cpp)
-  set(HUT_IMGUI_INCLUDES ext/imgui)
-
-  file(GLOB HUT_IMGUI_SHADERS_SOURCE ext/imgui/*.vert ext/imgui/*.frag)
-  hut_gen_spv_bundle(NAMESPACE imgui OUTDIR ${HUT_GEN_DIR}/imgui SHADER_SOURCES ${HUT_IMGUI_SHADERS_SOURCE})
-
-  add_library(hut_imgui STATIC ${HUT_IMGUI_HEADERS} ${HUT_IMGUI_SOURCES} ${HUT_BUNDLE_imgui_FILES})
-  target_link_libraries(hut_imgui imgui hut)
-  target_include_directories(hut_imgui PUBLIC ${HUT_IMGUI_INCLUDES} ${HUT_GEN_DIR}/imgui)
-endif()
-
-if (HUT_ENABLE_KTX2)
-  file(GLOB_RECURSE HUT_KTX2_HEADERS ext/ktx2/inc/*.hpp)
-  file(GLOB_RECURSE HUT_KTX2_SOURCES ext/ktx2/src/*.cpp)
-  set(HUT_KTX2_INCLUDES ext/ktx2/inc)
-
-  add_library(hut_ktx2 STATIC ${HUT_KTX2_HEADERS} ${HUT_KTX2_SOURCES})
-  target_link_libraries(hut_ktx2 hut)
-  target_include_directories(hut_ktx2 PUBLIC ${HUT_KTX2_INCLUDES})
-
-  if (HUT_COMPILE_UNITTESTS)
-    file(GLOB_RECURSE HUT_KTX2_TST_DATA ext/ktx2/tst/res/*.ktx2)
-    add_custom_command(OUTPUT ${HUT_GEN_DIR}/ktx2_tst_data.cpp
-        COMMAND $<TARGET_FILE:gen_res> ktx2_tst_data ${HUT_GEN_DIR} ${HUT_KTX2_TST_DATA}
-        DEPENDS gen_res ${HUT_KTX2_TST_DATA}
-        COMMENT "Generating KTX2 unittests data")
-
-    file(GLOB_RECURSE HUT_KTX2_UNIT_TESTS ext/ktx2/tst/*.cpp)
-    set(HUT_UNIT_TESTS ${HUT_UNIT_TESTS} ${HUT_KTX2_UNIT_TESTS} ${HUT_GEN_DIR}/ktx2_tst_data.cpp)
-    set(HUT_UNIT_TESTS_DEPS ${HUT_UNIT_TESTS_DEPS} hut_ktx2)
+function(hut_add_extension)
+  cmake_parse_arguments(HUT_ADD_EXTENSION "" "NAME" "DEPENDENCIES" ${ARGN})
+  if (NOT HUT_ADD_EXTENSION_NAME)
+    message(FATAL_ERROR "No name specified for hut_add_extension")
   endif()
-endif()
+  string(TOUPPER ${HUT_ADD_EXTENSION_NAME} HUT_ADD_EXTENSION_NAME_UPPER)
 
-if (HUT_ENABLE_RENDERDOC)
-  file(GLOB_RECURSE HUT_RENDERDOC_HEADERS ext/renderdoc/*.hpp)
-  file(GLOB HUT_RENDERDOC_SOURCES ext/renderdoc/*.cpp)
-  set(HUT_RENDERDOC_INCLUDES ext/renderdoc)
+  if (HUT_ENABLE_${HUT_ADD_EXTENSION_NAME_UPPER})
+    set(EXT_INCLUDE_DIR ext/${HUT_ADD_EXTENSION_NAME}/inc)
+    set(EXT_SOURCE_DIR ext/${HUT_ADD_EXTENSION_NAME}/src)
+    set(EXT_SHADER_DIR ext/${HUT_ADD_EXTENSION_NAME}/spv)
+    set(EXT_UNITTESTS_DIR ext/${HUT_ADD_EXTENSION_NAME}/tst)
+    set(EXT_GEN_DIR ${CMAKE_BINARY_DIR}/gen/${HUT_ADD_EXTENSION_NAME})
+    set(EXT_TARGET hut_${HUT_ADD_EXTENSION_NAME})
 
-  add_library(hut_renderdoc STATIC ${HUT_RENDERDOC_HEADERS} ${HUT_RENDERDOC_SOURCES})
-  target_link_libraries(hut_renderdoc dl)
-  target_include_directories(hut_renderdoc PUBLIC ${HUT_RENDERDOC_INCLUDES} ${RENDERDOC_INCLUDE_DIRS})
-endif()
+    file(GLOB_RECURSE EXT_HEADERS ${EXT_INCLUDE_DIR}/*.hpp)
+    file(GLOB_RECURSE EXT_SOURCES ${EXT_SOURCE_DIR}/*.cpp)
+    file(GLOB_RECURSE EXT_SHADERS ${EXT_SHADER_DIR}/*.vert ${EXT_SHADER_DIR}/*.frag)
 
-if (HUT_ENABLE_IMGDEC)
-  if (HUT_ENABLE_IMGDEC_LIBSPNG)
-    find_package(SimplePNG REQUIRED)
-    set(HUT_IMGDEC_DEFINITIONS ${HUT_IMGDEC_DEFINITIONS} -DHUT_ENABLE_IMGDEC_LIBSPNG)
-    set(HUT_IMGDEC_LIBS ${HUT_IMGDEC_LIBS} spng)
+    set(EXT_DEP_INCLUDES "")
+    set(EXT_DEP_LIBRARIES "")
+    set(EXT_DEP_TARGETS "")
+    foreach(EXT_DEPENDENCY ${HUT_ADD_EXTENSION_DEPENDENCIES})
+      if (NOT TARGET ${EXT_DEPENDENCY})
+        find_package(${EXT_DEPENDENCY} REQUIRED)
+        if (TARGET ${EXT_DEPENDENCY})
+          set(EXT_DEP_TARGETS ${EXT_DEP_TARGETS} ${EXT_DEPENDENCY})
+        else()
+          string(TOUPPER ${EXT_DEPENDENCY} EXT_DEPENDENCY_UPPER)
+          set(EXT_DEP_INCLUDES ${EXT_DEP_INCLUDES} ${${EXT_DEPENDENCY_UPPER}_INCLUDE_DIRS})
+          set(EXT_DEP_LIBRARIES ${EXT_DEP_LIBRARIES} ${${EXT_DEPENDENCY_UPPER}_LIBRARIES})
+        endif()
+      else()
+        set(EXT_DEP_TARGETS ${EXT_DEP_TARGETS} ${EXT_DEPENDENCY})
+      endif()
+    endforeach()
+
+    if (EXT_SHADERS)
+      hut_gen_spv_bundle(NAMESPACE ${HUT_ADD_EXTENSION_NAME} OUTDIR ${EXT_GEN_DIR} SHADER_SOURCES ${EXT_SHADERS})
+    else()
+      set(HUT_BUNDLE_${HUT_ADD_EXTENSION_NAME}_FILES "")
+    endif()
+
+    add_library(${EXT_TARGET} STATIC ${EXT_HEADERS} ${EXT_SOURCES} ${HUT_BUNDLE_${HUT_ADD_EXTENSION_NAME}_FILES})
+    target_link_libraries(${EXT_TARGET} hut ${EXT_DEP_TARGETS} ${EXT_DEP_LIBRARIES})
+    target_include_directories(${EXT_TARGET} PUBLIC ${EXT_INCLUDE_DIR} ${EXT_GEN_DIR} ${EXT_DEP_INCLUDES})
+    target_compile_definitions(${EXT_TARGET} PUBLIC -DHUT_ENABLE_${HUT_ADD_EXTENSION_NAME_UPPER})
+
+    if (HUT_COMPILE_UNITTESTS)
+      file(GLOB_RECURSE EXT_TST_DATA ${EXT_UNITTESTS_DIR}/res/*.*)
+      add_custom_command(OUTPUT ${EXT_GEN_DIR}/tst_data.cpp
+          COMMAND $<TARGET_FILE:gen_res> tst_data ${EXT_GEN_DIR} ${EXT_TST_DATA}
+          DEPENDS gen_res ${EXT_TST_DATA}
+          COMMENT "Generating ${HUT_ADD_EXTENSION_NAME} unittests data")
+
+      file(GLOB_RECURSE EXT_UNIT_TESTS ${EXT_UNITTESTS_DIR}/*.cpp)
+      set(HUT_UNIT_TESTS ${HUT_UNIT_TESTS} ${EXT_UNIT_TESTS} ${EXT_GEN_DIR}/tst_data.cpp)
+      set(HUT_UNIT_TESTS_DEPS ${HUT_UNIT_TESTS_DEPS} ${EXT_TARGET})
+    endif()
   endif()
+endfunction()
 
-  file(GLOB_RECURSE HUT_IMGDEC_HEADERS ext/imgdec/*.hpp)
-  file(GLOB HUT_IMGDEC_SOURCES ext/imgdec/*.cpp)
-  set(HUT_IMGDEC_INCLUDES ext/imgdec)
+hut_add_extension(NAME imgdec DEPENDENCIES SimplePNG)
+hut_add_extension(NAME imgui DEPENDENCIES DearImGui)
+hut_add_extension(NAME ktx2)
+hut_add_extension(NAME render2d)
+hut_add_extension(NAME renderdoc DEPENDENCIES Renderdoc)
+hut_add_extension(NAME text DEPENDENCIES Freetype HarfBuzz)
 
-  add_library(hut_imgdec STATIC ${HUT_IMGDEC_HEADERS} ${HUT_IMGDEC_SOURCES})
-  target_link_libraries(hut_imgdec hut ${HUT_IMGDEC_LIBS})
-  target_compile_definitions(hut_imgdec PUBLIC ${HUT_IMGDEC_DEFINITIONS})
-  target_include_directories(hut_imgdec PUBLIC ${HUT_IMGDEC_INCLUDES})
-endif()
+###########################################################
+# hut test data
+###########################################################
+set(HUT_TST_GEN_DIR ${CMAKE_BINARY_DIR}/gen/tst)
 
-if (HUT_ENABLE_RENDER2D)
-  file(GLOB_RECURSE HUT_RENDER2D_HEADERS ext/render2d/inc/*.hpp)
-  file(GLOB HUT_RENDER2D_SOURCES ext/render2d/src/*.cpp)
-  set(HUT_RENDER2D_INCLUDES ext/render2d/inc)
+file(GLOB HUT_TST_PNG_SOURCE tst/res/png/*.png)
+set(HUT_TST_PNG ${HUT_TST_GEN_DIR}/png/tst_png.cpp)
+add_custom_command(OUTPUT ${HUT_TST_PNG}
+    COMMAND $<TARGET_FILE:gen_res> tst_png ${HUT_TST_GEN_DIR}/png ${HUT_TST_PNG_SOURCE}
+    DEPENDS gen_res ${HUT_TST_PNG_SOURCE}
+    COMMENT "Generating ${HUT_TST_PNG}")
+add_library(hut_tst_data_png ${HUT_TST_PNG})
+target_include_directories(hut_tst_data_png PUBLIC ${HUT_TST_GEN_DIR}/png)
 
-  file(GLOB HUT_RENDER2D_SHADERS_SOURCE ext/render2d/spv/*.vert ext/render2d/spv/*.frag)
-  hut_gen_spv_bundle(NAMESPACE render2d OUTDIR ${HUT_GEN_DIR}/render2d SHADER_SOURCES ${HUT_RENDER2D_SHADERS_SOURCE})
+file(GLOB_RECURSE HUT_TST_WOFF2_SOURCE tst/res/woff2/*.woff2)
+set(HUT_TST_WOFF2 ${HUT_TST_GEN_DIR}/woff2/tst_woff2.cpp)
+add_custom_command(OUTPUT ${HUT_TST_WOFF2}
+    COMMAND $<TARGET_FILE:gen_res> tst_woff2 ${HUT_TST_GEN_DIR}/woff2 ${HUT_TST_WOFF2_SOURCE}
+    DEPENDS gen_res ${HUT_TST_WOFF2_SOURCE}
+    COMMENT "Generating ${HUT_TST_WOFF2}")
+add_library(hut_tst_data_woff2 ${HUT_TST_WOFF2})
+target_include_directories(hut_tst_data_woff2 PUBLIC ${HUT_TST_GEN_DIR}/woff2)
 
-  add_library(hut_render2d STATIC ${HUT_RENDER2D_HEADERS} ${HUT_RENDER2D_SOURCES} ${HUT_BUNDLE_render2d_FILES})
-  target_link_libraries(hut_render2d hut)
-  target_include_directories(hut_render2d PUBLIC ${HUT_RENDER2D_INCLUDES} ${HUT_GEN_DIR}/render2d)
-endif()
+file(GLOB HUT_TST_SHADERS_SOURCE tst/res/spv/*.vert tst/res/spv/*.frag)
+hut_gen_spv_bundle(NAMESPACE tst_shaders OUTDIR ${HUT_TST_GEN_DIR}/shaders SHADER_SOURCES ${HUT_TST_SHADERS_SOURCE})
+add_library(hut_tst_data_shaders ${HUT_BUNDLE_tst_shaders_FILES})
+target_include_directories(hut_tst_data_shaders PUBLIC ${HUT_TST_GEN_DIR}/shaders)
 
 ###########################################################
 # hut tests
 ###########################################################
-file(GLOB HUT_TST_PNG_SOURCE tst/res/png/*.png)
-set(HUT_TST_PNG ${HUT_GEN_DIR}/tst_png.cpp)
-add_custom_command(OUTPUT ${HUT_TST_PNG}
-    COMMAND $<TARGET_FILE:gen_res> tst_png ${HUT_GEN_DIR} ${HUT_TST_PNG_SOURCE}
-    DEPENDS gen_res ${HUT_TST_PNG_SOURCE}
-    COMMENT "Generating ${HUT_TST_PNG}")
+function(hut_add_test)
+  cmake_parse_arguments(HUT_ADD_TEST "" "NAME;PATH" "DEPENDENCIES" ${ARGN})
+  if (NOT HUT_ADD_TEST_NAME)
+    message(FATAL_ERROR "No name specified for hut_add_test")
+  endif()
+  if (NOT HUT_ADD_TEST_PATH)
+    message(FATAL_ERROR "No path specified for hut_add_test")
+  endif()
 
-file(GLOB_RECURSE HUT_TST_WOFF2_SOURCE tst/res/woff2/*.woff2)
-set(HUT_TST_WOFF2 ${HUT_GEN_DIR}/tst_woff2.cpp)
-add_custom_command(OUTPUT ${HUT_TST_WOFF2}
-    COMMAND $<TARGET_FILE:gen_res> tst_woff2 ${HUT_GEN_DIR} ${HUT_TST_WOFF2_SOURCE}
-    DEPENDS gen_res ${HUT_TST_WOFF2_SOURCE}
-    COMMENT "Generating ${HUT_TST_WOFF2}")
+  set(TST_MISSING_DEPENDENCIES "")
+  foreach(EXT_DEPENDENCY ${HUT_ADD_TEST_DEPENDENCIES})
+    if (NOT TARGET ${EXT_DEPENDENCY})
+      set(TST_MISSING_DEPENDENCIES ${TST_MISSING_DEPENDENCIES} ${EXT_DEPENDENCY})
+    endif()
+  endforeach()
 
-file(GLOB HUT_TST_SHADERS_SOURCE tst/res/spv/*.vert tst/res/spv/*.frag)
-hut_gen_spv_bundle(NAMESPACE tst_shaders OUTDIR ${HUT_GEN_DIR} SHADER_SOURCES ${HUT_TST_SHADERS_SOURCE})
-set(HUT_TST_SHADERS ${HUT_BUNDLE_tst_shaders_FILES})
+  if (NOT TST_MISSING_DEPENDENCIES)
+    add_executable(${HUT_ADD_TEST_NAME} ${HUT_ADD_TEST_PATH})
+    target_link_libraries(${HUT_ADD_TEST_NAME} hut ${HUT_ADD_TEST_DEPENDENCIES})
+    target_include_directories(${HUT_ADD_TEST_NAME} PRIVATE tst/common)
+  else()
+    message("Disabling test ${HUT_ADD_TEST_NAME} due to missing dependencies: ${TST_MISSING_DEPENDENCIES}")
+  endif()
+endfunction()
 
 if (HUT_COMPILE_SAMPLES)
-  add_executable(hut_sample_3d tst/samples/3d.cpp ${HUT_TST_SHADERS})
-  target_link_libraries(hut_sample_3d hut)
-  target_include_directories(hut_sample_3d PRIVATE tst/common)
-
-  if (HUT_ENABLE_IMGUI)
-    add_executable(hut_sample_imgui tst/samples/imgui.cpp)
-    target_link_libraries(hut_sample_imgui hut_imgui)
-    target_include_directories(hut_sample_imgui PRIVATE tst/common)
-  endif()
-
-  if (HUT_ENABLE_IMGDEC)
-    add_executable(hut_sample_pipelines tst/samples/pipelines.cpp ${HUT_TST_PNG} ${HUT_TST_WOFF2} ${HUT_TST_SHADERS})
-    target_link_libraries(hut_sample_pipelines hut_imgdec)
-    target_include_directories(hut_sample_pipelines PRIVATE tst/common)
-  endif()
+  hut_add_test(NAME hut_sample_3d PATH tst/samples/3d.cpp DEPENDENCIES hut_tst_data_shaders)
+  hut_add_test(NAME hut_sample_imgui PATH tst/samples/imgui.cpp DEPENDENCIES hut_imgui)
+  hut_add_test(NAME hut_sample_pipelines PATH tst/samples/pipelines.cpp DEPENDENCIES hut_imgdec hut_text hut_tst_data_shaders hut_tst_data_png hut_tst_data_woff2)
 endif()
 
 if (HUT_COMPILE_PLAYGROUNDS)
-  if (HUT_ENABLE_IMGUI)
-    add_executable(hut_playground_events tst/playgrounds/events.cpp)
-    target_link_libraries(hut_playground_events hut_imgui)
-    target_include_directories(hut_playground_events PRIVATE tst/common)
-
-    add_executable(hut_playground_binpacks tst/playgrounds/binpacks.cpp)
-    target_link_libraries(hut_playground_binpacks hut_imgui)
-    target_include_directories(hut_playground_binpacks PRIVATE tst/common)
-
-    add_executable(hut_playground_dragndrop tst/playgrounds/dragndrop.cpp)
-    target_link_libraries(hut_playground_dragndrop hut_imgui)
-    target_include_directories(hut_playground_dragndrop PRIVATE tst/common)
-
-    add_executable(hut_playground_window tst/playgrounds/window.cpp)
-    target_link_libraries(hut_playground_window hut_imgui)
-    target_include_directories(hut_playground_window PRIVATE tst/common)
-
-    add_executable(hut_playground_clipboard tst/playgrounds/clipboard.cpp ${HUT_TST_PNG})
-    target_link_libraries(hut_playground_clipboard hut_imgui)
-    target_include_directories(hut_playground_clipboard PRIVATE tst/common)
-
-    add_executable(hut_playground_text tst/playgrounds/text.cpp ${HUT_TST_WOFF2})
-    target_link_libraries(hut_playground_text hut_imgui)
-    target_include_directories(hut_playground_text PRIVATE tst/common)
-
-    add_executable(hut_playground_emoji tst/playgrounds/emoji.cpp ${HUT_TST_WOFF2})
-    target_link_libraries(hut_playground_emoji hut_imgui)
-    target_include_directories(hut_playground_emoji PRIVATE tst/common)
-
-    if (HUT_ENABLE_RENDER2D AND HUT_ENABLE_IMGDEC)
-      add_executable(hut_playground_render2d tst/playgrounds/render2d.cpp ${HUT_TST_WOFF2} ${HUT_TST_PNG})
-      target_link_libraries(hut_playground_render2d hut_render2d hut_imgui hut_imgdec)
-      target_include_directories(hut_playground_render2d PRIVATE tst/common)
-    endif()
-  endif()
+  hut_add_test(NAME hut_playground_events PATH tst/playgrounds/events.cpp DEPENDENCIES hut_imgui)
+  hut_add_test(NAME hut_playground_binpacks PATH tst/playgrounds/binpacks.cpp DEPENDENCIES hut_imgui)
+  hut_add_test(NAME hut_playground_dragndrop PATH tst/playgrounds/dragndrop.cpp DEPENDENCIES hut_imgui)
+  hut_add_test(NAME hut_playground_window PATH tst/playgrounds/window.cpp DEPENDENCIES hut_imgui)
+  hut_add_test(NAME hut_playground_clipboard PATH tst/playgrounds/clipboard.cpp DEPENDENCIES hut_imgui hut_tst_data_png)
+  hut_add_test(NAME hut_playground_text PATH tst/playgrounds/text.cpp DEPENDENCIES hut_imgui hut_text hut_tst_data_woff2 hut_tst_data_shaders)
+  hut_add_test(NAME hut_playground_emoji PATH tst/playgrounds/emoji.cpp DEPENDENCIES hut_imgui hut_text hut_tst_data_woff2 hut_tst_data_shaders)
+  hut_add_test(NAME hut_playground_render2d PATH tst/playgrounds/render2d.cpp DEPENDENCIES hut_render2d hut_imgui hut_imgdec hut_tst_data_png)
 endif()
 
 if (HUT_COMPILE_UNITTESTS AND GTEST_FOUND)

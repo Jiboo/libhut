@@ -30,15 +30,16 @@
 
 #include "hut/display.hpp"
 #include "hut/pipeline.hpp"
-#include "hut/font.hpp"
-#include "hut/shaping.hpp"
 #include "hut/window.hpp"
 
-#include "hut_imgdec.hpp"
+#include "hut/imgdec/imgdec.hpp"
+#include "hut/text/font.hpp"
+#include "hut/text/shaping.hpp"
 
 #include "tst_woff2.hpp"
 #include "tst_png.hpp"
 #include "tst_events.hpp"
+#include "tst_pipelines.hpp"
 
 using namespace hut;
 

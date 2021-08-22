@@ -32,12 +32,11 @@
 #include "hut/display.hpp"
 #include "hut/window.hpp"
 
-#include "hut_render2d.hpp"
-#include "hut_imgdec.hpp"
-#include "hut_imgui.hpp"
+#include "hut/imgdec/imgdec.hpp"
+#include "hut/imgui/imgui.hpp"
+#include "hut/render2d/render2d.hpp"
 
 #include "tst_png.hpp"
-#include "tst_woff2.hpp"
 #include "tst_events.hpp"
 
 using namespace hut;
@@ -74,7 +73,7 @@ int main(int, char**) {
 
   auto rand_color = [&]() {
     auto hsv = vec3{rand_norm() * 360, 0.99, 0.95};
-    auto rgba = vec4(glm::rgbColor(hsv), rand_norm());
+    auto rgba = vec4(glm::rgbColor(hsv), rand_norm() * 0.75 + 0.25);
     return u8vec4(rgba * 255);
   };
 

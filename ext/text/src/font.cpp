@@ -27,18 +27,38 @@
 
 #include <iostream>
 
-#include "hut/font.hpp"
+#include "hut/text/font.hpp"
+
 #include "hut/profiling.hpp"
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
 #include FT_BITMAP_H
+
+#include <harfbuzz/hb.h>
+#include <harfbuzz/hb-ft.h>
 
 using namespace hut;
 
+struct FTLibraryHolder {
+  FT_Library library_ = nullptr;
+  FTLibraryHolder() {
+    FT_Init_FreeType(&library_);
+  }
+  ~FTLibraryHolder() {
+    if (library_)
+      FT_Done_FreeType(library_);
+  }
+};
+
 font::font(display &_display, const uint8_t *_addr, size_t _size, const shared_atlas &_atlas, bool _hinting)
-  : library_(_display.ft_library_), atlas_(_atlas) {
+  : atlas_(_atlas) {
+
+  static FTLibraryHolder lib_holder;
+
   HUT_PROFILE_SCOPE(PFONT, "font::font");
   load_flags_ = FT_LOAD_COLOR | (_hinting ? FT_LOAD_FORCE_AUTOHINT : FT_LOAD_NO_HINTING);
-  auto result = FT_New_Memory_Face(library_, _addr, FT_Long(_size), 0, &face_);
+  auto result = FT_New_Memory_Face(lib_holder.library_, _addr, FT_Long(_size), 0, &face_);
   if (result != 0)
     throw std::runtime_error(sstream("couldn't load font: ") << result);
   if (FT_HAS_COLOR(face_))

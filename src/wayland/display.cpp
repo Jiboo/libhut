@@ -714,8 +714,6 @@ display::display(const char *_app_name, uint32_t _app_version, const char *_name
   HUT_PVK(vkDestroySurfaceKHR, instance_, dummy_surface, nullptr);
   wl_surface_destroy(dummy);
 
-  FT_Init_FreeType(&ft_library_);
-
   if (shm_ != nullptr) {
     char *env_cursor_theme = getenv("XCURSOR_THEME");
     char *env_cursor_size = getenv("XCURSOR_SIZE");
@@ -740,7 +738,6 @@ display::~display() {
   postflush_jobs_.clear();
   posted_jobs_.clear();
 
-  FT_Done_FreeType(ft_library_);
   destroy_vulkan();
 
   if (animate_cursor_ctx_.thread_.joinable()) {

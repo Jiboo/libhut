@@ -45,9 +45,6 @@
 #include <xkbcommon/xkbcommon.h>
 #include "xdg-shell-client-protocol.h"
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
-
 #include "hut/buffer_pool.hpp"
 #include "hut/utils.hpp"
 
@@ -258,7 +255,6 @@ class display {
   }
 
  protected:
-  FT_Library ft_library_ = nullptr;
   VkInstance instance_ = VK_NULL_HANDLE;
   VkDebugReportCallbackEXT debug_cb_ = VK_NULL_HANDLE;
 

@@ -32,7 +32,7 @@
 #include "hut/pipeline.hpp"
 #include "hut/binpacks.hpp"
 
-#include "hut_imgui.hpp"
+#include "hut/imgui/imgui.hpp"
 
 #include "tst_events.hpp"
 
