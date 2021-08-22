@@ -35,13 +35,15 @@
 namespace hut::binpack {
 
 template<typename T>
-struct linear1d {
+class linear1d {
+public:
   struct block {
     bool used_;
     T offset_;
     T size_;
   };
 
+private:
   using base_type = T;
   using type = T;
 
@@ -156,6 +158,7 @@ struct linear1d {
     erase_range(ibegin + 1, iend + 1);
   }
 
+public:
   explicit linear1d(T _pool_size) : pool_size_(_pool_size) { reset(); }
 
   std::optional<T> pack(T _size, T _align = 0) {
@@ -179,6 +182,21 @@ struct linear1d {
 
   bool empty() {
     return blocks_.empty() || (blocks_.size() == 1 && !blocks_[0].used_);
+  }
+
+  T upper_bound() const {
+    for (auto it = blocks_.crbegin(); it != blocks_.crend(); ++it) {
+      if (it->used_)
+        return it->offset_ + it->size_;
+    }
+    return 0;
+  }
+
+  template<typename TVisitor>
+  void visit_blocks(TVisitor _visitor) const {
+    for (const auto &block : blocks_)
+      if (!_visitor(block))
+        break;
   }
 };
 

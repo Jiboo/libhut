@@ -67,11 +67,11 @@ void install_resizable_movable(hut::window &_win) {
   });
 }
 
-void install_resizable_ubo(hut::window &_win, hut::shared_ref<proj_ubo> &_ubo) {
-  _win.on_resize.connect([&](const hut::uvec2 &_size) {
-    proj_ubo new_ubo;
-    new_ubo.proj_ = hut::ortho<float>(0.f, float(_size.x), 0.f, float(_size.y));
-    _ubo->set(new_ubo);
+template<typename TUBO>
+void install_resizable_ubo(hut::window &_win, hut::shared_ref<TUBO> &&_ubo) {
+  _win.on_resize.connect([ubo = std::move(_ubo)](const hut::uvec2 &_size) {
+    hut::mat4 proj = hut::ortho<float>(0.f, float(_size.x), 0.f, float(_size.y));
+    ubo->update_subone(0, offsetof(TUBO, proj_), sizeof(hut::mat4), &proj);
     return false;
   });
 }
@@ -91,7 +91,8 @@ void install_test_events(hut::display &_display, hut::window &_win) {
   install_continuous_redraw(_display, _win);
 }
 
-void install_test_events(hut::display &_display, hut::window &_win, hut::shared_ref<proj_ubo> &_ubo) {
+template<typename TUBO>
+void install_test_events(hut::display &_display, hut::window &_win, hut::shared_ref<TUBO> _ubo) {
   install_test_events(_display, _win);
-  install_resizable_ubo(_win, _ubo);
+  install_resizable_ubo<TUBO>(_win, std::move(_ubo));
 }

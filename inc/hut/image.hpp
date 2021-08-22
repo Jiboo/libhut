@@ -81,7 +81,13 @@ class image {
     }
 
    public:
-    ~updator() { target_.finalize_update(*this); }
+    ~updator() { if (data_.size_bytes()) target_.finalize_update(*this); }
+
+    updator() = delete;
+    updator(const updator &) = delete;
+    updator(updator &&) = default;
+    updator& operator=(const updator&) = delete;
+    updator& operator=(updator&&) = delete;
 
     [[nodiscard]] const u8 *data() const { return data_.data(); }
     [[nodiscard]] u8 *data() { return data_.data(); }

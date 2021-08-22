@@ -42,13 +42,13 @@ using namespace hut;
 
 int main(int, char**) {
   display d("hut demo");
+  auto b = d.alloc_buffer(1024*1024);
 
   window w(d, window_params{.size_{1024, 712}});
   w.clear_color({0, 0, 0, 0});
   w.title("hut imgui demo");
 
   shared_sampler samp = std::make_shared<sampler>(d);
-  auto b = d.alloc_buffer(1024*1024);
 
   vec4 clear_color({0, 0, 0, 1});
 

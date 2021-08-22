@@ -42,15 +42,14 @@ template<typename T>
 void debug(const binpack::linear1d<T> &_packer) {
   ImDrawList* draw_list = ImGui::GetWindowDrawList();
   ImVec2 p = ImGui::GetCursorScreenPos();
-
-  const auto size = _packer.blocks_.size();
-  for (size_t i = 0; i < size; i++) {
-    if (!_packer.blocks_[i].used_) {
-      u16vec4 rect{_packer.blocks_[i].offset_, 0, _packer.blocks_[i].offset_ + _packer.blocks_[i].size_, 100};
+  _packer.visit_blocks([p, draw_list](const auto &block) {
+    if (!block.used_) {
+      u16vec4 rect{block.offset_, 0, block.offset_ + block.size_, 100};
       draw_list->AddRectFilled(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w), IM_COL32(0, 255, 0, 63), 0.0f,  ImDrawCornerFlags_All);
       draw_list->AddRect(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w), IM_COL32(0, 255, 0, 127), 0.0f,  ImDrawCornerFlags_All);
     }
-  }
+    return true;
+  });
 }
 
 template<typename T, typename TUnderlying>
@@ -69,13 +68,11 @@ void debug(const binpack::shelve<T, TShelveSelector> &_packer) {
 }
 
 template<typename TPacker>
-void ImPacker(const char *_name = "Packer", u16vec2 _bounds = {8*1024, 8*1024}) {
+void ImPacker(const char *_name = "Packer", u16vec2 _bounds = {8*1024, 8*1024}, u16vec2 _min_rect = {5, 5}, u16vec2 _max_rect = {100, 100}) {
   ImGui::SetNextWindowContentSize({float(_bounds.x), float(_bounds.y)});
   if (ImGui::Begin(_name, nullptr, ImGuiWindowFlags_HorizontalScrollbar)) {
     using clock_t = std::chrono::high_resolution_clock;
     using dur_t = std::chrono::duration<float, std::milli>;
-    constexpr u16vec2 max_rect {100, 100};
-    constexpr u16vec2 min_rect {5, 5};
     static TPacker packer(_bounds);
     static std::vector<u16vec4> packed;
     static std::mt19937 gen;
@@ -94,7 +91,10 @@ void ImPacker(const char *_name = "Packer", u16vec2 _bounds = {8*1024, 8*1024}) 
       std::uniform_int_distribution dis(0, _end - 1);
       return dis(gen);
     };
-    auto rand_size = [&]() { return u16vec2 {max_rect.x * rand_norm() + min_rect.x, max_rect.y * rand_norm() + min_rect.y}; };
+    auto rand_size = [&]() { return u16vec2 {
+      (_max_rect.x - _min_rect.x) * rand_norm() + _min_rect.x,
+      (_max_rect.y - _min_rect.y) * rand_norm() + _min_rect.y};
+    };
     auto reset = [&]() {
       gen.seed(std::mt19937::default_seed);
       packed.clear();
@@ -192,7 +192,7 @@ int main(int, char**) {
     ImGui_ImplHut_NewFrame();
     ImGui::NewFrame();
 
-    ImPacker<binpack::adaptor1d_dummy2d<u16, binpack::linear1d<u16>>>("linear1d", {32*1024, 100});
+    ImPacker<binpack::adaptor1d_dummy2d<u16, binpack::linear1d<u16>>>("linear1d", {32*1024, 100}, {5, 100});
     ImPacker<binpack::shelve<u16, binpack::shelve_separator_align<u16, 16>>>("shelves<align<16>>");
     ImPacker<binpack::shelve<u16, binpack::shelve_separator_pow<u16, 16>>>("shelves<pow<16>>");
 

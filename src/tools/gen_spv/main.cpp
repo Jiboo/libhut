@@ -238,6 +238,7 @@ string format_name_cpp(SpvReflectInterfaceVariable *_input, unsigned _columns = 
   for (auto &vk_format : vk_formats) {
     if (name.ends_with(vk_format)) {
       format = vk_format;
+      break;
     }
   }
 
@@ -299,7 +300,7 @@ string format_name_cpp(SpvReflectInterfaceVariable *_input, unsigned _columns = 
   size_t occ8 = std::count(format.begin(), format.end(), '8');
   size_t occ16 = std::count(format.begin(), format.end(), '1');
   size_t occ32 = std::count(format.begin(), format.end(), '3');
-  size_t occ64 = std::count(format.begin(), format.end(), '6');
+  size_t occ64 = std::count(format.begin(), format.end(), '4');
 
   if (occ64 > 0) os << "64";
   else if (occ32 > 0) os << "32";

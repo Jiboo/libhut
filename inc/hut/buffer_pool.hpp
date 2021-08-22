@@ -74,16 +74,26 @@ protected:
     friend buffer_pool;
 
     buffer &target_;
-    alloc staging_;
+    alloc staging_{};
     std::span<u8> data_;
-    uint offset_;
+    uint offset_{};
 
     updator(buffer &_target, alloc _staging, std::span<u8> _data, uint _offset)
         : target_(_target), staging_(_staging), data_(_data), offset_(_offset) {
     }
 
   public:
-    ~updator() { target_.parent_.finalize_update(*this); }
+    ~updator() { if (data_.size_bytes()) target_.parent_.finalize_update(*this); }
+
+    updator() = delete;
+    updator(const updator &) = delete;
+    updator(updator && _other) noexcept : target_(_other.target_), data_() {
+      std::swap(data_, _other.data_);
+      staging_ = _other.staging_;
+      offset_ = _other.offset_;
+    }
+    updator& operator=(const updator&) = delete;
+    updator& operator=(updator&&) = delete;
 
     u8 *data() { return data_.data(); }
     size_t size_bytes() { return data_.size_bytes(); }
@@ -130,6 +140,10 @@ protected:
       assert(_byte_offset + _byte_size <= size_bytes());
       assert(_byte_size > 0);
       return pool().prepare_update(buff(), alloc_.offset_ + _byte_offset, _byte_size);
+    }
+
+    updator update_raw_indirect() {
+      return update_raw_indirect(0, size_bytes());
     }
 
     void update_some(uint _index_offset, uint _count, const T *_src) {

@@ -38,6 +38,7 @@ using namespace hut;
 
 int main(int, char **) {
   display d("hut demo3d");
+  auto b = d.alloc_buffer(1024*1024);
 
   window_params params;
   params.flags_.set(window_params::FDEPTH);
@@ -47,8 +48,6 @@ int main(int, char **) {
   window w(d, params);
   w.clear_color({0.1f, 0.1f, 0.1f, 0.0f});
   w.title("hut demo3d win");
-
-  auto b = d.alloc_buffer(1024*1024);
 
   auto indices = b->allocate<uint16_t>(36);
   indices->set({

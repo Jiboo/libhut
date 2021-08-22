@@ -47,14 +47,28 @@ struct pipeline_params {
   uint32_t max_sets_ = 16, initial_sets_ = 1;
 };
 
+namespace details {
+  template<typename TIndex>
+  struct vulkan_index_type {
+    constexpr static VkIndexType type = VK_INDEX_TYPE_MAX_ENUM;
+  };
+  template<>
+  struct vulkan_index_type<u16> {
+    constexpr static VkIndexType type = VK_INDEX_TYPE_UINT16;
+  };
+  template<>
+  struct vulkan_index_type<u32> {
+    constexpr static VkIndexType type = VK_INDEX_TYPE_UINT32;
+  };
+}
+
 template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments>
 class pipeline {
 public:
-  using indice = TIndice;
+  using index_t = TIndice;
   using vertex = typename TVertexRefl::vertex;
   using instance = typename TVertexRefl::instance;
-
-  using shared_indices = shared_ref<indice>;
+  using shared_indices = shared_ref<index_t>;
   using shared_vertices = shared_ref<vertex>;
   using shared_instances = shared_ref<instance>;
 
@@ -599,7 +613,9 @@ public:
   void bind_indices(VkCommandBuffer _buffer, const shared_indices &_indices, uint _indices_offset, uint _indices_count) {
     assert(_indices);
     assert(_indices_offset + _indices_count <= _indices->size());
-    HUT_PVK(vkCmdBindIndexBuffer, _buffer, _indices->buff().buffer_, _indices->alloc_.offset_, VK_INDEX_TYPE_UINT16);
+    constexpr auto vulkan_index_type = details::vulkan_index_type<index_t>::type;
+    static_assert(vulkan_index_type != VK_INDEX_TYPE_MAX_ENUM, "Unsupported index type");
+    HUT_PVK(vkCmdBindIndexBuffer, _buffer, _indices->buff().buffer_, _indices->alloc_.offset_, vulkan_index_type);
   }
 
   void draw(VkCommandBuffer _buffer, uint _vertex_count, uint _instances_count, uint _vertex_offset, uint _instances_offset)  {

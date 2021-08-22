@@ -240,6 +240,8 @@ class display {
     return pdevice_;
   }
 
+  u16vec2 max_tex_size() { auto dim = limits().maxImageDimension2D; return {dim, dim}; }
+
   constexpr static auto GENERAL_FLAGS = VkBufferUsageFlagBits(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
                                                           | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
                                                           | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);

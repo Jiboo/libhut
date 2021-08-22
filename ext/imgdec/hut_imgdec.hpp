@@ -30,11 +30,13 @@
 #include <memory>
 
 #include "hut/image.hpp"
+#include "hut/atlas_pool.hpp"
 
 namespace hut::imgdec {
 
 #ifdef HUT_ENABLE_IMGDEC_LIBSPNG
-  std::shared_ptr<image> load_png(display &, std::span<const u8> _data);
+  shared_image load_png(display &, std::span<const u8> _data);
+  shared_subimage load_png(const shared_atlas&, std::span<const u8> _data);
 #endif  // HUT_ENABLE_IMGDEC_LIBSPNG
 
 } // ns hut::imgdec

@@ -36,13 +36,13 @@
 #include "hut/pipeline.hpp"
 #include "hut/window.hpp"
 
-#include "hut_imgui_shaders_refl.hpp"
+#include "imgui_refl.hpp"
 
 struct proj_ubo {
   hut::mat4 proj_ {1};
 };
 
-using imgui_pipeline = hut::pipeline<ImDrawIdx, hut::hut_imgui_shaders::imgui_vert_spv_refl, hut::hut_imgui_shaders::imgui_frag_spv_refl, const hut::shared_ref<proj_ubo>&, const hut::shared_image&, const hut::shared_sampler&>;
+using imgui_pipeline = hut::pipeline<ImDrawIdx, hut::imgui::imgui_vert_spv_refl, hut::imgui::imgui_frag_spv_refl, const hut::shared_ref<proj_ubo>&, const hut::shared_image&, const hut::shared_sampler&>;
 
 constexpr size_t HUT_IMGUI_MAX_DESCRIPTORS = 256;
 
@@ -188,7 +188,7 @@ void ImGui_ImplHut_RenderDrawData(VkCommandBuffer _cmd_buffer, ImDrawData* _draw
   if (_draw_data->DisplaySize.x <= 0.0f || _draw_data->DisplaySize.y <= 0.0f)
     return;
 
-  static_assert(std::is_same_v<imgui_pipeline::indice, ImDrawIdx>);
+  static_assert(std::is_same_v<imgui_pipeline::index_t, ImDrawIdx>);
   // check bitcast compatibility between our pipeline vertex (generated from reflection) and ImDrawVert
   static_assert(sizeof(imgui_pipeline::vertex) == sizeof(ImDrawVert));
   static_assert(offsetof(imgui_pipeline::vertex, pos_) == offsetof(ImDrawVert, pos));
@@ -201,7 +201,7 @@ void ImGui_ImplHut_RenderDrawData(VkCommandBuffer _cmd_buffer, ImDrawData* _draw
 
     hut_imgui_mesh m;
 
-    m.indices_ = g_ctx.buffer_->allocate<imgui_pipeline::indice>(cmd_list->IdxBuffer.Size);
+    m.indices_ = g_ctx.buffer_->allocate<imgui_pipeline::index_t>(cmd_list->IdxBuffer.Size);
     m.indices_->update_raw(0, m.indices_->size_bytes(), cmd_list->IdxBuffer.Data);
 
     m.vertices_ = g_ctx.buffer_->allocate<imgui_pipeline::vertex>(cmd_list->VtxBuffer.Size);

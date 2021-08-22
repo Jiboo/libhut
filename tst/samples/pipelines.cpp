@@ -46,6 +46,8 @@ int main(int, char **) {
   std::cout << std::fixed << std::setprecision(1);
 
   display d("hut demo");
+  auto b = d.alloc_buffer(1024*1024);
+
   window_params wp;
   wp.flags_.set(window_params::FTRANSPARENT);
   window w(d, wp);
@@ -53,8 +55,6 @@ int main(int, char **) {
   w.title("hut demo win1");
 
   shared_sampler samp = std::make_shared<sampler>(d);
-
-  auto b = d.alloc_buffer(1024*1024);
 
   auto indices = b->allocate<uint16_t>(6);
   indices->set({0, 1, 2, 2, 1, 3});

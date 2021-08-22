@@ -69,6 +69,10 @@ class atlas_pool {
       pool_ = nullptr;
     }
 
+    bool from_pool(const atlas_pool *_pool) const {
+      return pool_ == _pool;
+    }
+
     [[nodiscard]] bool valid() const {
       return pool_ != nullptr;
     }

@@ -182,10 +182,11 @@ void buffer_pool::debug() {
   for (const auto &buffer : buffers_) {
     std::cout << "\tVkBuffer " << buffer.buffer_ << " size:" << buffer.size_ << std::endl;
 
-    for (const auto &block : buffer.suballocator_.blocks_) {
+    buffer.suballocator_.visit_blocks([](const auto &block) {
       std::cout << "\t\trange " << block.offset_ << " - " << (block.offset_ + block.size_)
                 << ": " << block.used_
                 << std::endl;
-    }
+      return true;
+    });
   }
 }
