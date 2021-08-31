@@ -31,99 +31,99 @@
 
 namespace hut::imgdec {
 
-  bool prepare_read(image_params *_params, spng_format *_format, spng_ctx &_ctx, std::span<const u8> _data) {
-    image_params params;
-    spng_format format;
+bool prepare_read(image_params *_params, spng_format *_format, spng_ctx &_ctx, std::span<const u8> _data) {
+  image_params params;
+  spng_format  format;
 
-    spng_set_png_buffer(&_ctx, _data.data(), _data.size_bytes());
+  spng_set_png_buffer(&_ctx, _data.data(), _data.size_bytes());
 
-    spng_ihdr ihdr = {};
-    if (spng_get_ihdr(&_ctx, &ihdr) != SPNG_OK)
+  spng_ihdr ihdr = {};
+  if (spng_get_ihdr(&_ctx, &ihdr) != SPNG_OK)
+    return false;
+
+  u8   rendering_intent = 0;
+  bool has_srgb         = spng_get_srgb(&_ctx, &rendering_intent) == 0;
+
+  switch (ihdr.color_type) {
+    case spng_color_type::SPNG_COLOR_TYPE_GRAYSCALE:
+      format = SPNG_FMT_G8;
+      break;
+    case spng_color_type::SPNG_COLOR_TYPE_GRAYSCALE_ALPHA:
+      format = (ihdr.bit_depth == 16) ? SPNG_FMT_GA16 : SPNG_FMT_GA8;
+      break;
+    case spng_color_type::SPNG_COLOR_TYPE_INDEXED: [[fallthrough]];
+    case spng_color_type::SPNG_COLOR_TYPE_TRUECOLOR: [[fallthrough]];
+    case spng_color_type::SPNG_COLOR_TYPE_TRUECOLOR_ALPHA:
+      format = (ihdr.bit_depth == 16) ? SPNG_FMT_RGBA16 : SPNG_FMT_RGBA8;
+      break;
+  }
+
+  switch (format) {
+    case SPNG_FMT_RGBA8: params.format_ = has_srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM; break;
+    case SPNG_FMT_RGBA16: params.format_ = VK_FORMAT_R16G16B16A16_UNORM; break;
+    case SPNG_FMT_GA8: params.format_ = VK_FORMAT_R8G8_UNORM; break;
+    case SPNG_FMT_GA16: params.format_ = VK_FORMAT_R16G16_UNORM; break;
+    case SPNG_FMT_G8: params.format_ = VK_FORMAT_R8_UNORM; break;
+    default: return false;
+  }
+
+  assert(ihdr.width < (1 << 16));
+  assert(ihdr.height < (1 << 16));
+  params.size_ = {ihdr.width, ihdr.height};
+
+  *_format = format;
+  *_params = params;
+  return true;
+}
+
+bool do_read(image::updator &&_target, spng_ctx &_ctx, uint _rows, spng_format _format) {
+  if (spng_decode_image(&_ctx, _target.data(), _target.size_bytes(), _format, SPNG_DECODE_PROGRESSIVE) != SPNG_OK)
+    return false;
+
+  auto img_row_pitch = _target.image_row_pitch();
+  for (uint row = 0; row < _rows; row++) {
+    u8 * target  = _target.data() + (row * _target.staging_row_pitch());
+    auto errcode = spng_decode_row(&_ctx, target, img_row_pitch);
+    if (errcode != SPNG_OK && errcode != SPNG_EOI)
       return false;
-
-    uint8_t rendering_intent = 0;
-    bool has_srgb = spng_get_srgb(&_ctx, &rendering_intent) == 0;
-
-    switch (ihdr.color_type) {
-      case spng_color_type::SPNG_COLOR_TYPE_GRAYSCALE:
-        format = SPNG_FMT_G8;
-        break;
-      case spng_color_type::SPNG_COLOR_TYPE_GRAYSCALE_ALPHA:
-        format = (ihdr.bit_depth == 16) ? SPNG_FMT_GA16 : SPNG_FMT_GA8;
-        break;
-      case spng_color_type::SPNG_COLOR_TYPE_INDEXED: [[fallthrough]];
-      case spng_color_type::SPNG_COLOR_TYPE_TRUECOLOR: [[fallthrough]];
-      case spng_color_type::SPNG_COLOR_TYPE_TRUECOLOR_ALPHA:
-        format = (ihdr.bit_depth == 16) ? SPNG_FMT_RGBA16 : SPNG_FMT_RGBA8;
-        break;
-    }
-
-    switch (format) {
-      case SPNG_FMT_RGBA8: params.format_ = has_srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM; break;
-      case SPNG_FMT_RGBA16: params.format_ = VK_FORMAT_R16G16B16A16_UNORM; break;
-      case SPNG_FMT_GA8: params.format_ = VK_FORMAT_R8G8_UNORM; break;
-      case SPNG_FMT_GA16: params.format_ = VK_FORMAT_R16G16_UNORM; break;
-      case SPNG_FMT_G8: params.format_ = VK_FORMAT_R8_UNORM; break;
-      default: return false;
-    }
-
-    assert(ihdr.width < (1<<16));
-    assert(ihdr.height < (1<<16));
-    params.size_ = {ihdr.width, ihdr.height};
-
-    *_format = format;
-    *_params = params;
-    return true;
   }
 
-  bool do_read(image::updator &&_target, spng_ctx &_ctx, uint _rows, spng_format _format) {
-    if (spng_decode_image(&_ctx, _target.data(), _target.size_bytes(), _format, SPNG_DECODE_PROGRESSIVE) != SPNG_OK)
-      return false;
+  return true;
+}
 
-    auto img_row_pitch = _target.image_row_pitch();
-    for (uint row = 0; row < _rows; row++) {
-      u8 *target = _target.data() + (row * _target.staging_row_pitch());
-      auto errcode = spng_decode_row(&_ctx, target, img_row_pitch);
-      if (errcode != SPNG_OK && errcode != SPNG_EOI)
-        return false;
-    }
+std::shared_ptr<image> load_png(display &_display, std::span<const u8> _data) {
+  auto         ctx = std::unique_ptr<spng_ctx, decltype(&spng_ctx_free)>(spng_ctx_new(0), spng_ctx_free);
+  image_params iparams;
+  spng_format  decode_format;
+  if (!prepare_read(&iparams, &decode_format, *ctx, _data))
+    return nullptr;
 
-    return true;
-  }
+  auto result = std::make_shared<image>(_display, iparams);
+  if (!result)
+    return nullptr;
 
-  std::shared_ptr<image> load_png(display &_display, std::span<const u8> _data) {
-    auto ctx = std::unique_ptr<spng_ctx, decltype(&spng_ctx_free)>(spng_ctx_new(0), spng_ctx_free);
-    image_params iparams;
-    spng_format decode_format;
-    if (!prepare_read(&iparams, &decode_format, *ctx, _data))
-      return nullptr;
+  if (!do_read(result->update(), *ctx, iparams.size_.y, decode_format))
+    return nullptr;
 
-    auto result = std::make_shared<image>(_display, iparams);
-    if (!result)
-      return nullptr;
+  return result;
+}
 
-    if (!do_read(result->prepare_update(), *ctx, iparams.size_.y, decode_format))
-      return nullptr;
+shared_subimage load_png(const shared_atlas &_atlas, std::span<const u8> _data) {
+  auto         ctx = std::unique_ptr<spng_ctx, decltype(&spng_ctx_free)>(spng_ctx_new(0), spng_ctx_free);
+  image_params iparams;
+  spng_format  decode_format;
+  if (!prepare_read(&iparams, &decode_format, *ctx, _data))
+    return nullptr;
 
-    return result;
-  }
+  assert(iparams.format_ == _atlas->format());
+  auto result = _atlas->alloc(iparams.size_);
+  if (!result)
+    return nullptr;
 
-  shared_subimage load_png(const shared_atlas &_atlas, std::span<const u8> _data) {
-    auto ctx = std::unique_ptr<spng_ctx, decltype(&spng_ctx_free)>(spng_ctx_new(0), spng_ctx_free);
-    image_params iparams;
-    spng_format decode_format;
-    if (!prepare_read(&iparams, &decode_format, *ctx, _data))
-      return nullptr;
+  if (!do_read(result->update(), *ctx, iparams.size_.y, decode_format))
+    return nullptr;
 
-    assert(iparams.format_ == _atlas->image(0)->format());
-    auto result = _atlas->alloc(iparams.size_);
-    if (!result)
-      return nullptr;
+  return result;
+}
 
-    if (!do_read(result->prepare_update(), *ctx, iparams.size_.y, decode_format))
-      return nullptr;
-
-    return result;
-  }
-
-} // ns hut::imgdec
+}  // namespace hut::imgdec

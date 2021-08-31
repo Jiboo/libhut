@@ -29,135 +29,122 @@
 
 #include <utility>
 
-#include "hut/atlas_pool.hpp"
+#include "hut/utils/math.hpp"
+
+#include "hut/atlas.hpp"
 #include "hut/image.hpp"
 #include "hut/pipeline.hpp"
-#include "hut/utils.hpp"
 
 #include "render2d_refl.hpp"
 
 namespace hut::render2d {
 
-  class renderer;
-  class quads_set;
+class renderer;
+class quads_set;
 
-  using index = uint32_t;
-  struct ubo {
-    hut::mat4 proj_ {1};
-    hut::mat4 view_ {1};
-    float dpi_scale = 1;
-  };
-  using shared_ubo = hut::shared_ref<ubo>;
+using index = u32;
 
-  using pipeline = hut::pipeline<index, render2d_vert_spv_refl, render2d_frag_spv_refl,
-      const hut::shared_ref<ubo> &, const hut::shared_atlas &, const hut::shared_sampler &>;
+using pipeline = hut::pipeline<index, render2d_vert_spv_refl, render2d_frag_spv_refl,
+                               const hut::shared_ubo &, const hut::shared_atlas &, const hut::shared_sampler &>;
 
-  using vertex = pipeline::vertex;
-  using instance = pipeline::instance;
+using vertex   = pipeline::vertex;
+using instance = pipeline::instance;
 
-  using shared_indices = pipeline::shared_indices;
-  using shared_vertices = pipeline::shared_vertices;
-  using shared_instances = pipeline::shared_instances;
+using shared_indices   = pipeline::shared_indices;
+using shared_vertices  = pipeline::shared_vertices;
+using shared_instances = pipeline::shared_instances;
 
-  enum gradient : u16 {
-    T2B, L2R, TL2BR, TR2BL
-  };
+enum gradient : u16 {
+  T2B,
+  L2R,
+  TL2BR,
+  TR2BL
+};
 
-  // Helper to write to set an instance
-  inline void set(instance &_target, u16vec4 _bbox,
-                  u8vec4 _from, u8vec4 _to, gradient _gradient = T2B,
-                  uint _corner_radius = 0, uint _corner_softness = 0,
-                  const shared_subimage &_subimg = shared_subimage{}) {
-    _target.col_from_ = _from;
-    _target.col_to_ = _to;
-    assert(_bbox.x < 4096);
-    assert(_bbox.y < 4096);
-    assert(_bbox.z < 4096);
-    assert(_bbox.w < 4096);
-    _target.pos_box_ = _bbox;
-    _target.pos_box_.x |= (_corner_radius & 0xF) << 12;
-    _target.pos_box_.y |= (_corner_softness & 0xF) << 12;
-    if (_subimg) {
-      _target.uv_box_ = _subimg->texcoords() * std::numeric_limits<u16>::max();
-      assert(_subimg->page() < 4);
-      _target.pos_box_.z |= (_subimg->page() & 0xF) << 12;
-    }
-    else {
-      _target.uv_box_ = vec4(0);
-    }
-    _target.pos_box_.w |= (_gradient & 0xF) << 12;
+// Helper to write to an instance
+inline void set(instance &_target, u16vec4 _bbox,
+                u8vec4 _from, u8vec4 _to, gradient _gradient = T2B,
+                uint _corner_radius = 0, uint _corner_softness = 0,
+                const shared_subimage &_subimg = shared_subimage{}) {
+  _target.col_from_ = _from;
+  _target.col_to_   = _to;
+  assert(_bbox.x < 4096);
+  assert(_bbox.y < 4096);
+  assert(_bbox.z < 4096);
+  assert(_bbox.w < 4096);
+  _target.pos_box_ = _bbox;
+  _target.pos_box_.x |= (_corner_radius & 0xF) << 12;
+  _target.pos_box_.y |= (_corner_softness & 0xF) << 12;
+  if (_subimg) {
+    _target.uv_box_ = _subimg->texcoords() * std::numeric_limits<u16>::max();
+    assert(_subimg->page() < 4);
+    _target.pos_box_.z |= (_subimg->page() & 0xF) << 12;
+  } else {
+    _target.uv_box_ = vec4(0);
   }
+  _target.pos_box_.w |= (_gradient & 0xF) << 12;
+}
 
-  class updator {
-    friend class quads_set;
+struct renderer_params : pipeline_params {
+  uint initial_count_ = 1024;
+};
 
-    buffer_pool::updator updator_;
+class renderer {
+ public:
+  class renderer_suballoc : public suballoc_raw {
+    renderer *parent_ = nullptr;
+    uint      batch_;
 
-    explicit updator(buffer_pool::updator &&_updator) : updator_(std::move(_updator)) {}
+   public:
+    renderer_suballoc()                          = delete;
+    renderer_suballoc(const renderer_suballoc &) = delete;
+    renderer_suballoc &operator=(const renderer_suballoc &) = delete;
 
-  public:
-    updator() = delete;
-    updator(const updator &) = delete;
-    updator& operator=(const updator&) = delete;
-    updator(updator &&) = delete;
-    updator& operator=(updator&&) = delete;
+    renderer_suballoc(renderer *_parent, uint _batch, uint _offset_bytes, uint _size_bytes)
+        : suballoc_raw(_offset_bytes, _size_bytes)
+        , parent_(_parent)
+        , batch_(_batch) {}
+    renderer_suballoc(renderer_suballoc &&_other) noexcept = default;
+    renderer_suballoc &operator=(renderer_suballoc &&_other) noexcept = default;
 
-    instance &operator[](uint _index) {
-      u8 *u8ptr = updator_.data() + sizeof(instance) * _index;
-      return *reinterpret_cast<instance*>(u8ptr);
+    ~renderer_suballoc() override {
+      if (parent_) renderer_suballoc::release();
     }
+
+    updator  update_raw(uint _offset_bytes, uint _size_bytes) override;
+    void     finalize(const updator &_updator) override;
+    void     zero_raw(uint _offset_bytes, uint _size_bytes) override;
+    VkBuffer underlying_buffer() const override;
+    u8 *     existing_mapping() override;
+    bool     valid() const override { return parent_ != nullptr; }
+    void     release() override;
   };
+  template<typename T> using suballoc        = suballoc<T, renderer_suballoc>;
+  template<typename T> using shared_suballoc = std::shared_ptr<suballoc<T>>;
 
-  // Holds a contiguous set of instances, upon destruction hide all instances
-  class quads_set {
-    friend class renderer;
+ public:
+  renderer(render_target &_target, shared_buffer _buffer,
+           const shared_ubo &_ubo, shared_atlas _atlas, const shared_sampler &_sampler,
+           renderer_params _params = {});
 
-    quads_set(renderer &_parent, uint _batch_index, uint _offset, uint _count)
-    : parent_(_parent), batch_index_(_batch_index), offset_(_offset), count_(_count) {}
+  void draw(VkCommandBuffer);
 
-    renderer &parent_;
-    uint batch_index_, offset_, count_;
+  shared_suballoc<instance> allocate(uint _count, uint _align = 4);
 
-  public:
-    ~quads_set();
+ private:
+  struct batch {
+    shared_instances        buffer_;
+    binpack::linear1d<uint> suballocator_;
 
-    [[nodiscard]] uint count() const { return count_; }
-
-    updator update();
+    [[nodiscard]] uint size() const { return suballocator_.capacity(); }
   };
+  std::vector<batch> batches_;
 
-  struct renderer_params : pipeline_params {
-    uint initial_count_ = 1024;
-  };
+  pipeline      pipeline_;
+  shared_buffer buffer_;
+  shared_atlas  atlas_;
 
-  class renderer {
-    friend class quads_set;
+  batch &grow(uint _count);
+};
 
-    struct batch {
-      shared_instances buffer_;
-      binpack::linear1d<uint> suballocator_;
-    };
-
-    std::vector<batch> batches_;
-
-    pipeline pipeline_;
-    shared_buffer buffer_;
-    shared_atlas atlas_;
-    shared_sampler sampler_;
-    shared_ubo ubo_;
-
-    void free(quads_set&&);
-    batch &grow(uint _count);
-
-  public:
-    renderer(render_target &_target, shared_buffer _buffer, shared_atlas _atlas, shared_sampler _sampler, renderer_params _params = {});
-
-    quads_set alloc_uninitialized(uint _count);
-    quads_set alloc(std::span<const instance> _initial_data);
-
-    void draw(VkCommandBuffer);
-
-    shared_ubo ubo_ref() { return ubo_; }
-  };
-
-} // ns hut::render2d
+}  // namespace hut::render2d

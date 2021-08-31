@@ -25,36 +25,39 @@
  * SOFTWARE.
  */
 
-#include "hut/window.hpp"
 #include "hut/pipeline.hpp"
+#include "hut/window.hpp"
 
-void install_esc_close(hut::window &_win) {
-  _win.on_key.connect([&](hut::keycode _kcode, hut::keysym _ksym, bool _down) {
-    if (_ksym == hut::KSYM_ESC && !_down)
+namespace hut {
+
+void install_esc_close(window &_win) {
+  _win.on_key.connect([&](keycode _kcode, keysym _ksym, bool _down) {
+    if (_ksym == KSYM_ESC && !_down)
       _win.close();
     return false;
   });
 }
 
-void install_resizable_movable(hut::window &_win) {
-  _win.on_mouse.connect([&](uint8_t _button, hut::mouse_event_type _type, hut::vec2 _coords) {
+void install_resizable_movable(window &_win) {
+  _win.on_mouse.connect([&](u8 _button, mouse_event_type _type, vec2 _coords) {
     constexpr float resize_border_threshold = 20;
 
-    hut::edge coords_edge;
+    edge coords_edge;
     if (_coords.x < resize_border_threshold)
-      coords_edge |= hut::LEFT;
+      coords_edge |= LEFT;
     if (_coords.y < resize_border_threshold)
-      coords_edge |= hut::TOP;
-    if (float(_win.size().x) - _coords.x <  resize_border_threshold)
-      coords_edge |= hut::RIGHT;
+      coords_edge |= TOP;
+    if (float(_win.size().x) - _coords.x < resize_border_threshold)
+      coords_edge |= RIGHT;
     if (float(_win.size().y) - _coords.y < resize_border_threshold)
-      coords_edge |= hut::BOTTOM;
+      coords_edge |= BOTTOM;
     _win.cursor(edge_cursor(coords_edge));
 
     static bool clicked = false;
-    if (_type == hut::MDOWN && _button == 1) clicked = true;
-    else if (_type == hut::MUP && _button == 1) clicked = false;
-    else if (_type == hut::MMOVE && clicked) {
+    if (_type == MDOWN && _button == 1) clicked = true;
+    else if (_type == MUP && _button == 1)
+      clicked = false;
+    else if (_type == MMOVE && clicked) {
       if (!coords_edge)
         _win.interactive_move();
       else
@@ -66,31 +69,33 @@ void install_resizable_movable(hut::window &_win) {
 }
 
 template<typename TUBO>
-void install_resizable_ubo(hut::window &_win, hut::shared_ref<TUBO> &&_ubo) {
-  _win.on_resize.connect([ubo = std::move(_ubo)](const hut::uvec2 &_size) {
-    hut::mat4 proj = hut::ortho<float>(0.f, float(_size.x), 0.f, float(_size.y));
-    ubo->update_subone(0, offsetof(TUBO, proj_), sizeof(hut::mat4), &proj);
+void install_resizable_ubo(window &_win, buffer::shared_suballoc<TUBO> _ubo) {
+  _win.on_resize.connect([_ubo](const uvec2 &_size) {
+    mat4 proj = ortho<float>(0.f, float(_size.x), 0.f, float(_size.y));
+    _ubo->set_subone(0, offsetof(TUBO, proj_), sizeof(mat4), &proj);
     return false;
   });
 }
 
-void install_continuous_redraw(hut::display &_display, hut::window &_win) {
-  _win.on_frame.connect([&](hut::display::duration _dt) {
-    _display.post([&](auto){
+void install_continuous_redraw(display &_display, window &_win) {
+  _win.on_frame.connect([&](display::duration _dt) {
+    _display.post([&](auto) {
       _win.invalidate(true);
     });
     return false;
   });
 }
 
-void install_test_events(hut::display &_display, hut::window &_win) {
+void install_test_events(display &_display, window &_win) {
   install_esc_close(_win);
   install_resizable_movable(_win);
   install_continuous_redraw(_display, _win);
 }
 
 template<typename TUBO>
-void install_test_events(hut::display &_display, hut::window &_win, hut::shared_ref<TUBO> _ubo) {
+void install_test_events(display &_display, window &_win, buffer::shared_suballoc<TUBO> _ubo) {
   install_test_events(_display, _win);
-  install_resizable_ubo<TUBO>(_win, std::move(_ubo));
+  install_resizable_ubo<TUBO>(_win, _ubo);
 }
+
+}  // namespace hut

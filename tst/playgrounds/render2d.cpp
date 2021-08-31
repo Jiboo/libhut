@@ -29,6 +29,7 @@
 
 #include <glm/gtx/color_space.hpp>
 
+#include "hut/atlas.hpp"
 #include "hut/display.hpp"
 #include "hut/window.hpp"
 
@@ -36,73 +37,70 @@
 #include "hut/imgui/imgui.hpp"
 #include "hut/render2d/render2d.hpp"
 
-#include "tst_png.hpp"
 #include "tst_events.hpp"
+#include "tst_png.hpp"
 
 using namespace hut;
 
-int main(int, char**) {
-  display d("hut demo");
-  auto b = d.alloc_buffer(256*1024*1024);
+int main(int, char **) {
+  display dsp("hut demo");
+  auto    buf = std::make_shared<buffer>(dsp, 256 * 1024 * 1024);
 
-  window_params wp;
-  wp.flags_.set(window_params::FVSYNC);
-  wp.flags_.set(window_params::FDEPTH);
-  window w(d, wp);
-  w.title("hut imgui demo");
-  w.clear_color({1, 1, 1, 1});
+  window win(dsp);
+  win.title(u8"hut imgui demo");
+  win.clear_color({1, 1, 1, 1});
 
-  auto a = std::make_shared<atlas_pool>(d, image_params{.size_ = d.max_tex_size(), .format_ = VK_FORMAT_R8G8B8A8_UNORM});
-  auto s = std::make_shared<sampler>(d);
-  auto t = hut::imgdec::load_png(a, tst_png::tex1_png);
+  auto texatlas = std::make_shared<atlas>(dsp, image_params{.size_ = dsp.max_tex_size(), .format_ = VK_FORMAT_R8G8B8A8_UNORM});
+  auto samp     = std::make_shared<sampler>(dsp);
+  auto tex      = imgdec::load_png(texatlas, tst_png::tex1_png);
+  auto ubo      = buf->allocate<common_ubo>(1, dsp.ubo_align());
+  ubo->set(common_ubo{win.size()});
 
-  render2d::renderer r(w, b, a, s);
+  render2d::renderer box_renderer(win, buf, ubo, texatlas, samp);
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!ImGui_ImplHut_Init(&d, &w, true))
+  if (!ImGui_ImplHut_Init(&dsp, &win, true))
     return EXIT_FAILURE;
-  install_test_events<render2d::ubo>(d, w, r.ubo_ref());
+  install_test_events<common_ubo>(dsp, win, ubo);
 
   std::mt19937 gen;
-  auto rand_norm = [&]() {
+  auto         rand_norm = [&]() {
     std::uniform_real_distribution<> dis(0.0, 1.0);
     return dis(gen);
   };
 
   auto rand_color = [&]() {
-    auto hsv = vec3{rand_norm() * 360, 0.99, 0.95};
-    auto rgba = vec4(glm::rgbColor(hsv), rand_norm() * 0.75 + 0.25);
+    auto hsv  = vec3{rand_norm() * 360, 0.99, 0.95};
+    auto rgba = vec4(rgbColor(hsv), rand_norm() * 0.75 + 0.25);
     return u8vec4(rgba * 255);
   };
 
-  auto quads = r.alloc_uninitialized(15 * 15 + 1);
+  auto quads = box_renderer.allocate(15 * 15 + 1);
 
-  u16 u16min = 0, u16max = std::numeric_limits<u16>::max()>>4;
-  u16 bbox_min = 0, bbox_max = 1000;
-  u16vec4 custom_bbox = {0, 0, 0, 0};
-  u8vec4 custom_col_from = {255, 0, 0, 255}, custom_col_to = {0, 0, 255, 255};
-  u16 custom_radius = 8, custom_softness = 1;
-  u16 extra_min = 0, extra_max = 15;
-  int custom_gradient = 0;
-  bool custom_use_tex = false;
+  u16     bbox_min = 0, bbox_max = 1000;
+  u16vec4 custom_bbox     = {0, 0, 0, 0};
+  u8vec4  custom_col_from = {255, 0, 0, 255}, custom_col_to = {0, 0, 255, 255};
+  u16     custom_radius = 8, custom_softness = 1;
+  u16     extra_min = 0, extra_max = 15;
+  int     custom_gradient = 0;
+  bool    custom_use_tex  = false;
 
-  bool grid_use_tex = false;
-  bool grid_fixed_colors = false;
-  bool grid_fixed_gradient = false;
-  u16vec2 grid_size = {50, 50};
-  u16 grid_min = 10, grid_max = 200;
+  bool    grid_use_tex                = false;
+  bool    grid_fixed_colors           = false;
+  bool    grid_fixed_gradient         = false;
+  bool    grid_release_before_realloc = false;
+  u16vec2 grid_size                   = {75, 75};
+  u16     grid_min = 10, grid_max = 200, scroll_min = 0, scroll_max = 800;
+  u16vec2 scroll = {0, 0};
 
-  w.on_draw.connect([&](VkCommandBuffer _buffer) {
-    r.draw(_buffer);
-
+  win.on_draw.connect([&](VkCommandBuffer _buffer) {
     ImGui_ImplHut_NewFrame();
     ImGui::NewFrame();
 
     if (ImGui::Begin("renderer2d")) {
       gen.seed(std::mt19937::default_seed);
-      auto updator = quads.update();
 
       u16vec2 origin = bbox_origin(custom_bbox), size = bbox_size(custom_bbox);
       ImGui::SliderScalarN("Origin", ImGuiDataType_U16, &origin, 2, &bbox_min, &bbox_max);
@@ -124,37 +122,57 @@ int main(int, char**) {
       ImGui::Combo("Gradient", &custom_gradient, gradients, 4);
       ImGui::Checkbox("Use texture", &custom_use_tex);
 
-      render2d::set(updator[quads.count() - 1], custom_bbox, custom_col_from, custom_col_to,
-                    render2d::gradient(custom_gradient), custom_radius, custom_softness,
-                    custom_use_tex ? t : shared_subimage{});
-
       ImGui::Separator();
+
+      if (ImGui::Button("Realloc grid")) {
+        if (grid_release_before_realloc)
+          quads->release();
+        quads = box_renderer.allocate(15 * 15 + 1);
+      }
+      ImGui::SameLine();
+      ImGui::Checkbox("Free before", &grid_release_before_realloc);
+      ImGui::SameLine();
+      ImGui::Text("Offset: %d, size: %d", quads->offset_bytes(), quads->size_bytes());
 
       ImGui::SliderScalarN("Grid size", ImGuiDataType_U16, &grid_size, 2, &grid_min, &grid_max);
       ImGui::Checkbox("Grid use texture", &grid_use_tex);
       ImGui::Checkbox("Grid fixed colors", &grid_fixed_colors);
       ImGui::Checkbox("Grid fixed gradient", &grid_fixed_gradient);
-      for (int i = 0; i < quads.count() - 1; i++) {
+
+      auto iupdator = quads->update();
+      for (int i = 0; i < quads->size() - 1; i++) {
         auto line = i / 15;
-        auto col = i % 15;
+        auto col  = i % 15;
         auto bbox = make_bbox_with_origin_size(u16vec2{8} + u16vec2{col * (grid_size.x + 8), line * (grid_size.y + 8)}, grid_size);
-        render2d::set(updator[i], bbox,
+        render2d::set(iupdator[i], bbox,
                       grid_fixed_colors ? custom_col_from : rand_color(),
                       grid_fixed_colors ? custom_col_to : rand_color(),
                       grid_fixed_gradient ? render2d::gradient(custom_gradient) : render2d::gradient(i % 4),
-                      col, line, grid_use_tex ? t : shared_subimage{});
+                      col, line, grid_use_tex ? tex : shared_subimage{});
+      }
+      render2d::set(iupdator[quads->size() - 1], custom_bbox, custom_col_from, custom_col_to,
+                    render2d::gradient(custom_gradient), custom_radius, custom_softness,
+                    custom_use_tex ? tex : shared_subimage{});
+
+      ImGui::Separator();
+
+      if (ImGui::SliderScalarN("Scroll", ImGuiDataType_U16, &scroll, 2, &scroll_min, &scroll_max)) {
+        mat4 translate = make_transform_mat4(scroll);
+        ubo->set_subone(0, offsetof(common_ubo, view_), sizeof(hut::mat4), &translate);
       }
 
       ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
     }
     ImGui::End();
 
+    box_renderer.draw(_buffer);
+
     ImGui::Render();
     ImGui_ImplHut_RenderDrawData(_buffer, ImGui::GetDrawData());
     return false;
   });
 
-  d.dispatch();
+  dsp.dispatch();
 
   ImGui_ImplHut_Shutdown();
   ImGui::DestroyContext();

@@ -32,26 +32,30 @@
 #include <condition_variable>
 #include <functional>
 #include <list>
-#include <map>
 #include <mutex>
+#include <optional>
+#include <span>
 #include <thread>
 #include <tuple>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
+#include <vulkan/vulkan.h>
+
+#include "hut/utils/flagged.hpp"
+#include "hut/utils/fwd.hpp"
+#include "hut/utils/math.hpp"
+#include "hut/utils/sstream.hpp"
+
+#include "xdg-shell-client-protocol.h"
 #include <wayland-client.h>
 #include <wayland-cursor.h>
 #include <xkbcommon/xkbcommon.h>
-#include "xdg-shell-client-protocol.h"
-
-#include "hut/buffer_pool.hpp"
-#include "hut/utils.hpp"
 
 namespace hut {
 
 /** Unique ID of a physical keyboard key */
-using keycode = uint32_t;
+using keycode = u32;
 
 /** ID of function/character, which depends on keymap */
 enum keysym {
@@ -61,8 +65,10 @@ enum keysym {
 #undef HUT_MAP_KEYSYM
   KSYM_LAST_VALUE = KSYM_RIGHTMETA,
 };
-const char *keysym_name(keysym);
-inline std::ostream &operator<<(std::ostream &_os, keysym _k) { return _os << keysym_name(_k); }
+const char *         keysym_name(keysym);
+inline std::ostream &operator<<(std::ostream &_os, keysym _k) {
+  return _os << keysym_name(_k);
+}
 
 enum cursor_type {
   CNONE,
@@ -106,8 +112,10 @@ enum cursor_type {
   CZOOM_OUT,
   CURSOR_TYPE_LAST_VALUE = CZOOM_OUT,
 };
-const char *cursor_css_name(cursor_type);
-inline std::ostream &operator<<(std::ostream &_os, cursor_type _c) { return _os << cursor_css_name(_c); }
+const char *         cursor_css_name(cursor_type);
+inline std::ostream &operator<<(std::ostream &_os, cursor_type _c) {
+  return _os << cursor_css_name(_c);
+}
 
 enum clipboard_format {
   FIMAGE_PNG,
@@ -119,9 +127,11 @@ enum clipboard_format {
   CLIPBOARD_FORMAT_LAST_VALUE = FTEXT_PLAIN,
 };
 using clipboard_formats = flagged<clipboard_format, CLIPBOARD_FORMAT_LAST_VALUE>;
-const char *format_mime_type(clipboard_format _f);
-inline std::ostream &operator<<(std::ostream &_os, clipboard_format _f) { return _os << format_mime_type(_f); }
-std::optional<clipboard_format> mime_type_format(const char * _mime_type);
+const char *         format_mime_type(clipboard_format _f);
+inline std::ostream &operator<<(std::ostream &_os, clipboard_format _f) {
+  return _os << format_mime_type(_f);
+}
+std::optional<clipboard_format> mime_type_format(const char *_mime_type);
 
 enum dragndrop_action {
   DNDNONE,
@@ -130,8 +140,10 @@ enum dragndrop_action {
   DRAGNDROP_ACTION_LAST_VALUE = DNDMOVE,
 };
 using dragndrop_actions = flagged<dragndrop_action, DRAGNDROP_ACTION_LAST_VALUE>;
-const char *action_name(dragndrop_action _a);
-inline std::ostream &operator<<(std::ostream &_os, dragndrop_action _a) { return _os << action_name(_a); }
+const char *         action_name(dragndrop_action _a);
+inline std::ostream &operator<<(std::ostream &_os, dragndrop_action _a) {
+  return _os << action_name(_a);
+}
 
 enum modifier {
   KMOD_ALT,
@@ -140,8 +152,10 @@ enum modifier {
   MODIFIER_LAST_VALUE = KMOD_SHIFT,
 };
 using modifiers = flagged<modifier, MODIFIER_LAST_VALUE>;
-const char *modifier_name(modifier _m);
-inline std::ostream &operator<<(std::ostream &_os, modifier _a) { return _os << modifier_name(_a); }
+const char *         modifier_name(modifier _m);
+inline std::ostream &operator<<(std::ostream &_os, modifier _a) {
+  return _os << modifier_name(_a);
+}
 
 class clipboard_sender {
   friend class window;
@@ -150,10 +164,10 @@ class clipboard_sender {
   int fd_ = 0;
 
   void open(int _fd);
-  void close();
 
-public:
-  ssize_t write(std::span<const uint8_t>);
+ public:
+  void    close();
+  ssize_t write(std::span<const u8>);
 };
 
 class clipboard_receiver {
@@ -163,58 +177,61 @@ class clipboard_receiver {
   int fd_ = 0;
 
   void open(int _fd);
-  void close();
 
-public:
-  ssize_t read(std::span<uint8_t>);
+ public:
+  void    close();
+  ssize_t read(std::span<u8>);
 };
 
 struct drop_target_interface {
   struct move_result {
     dragndrop_actions possible_actions_;
-    dragndrop_action preferred_action_ = DNDNONE;
-    clipboard_format preferred_format_ = FTEXT_PLAIN;
+    dragndrop_action  preferred_action_ = DNDNONE;
+    clipboard_format  preferred_format_ = FTEXT_PLAIN;
 
-    constexpr bool operator==(const move_result&) const = default;
+    constexpr bool operator==(const move_result &) const = default;
   };
 
-  virtual void on_enter(dragndrop_actions, clipboard_formats) = 0;
-  virtual move_result on_move(vec2) = 0;
-  virtual void on_drop(dragndrop_action, clipboard_receiver&) = 0;
+  virtual void        on_enter(dragndrop_actions, clipboard_formats)  = 0;
+  virtual move_result on_move(vec2)                                   = 0;
+  virtual void        on_drop(dragndrop_action, clipboard_receiver &) = 0;
 };
 
 class display {
-  friend class render_target;
-  friend class window;
+  friend class buffer;
   friend class offscreen;
-  friend class buffer_pool;
+  friend class window;
   friend class image;
-  friend class sampler;
-  friend class font;
-  template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
 
  public:
-  using clock = std::chrono::steady_clock;
-  using time_point = clock::time_point;
-  using duration = clock::duration;
-  using callback = std::function<void(time_point)>;
+  using clock          = std::chrono::steady_clock;
+  using time_point     = clock::time_point;
+  using duration       = clock::duration;
+  using callback       = std::function<void(time_point)>;
   using scheduled_item = std::tuple<callback, duration>;
 
-  explicit display(const char *_app_name, uint32_t _app_version = VK_MAKE_VERSION(1, 0, 0),
+  explicit display(const char *_app_name, u32 _app_version = VK_MAKE_VERSION(1, 0, 0),
                    const char *_display_name = nullptr);
   ~display();
 
   void flush();
   void flush_staged();
   void roundtrip();
-  int dispatch();
+  int  dispatch();
+
+  VkInstance                        instance() { return instance_; }
+  VkPhysicalDevice                  pdevice() { return pdevice_; }
+  VkDevice                          device() { return device_; }
+  const VkPhysicalDeviceFeatures &  features() const { return device_features_; }
+  const VkPhysicalDeviceProperties &properties() const { return device_props_; }
+  const VkPhysicalDeviceLimits &    limits() const { return device_props_.limits; }
 
   void post(const callback &_callback);
 
   char32_t keycode_idle_char(keycode _in) const;
-  char *keycode_name(std::span<char> _out, keycode _in) const;
+  char *   keycode_name(std::span<char> _out, keycode _in) const;
 
-  template <typename T>
+  template<typename T>
   T get_proc(const std::string &_name) {
     static std::unordered_map<std::string, void *> cache;
 
@@ -230,53 +247,35 @@ class display {
     }
   }
 
-  const VkPhysicalDeviceLimits &limits() const {
-    return device_props_.limits;
+  [[nodiscard]] u16vec2 max_tex_size() const {
+    auto dim = limits().maxImageDimension2D;
+    return {dim, dim};
   }
-  VkPhysicalDevice physical_device() const {
-    return pdevice_;
-  }
+  [[nodiscard]] uint ubo_align() const { return limits().minUniformBufferOffsetAlignment; }
 
-  u16vec2 max_tex_size() { auto dim = limits().maxImageDimension2D; return {dim, dim}; }
-
-  constexpr static auto GENERAL_FLAGS = VkBufferUsageFlagBits(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
-                                                          | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
-                                                          | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-
-  shared_buffer alloc_buffer(uint _byte_size,
-      VkMemoryPropertyFlags _type = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-      VkBufferUsageFlagBits _flags = GENERAL_FLAGS);
-
-  template<typename T>
-  shared_ref<T> alloc_ubo(shared_buffer &_buf, const T &_default = {}) {
-    auto ref = _buf->allocate<T>(1, device_props_.limits.minUniformBufferOffsetAlignment);
-    ref->set(_default);
-    return ref;
-  }
+  std::pair<u32, VkMemoryPropertyFlags> find_memory_type(u32 _type_filter, VkMemoryPropertyFlags _properties);
 
  protected:
-  VkInstance instance_ = VK_NULL_HANDLE;
+  VkInstance               instance_ = VK_NULL_HANDLE;
   VkDebugReportCallbackEXT debug_cb_ = VK_NULL_HANDLE;
 
-  VkPhysicalDevice pdevice_;
-  uint32_t iqueueg_, iqueuec_, iqueuet_, iqueuep_;
-  VkDevice device_ = VK_NULL_HANDLE;
-  VkPhysicalDeviceFeatures device_features_;
-  VkPhysicalDeviceProperties device_props_;
-  VkQueue queueg_, queuec_, queuet_, queuep_;
-  VkCommandPool commandg_pool_ = VK_NULL_HANDLE;
+  VkPhysicalDevice                 pdevice_;
+  u32                              iqueueg_, iqueuec_, iqueuet_, iqueuep_;
+  VkDevice                         device_ = VK_NULL_HANDLE;
+  VkPhysicalDeviceFeatures         device_features_;
+  VkPhysicalDeviceProperties       device_props_;
+  VkQueue                          queueg_, queuec_, queuet_, queuep_;
+  VkCommandPool                    commandg_pool_ = VK_NULL_HANDLE;
   VkPhysicalDeviceMemoryProperties mem_props_;
 
-  void init_vulkan_instance(const char *_app_name, uint32_t _app_version, std::vector<const char *> &_extensions);
+  void init_vulkan_instance(const char *_app_name, u32 _app_version, std::vector<const char *> &_extensions);
   void init_vulkan_device(VkSurfaceKHR _dummy);
   void destroy_vulkan();
 
-  std::pair<uint32_t, VkMemoryPropertyFlags> find_memory_type(uint32_t _type_filter, VkMemoryPropertyFlags _properties);
-
-  std::shared_ptr<buffer_pool> staging_;
+  shared_buffer   staging_;
   VkCommandBuffer staging_cb_;
-  uint staging_jobs_ = 0;
-  std::mutex staging_mutex_;
+  uint            staging_jobs_ = 0;
+  std::mutex      staging_mutex_;
   using flush_callback = std::function<void()>;
   std::vector<flush_callback> preflush_jobs_;
   std::vector<flush_callback> postflush_jobs_;
@@ -294,15 +293,15 @@ class display {
   };
 
   struct buffer_zero {
-    VkBuffer destination;
+    VkBuffer     destination;
     VkDeviceSize size;
     VkDeviceSize offset;
   };
 
   struct buffer2image_copy : public VkBufferImageCopy {
     VkBuffer source;
-    VkImage destination;
-    uint bytesSize;
+    VkImage  destination;
+    uint     bytesSize;
   };
 
   struct image_copy : public VkImageCopy {
@@ -311,12 +310,12 @@ class display {
   };
 
   struct image_clear {
-    VkImage destination;
+    VkImage           destination;
     VkClearColorValue color;
   };
 
   struct image_transition {
-    VkImage destination;
+    VkImage       destination;
     VkImageLayout oldLayout, newLayout;
   };
 
@@ -331,114 +330,114 @@ class display {
   static void transition_image(VkCommandBuffer _cb, VkImage _image, VkImageSubresourceRange _range, VkImageLayout _oldLayout, VkImageLayout _newLayout);
 
   std::list<callback> posted_jobs_;
-  std::mutex posted_mutex_;
-  void process_posts(time_point _now);
-  void post_empty_event();
+  std::mutex          posted_mutex_;
+  void                process_posts(time_point _now);
+  void                post_empty_event();
 
-  static void registry_handler(void*, wl_registry*, uint32_t, const char*, uint32_t);
-  static void seat_handler(void*, wl_seat*, uint32_t);
-  static void pointer_handle_enter(void*, wl_pointer*, uint32_t, wl_surface*, wl_fixed_t, wl_fixed_t);
-  static void pointer_handle_leave(void*, wl_pointer*, uint32_t, wl_surface*);
-  static void pointer_handle_motion(void*, wl_pointer*, uint32_t, wl_fixed_t, wl_fixed_t);
-  static void pointer_handle_button(void*, wl_pointer*, uint32_t, uint32_t, uint32_t, uint32_t);
-  static void pointer_handle_axis(void*, wl_pointer*, uint32_t, uint32_t, wl_fixed_t);
-  static void pointer_handle_frame(void*, wl_pointer*);
-  static void pointer_handle_axis_source(void*, wl_pointer*, uint32_t);
-  static void pointer_handle_axis_stop(void*, wl_pointer*, uint32_t, uint32_t);
-  static void pointer_handle_axis_discrete(void*, wl_pointer*, uint32_t, int32_t);
-  static void keyboard_handle_keymap(void*, wl_keyboard*, uint32_t, int, uint32_t);
-  static void keyboard_handle_enter(void*, wl_keyboard*, uint32_t, wl_surface*, wl_array*);
-  static void keyboard_handle_leave(void*, wl_keyboard*, uint32_t, wl_surface*);
-  static void keyboard_handle_key(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t);
-  static void keyboard_handle_modifiers(void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
-  static void keyboard_handle_repeat_info(void*, wl_keyboard*, int32_t, int32_t);
-  static void data_offer_handle_offer(void*, wl_data_offer*, const char*);
-  static void data_offer_handle_source_actions(void*, wl_data_offer*, uint32_t);
-  static void data_offer_handle_action(void*, wl_data_offer*, uint32_t);
-  static void data_device_handle_data_offer(void*, wl_data_device*, wl_data_offer*);
-  static void data_device_handle_enter(void*, wl_data_device*, uint32_t, wl_surface*, wl_fixed_t, wl_fixed_t, wl_data_offer*);
-  static void data_device_handle_leave(void*, wl_data_device*);
-  static void data_device_handle_motion(void*, wl_data_device*, uint32_t, wl_fixed_t, wl_fixed_t);
-  static void data_device_handle_drop(void*, wl_data_device*);
-  static void data_device_handle_selection(void*, wl_data_device*, wl_data_offer*);
+  static void registry_handler(void *, wl_registry *, u32, const char *, u32);
+  static void seat_handler(void *, wl_seat *, u32);
+  static void pointer_handle_enter(void *, wl_pointer *, u32, wl_surface *, wl_fixed_t, wl_fixed_t);
+  static void pointer_handle_leave(void *, wl_pointer *, u32, wl_surface *);
+  static void pointer_handle_motion(void *, wl_pointer *, u32, wl_fixed_t, wl_fixed_t);
+  static void pointer_handle_button(void *, wl_pointer *, u32, u32, u32, u32);
+  static void pointer_handle_axis(void *, wl_pointer *, u32, u32, wl_fixed_t);
+  static void pointer_handle_frame(void *, wl_pointer *);
+  static void pointer_handle_axis_source(void *, wl_pointer *, u32);
+  static void pointer_handle_axis_stop(void *, wl_pointer *, u32, u32);
+  static void pointer_handle_axis_discrete(void *, wl_pointer *, u32, i32);
+  static void keyboard_handle_keymap(void *, wl_keyboard *, u32, int, u32);
+  static void keyboard_handle_enter(void *, wl_keyboard *, u32, wl_surface *, wl_array *);
+  static void keyboard_handle_leave(void *, wl_keyboard *, u32, wl_surface *);
+  static void keyboard_handle_key(void *, wl_keyboard *, u32, u32, u32, u32);
+  static void keyboard_handle_modifiers(void *, wl_keyboard *, u32, u32, u32, u32, u32);
+  static void keyboard_handle_repeat_info(void *, wl_keyboard *, i32, i32);
+  static void data_offer_handle_offer(void *, wl_data_offer *, const char *);
+  static void data_offer_handle_source_actions(void *, wl_data_offer *, u32);
+  static void data_offer_handle_action(void *, wl_data_offer *, u32);
+  static void data_device_handle_data_offer(void *, wl_data_device *, wl_data_offer *);
+  static void data_device_handle_enter(void *, wl_data_device *, u32, wl_surface *, wl_fixed_t, wl_fixed_t, wl_data_offer *);
+  static void data_device_handle_leave(void *, wl_data_device *);
+  static void data_device_handle_motion(void *, wl_data_device *, u32, wl_fixed_t, wl_fixed_t);
+  static void data_device_handle_drop(void *, wl_data_device *);
+  static void data_device_handle_selection(void *, wl_data_device *, wl_data_offer *);
 
   struct animate_cursor_context {
-    display &display_;
-    std::thread thread_;
-    std::mutex mutex_;
+    display &               display_;
+    std::thread             thread_;
+    std::mutex              mutex_;
     std::condition_variable cv_;
-    bool stop_request_ = false;
+    bool                    stop_request_ = false;
 
     wl_cursor *cursor_ = nullptr;
-    size_t frame_ = 0;
+    size_t     frame_  = 0;
   };
-  void cursor(cursor_type _c);
-  void cursor_frame(wl_cursor *_cursor, size_t _frame);
-  void animate_cursor(wl_cursor *_cursor);
+  void        cursor(cursor_type _c);
+  void        cursor_frame(wl_cursor *_cursor, size_t _frame);
+  void        animate_cursor(wl_cursor *_cursor);
   static void animate_cursor_thread(animate_cursor_context *_ctx);
 
   struct keyboard_repeat_context {
-    display &display_;
-    std::thread thread_;
-    std::mutex mutex_;
+    display &               display_;
+    std::thread             thread_;
+    std::mutex              mutex_;
     std::condition_variable cv_;
-    bool stop_request_ = false;
+    bool                    stop_request_ = false;
 
-    duration delay_;
-    duration sleep_;
-    char32_t key_ = 0;
+    duration   delay_;
+    duration   sleep_;
+    char32_t   key_ = 0;
     time_point start_;
   };
-  void keyboard_repeat(char32_t _c);
+  void        keyboard_repeat(char32_t _c);
   static void keyboard_repeat_thread(keyboard_repeat_context *_ctx);
 
   static keysym map_xkb_keysym(xkb_keysym_t);
 
-  std::unordered_map<wl_surface*, window*> windows_;
-  bool loop_ = true;
+  std::unordered_map<wl_surface *, window *> windows_;
+  bool                                       loop_ = true;
 
-  wl_display *display_;
-  wl_registry *registry_ = nullptr;
-  wl_compositor *compositor_ = nullptr;
-  xdg_wm_base *xdg_wm_base_ = nullptr;
-  wl_shm *shm_ = nullptr;
+  wl_display *   display_;
+  wl_registry *  registry_    = nullptr;
+  wl_compositor *compositor_  = nullptr;
+  xdg_wm_base *  xdg_wm_base_ = nullptr;
+  wl_shm *       shm_         = nullptr;
 
-  wl_seat *seat_ = nullptr;
-  wl_pointer *pointer_ = nullptr;
-  wl_keyboard *keyboard_ = nullptr;
-  xkb_context *xkb_context_ = nullptr;
-  xkb_state *xkb_state_ = nullptr, *xkb_state_empty_ = nullptr;
-  xkb_keymap *keymap_ = nullptr;
-  uint32_t mod_index_alt_ = 0;
-  uint32_t mod_index_ctrl_ = 0;
-  uint32_t mod_index_shift_ = 0;
-  uint32_t last_serial_ = 0;
-  uint32_t last_mouse_enter_serial_ = 0;
-  uint32_t last_mouse_click_serial_ = 0;
-  std::pair<wl_surface*, window*> pointer_current_ {nullptr, nullptr};
-  std::pair<wl_surface*, window*> keyboard_current_ {nullptr, nullptr};
-  keyboard_repeat_context keyboard_repeat_ctx_;
+  wl_seat *                         seat_        = nullptr;
+  wl_pointer *                      pointer_     = nullptr;
+  wl_keyboard *                     keyboard_    = nullptr;
+  xkb_context *                     xkb_context_ = nullptr;
+  xkb_state *                       xkb_state_ = nullptr, *xkb_state_empty_ = nullptr;
+  xkb_keymap *                      keymap_                  = nullptr;
+  u32                               mod_index_alt_           = 0;
+  u32                               mod_index_ctrl_          = 0;
+  u32                               mod_index_shift_         = 0;
+  u32                               last_serial_             = 0;
+  u32                               last_mouse_enter_serial_ = 0;
+  u32                               last_mouse_click_serial_ = 0;
+  std::pair<wl_surface *, window *> pointer_current_{nullptr, nullptr};
+  std::pair<wl_surface *, window *> keyboard_current_{nullptr, nullptr};
+  keyboard_repeat_context           keyboard_repeat_ctx_;
 
-  wl_cursor_theme *cursor_theme_ = nullptr;
-  wl_surface *cursor_surface_ = nullptr;
+  wl_cursor_theme *      cursor_theme_   = nullptr;
+  wl_surface *           cursor_surface_ = nullptr;
   animate_cursor_context animate_cursor_ctx_;
 
   wl_data_device_manager *data_device_manager_ = nullptr;
-  wl_data_device *data_device_ = nullptr;
+  wl_data_device *        data_device_         = nullptr;
   struct offer_params {
     clipboard_formats formats_;
     dragndrop_actions actions_;
-    dragndrop_action drop_action_;
-    clipboard_format drop_format_;
+    dragndrop_action  drop_action_;
+    clipboard_format  drop_format_;
   };
-  std::unordered_map<wl_data_offer*, offer_params> offer_params_;
-  wl_data_offer *last_offer_from_clipboard_ = nullptr;
-  wl_data_offer *last_offer_from_dropenter_ = nullptr;
-  std::shared_ptr<drop_target_interface> current_drop_target_interface_;
-  uint32_t drag_enter_serial_ = 0;
+  std::unordered_map<wl_data_offer *, offer_params> offer_params_;
+  wl_data_offer *                                   last_offer_from_clipboard_ = nullptr;
+  wl_data_offer *                                   last_offer_from_dropenter_ = nullptr;
+  std::shared_ptr<drop_target_interface>            current_drop_target_interface_;
+  u32                                               drag_enter_serial_ = 0;
 
   struct async_reader {
-    std::thread thread_;
+    std::thread        thread_;
     clipboard_receiver receiver_;
 
     ~async_reader() {

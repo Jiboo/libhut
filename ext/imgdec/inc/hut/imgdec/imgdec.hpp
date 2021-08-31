@@ -29,12 +29,12 @@
 
 #include <memory>
 
+#include "hut/atlas.hpp"
 #include "hut/image.hpp"
-#include "hut/atlas_pool.hpp"
 
 namespace hut::imgdec {
 
-  shared_image load_png(display &, std::span<const u8> _data);
-  shared_subimage load_png(const shared_atlas&, std::span<const u8> _data);
+shared_image    load_png(display &, std::span<const u8> _data);
+shared_subimage load_png(const shared_atlas &, std::span<const u8> _data);
 
-} // ns hut::imgdec
+}  // namespace hut::imgdec

@@ -32,17 +32,18 @@
 #include <set>
 #include <unordered_set>
 
-#include "hut/buffer_pool.hpp"
+#include "hut/utils/profiling.hpp"
+
+#include "hut/buffer.hpp"
 #include "hut/display.hpp"
-#include "hut/profiling.hpp"
 #include "hut/window.hpp"
 
 using namespace hut;
 
 #ifdef HUT_ENABLE_VALIDATION
 static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT flags,
-                                                     VkDebugReportObjectTypeEXT /*objType*/, uint64_t /*obj*/,
-                                                     size_t /*location*/, int32_t /*code*/, const char *layerPrefix,
+                                                     VkDebugReportObjectTypeEXT /*objType*/, u64 /*obj*/,
+                                                     size_t /*location*/, i32 /*code*/, const char *layerPrefix,
                                                      const char *msg, void * /*userData*/) {
   if (strcmp(layerPrefix, "Loader Message") == 0)
     return VK_FALSE;
@@ -59,70 +60,72 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT flags
   }
 
   std::cout << '[' << level << ' ' << layerPrefix << "] " << msg << std::endl;
-#if defined(HUT_ENABLE_VALIDATION_DEBUG) && defined(HUT_ENABLE_PROFILING)
+#  if defined(HUT_ENABLE_VALIDATION_DEBUG) && defined(HUT_ENABLE_PROFILING)
   boost::stacktrace::stacktrace st;
   if (st) {
     for (const auto &frame : st.as_vector()) {
       std::cout << "\t[" << layerPrefix << "] callstack: " << frame << std::endl;
     }
   }
-#endif //HUT_ENABLE_VALIDATION_DEBUG
+#  endif  //HUT_ENABLE_VALIDATION_DEBUG
   return VK_FALSE;
 }
-#endif //HUT_ENABLE_VALIDATION
+#endif  //HUT_ENABLE_VALIDATION
 
 const char *hut::keysym_name(keysym _keysym) {
-  switch(_keysym) {
-#define HUT_MAP_KEYSYM(KEYSYM) case KSYM_##KEYSYM: return "KSYM_" #KEYSYM;
+  switch (_keysym) {
+#define HUT_MAP_KEYSYM(KEYSYM) \
+  case KSYM_##KEYSYM:          \
+    return "KSYM_" #KEYSYM;
 #include "hut/keysyms.inc"
 #undef HUT_MAP_KEYSYM
     default: return "KSYM_INVALID";
   }
 }
 
-const char* hut::cursor_css_name(cursor_type _c) {
+const char *hut::cursor_css_name(cursor_type _c) {
   using namespace hut;
-  switch(_c) {
-    case CNONE:         return "none";
+  switch (_c) {
+    case CNONE: return "none";
     default: [[fallthrough]];
-    case CDEFAULT:      return "default";
+    case CDEFAULT: return "default";
     case CCONTEXT_MENU: return "context-menu";
-    case CHELP:         return "help";
-    case CPOINTER:      return "pointer";
-    case CPROGRESS:     return "progress";
-    case CWAIT:         return "wait";
-    case CCELL:         return "cell";
-    case CCROSSHAIR:    return "crosshair";
-    case CTEXT:         return "text";
-    case CALIAS:        return "alias";
-    case CCOPY:         return "copy";
-    case CMOVE:         return "move";
-    case CNO_DROP:      return "no-drop";
-    case CNOT_ALLOWED:  return "not-allowed";
-    case CGRAB:         return "grab";
-    case CGRABBING:     return "grabbing";
-    case CSCROLL_ALL:   return "all-scroll";
-    case CRESIZE_COL:   return "col-resize";
-    case CRESIZE_ROW:   return "row-resize";
-    case CRESIZE_N:     return "n-resize";
-    case CRESIZE_E:     return "e-resize";
-    case CRESIZE_S:     return "s-resize";
-    case CRESIZE_W:     return "w-resize";
-    case CRESIZE_NE:    return "ne-resize";
-    case CRESIZE_NW:    return "nw-resize";
-    case CRESIZE_SE:    return "se-resize";
-    case CRESIZE_SW:    return "sw-resize";
-    case CRESIZE_EW:    return "ew-resize";
-    case CRESIZE_NS:    return "ns-resize";
-    case CRESIZE_NESW:  return "nesw-resize";
-    case CRESIZE_NWSE:  return "nwse-resize";
-    case CZOOM_IN:      return "zoom-in";
-    case CZOOM_OUT:     return "zoom-out";
+    case CHELP: return "help";
+    case CPOINTER: return "pointer";
+    case CPROGRESS: return "progress";
+    case CWAIT: return "wait";
+    case CCELL: return "cell";
+    case CCROSSHAIR: return "crosshair";
+    case CTEXT: return "text";
+    case CALIAS: return "alias";
+    case CCOPY: return "copy";
+    case CMOVE: return "move";
+    case CNO_DROP: return "no-drop";
+    case CNOT_ALLOWED: return "not-allowed";
+    case CGRAB: return "grab";
+    case CGRABBING: return "grabbing";
+    case CSCROLL_ALL: return "all-scroll";
+    case CRESIZE_COL: return "col-resize";
+    case CRESIZE_ROW: return "row-resize";
+    case CRESIZE_N: return "n-resize";
+    case CRESIZE_E: return "e-resize";
+    case CRESIZE_S: return "s-resize";
+    case CRESIZE_W: return "w-resize";
+    case CRESIZE_NE: return "ne-resize";
+    case CRESIZE_NW: return "nw-resize";
+    case CRESIZE_SE: return "se-resize";
+    case CRESIZE_SW: return "sw-resize";
+    case CRESIZE_EW: return "ew-resize";
+    case CRESIZE_NS: return "ns-resize";
+    case CRESIZE_NESW: return "nesw-resize";
+    case CRESIZE_NWSE: return "nwse-resize";
+    case CZOOM_IN: return "zoom-in";
+    case CZOOM_OUT: return "zoom-out";
   }
 }
 
 const char *hut::format_mime_type(clipboard_format _f) {
-  switch(_f) {
+  switch (_f) {
     case FTEXT_PLAIN: return "text/plain;charset=utf-8";
     case FTEXT_HTML: return "text/html";
     case FTEXT_URI_LIST: return "text/uri-list";
@@ -133,18 +136,23 @@ const char *hut::format_mime_type(clipboard_format _f) {
   return nullptr;
 }
 
-std::optional<clipboard_format> hut::mime_type_format(const char * _mime_type) {
+std::optional<clipboard_format> hut::mime_type_format(const char *_mime_type) {
   if (strcmp(_mime_type, "text/plain;charset=utf-8") == 0) return FTEXT_PLAIN;
-  else if (strcmp(_mime_type, "text/html") == 0) return FTEXT_HTML;
-  else if (strcmp(_mime_type, "text/uri-list") == 0) return FTEXT_URI_LIST;
-  else if (strcmp(_mime_type, "image/bmp") == 0) return FIMAGE_BMP;
-  else if (strcmp(_mime_type, "image/png") == 0) return FIMAGE_PNG;
-  else if (strcmp(_mime_type, "image/jpeg") == 0) return FIMAGE_JPEG;
+  else if (strcmp(_mime_type, "text/html") == 0)
+    return FTEXT_HTML;
+  else if (strcmp(_mime_type, "text/uri-list") == 0)
+    return FTEXT_URI_LIST;
+  else if (strcmp(_mime_type, "image/bmp") == 0)
+    return FIMAGE_BMP;
+  else if (strcmp(_mime_type, "image/png") == 0)
+    return FIMAGE_PNG;
+  else if (strcmp(_mime_type, "image/jpeg") == 0)
+    return FIMAGE_JPEG;
   return {};
 }
 
 const char *hut::action_name(dragndrop_action _a) {
-  switch(_a) {
+  switch (_a) {
     case DNDNONE: return "None";
     case DNDMOVE: return "Move";
     case DNDCOPY: return "Copy";
@@ -153,7 +161,7 @@ const char *hut::action_name(dragndrop_action _a) {
 }
 
 const char *hut::modifier_name(modifier _m) {
-  switch(_m) {
+  switch (_m) {
     case KMOD_CTRL: return "Ctrl";
     case KMOD_ALT: return "Alt";
     case KMOD_SHIFT: return "Shift";
@@ -181,21 +189,17 @@ void display::process_posts(time_point _now) {
     job(_now);
 }
 
-shared_buffer display::alloc_buffer(uint _byte_size, VkMemoryPropertyFlags _type, VkBufferUsageFlagBits _flags) {
-  return std::make_shared<buffer_pool>(*this, _byte_size, _type, _flags);
-}
-
 struct score_t {
-  constexpr static uint32_t bad_id = std::numeric_limits<uint32_t>::max();
-  uint32_t iqueueg_ = bad_id, iqueuec_ = bad_id, iqueuet_ = bad_id, iqueuep_ = bad_id;
-  uint score_ = 0;
+  constexpr static u32 bad_id   = std::numeric_limits<u32>::max();
+  u32                  iqueueg_ = bad_id, iqueuec_ = bad_id, iqueuet_ = bad_id, iqueuep_ = bad_id;
+  uint                 score_ = 0;
 };
 
 score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
   score_t result{};
   result.score_ = 1;
 
-  VkPhysicalDeviceVulkan12Properties properties12 {};
+  VkPhysicalDeviceVulkan12Properties properties12{};
   properties12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES;
   VkPhysicalDeviceProperties2 properties2;
   properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
@@ -203,9 +207,9 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
   HUT_PVK(vkGetPhysicalDeviceProperties2, _device, &properties2);
   VkPhysicalDeviceProperties &properties = properties2.properties;
 
-  VkPhysicalDeviceVulkan12Features features12 {};
+  VkPhysicalDeviceVulkan12Features features12{};
   features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-  VkPhysicalDeviceFeatures2 features2 {};
+  VkPhysicalDeviceFeatures2 features2{};
   features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
   features2.pNext = &features12;
   HUT_PVK(vkGetPhysicalDeviceFeatures2, _device, &features2);
@@ -215,13 +219,15 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
     result.score_ = 0;
   if (features12.shaderSampledImageArrayNonUniformIndexing == VK_FALSE)
     result.score_ = 0;
+  if (features2.features.multiDrawIndirect == VK_FALSE)
+    result.score_ = 0;
 
 #ifdef HUT_PREFER_NONDESCRETE_DEVICES
   if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
     result.score_ = 0;
 #endif
 
-  uint32_t extension_count;
+  u32 extension_count;
   HUT_PVK(vkEnumerateDeviceExtensionProperties, _device, nullptr, &extension_count, nullptr);
   std::vector<VkExtensionProperties> available_extensions(extension_count);
   HUT_PVK(vkEnumerateDeviceExtensionProperties, _device, nullptr, &extension_count, available_extensions.data());
@@ -232,14 +238,14 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
   }
 
   if (result.score_ > 0 && has_swapchhain_ext) {
-    uint32_t famillies_count;
+    u32 famillies_count;
     HUT_PVK(vkGetPhysicalDeviceQueueFamilyProperties, _device, &famillies_count, nullptr);
     std::vector<VkQueueFamilyProperties> famillies(famillies_count);
     HUT_PVK(vkGetPhysicalDeviceQueueFamilyProperties, _device, &famillies_count, famillies.data());
 
-    for (uint32_t i = 0; i < famillies_count; i++) {
+    for (u32 i = 0; i < famillies_count; i++) {
       const VkQueueFamilyProperties &props = famillies[i];
-      VkBool32 present;
+      VkBool32                       present;
       HUT_PVK(vkGetPhysicalDeviceSurfaceSupportKHR, _device, i, _dummy, &present);
 
       if (props.queueCount > 0) {
@@ -265,7 +271,7 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
     VkSurfaceCapabilitiesKHR capabilities = {};
     HUT_PVK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR, _device, _dummy, &capabilities);
 
-    uint32_t formats_count, modes_count;
+    u32 formats_count, modes_count;
     HUT_PVK(vkGetPhysicalDeviceSurfaceFormatsKHR, _device, _dummy, &formats_count, nullptr);
     HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, _device, _dummy, &modes_count, nullptr);
 
@@ -303,12 +309,12 @@ const std::vector<const char *> layers = {
 #endif
 };
 
-void display::init_vulkan_instance(const char *_app_name, uint32_t _app_version,
+void display::init_vulkan_instance(const char *_app_name, u32 _app_version,
                                    std::vector<const char *> &extensions) {
   HUT_PROFILE_SCOPE(PDISPLAY, "display::init_vulkan_instance");
   extensions.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);
 
-  uint32_t extension_count;
+  u32 extension_count;
   HUT_PVK(vkEnumerateInstanceExtensionProperties, nullptr, &extension_count, nullptr);
   std::vector<VkExtensionProperties> available_extensions(extension_count);
   HUT_PVK(vkEnumerateInstanceExtensionProperties, nullptr, &extension_count, available_extensions.data());
@@ -320,21 +326,21 @@ void display::init_vulkan_instance(const char *_app_name, uint32_t _app_version,
 #endif
   }
 
-  VkApplicationInfo appInfo = {};
-  appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-  appInfo.apiVersion = VK_API_VERSION_1_2;
-  appInfo.pEngineName = "hut";
-  appInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0);
-  appInfo.pApplicationName = _app_name;
+  VkApplicationInfo appInfo  = {};
+  appInfo.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+  appInfo.apiVersion         = VK_API_VERSION_1_2;
+  appInfo.pEngineName        = "hut";
+  appInfo.engineVersion      = VK_MAKE_VERSION(0, 1, 0);
+  appInfo.pApplicationName   = _app_name;
   appInfo.applicationVersion = _app_version;
 
-  VkInstanceCreateInfo info = {};
-  info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-  info.enabledExtensionCount = (uint32_t)extensions.size();
+  VkInstanceCreateInfo info    = {};
+  info.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+  info.enabledExtensionCount   = (u32)extensions.size();
   info.ppEnabledExtensionNames = extensions.data();
-  info.enabledLayerCount = (uint32_t)layers.size();
-  info.ppEnabledLayerNames = layers.data();
-  info.pApplicationInfo = &appInfo;
+  info.enabledLayerCount       = (u32)layers.size();
+  info.ppEnabledLayerNames     = layers.data();
+  info.pApplicationInfo        = &appInfo;
 
   VkResult result = HUT_PVK(vkCreateInstance, &info, nullptr, &instance_);
   if (result != VK_SUCCESS)
@@ -343,12 +349,12 @@ void display::init_vulkan_instance(const char *_app_name, uint32_t _app_version,
 #ifdef HUT_ENABLE_VALIDATION
   if (std::find(extensions.cbegin(), extensions.cend(), VK_EXT_DEBUG_REPORT_EXTENSION_NAME) != extensions.cend()) {
     VkDebugReportCallbackCreateInfoEXT dinfo = {};
-    dinfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
-    dinfo.flags = VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT
-        | VK_DEBUG_REPORT_ERROR_BIT_EXT
-#ifdef HUT_ENABLE_VALIDATION_DEBUG
-        | VK_DEBUG_REPORT_INFORMATION_BIT_EXT
-#endif
+    dinfo.sType                              = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
+    dinfo.flags                              = VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT
+                | VK_DEBUG_REPORT_ERROR_BIT_EXT
+#  ifdef HUT_ENABLE_VALIDATION_DEBUG
+                | VK_DEBUG_REPORT_INFORMATION_BIT_EXT
+#  endif
         ;
     dinfo.pfnCallback = debug_callback;
 
@@ -361,17 +367,17 @@ void display::init_vulkan_instance(const char *_app_name, uint32_t _app_version,
 
 void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   HUT_PROFILE_SCOPE(PDISPLAY, "display::init_vulkan_device");
-  uint32_t device_count;
+  u32 device_count;
   HUT_PVK(vkEnumeratePhysicalDevices, instance_, &device_count, nullptr);
   std::vector<VkPhysicalDevice> physical_devices(device_count);
   HUT_PVK(vkEnumeratePhysicalDevices, instance_, &device_count, physical_devices.data());
 
   VkPhysicalDevice prefered_device = VK_NULL_HANDLE;
-  score_t prefered_rate;
+  score_t          prefered_rate;
   for (VkPhysicalDevice &device : physical_devices) {
     score_t rate = rate_p_device(device, _dummy);
     if (rate.score_ > 0 && rate.score_ > prefered_rate.score_) {
-      prefered_rate = rate;
+      prefered_rate   = rate;
       prefered_device = device;
     }
   }
@@ -383,8 +389,8 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
 
 #ifdef HUT_ENABLE_VALIDATION_DEBUG
   std::cout << "[hut] selected device " << device_props_.deviceName << " using Vulkan "
-    << VK_VERSION_MAJOR(device_props_.apiVersion) << '.'
-    << VK_VERSION_MINOR(device_props_.apiVersion) << std::endl;
+            << VK_VERSION_MAJOR(device_props_.apiVersion) << '.'
+            << VK_VERSION_MINOR(device_props_.apiVersion) << std::endl;
 #endif
 
   pdevice_ = prefered_device;
@@ -395,24 +401,24 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
 
   HUT_PVK(vkGetPhysicalDeviceMemoryProperties, pdevice_, &mem_props_);
 
-  std::unordered_set<uint32_t> unique_indexes;
+  std::unordered_set<u32> unique_indexes;
   unique_indexes.emplace(prefered_rate.iqueueg_);
   unique_indexes.emplace(prefered_rate.iqueuec_);
   unique_indexes.emplace(prefered_rate.iqueuet_);
   unique_indexes.emplace(prefered_rate.iqueuep_);
 
   std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
-  float queuePriority = 1.0f;
-  VkDeviceQueueCreateInfo queue_create_info = {};
-  queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-  queue_create_info.queueCount = 1;
-  queue_create_info.pQueuePriorities = &queuePriority;
-  for (uint32_t index : unique_indexes) {
+  float                                queuePriority     = 1.0f;
+  VkDeviceQueueCreateInfo              queue_create_info = {};
+  queue_create_info.sType                                = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+  queue_create_info.queueCount                           = 1;
+  queue_create_info.pQueuePriorities                     = &queuePriority;
+  for (u32 index : unique_indexes) {
     queue_create_info.queueFamilyIndex = index;
     queue_create_infos.emplace_back(queue_create_info);
   }
 
-  uint32_t extension_count;
+  u32 extension_count;
   HUT_PVK(vkEnumerateDeviceExtensionProperties, prefered_device, nullptr, &extension_count, nullptr);
   std::vector<VkExtensionProperties> available_extensions(extension_count);
   HUT_PVK(vkEnumerateDeviceExtensionProperties, prefered_device, nullptr, &extension_count, available_extensions.data());
@@ -428,35 +434,36 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
 #endif
   }
 
-  VkPhysicalDeviceFeatures core_features = {};
-  core_features.samplerAnisotropy = device_features_.samplerAnisotropy;
+  VkPhysicalDeviceFeatures core_features               = {};
+  core_features.samplerAnisotropy                      = device_features_.samplerAnisotropy;
   core_features.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
+  core_features.multiDrawIndirect                      = VK_TRUE;
   //core_features.textureCompressionBC = VK_TRUE;
   //core_features.textureCompressionASTC_LDR = VK_TRUE;
   //core_features.textureCompressionETC2 = VK_TRUE;
 
-  VkPhysicalDeviceDescriptorIndexingFeatures bindings_features = {};
-  bindings_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-  bindings_features.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+  VkPhysicalDeviceDescriptorIndexingFeatures bindings_features    = {};
+  bindings_features.sType                                         = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+  bindings_features.shaderSampledImageArrayNonUniformIndexing     = VK_TRUE;
   bindings_features.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
-  bindings_features.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
-  bindings_features.descriptorBindingPartiallyBound = VK_TRUE;
+  bindings_features.descriptorBindingSampledImageUpdateAfterBind  = VK_TRUE;
+  bindings_features.descriptorBindingPartiallyBound               = VK_TRUE;
 
   VkPhysicalDeviceFeatures2 device_features = {};
-  device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  device_features.pNext = &bindings_features;
-  device_features.features = core_features;
+  device_features.sType                     = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  device_features.pNext                     = &bindings_features;
+  device_features.features                  = core_features;
 
-  VkDeviceCreateInfo device_info = {};
-  device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-  device_info.pQueueCreateInfos = queue_create_infos.data();
-  device_info.queueCreateInfoCount = (uint32_t)queue_create_infos.size();
-  device_info.pEnabledFeatures = nullptr;
-  device_info.pNext = &device_features;
-  device_info.enabledExtensionCount = (uint32_t)extensions.size();
+  VkDeviceCreateInfo device_info      = {};
+  device_info.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+  device_info.pQueueCreateInfos       = queue_create_infos.data();
+  device_info.queueCreateInfoCount    = (u32)queue_create_infos.size();
+  device_info.pEnabledFeatures        = nullptr;
+  device_info.pNext                   = &device_features;
+  device_info.enabledExtensionCount   = (u32)extensions.size();
   device_info.ppEnabledExtensionNames = extensions.data();
-  device_info.enabledLayerCount = (uint32_t)layers.size();
-  device_info.ppEnabledLayerNames = layers.data();
+  device_info.enabledLayerCount       = (u32)layers.size();
+  device_info.ppEnabledLayerNames     = layers.data();
 
   VkResult result = HUT_PVK(vkCreateDevice, pdevice_, &device_info, nullptr, &device_);
   if (result != VK_SUCCESS)
@@ -468,27 +475,31 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   HUT_PVK(vkGetDeviceQueue, device_, prefered_rate.iqueuep_, 0, &queuep_);
 
   VkCommandPoolCreateInfo poolInfo = {};
-  poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-  poolInfo.queueFamilyIndex = prefered_rate.iqueueg_;
-  poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+  poolInfo.sType                   = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  poolInfo.queueFamilyIndex        = prefered_rate.iqueueg_;
+  poolInfo.flags                   = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
   if (HUT_PVK(vkCreateCommandPool, device_, &poolInfo, nullptr, &commandg_pool_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create command pool!");
   }
 
-  staging_ = std::make_shared<buffer_pool>(*this, 1024 * 1024, buffer_pool::staging_type, buffer_pool::staging_usage);
+  buffer_params staging_params;
+  staging_params.permanent_map_ = true;
+  staging_params.type_          = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+  staging_params.usage_         = VkBufferUsageFlagBits(VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+  staging_                      = std::make_shared<buffer>(*this, 1024 * 1024, staging_params);
 
   VkCommandBufferAllocateInfo allocInfo = {};
-  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  allocInfo.commandPool = commandg_pool_;
-  allocInfo.commandBufferCount = 1;
+  allocInfo.sType                       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocInfo.level                       = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocInfo.commandPool                 = commandg_pool_;
+  allocInfo.commandBufferCount          = 1;
 
   HUT_PVK(vkAllocateCommandBuffers, device_, &allocInfo, &staging_cb_);
 
   VkCommandBufferBeginInfo beginInfo = {};
-  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  beginInfo.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  beginInfo.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
   HUT_PVK(vkBeginCommandBuffer, staging_cb_, &beginInfo);
 }
@@ -515,11 +526,9 @@ void display::destroy_vulkan() {
     HUT_PVK(vkDestroyInstance, instance_, nullptr);
 }
 
-std::pair<uint32_t, VkMemoryPropertyFlags> display::find_memory_type(uint32_t typeFilter,
-                                                                     VkMemoryPropertyFlags properties) {
-  // check_thread();
-
-  for (uint32_t i = 0; i < mem_props_.memoryTypeCount; i++) {
+std::pair<u32, VkMemoryPropertyFlags> display::find_memory_type(u32                   typeFilter,
+                                                                VkMemoryPropertyFlags properties) {
+  for (u32 i = 0; i < mem_props_.memoryTypeCount; i++) {
     if ((typeFilter & (1 << i)) && (mem_props_.memoryTypes[i].propertyFlags & properties) == properties) {
       return {i, mem_props_.memoryTypes[i].propertyFlags};
     }
@@ -539,82 +548,73 @@ std::ostream &operator<<(std::ostream &_os, const VkImageLayout _layout) {
 }
 
 std::ostream &operator<<(std::ostream &_os, const VkOffset3D _offset) {
-  return _os << "offset " << glm::ivec3{_offset.x, _offset.y, _offset.z};
+  return _os << "offset " << ivec3{_offset.x, _offset.y, _offset.z};
 }
 
 std::ostream &operator<<(std::ostream &_os, const VkExtent3D _extent) {
-  return _os << "extent " << glm::uvec3{_extent.width, _extent.height, _extent.depth};
+  return _os << "extent " << uvec3{_extent.width, _extent.height, _extent.depth};
 }
 
 void display::transition_image(VkCommandBuffer _cb, VkImage _image, VkImageSubresourceRange _range, VkImageLayout _oldLayout, VkImageLayout _newLayout) {
   VkImageMemoryBarrier barrier = {};
-  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  barrier.oldLayout = _oldLayout;
-  barrier.newLayout = _newLayout;
-  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = _image;
-  barrier.subresourceRange = _range;
+  barrier.sType                = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  barrier.oldLayout            = _oldLayout;
+  barrier.newLayout            = _newLayout;
+  barrier.srcQueueFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
+  barrier.image                = _image;
+  barrier.subresourceRange     = _range;
 
   VkPipelineStageFlagBits srcStage, dstStage;
 
-  if (_oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED &&
-      _newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+  if (_oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED && _newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-    srcStage = VK_PIPELINE_STAGE_HOST_BIT;
-    dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-  } else if (_oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED &&
-             _newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+    srcStage              = VK_PIPELINE_STAGE_HOST_BIT;
+    dstStage              = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  } else if (_oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED && _newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    srcStage = VK_PIPELINE_STAGE_HOST_BIT;
-    dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-  } else if (_oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED &&
-             _newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+    srcStage              = VK_PIPELINE_STAGE_HOST_BIT;
+    dstStage              = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  } else if (_oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED && _newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    srcStage = VK_PIPELINE_STAGE_HOST_BIT;
-    dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    srcStage              = VK_PIPELINE_STAGE_HOST_BIT;
+    dstStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
-  } else if (_oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
-             _newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+  } else if (_oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL && _newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
     barrier.dstAccessMask = VK_ACCESS_HOST_WRITE_BIT;
-    srcStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    dstStage = VK_PIPELINE_STAGE_HOST_BIT;
-  } else if (_oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
-             _newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+    srcStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    dstStage              = VK_PIPELINE_STAGE_HOST_BIT;
+  } else if (_oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && _newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    srcStage              = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    dstStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
-  } else if (_oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
-             _newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+  } else if (_oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL && _newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-    srcStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-  } else if (_oldLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL &&
-             _newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+    srcStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    dstStage              = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  } else if (_oldLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL && _newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    srcStage              = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    dstStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
-  } else if (_oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
-             _newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
+  } else if (_oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL && _newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    srcStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-  } else if (_oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
-             _newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+    srcStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    dstStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+  } else if (_oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL && _newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    srcStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    srcStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    dstStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
   } else {
     throw std::invalid_argument("unsupported layout transition!");
@@ -622,14 +622,14 @@ void display::transition_image(VkCommandBuffer _cb, VkImage _image, VkImageSubre
 
   HUT_PVK_NAMED_ALIASED(vkCmdPipelineBarrier,
                         ("dest", "from", "to"),
-                        ((void*)_image, _oldLayout, _newLayout),
+                        ((void *)_image, _oldLayout, _newLayout),
                         _cb, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
 void display::stage_transition(const image_transition &_info, VkImageSubresourceRange _range) {
 #ifdef HUT_DEBUG_STAGING
   std::cout << "[staging] transition " << _info.destination << " from " << _info.oldLayout << " to "
-            <<  _info.newLayout << std::endl;
+            << _info.newLayout << std::endl;
 #endif
 
   transition_image(staging_cb_, _info.destination, _range, _info.oldLayout, _info.newLayout);
@@ -637,26 +637,26 @@ void display::stage_transition(const image_transition &_info, VkImageSubresource
 
 void display::stage_copy(const buffer_copy &_info) {
 #ifdef HUT_DEBUG_STAGING
-  std::cout << "[staging] buffer_copy " << _info.source << '[' << _info.srcOffset << "-" << (_info.srcOffset+_info.size)
-            << "] to " << _info.destination << '[' << _info.dstOffset << "-" << (_info.dstOffset+_info.size)
+  std::cout << "[staging] buffer_copy " << _info.source << '[' << _info.srcOffset << "-" << (_info.srcOffset + _info.size)
+            << "] to " << _info.destination << '[' << _info.dstOffset << "-" << (_info.dstOffset + _info.size)
             << ']' << std::endl;
 #endif
 
   HUT_PVK_NAMED_ALIASED(vkCmdCopyBuffer,
                         ("src", "srcOffset", "size", "dst", "dstOffset"),
-                        ((void*)_info.source, _info.srcOffset, _info.size, (void*)_info.destination, _info.dstOffset),
+                        ((void *)_info.source, _info.srcOffset, _info.size, (void *)_info.destination, _info.dstOffset),
                         staging_cb_, _info.source, _info.destination, 1, &_info);
 }
 
 void display::stage_zero(const display::buffer_zero &_info) {
 #ifdef HUT_DEBUG_STAGING
-  std::cout << "[staging] buffer_zero " << _info.destination << '[' << _info.offset << "-" << (_info.offset+_info.size)
+  std::cout << "[staging] buffer_zero " << _info.destination << '[' << _info.offset << "-" << (_info.offset + _info.size)
             << "]" << std::endl;
 #endif
 
   HUT_PVK_NAMED_ALIASED(vkCmdFillBuffer,
                         ("dst", "dstOffset", "size", "data"),
-                        ((void*)_info.destination, _info.offset, _info.size, 0),
+                        ((void *)_info.destination, _info.offset, _info.size, 0),
                         staging_cb_, _info.destination, _info.offset, _info.size, 0);
 }
 
@@ -672,14 +672,14 @@ void display::stage_copy(const image_copy &_info) {
 
   HUT_PVK_NAMED_ALIASED(vkCmdCopyImage,
                         ("src", "dst", "srcOffset", "dstOffset", "extent"),
-                        ((void*)_info.source, (void*)_info.destination, offset3_16(_info.srcOffset), offset3_16(_info.dstOffset), extent3_16(_info.extent)),
+                        ((void *)_info.source, (void *)_info.destination, offset3_16(_info.srcOffset), offset3_16(_info.dstOffset), extent3_16(_info.extent)),
                         staging_cb_, _info.source, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                         _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &_info);
 }
 
 void display::stage_copy(const buffer2image_copy &_info) {
 #ifdef HUT_DEBUG_STAGING
-  std::cout << "[staging] buffer2image_copy " << _info.source << '[' << _info.bufferOffset << "-" << (_info.bufferOffset+_info.bytesSize)
+  std::cout << "[staging] buffer2image_copy " << _info.source << '[' << _info.bufferOffset << "-" << (_info.bufferOffset + _info.bytesSize)
             << "] to image " << _info.destination
             << "[" << _info.imageOffset.x << ", " << _info.imageOffset.y << ", "
             << _info.imageExtent.width << ", " << _info.imageExtent.height << "]"
@@ -688,7 +688,7 @@ void display::stage_copy(const buffer2image_copy &_info) {
 
   HUT_PVK_NAMED_ALIASED(vkCmdCopyBufferToImage,
                         ("src", "dst", "srcOffset", "srcSize", "dstOffset", "dstExtent"),
-                        ((void*)_info.source, (void*)_info.destination, _info.bufferOffset, _info.bytesSize, offset3_16(_info.imageOffset), extent3_16(_info.imageExtent)),
+                        ((void *)_info.source, (void *)_info.destination, _info.bufferOffset, _info.bytesSize, offset3_16(_info.imageOffset), extent3_16(_info.imageExtent)),
                         staging_cb_, _info.source, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &_info);
 }
 
@@ -698,7 +698,7 @@ void display::stage_clear(const image_clear &_info, VkImageSubresourceRange _ran
 #endif
   HUT_PVK_NAMED_ALIASED(vkCmdClearColorImage,
                         ("dst", "color"),
-                        ((void*)_info.destination, color3_32(_info.color)),
+                        ((void *)_info.destination, color3_32(_info.color)),
                         staging_cb_, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &_info.color, 1, &_range);
 }
 
@@ -720,10 +720,10 @@ void display::flush_staged() {
 
   HUT_PVK(vkEndCommandBuffer, staging_cb_);
 
-  VkSubmitInfo submitInfo = {};
-  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  VkSubmitInfo submitInfo       = {};
+  submitInfo.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &staging_cb_;
+  submitInfo.pCommandBuffers    = &staging_cb_;
 
 #ifdef HUT_DEBUG_STAGING
   std::cout << "[staging] submitting!" << std::endl;
@@ -732,8 +732,8 @@ void display::flush_staged() {
   HUT_PVK(vkQueueWaitIdle, queueg_);
 
   VkCommandBufferBeginInfo beginInfo = {};
-  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  beginInfo.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  beginInfo.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
   HUT_PVK(vkBeginCommandBuffer, staging_cb_, &beginInfo);
 

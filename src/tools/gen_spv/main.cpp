@@ -1,45 +1,43 @@
+#include <cassert>
 #include <chrono>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <iomanip>
 #include <iostream>
-#include <locale>
 #include <regex>
 
 #include <spirv_reflect.h>
 
-#include "hut/utils.hpp"
+#include "hut/utils/math.hpp"
+#include "hut/utils/sstream.hpp"
 
 using namespace std;
 using namespace filesystem;
 using namespace chrono;
 using namespace hut;
 
-using svmatch = match_results<string_view::const_iterator>;
+using svmatch     = match_results<string_view::const_iterator>;
 using svsub_match = sub_match<string_view::const_iterator>;
 
-inline string_view get_sv(const svsub_match& m) {
+inline string_view get_sv(const svsub_match &m) {
   return string_view(m.first, m.length());
 }
 
-inline bool regex_match(string_view sv,
-                        svmatch& m,
-                        const regex& e,
-                        regex_constants::match_flag_type flags =
-                        regex_constants::match_default) {
+inline bool regex_match(string_view                      sv,
+                        svmatch &                        m,
+                        const regex &                    e,
+                        regex_constants::match_flag_type flags = regex_constants::match_default) {
   return regex_match(sv.begin(), sv.end(), m, e, flags);
 }
 
-inline bool regex_match(string_view sv,
-                        const regex& e,
-                        regex_constants::match_flag_type flags =
-                        regex_constants::match_default) {
+inline bool regex_match(string_view                      sv,
+                        const regex &                    e,
+                        regex_constants::match_flag_type flags = regex_constants::match_default) {
   return regex_match(sv.begin(), sv.end(), e, flags);
 }
 
 string_view descriptor_type_vk(SpvReflectDescriptorType _type) {
-  switch(_type) {
+  switch (_type) {
     case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER: return "VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER";
     case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER: return "VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER";
     default: throw runtime_error(sstream("unknown descriptor type ") << _type);
@@ -175,7 +173,7 @@ constexpr string_view vk_formats[] = {
 string_view remove_format_suffix(string_view _input) {
   for (auto &vk_format : vk_formats) {
     if (_input.ends_with(vk_format))
-      return _input.substr(0, _input.size() - vk_format.size() - 1); // NOTE JBL: extra one for the underscore, '_'<format>
+      return _input.substr(0, _input.size() - vk_format.size() - 1);  // NOTE JBL: extra one for the underscore, '_'<format>
   }
   return _input;
 }
@@ -208,7 +206,7 @@ string format_name_vk(SpvReflectInterfaceVariable *_input) {
   if (_input->numeric.vector.component_count > 3)
     os << "A" << _input->numeric.scalar.width;
 
-  switch(_input->format) {
+  switch (_input->format) {
     case SPV_REFLECT_FORMAT_R32_SFLOAT:
     case SPV_REFLECT_FORMAT_R32G32_SFLOAT:
     case SPV_REFLECT_FORMAT_R32G32B32_SFLOAT:
@@ -217,7 +215,8 @@ string format_name_vk(SpvReflectInterfaceVariable *_input) {
     case SPV_REFLECT_FORMAT_R64G64_SFLOAT:
     case SPV_REFLECT_FORMAT_R64G64B64_SFLOAT:
     case SPV_REFLECT_FORMAT_R64G64B64A64_SFLOAT:
-      os << "_SFLOAT"; break;
+      os << "_SFLOAT";
+      break;
 
     default:
       if (_input->numeric.scalar.width > 16)
@@ -234,7 +233,7 @@ string format_name_cpp(SpvReflectInterfaceVariable *_input, unsigned _columns = 
   _columns = (_columns == -1 ? _input->numeric.matrix.column_count : _columns);
 
   const string_view name = _input->name;
-  string format;
+  string            format;
   for (auto &vk_format : vk_formats) {
     if (name.ends_with(vk_format)) {
       format = vk_format;
@@ -244,18 +243,22 @@ string format_name_cpp(SpvReflectInterfaceVariable *_input, unsigned _columns = 
 
   if (format.empty()) {
     stringstream os;
-    bool fp = false;
-    switch(_input->format) {
+    bool         fp = false;
+    switch (_input->format) {
       case SPV_REFLECT_FORMAT_R32_SFLOAT:
       case SPV_REFLECT_FORMAT_R32G32_SFLOAT:
       case SPV_REFLECT_FORMAT_R32G32B32_SFLOAT:
       case SPV_REFLECT_FORMAT_R32G32B32A32_SFLOAT:
-        os << "f32"; fp = true; break;
+        os << "f32";
+        fp = true;
+        break;
       case SPV_REFLECT_FORMAT_R64_SFLOAT:
       case SPV_REFLECT_FORMAT_R64G64_SFLOAT:
       case SPV_REFLECT_FORMAT_R64G64B64_SFLOAT:
       case SPV_REFLECT_FORMAT_R64G64B64A64_SFLOAT:
-        os << "f64"; fp = true; break;
+        os << "f64";
+        fp = true;
+        break;
 
       default:
         os << (_input->numeric.scalar.signedness == 0 ? "u" : "i");
@@ -297,22 +300,24 @@ string format_name_cpp(SpvReflectInterfaceVariable *_input, unsigned _columns = 
   else
     throw std::runtime_error(sstream("unknown suffix for ") << format);
 
-  size_t occ8 = std::count(format.begin(), format.end(), '8');
+  size_t occ8  = std::count(format.begin(), format.end(), '8');
   size_t occ16 = std::count(format.begin(), format.end(), '1');
   size_t occ32 = std::count(format.begin(), format.end(), '3');
   size_t occ64 = std::count(format.begin(), format.end(), '4');
 
   if (occ64 > 0) os << "64";
-  else if (occ32 > 0) os << "32";
-  else if (occ16 > 0) os << "16";
-  else if (occ8 > 0) os << "8";
+  else if (occ32 > 0)
+    os << "32";
+  else if (occ16 > 0)
+    os << "16";
+  else if (occ8 > 0)
+    os << "8";
 
   if (_columns > 0) {
     os << "mat" << _columns;
     if (_input->numeric.matrix.row_count != _columns)
       os << "x" << _input->numeric.matrix.row_count;
-  }
-  else if (_input->numeric.vector.component_count > 0) {
+  } else if (_input->numeric.vector.component_count > 0) {
     os << "vec" << _input->numeric.vector.component_count;
   }
 
@@ -320,10 +325,10 @@ string format_name_cpp(SpvReflectInterfaceVariable *_input, unsigned _columns = 
 }
 
 void reflect_bindings(ostream &_os, const SpvReflectShaderModule &_mod) {
-  uint32_t bindings_count = 0;
-  SpvReflectResult result = spvReflectEnumerateDescriptorBindings(&_mod, &bindings_count, nullptr);
+  u32              bindings_count = 0;
+  SpvReflectResult result         = spvReflectEnumerateDescriptorBindings(&_mod, &bindings_count, nullptr);
   assert(result == SPV_REFLECT_RESULT_SUCCESS);
-  vector<SpvReflectDescriptorBinding*> bindings(bindings_count);
+  vector<SpvReflectDescriptorBinding *> bindings(bindings_count);
   result = spvReflectEnumerateDescriptorBindings(&_mod, &bindings_count, bindings.data());
   assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
@@ -351,10 +356,10 @@ void reflect_vertex_input(ostream &_os, SpvReflectInterfaceVariable *_input, int
 }
 
 void reflect_vertex_inputs(ostream &_os, const SpvReflectShaderModule &_mod) {
-  uint32_t inputs_count = 0;
-  SpvReflectResult result = spvReflectEnumerateInputVariables(&_mod, &inputs_count, nullptr);
+  u32              inputs_count = 0;
+  SpvReflectResult result       = spvReflectEnumerateInputVariables(&_mod, &inputs_count, nullptr);
   assert(result == SPV_REFLECT_RESULT_SUCCESS);
-  vector<SpvReflectInterfaceVariable*> inputs(inputs_count);
+  vector<SpvReflectInterfaceVariable *> inputs(inputs_count);
   result = spvReflectEnumerateInputVariables(&_mod, &inputs_count, inputs.data());
   assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
@@ -364,9 +369,11 @@ void reflect_vertex_inputs(ostream &_os, const SpvReflectShaderModule &_mod) {
 
   struct vertex_data_member {
     SpvReflectInterfaceVariable *input_;
-    string_view name_;
+    string_view                  name_;
 
-    vertex_data_member(SpvReflectInterfaceVariable *_input, string_view _name) : input_(_input), name_(_name) {}
+    vertex_data_member(SpvReflectInterfaceVariable *_input, string_view _name)
+        : input_(_input)
+        , name_(_name) {}
   };
   vector<vertex_data_member> vertex_inputs, instance_inputs;
 
@@ -375,11 +382,11 @@ void reflect_vertex_inputs(ostream &_os, const SpvReflectShaderModule &_mod) {
    * or pragmas for cpp-like "attributes"..*/
 
   constexpr string_view input_regex_source = "in_(v|i)_([a-z0-9_]*)";
-  static regex input_regex(input_regex_source.data(), input_regex_source.size());
-  static svmatch input_match;
+  static regex          input_regex(input_regex_source.data(), input_regex_source.size());
+  static svmatch        input_match;
 
   std::vector<std::string> attributes;
-  ostringstream attribute_buffer;
+  ostringstream            attribute_buffer;
 
   for (auto *input : inputs) {
     try {
@@ -389,15 +396,13 @@ void reflect_vertex_inputs(ostream &_os, const SpvReflectShaderModule &_mod) {
       int binding = 0;
       if (!regex_match(string_view{input->name}, input_match, input_regex)) {
         throw runtime_error(hut::sstream("did not match regexp ") << input_regex_source);
-      }
-      else {
+      } else {
         auto name_without_prefix = string_view{input_match[2].first, input_match[2].second};
-        auto short_name = remove_format_suffix(name_without_prefix);
+        auto short_name          = remove_format_suffix(name_without_prefix);
         if (input_match[1] == "i") {
           instance_inputs.emplace_back(input, short_name);
           binding = 1;
-        }
-        else {
+        } else {
           vertex_inputs.emplace_back(input, short_name);
         }
 
@@ -406,8 +411,7 @@ void reflect_vertex_inputs(ostream &_os, const SpvReflectShaderModule &_mod) {
           attribute_buffer.str("");
           reflect_vertex_input(attribute_buffer, input, binding, short_name);
           attributes.emplace_back(attribute_buffer.str());
-        }
-        else {
+        } else {
           for (int i = 0; i < columns; i++) {
             attribute_buffer.str("");
             reflect_vertex_input(attribute_buffer, input, binding, short_name, i, sstream(" + sizeof(") << format_name_cpp(input, 0) << ") * " << i);
@@ -415,8 +419,7 @@ void reflect_vertex_inputs(ostream &_os, const SpvReflectShaderModule &_mod) {
           }
         }
       }
-    }
-    catch(const exception &_ex) {
+    } catch (const exception &_ex) {
       throw runtime_error(sstream("while reflecting on field ") << input->name << ": " << _ex.what());
     }
   }
@@ -466,7 +469,7 @@ int main(int argc, char **argv) {
     create_directories(output_path.parent_path());
 
   path output_base_path = output_path / argv[1];
-  path output_h_path = output_base_path;
+  path output_h_path    = output_base_path;
   output_h_path += ".hpp";
 
   ofstream output_h(output_h_path, ios::out | ios::trunc);
@@ -478,12 +481,14 @@ int main(int argc, char **argv) {
   bundle_namespace.resize(bundle_namespace.size() - strlen("_refl"));
 
   output_h << "// This is an autogenerated file.\n"
-            "#pragma once\n"
-            "#include <array>\n"
-            "#include <cstdint>\n"
-            "#include <vulkan/vulkan.h>\n"
-            "#include \"" << bundle_namespace << ".hpp\"\n"
-            "namespace hut::" << bundle_namespace<< " {\n";
+              "#pragma once\n"
+              "#include <array>\n"
+              "#include <vulkan/vulkan.h>\n"
+              "#include \"hut/utils/math.hpp\"\n"
+              "#include \""
+           << bundle_namespace << ".hpp\"\n"
+                                  "namespace hut::"
+           << bundle_namespace << " {\n";
 
   for (auto i = 3; i < argc; i++) {
     path input_path = argv[i];
@@ -497,14 +502,14 @@ int main(int argc, char **argv) {
     replace(symbol.begin(), symbol.end(), '-', '_');
 
     auto found_size = input.tellg();
-    auto written = 0;
+    auto written    = 0;
 
     input.seekg(0);
     string spirv_data;
     spirv_data.resize(found_size);
     input.read(spirv_data.data(), spirv_data.size());
     SpvReflectShaderModule module;
-    SpvReflectResult result = spvReflectCreateShaderModule(spirv_data.size(), spirv_data.data(), &module);
+    SpvReflectResult       result = spvReflectCreateShaderModule(spirv_data.size(), spirv_data.data(), &module);
     assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
     output_h << "\nstruct " << symbol << "_refl {\n";
@@ -516,8 +521,7 @@ int main(int argc, char **argv) {
         default:
           throw runtime_error(sstream("reflecting on unsupported vertex stage ") << module.shader_stage);
       }
-    }
-    catch(const exception &_ex) {
+    } catch (const exception &_ex) {
       throw runtime_error(sstream("exception while reflecting on ") << input_path << ": " << _ex.what());
     }
 
@@ -533,5 +537,5 @@ int main(int argc, char **argv) {
   output_h.flush();
 
   cout << "Generated " << argv[1] << " at " << output_path << " in "
-            << duration<double, milli>(steady_clock::now() - start).count() << "ms." << endl;
+       << duration<double, milli>(steady_clock::now() - start).count() << "ms." << endl;
 }

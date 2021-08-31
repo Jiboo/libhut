@@ -28,51 +28,52 @@
 #include <atomic>
 #include <iostream>
 
-#include "hut/imgui/imgui.hpp"
+#include "hut/utils/utf.hpp"
 
-#include "hut/buffer_pool.hpp"
+#include "hut/buffer.hpp"
 #include "hut/display.hpp"
 #include "hut/image.hpp"
 #include "hut/pipeline.hpp"
 #include "hut/window.hpp"
 
+#include "hut/imgui/imgui.hpp"
+
 #include "imgui_refl.hpp"
 
-struct proj_ubo {
-  hut::mat4 proj_ {1};
-};
+using namespace hut;
+using namespace imgui;
 
-using imgui_pipeline = hut::pipeline<ImDrawIdx, hut::imgui::imgui_vert_spv_refl, hut::imgui::imgui_frag_spv_refl, const hut::shared_ref<proj_ubo>&, const hut::shared_image&, const hut::shared_sampler&>;
+using imgui_pipeline = pipeline<ImDrawIdx, imgui_vert_spv_refl, imgui_frag_spv_refl, const shared_ubo &, const shared_image &, const shared_sampler &>;
 
 constexpr size_t HUT_IMGUI_MAX_DESCRIPTORS = 256;
 
 struct hut_imgui_mesh {
-  imgui_pipeline::shared_indices indices_;
+  imgui_pipeline::shared_indices  indices_;
   imgui_pipeline::shared_vertices vertices_;
 };
 
 struct tex_binding {
-  hut::shared_image image_;
-  hut::shared_sampler sampler_;
+  shared_image   image_;
+  shared_sampler sampler_;
 };
 
 struct hut_imgui_impl_ctx {
-  hut::display *display_ = nullptr;
-  hut::window *window_ = nullptr;
+  display *display_ = nullptr;
+  window * window_  = nullptr;
 
-  hut::shared_buffer buffer_;
+  shared_buffer                   buffer_;
   std::unique_ptr<imgui_pipeline> pipeline_;
-  hut::shared_ref<proj_ubo> ubo_;
+  shared_ubo                      ubo_;
 
-  hut::display::time_point last_frame_;
+  display::time_point         last_frame_;
   std::vector<hut_imgui_mesh> meshes_;
 
   std::vector<tex_binding> bindings_;
-  std::vector<size_t> reusable_bindings_ids_;
+  std::vector<size_t>      reusable_bindings_ids_;
 
   std::string clipboard_buffer_;
 
-  hut::cursor_type last_mouse_cursor_ = hut::CDEFAULT;
+  cursor_type last_mouse_cursor_ = CDEFAULT;
 
   void reset() {
     meshes_.clear();
@@ -81,79 +82,79 @@ struct hut_imgui_impl_ctx {
     bindings_.clear();
     buffer_.reset();
     clipboard_buffer_.clear();
-    last_mouse_cursor_ = hut::CDEFAULT;
+    last_mouse_cursor_ = CDEFAULT;
   }
 };
 
 static hut_imgui_impl_ctx g_ctx;
 
-const char* GetClipboardText(void* user_data) {
+const char *GetClipboardText(void *) {
   auto &target = g_ctx.clipboard_buffer_;
   target.clear();
 
   std::atomic_bool done = false;
-  g_ctx.window_->clipboard_receive(hut::clipboard_formats{hut::FTEXT_PLAIN},
-                                   [&](hut::clipboard_format _mime, hut::clipboard_receiver &_receiver) {
-    uint8_t buffer[2048];
-    size_t read_bytes;
-    while ((read_bytes = _receiver.read(buffer))) {
-      target += std::string_view{(char *) buffer, read_bytes};
-    }
-    done = true;
-  });
+  g_ctx.window_->clipboard_receive(clipboard_formats{FTEXT_PLAIN},
+                                   [&](clipboard_format _mime, clipboard_receiver &_receiver) {
+                                     u8     buffer[2048];
+                                     size_t read_bytes;
+                                     while ((read_bytes = _receiver.read(buffer))) {
+                                       target += std::string_view{(char *)buffer, read_bytes};
+                                     }
+                                     done = true;
+                                   });
 
   // As this function is blocking the main thread, due to the nature of the synchronous clipboard API,
   // we need to continue to process wayland events to continue processing the clipboard communication
-  while(!done)
+  while (!done)
     g_ctx.display_->roundtrip();
 
   return target.data();
 }
 
-void SetClipboardText(void* user_data, const char* text) {
-  g_ctx.window_->clipboard_offer(hut::clipboard_formats{hut::FTEXT_PLAIN},
-    [buffer{std::string(text)}](hut::clipboard_format _mime, hut::clipboard_sender &_sender) {
-    if (_mime == hut::FTEXT_PLAIN) {
-      _sender.write({(uint8_t *) buffer.data(), buffer.size()});
-    }
-  });
+void SetClipboardText(void *, const char *text) {
+  g_ctx.window_->clipboard_offer(clipboard_formats{FTEXT_PLAIN},
+                                 [buffer{std::string(text)}](clipboard_format _mime, clipboard_sender &_sender) {
+                                   if (_mime == FTEXT_PLAIN) {
+                                     _sender.write({(u8 *)buffer.data(), buffer.size()});
+                                   }
+                                 });
 }
 
-bool ImGui_ImplHut_Init(hut::display *_d, hut::window* _w, bool _install_callbacks) {
-  ImGuiIO& io = ImGui::GetIO();
+bool ImGui_ImplHut_Init(display *_d, window *_w, bool _install_callbacks) {
+  ImGuiIO &io            = ImGui::GetIO();
   io.BackendPlatformName = io.BackendRendererName = "hut_imgui";
   io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
   io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
 
-  io.KeyMap[ImGuiKey_Tab] = hut::KSYM_TAB;
-  io.KeyMap[ImGuiKey_LeftArrow] = hut::KSYM_LEFT;
-  io.KeyMap[ImGuiKey_RightArrow] = hut::KSYM_RIGHT;
-  io.KeyMap[ImGuiKey_UpArrow] = hut::KSYM_UP;
-  io.KeyMap[ImGuiKey_DownArrow] = hut::KSYM_DOWN;
-  io.KeyMap[ImGuiKey_PageUp] = hut::KSYM_PAGEUP;
-  io.KeyMap[ImGuiKey_PageDown] = hut::KSYM_PAGEDOWN;
-  io.KeyMap[ImGuiKey_Home] = hut::KSYM_HOME;
-  io.KeyMap[ImGuiKey_End] = hut::KSYM_END;
-  io.KeyMap[ImGuiKey_Insert] = hut::KSYM_INSERT;
-  io.KeyMap[ImGuiKey_Delete] = hut::KSYM_DELETE;
-  io.KeyMap[ImGuiKey_Backspace] = hut::KSYM_BACKSPACE;
-  io.KeyMap[ImGuiKey_Space] = hut::KSYM_SPACE;
-  io.KeyMap[ImGuiKey_Enter] = hut::KSYM_ENTER;
-  io.KeyMap[ImGuiKey_Escape] = hut::KSYM_ESC;
-  io.KeyMap[ImGuiKey_KeyPadEnter] = hut::KSYM_KPENTER;
-  io.KeyMap[ImGuiKey_A] = hut::KSYM_A;
-  io.KeyMap[ImGuiKey_C] = hut::KSYM_C;
-  io.KeyMap[ImGuiKey_V] = hut::KSYM_V;
-  io.KeyMap[ImGuiKey_X] = hut::KSYM_X;
-  io.KeyMap[ImGuiKey_Y] = hut::KSYM_Y;
-  io.KeyMap[ImGuiKey_Z] = hut::KSYM_Z;
+  io.KeyMap[ImGuiKey_Tab]         = KSYM_TAB;
+  io.KeyMap[ImGuiKey_LeftArrow]   = KSYM_LEFT;
+  io.KeyMap[ImGuiKey_RightArrow]  = KSYM_RIGHT;
+  io.KeyMap[ImGuiKey_UpArrow]     = KSYM_UP;
+  io.KeyMap[ImGuiKey_DownArrow]   = KSYM_DOWN;
+  io.KeyMap[ImGuiKey_PageUp]      = KSYM_PAGEUP;
+  io.KeyMap[ImGuiKey_PageDown]    = KSYM_PAGEDOWN;
+  io.KeyMap[ImGuiKey_Home]        = KSYM_HOME;
+  io.KeyMap[ImGuiKey_End]         = KSYM_END;
+  io.KeyMap[ImGuiKey_Insert]      = KSYM_INSERT;
+  io.KeyMap[ImGuiKey_Delete]      = KSYM_DELETE;
+  io.KeyMap[ImGuiKey_Backspace]   = KSYM_BACKSPACE;
+  io.KeyMap[ImGuiKey_Space]       = KSYM_SPACE;
+  io.KeyMap[ImGuiKey_Enter]       = KSYM_ENTER;
+  io.KeyMap[ImGuiKey_Escape]      = KSYM_ESC;
+  io.KeyMap[ImGuiKey_KeyPadEnter] = KSYM_KPENTER;
+  io.KeyMap[ImGuiKey_A]           = KSYM_A;
+  io.KeyMap[ImGuiKey_C]           = KSYM_C;
+  io.KeyMap[ImGuiKey_V]           = KSYM_V;
+  io.KeyMap[ImGuiKey_X]           = KSYM_X;
+  io.KeyMap[ImGuiKey_Y]           = KSYM_Y;
+  io.KeyMap[ImGuiKey_Z]           = KSYM_Z;
 
   io.GetClipboardTextFn = GetClipboardText;
   io.SetClipboardTextFn = SetClipboardText;
 
-  g_ctx.display_ = _d;
-  g_ctx.window_ = _w;
-  g_ctx.last_frame_ = hut::display::clock::now();
+  g_ctx.display_    = _d;
+  g_ctx.window_     = _w;
+  g_ctx.last_frame_ = display::clock::now();
 
   if (_install_callbacks) {
     _w->on_resize.connect(ImGui_ImplHut_HandleOnResize);
@@ -176,15 +177,15 @@ void ImGui_ImplHut_NewFrame() {
   if (!g_ctx.buffer_)
     ImGui_ImplHut_CreateDeviceObjects();
 
-  const auto now = hut::display::clock::now();
-  const auto delta = std::chrono::duration<float>(now - g_ctx.last_frame_);
+  const auto now    = display::clock::now();
+  const auto delta  = std::chrono::duration<float>(now - g_ctx.last_frame_);
   g_ctx.last_frame_ = now;
 
-  ImGuiIO& io = ImGui::GetIO();
+  ImGuiIO &io  = ImGui::GetIO();
   io.DeltaTime = std::max(delta.count(), std::numeric_limits<float>::min());
 }
 
-void ImGui_ImplHut_RenderDrawData(VkCommandBuffer _cmd_buffer, ImDrawData* _draw_data) {
+void ImGui_ImplHut_RenderDrawData(VkCommandBuffer _cmd_buffer, ImDrawData *_draw_data) {
   if (_draw_data->DisplaySize.x <= 0.0f || _draw_data->DisplaySize.y <= 0.0f)
     return;
 
@@ -197,31 +198,32 @@ void ImGui_ImplHut_RenderDrawData(VkCommandBuffer _cmd_buffer, ImDrawData* _draw
 
   g_ctx.meshes_.clear();
   for (int n = 0; n < _draw_data->CmdListsCount; n++) {
-    const ImDrawList* cmd_list = _draw_data->CmdLists[n];
+    const ImDrawList *cmd_list = _draw_data->CmdLists[n];
 
     hut_imgui_mesh m;
 
-    m.indices_ = g_ctx.buffer_->allocate<imgui_pipeline::index_t>(cmd_list->IdxBuffer.Size);
-    m.indices_->update_raw(0, m.indices_->size_bytes(), cmd_list->IdxBuffer.Data);
+    m.indices_         = g_ctx.buffer_->allocate<imgui_pipeline::index_t>(cmd_list->IdxBuffer.Size);
+    auto imgui_indices = std::span{(imgui_pipeline::index_t *)cmd_list->IdxBuffer.Data, uint(cmd_list->IdxBuffer.Size)};
+    m.indices_->set(imgui_indices);
 
-    m.vertices_ = g_ctx.buffer_->allocate<imgui_pipeline::vertex>(cmd_list->VtxBuffer.Size);
-    m.vertices_->update_raw(0, m.vertices_->size_bytes(), cmd_list->VtxBuffer.Data);
+    m.vertices_         = g_ctx.buffer_->allocate<imgui_pipeline::vertex>(cmd_list->VtxBuffer.Size);
+    auto imgui_vertices = std::span{(imgui_pipeline::vertex *)cmd_list->VtxBuffer.Data, uint(cmd_list->VtxBuffer.Size)};
+    m.vertices_->set(imgui_vertices);
 
     for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++) {
-      const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
+      const ImDrawCmd *pcmd = &cmd_list->CmdBuffer[cmd_i];
 
       if (pcmd->UserCallback != nullptr && pcmd->UserCallback != ImDrawCallback_ResetRenderState) {
         pcmd->UserCallback(cmd_list, pcmd);
-      }
-      else {
+      } else {
         VkRect2D scissor = {};
-        scissor.offset = {(int32_t) pcmd->ClipRect.x, (int32_t) pcmd->ClipRect.y};
-        scissor.extent = {(uint32_t) (pcmd->ClipRect.z - pcmd->ClipRect.x),
-                          (uint32_t) (pcmd->ClipRect.w - pcmd->ClipRect.y)};
+        scissor.offset   = {(i32)pcmd->ClipRect.x, (i32)pcmd->ClipRect.y};
+        scissor.extent   = {(u32)(pcmd->ClipRect.z - pcmd->ClipRect.x),
+                          (u32)(pcmd->ClipRect.w - pcmd->ClipRect.y)};
         HUT_PVK(vkCmdSetScissor, _cmd_buffer, 0, 1, &scissor);
 
         g_ctx.pipeline_->draw(_cmd_buffer,
-                              (size_t) pcmd->TextureId,
+                              (size_t)pcmd->TextureId,
                               m.indices_, pcmd->IdxOffset, pcmd->ElemCount,
                               imgui_pipeline::shared_instances{}, 0, 1,
                               m.vertices_, pcmd->VtxOffset);
@@ -230,32 +232,37 @@ void ImGui_ImplHut_RenderDrawData(VkCommandBuffer _cmd_buffer, ImDrawData* _draw
 
     g_ctx.meshes_.emplace_back(std::move(m));
   }
+
+  // Reset scissor
+  ImGuiIO &io      = ImGui::GetIO();
+  VkRect2D scissor = {};
+  scissor.offset   = {0, 0};
+  scissor.extent   = {static_cast<u32>(io.DisplaySize[0]), static_cast<u32>(io.DisplaySize[1])};
+  HUT_PVK(vkCmdSetScissor, _cmd_buffer, 0, 1, &scissor);
 }
 
 bool ImGui_ImplHut_CreateDeviceObjects() {
   // Build texture atlas
-  ImGuiIO& io = ImGui::GetIO();
+  ImGuiIO &      io = ImGui::GetIO();
   unsigned char *data;
-  int width, height;
+  int            width, height;
   io.Fonts->GetTexDataAsRGBA32(&data, &width, &height);
 
-  g_ctx.buffer_ = g_ctx.display_->alloc_buffer(4*1024*1024);
+  g_ctx.buffer_ = std::make_shared<buffer>(*g_ctx.display_, 4 * 1024 * 1024);
 
-  proj_ubo default_ubo;
-  auto w_size = g_ctx.window_->size();
-  default_ubo.proj_ = glm::ortho<float>(0, w_size.x, 0, w_size.y);
-  g_ctx.ubo_ = g_ctx.display_->alloc_ubo(g_ctx.buffer_, default_ubo);
+  g_ctx.ubo_ = g_ctx.buffer_->allocate<common_ubo>(1, g_ctx.display_->ubo_align());
+  g_ctx.ubo_->set(common_ubo{g_ctx.window_->size()});
 
   // Upload texture to graphics system
-  std::span<uint8_t> pixels {data, size_t(width * height * 4)};
-  hut::image_params atlas_params;
-  atlas_params.size_ = {width, height};
+  std::span<u8> pixels{data, size_t(width * height * 4)};
+  image_params  atlas_params;
+  atlas_params.size_   = {width, height};
   atlas_params.format_ = VK_FORMAT_R8G8B8A8_UNORM;
-  auto image = hut::image::load_raw(*g_ctx.display_, pixels, width * 4, atlas_params);
-  auto sampler = std::make_shared<hut::sampler>(*g_ctx.display_);
-  io.Fonts->TexID = ImGui_ImplHut_AddImage(std::move(image), std::move(sampler));
+  auto image           = image::load_raw(*g_ctx.display_, pixels, width * 4, atlas_params);
+  auto samp            = std::make_shared<sampler>(*g_ctx.display_);
+  io.Fonts->TexID      = ImGui_ImplHut_AddImage(image, samp);
 
-  hut::pipeline_params pparams;
+  pipeline_params pparams;
   pparams.max_sets_ = HUT_IMGUI_MAX_DESCRIPTORS;
 
   g_ctx.pipeline_ = std::make_unique<imgui_pipeline>(*g_ctx.window_, pparams);
@@ -273,19 +280,19 @@ void ImGui_ImplHut_InvalidateDeviceObjects() {
   g_ctx.reset();
 }
 
-ImTextureID ImGui_ImplHut_AddImage(hut::shared_image _image, hut::shared_sampler _sampler) {
+ImTextureID ImGui_ImplHut_AddImage(const shared_image &_image, const shared_sampler &_sampler) {
   size_t index;
   if (!g_ctx.reusable_bindings_ids_.empty()) {
     index = g_ctx.reusable_bindings_ids_.back();
     g_ctx.reusable_bindings_ids_.pop_back();
-  }
-  else {
+  } else {
     index = g_ctx.bindings_.size();
     assert(index < HUT_IMGUI_MAX_DESCRIPTORS);
-    auto &binding = g_ctx.bindings_.emplace_back(tex_binding{std::move(_image), std::move(_sampler)});
-    if (g_ctx.pipeline_)
-      g_ctx.pipeline_->write(index, g_ctx.ubo_, binding.image_, binding.sampler_);
+    g_ctx.bindings_.emplace_back(tex_binding{_image, _sampler});
   }
+
+  if (g_ctx.pipeline_)
+    g_ctx.pipeline_->write(index, g_ctx.ubo_, _image, _sampler);
 
   return reinterpret_cast<ImTextureID>(index);
 }
@@ -294,56 +301,57 @@ void ImGui_ImplHut_RemImage(ImTextureID _id) {
   g_ctx.reusable_bindings_ids_.emplace_back(reinterpret_cast<size_t>(_id));
 }
 
-bool ImGui_ImplHut_HandleOnResize(hut::uvec2 _size) {
-  ImGuiIO& io = ImGui::GetIO();
+bool ImGui_ImplHut_HandleOnResize(uvec2 _size) {
+  ImGuiIO &io    = ImGui::GetIO();
   io.DisplaySize = {float(_size.x), float(_size.y)};
 
-  if (g_ctx.ubo_) {
-    proj_ubo new_ubo;
-    new_ubo.proj_ = glm::ortho<float>(0, _size.x, 0, _size.y);
-    g_ctx.ubo_->set(new_ubo);
-  }
+  if (g_ctx.ubo_)
+    g_ctx.ubo_->set(common_ubo{_size});
 
   return false;
 }
 
-hut::cursor_type hut_cursor_type(ImGuiMouseCursor _input) {
-  hut::cursor_type result = hut::CDEFAULT;
+cursor_type hut_cursor_type(ImGuiMouseCursor _input) {
+  cursor_type result;
   switch (_input) {
-    case ImGuiMouseCursor_Arrow:        result = hut::CDEFAULT; break;
-    case ImGuiMouseCursor_TextInput:    result = hut::CTEXT; break;
-    case ImGuiMouseCursor_ResizeAll:    result = hut::CMOVE; break;
-    case ImGuiMouseCursor_ResizeNS:     result = hut::CRESIZE_NS; break;
-    case ImGuiMouseCursor_ResizeEW:     result = hut::CRESIZE_EW; break;
-    case ImGuiMouseCursor_ResizeNESW:   result = hut::CRESIZE_NESW; break;
-    case ImGuiMouseCursor_ResizeNWSE:   result = hut::CRESIZE_NWSE; break;
-    case ImGuiMouseCursor_Hand:         result = hut::CPOINTER; break;
-    case ImGuiMouseCursor_NotAllowed:   result = hut::CNOT_ALLOWED; break;
+    case ImGuiMouseCursor_Arrow: result = CDEFAULT; break;
+    case ImGuiMouseCursor_TextInput: result = CTEXT; break;
+    case ImGuiMouseCursor_ResizeAll: result = CMOVE; break;
+    case ImGuiMouseCursor_ResizeNS: result = CRESIZE_NS; break;
+    case ImGuiMouseCursor_ResizeEW: result = CRESIZE_EW; break;
+    case ImGuiMouseCursor_ResizeNESW: result = CRESIZE_NESW; break;
+    case ImGuiMouseCursor_ResizeNWSE: result = CRESIZE_NWSE; break;
+    case ImGuiMouseCursor_Hand: result = CPOINTER; break;
+    case ImGuiMouseCursor_NotAllowed: result = CNOT_ALLOWED; break;
     default:
-      assert(false); break;
+      assert(false);
   }
   return result;
 }
 
-bool ImGui_ImplHut_HandleOnMouse(uint8_t _button, hut::mouse_event_type _type, glm::vec2 _pos) {
-  ImGuiIO& io = ImGui::GetIO();
+bool ImGui_ImplHut_HandleOnMouse(u8 _button, mouse_event_type _type, vec2 _pos) {
+  ImGuiIO &io = ImGui::GetIO();
   io.MousePos = {_pos.x, _pos.y};
 
   switch (_type) {
-    case hut::MDOWN:
+    case MDOWN:
       assert(_button > 0 && _button < 6);
-      io.MouseDown[_button - 1] = true; break;
-    case hut::MUP:
+      io.MouseDown[_button - 1] = true;
+      break;
+    case MUP:
       assert(_button > 0 && _button < 6);
-      io.MouseDown[_button - 1] = false; break;
-    case hut::MWHEEL_DOWN:
-      io.MouseWheel -= 1; break;
-    case hut::MWHEEL_UP:
-      io.MouseWheel += 1; break;
-    case hut::MMOVE: /*do nothing*/ break;
+      io.MouseDown[_button - 1] = false;
+      break;
+    case MWHEEL_DOWN:
+      io.MouseWheel -= 1;
+      break;
+    case MWHEEL_UP:
+      io.MouseWheel += 1;
+      break;
+    case MMOVE: /*do nothing*/ break;
   }
 
-  auto request_cursor = io.MouseDrawCursor ? hut::CNONE : hut_cursor_type(ImGui::GetMouseCursor());
+  auto request_cursor = io.MouseDrawCursor ? CNONE : hut_cursor_type(ImGui::GetMouseCursor());
   if (g_ctx.last_mouse_cursor_ != request_cursor) {
     g_ctx.last_mouse_cursor_ = request_cursor;
     g_ctx.window_->cursor(request_cursor);
@@ -352,68 +360,68 @@ bool ImGui_ImplHut_HandleOnMouse(uint8_t _button, hut::mouse_event_type _type, g
   return ImGui::GetIO().WantCaptureMouse;
 }
 
-bool ImGui_ImplHut_HandleOnKey(hut::keycode _kcode, hut::keysym _ksym, bool _down) {
-  ImGuiIO& io = ImGui::GetIO();
+bool ImGui_ImplHut_HandleOnKey(keycode _kcode, keysym _ksym, bool _down) {
+  ImGuiIO &io = ImGui::GetIO();
 
   if (!io.WantCaptureKeyboard)
     return false;
 
 #if !defined(NDEBUG) && 0
-    char kcode_name[64];
-    char *kcode_name_end = g_ctx.display_->keycode_name(kcode_name, _kcode);
-    *kcode_name_end = 0;
+  char  kcode_name[64];
+  char *kcode_name_end = g_ctx.display_->keycode_name(kcode_name, _kcode);
+  *kcode_name_end      = 0;
 
-    char32_t kcode_idle_char = g_ctx.display_->keycode_idle_char(_kcode);
-    char8_t kcode_idle_char_utf8[5];
-    char8_t *kcode_idle_char_utf8_end = hut::to_utf8(kcode_idle_char_utf8, kcode_idle_char);
-    *kcode_idle_char_utf8_end = 0;
+  char32_t kcode_idle_char = g_ctx.display_->keycode_idle_char(_kcode);
+  char8_t  kcode_idle_char_utf8[5];
+  char8_t *kcode_idle_char_utf8_end = to_utf8(kcode_idle_char_utf8, kcode_idle_char);
+  *kcode_idle_char_utf8_end         = 0;
 
-    std::cout << "OnKey "
-              << "keycode:" << _kcode << " (name: " << kcode_name << ", char:" << (char*)kcode_idle_char_utf8 << "), "
-              << "keysym: " << _ksym << " (" << hut::keysym_name(_ksym) << "), "
-              << "down:" << _down
-              << std::endl;
+  std::cout << "OnKey "
+            << "keycode:" << _kcode << " (name: " << kcode_name << ", char:" << (char *)kcode_idle_char_utf8 << "), "
+            << "keysym: " << _ksym << " (" << keysym_name(_ksym) << "), "
+            << "down:" << _down
+            << std::endl;
 #endif
 
-  static_assert(hut::KSYM_LAST_VALUE <= IM_ARRAYSIZE(io.KeysDown));
+  static_assert(KSYM_LAST_VALUE <= IM_ARRAYSIZE(io.KeysDown));
   io.KeysDown[_ksym] = _down;
 
   return ImGui::GetIO().WantCaptureKeyboard;
 }
 
-bool ImGui_ImplHut_HandleOnKMods(hut::modifiers _mods) {
-  ImGuiIO& io = ImGui::GetIO();
+bool ImGui_ImplHut_HandleOnKMods(modifiers _mods) {
+  ImGuiIO &io = ImGui::GetIO();
 
 #if !defined(NDEBUG) && 0
   std::cout << "OnMods " << _mods
-            << "(shift: " << _mods.query(hut::KMOD_SHIFT) << ", "
-            << "ctrl: " << _mods.query(hut::KMOD_CTRL) << ", "
-            << "alt: " << _mods.query(hut::KMOD_ALT) << ")"
+            << "(shift: " << _mods.query(KMOD_SHIFT) << ", "
+            << "ctrl: " << _mods.query(KMOD_CTRL) << ", "
+            << "alt: " << _mods.query(KMOD_ALT) << ")"
             << std::endl;
 #endif
 
-  io.KeyShift = _mods.query(hut::KMOD_SHIFT);
-  io.KeyCtrl = _mods.query(hut::KMOD_CTRL);
-  io.KeyAlt = _mods.query(hut::KMOD_ALT);
+  io.KeyShift = _mods.query(KMOD_SHIFT);
+  io.KeyCtrl  = _mods.query(KMOD_CTRL);
+  io.KeyAlt   = _mods.query(KMOD_ALT);
   io.KeySuper = false;
 
   return false;
 }
 
 bool ImGui_ImplHut_HandleOnChar(char32_t _utf32_char) {
-  ImGuiIO& io = ImGui::GetIO();
+  ImGuiIO &io = ImGui::GetIO();
 
   if (!io.WantCaptureKeyboard)
     return false;
 
-  char8_t buffer[5];
-  char8_t *end = hut::to_utf8(buffer, _utf32_char);
-  *end = 0;
+  char8_t  buffer[5];
+  char8_t *end = to_utf8(buffer, _utf32_char);
+  *end         = 0;
 
 #if !defined(NDEBUG) && 0
-  std::cout << "OnChar " << (char*)buffer << " (0x" << std::hex << (uint32_t)_utf32_char << std::dec << "), " << std::endl;
+  std::cout << "OnChar " << (char *)buffer << " (0x" << std::hex << (u32)_utf32_char << std::dec << "), " << std::endl;
 #endif
 
-  io.AddInputCharactersUTF8((const char *) buffer);
+  io.AddInputCharactersUTF8((const char *)buffer);
   return true;
 }

@@ -31,8 +31,6 @@
 
 #include "hut/ktx2/ktx2.hpp"
 
-#include "khr_df.h"
-
 namespace hut::ktx {
 
 bool is_prohibited_format(VkFormat _format) {
@@ -135,19 +133,19 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
 
   image_params iparams;
   level_ranges levels[32];
-  u32 type_size;
+  u32          type_size;
 
   {
-    iparams.tiling_ = _params.tiling_;
-    iparams.usage_ = _params.usage_;
-    iparams.aspect_ = _params.aspect_;
+    iparams.tiling_     = _params.tiling_;
+    iparams.usage_      = _params.usage_;
+    iparams.aspect_     = _params.aspect_;
     iparams.properties_ = _params.properties_;
-    iparams.samples_ = _params.samples_;
-    iparams.flags_ = _params.flags_;
+    iparams.samples_    = _params.samples_;
+    iparams.flags_      = _params.flags_;
 
     const u8 *start = _input.begin().base();
-    const u8 *end = _input.end().base();
-    const u8 *pos = start;
+    const u8 *end   = _input.end().base();
+    const u8 *pos   = start;
 
     auto read_u32 = [&]() -> u32 {
       assert(pos + 4 <= end);
@@ -158,7 +156,7 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
 
     auto read_u64 = [&]() -> u64 {
       assert(pos + 4 <= end);
-      u64 left = read_u32();
+      u64 left  = read_u32();
       u64 right = read_u32();
       return left << 0 | right << 32;
     };
@@ -172,11 +170,9 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
     };
 
     constexpr static u8 zero_padding_[4] = {
-        0, 0, 0, 0
-    };
+        0, 0, 0, 0};
     constexpr static u8 expected_ktx2_header_[12] = {
-        0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A
-    };
+        0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A};
     if (!expect_data(expected_ktx2_header_, 12))
       return {};
 
@@ -184,18 +180,18 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
     if (is_prohibited_format(iparams.format_))
       return {};
     if (is_special_depth_format(iparams.format_))
-      return {}; // FIXME http://github.khronos.org/KTX-Specification/#_depth_and_stencil_formats
+      return {};  // FIXME http://github.khronos.org/KTX-Specification/#_depth_and_stencil_formats
     if (iparams.format_ == VK_FORMAT_UNDEFINED)
-      return {}; // FIXME http://github.khronos.org/KTX-Specification/#_use_of_vk_format_undefined
+      return {};  // FIXME http://github.khronos.org/KTX-Specification/#_use_of_vk_format_undefined
 
-    type_size = read_u32();
+    type_size       = read_u32();
     iparams.size_.x = read_u32();
     iparams.size_.y = read_u32();
     u32 pixel_depth = read_u32();
     if (pixel_depth > 1)
-      return {}; // FIXME Support 3D texture
+      return {};  // FIXME Support 3D texture
     iparams.layers_ = max(read_u32(), u32{1});
-    u32 face_count = read_u32();
+    u32 face_count  = read_u32();
     if (face_count != 1 && face_count != 6)
       return {};
     if (iparams.layers_ != 1 && face_count != 1)
@@ -207,7 +203,7 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
     iparams.levels_ = read_u32();
     u32 compression = read_u32();
     if (compression != 0)
-      return {}; // FIXME Support some compression
+      return {};  // FIXME Support some compression
 
     u32 dfd_byte_offset = read_u32();
     u32 dfd_byte_length = read_u32();
@@ -217,9 +213,9 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
     u64 sgd_byte_length = read_u64();
 
     for (uint level = 0; level < iparams.levels_; level++) {
-      auto &range = levels[level];
-      range.byte_offset_ = read_u64();
-      range.byte_length_ = read_u64();
+      auto &range                     = levels[level];
+      range.byte_offset_              = read_u64();
+      range.byte_length_              = read_u64();
       range.uncompressed_byte_length_ = read_u64();
     }
   }
@@ -227,16 +223,16 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
   shared_image img = std::make_shared<image>(_display, iparams);
   for (u16 level = 0; level < iparams.levels_; level++) {
     const auto &level_range = levels[level];
-    u16vec2 level_size = iparams.size_ >> level;
-    u32 bit_stride = level_size.x * img->bpp();
+    u16vec2     level_size  = iparams.size_ >> level;
+    u32         bit_stride  = level_size.x * img->bpp();
     assert(bit_stride > 8);
-    u32 byte_stride = bit_stride / 8;
+    u32  byte_stride       = bit_stride / 8;
     auto layer_byte_length = byte_stride * level_size.y;
     assert(level_range.uncompressed_byte_length_ == layer_byte_length * iparams.layers_);
 
     for (u16 layer = 0; layer < iparams.layers_; layer++) {
       auto layer_byte_offset = _input.data() + level_range.byte_offset_ + layer_byte_length * layer;
-      auto subres = image::subresource{u16vec4{0, 0, level_size}, level, layer};
+      auto subres            = image::subresource{u16vec4{0, 0, level_size}, level, layer};
       img->update(subres, std::span<const u8>(layer_byte_offset, layer_byte_length), byte_stride);
     }
   }
@@ -244,4 +240,4 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
   return img;
 }
 
-} // ns hut::ktx
+}  // namespace hut::ktx

@@ -30,25 +30,25 @@
 #include <bit>
 #include <optional>
 
-#include "hut/utils.hpp"
+#include "hut/utils/math.hpp"
 
 namespace hut::binpack {
 
 template<typename T>
 class linear1d {
-public:
+ public:
   struct block {
     bool used_;
-    T offset_;
-    T size_;
+    T    offset_;
+    T    size_;
   };
 
-private:
+ private:
   using base_type = T;
-  using type = T;
+  using type      = T;
 
-  size_t last_found_fit_ = 0;
-  T pool_size_;
+  size_t             last_found_fit_ = 0;
+  T                  pool_size_, allocated_size_ = 0;
   std::vector<block> blocks_;
 
   void emplace_at(size_t _index, bool _status, T _offset, T _size) {
@@ -71,30 +71,28 @@ private:
 
   struct fit {
     size_t index_;
-    T offset_;
-    T aligned_offset_;
-    T aligned_size_;
+    T      offset_;
+    T      aligned_offset_;
+    T      aligned_size_;
   };
 
-  [[nodiscard]] std::optional<fit> find_first_fit(T _size, T _align) {
+  [[nodiscard]] std::optional<fit> find_first_fit(T _size, T _align) const {
     const auto blocks_count = blocks_.size();
-    const auto last_found = last_found_fit_;
-    fit result;
+    fit        result;
     for (size_t i = 0; i < blocks_count; i++) {
-      result.index_ = (last_found + i) % blocks_count; // Start from last found fit
-      auto block = blocks_[result.index_];
+      result.index_ = (last_found_fit_ + i) % blocks_count;  // Start from last found fit
+      auto block    = blocks_[result.index_];
 
-      if (block.used_) continue; // In use
+      if (block.used_) continue;  // In use
       const auto size = block.size_;
       if (size < _size)
-        continue; // Too small even witht considering alignment
+        continue;  // Too small even without considering alignment
 
-      result.offset_ = block.offset_;
+      result.offset_         = block.offset_;
       result.aligned_offset_ = align<uint>(result.offset_, _align);
       const auto align_bytes = result.aligned_offset_ - result.offset_;
-      result.aligned_size_ = align<uint>(_size + align_bytes, _align);
+      result.aligned_size_   = align<uint>(_size + align_bytes, _align);
       if (size >= result.aligned_size_) {
-        last_found_fit_ = result.index_;
         return result;
       }
     }
@@ -112,8 +110,8 @@ private:
 
   T split(const fit &_fit) {
     // Compute size/offset for new block after split
-    const auto split_block = blocks_[_fit.index_];
-    const auto new_block_size = split_block.size_ - _fit.aligned_size_;
+    const auto split_block      = blocks_[_fit.index_];
+    const auto new_block_size   = split_block.size_ - _fit.aligned_size_;
     const auto new_block_offset = split_block.offset_ + _fit.aligned_size_;
 
     const auto align_bytes = _fit.aligned_offset_ - _fit.offset_;
@@ -134,11 +132,11 @@ private:
 
   void merge(size_t _index) {
     assert(blocks_[_index].used_ == true);
-    blocks_[_index].used_ = false;
-    const auto blocks_count = blocks_.size();
-    T accumulated_size = blocks_[_index].size_;
-    size_t ibegin = _index;
-    size_t iend = _index;
+    blocks_[_index].used_       = false;
+    const auto blocks_count     = blocks_.size();
+    T          accumulated_size = blocks_[_index].size_;
+    size_t     ibegin           = _index;
+    size_t     iend             = _index;
     for (size_t i = _index + 1; i < blocks_count; i++) {
       if (blocks_[i].used_)
         break;
@@ -158,19 +156,28 @@ private:
     erase_range(ibegin + 1, iend + 1);
   }
 
-public:
-  explicit linear1d(T _pool_size) : pool_size_(_pool_size) { reset(); }
+ public:
+  explicit linear1d(T _pool_size)
+      : pool_size_(_pool_size) { reset(); }
 
   std::optional<T> pack(T _size, T _align = 0) {
+    assert(_size > 0);
     auto first_fit = find_first_fit(_size, _align);
     if (!first_fit)
       return {};
+    last_found_fit_ = first_fit->index_;
+    allocated_size_ += _size;
     return split(*first_fit);
+  }
+
+  [[nodiscard]] bool try_fit(T _size, T _align = 0) const {
+    return find_first_fit(_size, _align).has_value();
   }
 
   void offer(T _offset) {
     auto found = find_offset(_offset);
     assert(found);
+    allocated_size_ -= blocks_[*found].size_;
     merge(*found);
   }
 
@@ -180,11 +187,16 @@ public:
     last_found_fit_ = 0;
   }
 
-  bool empty() {
-    return blocks_.empty() || (blocks_.size() == 1 && !blocks_[0].used_);
+  [[nodiscard]] T capacity() const { return pool_size_; }
+  [[nodiscard]] T allocated() const { return allocated_size_; }
+  [[nodiscard]] T free() const { return pool_size_ - allocated_size_; }
+
+  [[nodiscard]] bool empty() const {
+    assert(!blocks_.empty());
+    return blocks_.size() == 1 && !blocks_[0].used_;
   }
 
-  T upper_bound() const {
+  [[nodiscard]] T upper_bound() const {
     for (auto it = blocks_.crbegin(); it != blocks_.crend(); ++it) {
       if (it->used_)
         return it->offset_ + it->size_;
@@ -207,9 +219,10 @@ struct adaptor1d_dummy2d {
   TUnderlying underlying_;
 
   using base_type = T;
-  using type = glm::vec<2, T>;
+  using type      = vec<2, T>;
 
-  explicit adaptor1d_dummy2d(const type &_size) : underlying_(_size.x) {}
+  explicit adaptor1d_dummy2d(const type &_size)
+      : underlying_(_size.x) {}
 
   std::optional<type> pack(const type &_size) {
     auto result = underlying_.pack(_size.x);
@@ -217,6 +230,7 @@ struct adaptor1d_dummy2d {
       return {};
     return type{*result, 0};
   }
+  bool try_fit(const type &_size) { return underlying_.try_fit(_size.x); }
   void offer(const type &_free) { underlying_.offer(_free.x); }
   void reset() { underlying_.reset(); }
   bool empty() { return underlying_.empty(); }
@@ -239,25 +253,28 @@ struct shelve_separator_pow {
 template<typename T, typename TShelveSelector>
 struct shelve {
   // Uses a linear1d to maintain a shelves list, and another linear1d in each shelve to arrange elements horizontally
-
   using base_type = T;
-  using type = glm::vec<2, T>;
+  using type      = vec<2, T>;
 
   struct row {
-    T y_;
+    T           y_;
     linear1d<T> suballocator_;
 
-    row(T _y, T _sizex) : y_(_y), suballocator_(_sizex) {}
+    row(T _y, T _sizex)
+        : y_(_y)
+        , suballocator_(_sizex) {}
   };
 
-  type size_;
-  linear1d<T> shelves_allocator_;
+  type                            size_;
+  linear1d<T>                     shelves_allocator_;
   std::unordered_multimap<T, row> rows_;
 
-  explicit shelve(const type &_size) : size_(_size), shelves_allocator_(_size.y) { reset(); }
+  explicit shelve(const type &_size)
+      : size_(_size)
+      , shelves_allocator_(_size.y) { reset(); }
 
-  std::optional<type> pack(const type &_size)  {
-    auto pow = TShelveSelector{}.select_shelve(_size.y);
+  std::optional<type> pack(const type &_size) {
+    auto pow   = TShelveSelector{}.select_shelve(_size.y);
     auto range = rows_.equal_range(pow);
     for (auto it = range.first; it != range.second; it++) {
       auto fit = it->second.suballocator_.pack(_size.x);
@@ -270,7 +287,7 @@ struct shelve {
       return {};
 
     auto new_row = rows_.emplace(pow, row{*new_row_y, size_.x});
-    auto fit = new_row->second.suballocator_.pack(_size.x);
+    auto fit     = new_row->second.suballocator_.pack(_size.x);
     assert(fit);
     return type{*fit, new_row->second.y_};
   }
@@ -289,7 +306,7 @@ struct shelve {
     }
   }
 
-  void reset()  {
+  void reset() {
     rows_.clear();
     shelves_allocator_.reset();
   }
@@ -299,4 +316,4 @@ struct shelve {
   }
 };
 
-} // namespace hut::binpack
+}  // namespace hut::binpack

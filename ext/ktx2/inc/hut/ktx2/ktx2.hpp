@@ -30,21 +30,25 @@
 #include <optional>
 #include <span>
 
+#include <vulkan/vulkan.h>
+
+#include "hut/utils/fwd.hpp"
+#include "hut/utils/math.hpp"
+
 #include "hut/image.hpp"
-#include "hut/utils.hpp"
 
 namespace hut::ktx {
 
 struct load_params {
   // import defaults from image_params
-  VkImageTiling tiling_ = image_params{}.tiling_;
-  VkImageUsageFlags usage_ = image_params{}.usage_;
-  VkImageAspectFlags aspect_ = image_params{}.aspect_;
+  VkImageTiling         tiling_     = image_params{}.tiling_;
+  VkImageUsageFlags     usage_      = image_params{}.usage_;
+  VkImageAspectFlags    aspect_     = image_params{}.aspect_;
   VkMemoryPropertyFlags properties_ = image_params{}.properties_;
-  VkSampleCountFlagBits samples_ = image_params{}.samples_;
-  VkImageCreateFlags flags_ = image_params{}.flags_;
+  VkSampleCountFlagBits samples_    = image_params{}.samples_;
+  VkImageCreateFlags    flags_      = image_params{}.flags_;
 };
 
 std::optional<shared_image> load(display &_display, std::span<const u8> _input, const load_params &_params = {});
 
-} // ns hut::ktx
+}  // namespace hut::ktx

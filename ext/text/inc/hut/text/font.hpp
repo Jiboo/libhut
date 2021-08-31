@@ -27,55 +27,43 @@
 
 #pragma once
 
-#include <unordered_map>
 #include <memory>
+#include <unordered_map>
 
-#include "hut/atlas_pool.hpp"
-#include "hut/buffer_pool.hpp"
+#include "hut/atlas.hpp"
+#include "hut/buffer.hpp"
 #include "hut/image.hpp"
 #include "hut/pipeline.hpp"
 
 struct FT_FaceRec_;
-typedef FT_FaceRec_* FT_Face;
+typedef FT_FaceRec_ *FT_Face;
 struct hb_font_t;
 
-namespace hut {
+namespace hut::text {
+
+static constexpr size_t font_scale = 64;
 
 class font {
-  template<typename TIndexType, typename TVertexType, typename TUpdater> friend class shaper;
+  friend class shaper;
 
  public:
-  font(display &_display, const uint8_t *_addr, size_t _size, const shared_atlas &_atlas, bool _hinting = true);
+  font(std::span<const u8> _data, uint _size, bool _hinting = true);
   ~font();
 
- private:
   struct glyph {
     shared_subimage subimage_;
-    vec4 texcoords_ {0, 0, 0, 0};
-    vec2 bearing_ {0, 0};
-    uvec2 bounds_ {0, 0};
-
-    inline explicit operator bool() const { return bounds_.x > 0 && bounds_.y > 0; }
+    i16vec2         bearing_, size_;
   };
 
-  using glyph_cache_t = std::unordered_map<uint, glyph>;
-  struct cache {
-    glyph_cache_t glyphs_;
-    hb_font_t *font_ = nullptr;
+  glyph load(const shared_atlas &, uint _char_index);
+  glyph load(const shared_atlas &, char32_t _unichar);
 
-    explicit operator bool() const { return font_ != nullptr; }
-  };
-
-  FT_Face face_;
-  i32 load_flags_;
-  shared_atlas atlas_;
-  std::unordered_map<uint8_t, cache> caches_;
-  std::mutex baking_mutex_;
-
-  glyph &load_glyph(glyph_cache_t &_cache, uint _char_index);
-  cache &load_cache(uint8_t _size);
+ private:
+  FT_Face    face_;
+  hb_font_t *font_;
+  i32        load_flags_;
+  std::mutex mutex_;
 };
-
 using shared_font = std::shared_ptr<font>;
 
-}  // namespace hut
+}  // namespace hut::text

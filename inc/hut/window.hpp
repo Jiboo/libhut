@@ -32,9 +32,10 @@
 
 #include <wayland-client.h>
 
+#include "hut/utils/event.hpp"
+
 #include "hut/display.hpp"
 #include "hut/render_target.hpp"
-#include "hut/utils.hpp"
 
 namespace hut {
 
@@ -48,19 +49,29 @@ enum side {
 using edge = flagged<side, LAST_SIDE>;
 cursor_type edge_cursor(edge);
 
-enum touch_event_type { TDOWN, TUP, TMOVE };
-const char *touch_event_name(touch_event_type);
-inline std::ostream &operator<<(std::ostream &_os, touch_event_type _c) { return _os << touch_event_name(_c); }
+enum touch_event_type { TDOWN,
+                        TUP,
+                        TMOVE };
+const char *         touch_event_name(touch_event_type);
+inline std::ostream &operator<<(std::ostream &_os, touch_event_type _c) {
+  return _os << touch_event_name(_c);
+}
 
-enum mouse_event_type { MDOWN, MUP, MMOVE, MWHEEL_UP, MWHEEL_DOWN };
-const char *mouse_event_name(mouse_event_type);
-inline std::ostream &operator<<(std::ostream &_os, mouse_event_type _c) { return _os << mouse_event_name(_c); }
+enum mouse_event_type { MDOWN,
+                        MUP,
+                        MMOVE,
+                        MWHEEL_UP,
+                        MWHEEL_DOWN };
+const char *         mouse_event_name(mouse_event_type);
+inline std::ostream &operator<<(std::ostream &_os, mouse_event_type _c) {
+  return _os << mouse_event_name(_c);
+}
 
 class display;
 
 struct window_params {
   enum flag {
-    FDEPTH = render_target_params::flag::FDEPTH,
+    FDEPTH         = render_target_params::flag::FDEPTH,
     FMULTISAMPLING = render_target_params::flag::FMULTISAMPLING,
     FVSYNC,
     FTRANSPARENT,
@@ -69,29 +80,28 @@ struct window_params {
   };
   using flags = flagged<flag, flag::FLAG_LAST_VALUE>;
 
-  flags flags_ {FVSYNC};
+  flags flags_{FVSYNC};
   uvec2 size_ = {800, 600}, min_size_ = {0, 0}, max_size_ = {0, 0};
 };
 
 class window : public render_target {
   friend class display;
-  template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
 
  public:
-  event<> on_pause, on_resume, on_focus, on_blur, on_close;
-  event<uvec4> on_expose;
-  event<uvec2> on_resize;
-  event<VkCommandBuffer> on_draw;
+  event<>                  on_pause, on_resume, on_focus, on_blur, on_close;
+  event<uvec4>             on_expose;
+  event<uvec2>             on_resize;
+  event<VkCommandBuffer>   on_draw;
   event<display::duration> on_frame;
 
-  event<uint8_t /*finger*/, touch_event_type, vec2 /*pos*/> on_touch;
-  event<uint8_t /*button*/, mouse_event_type, vec2 /*pos*/> on_mouse;
+  event<u8 /*finger*/, touch_event_type, vec2 /*pos*/> on_touch;
+  event<u8 /*button*/, mouse_event_type, vec2 /*pos*/> on_mouse;
 
-  event<uint32_t> on_time;
+  event<u32> on_time;
 
-  event<modifiers /*mods*/> on_kmods;
+  event<modifiers /*mods*/>             on_kmods;
   event<keycode, keysym, bool /*down*/> on_key;
-  event<char32_t /*utf32_char*/> on_char;
+  event<char32_t /*utf32_char*/>        on_char;
 
   explicit window(display &_display, const window_params &_init_params = {});
   ~window();
@@ -102,15 +112,15 @@ class window : public render_target {
   void invalidate(const uvec4 &, bool _redraw);
   void invalidate(bool _redraw);
 
-  void maximize(bool _set = true);
-  void fullscreen(bool _set = true);
+  void  maximize(bool _set = true);
+  void  fullscreen(bool _set = true);
   uvec2 size() {
     return size_;
   }
   void interactive_resize(edge);
   void interactive_move();
 
-  void title(std::string_view);
+  void title(std::u8string_view);
   void cursor(cursor_type _c);
   void clear_color(const vec4 &_color) {
     render_target_params_.clear_color_ = {_color.r, _color.g, _color.b, _color.a};
@@ -129,29 +139,28 @@ class window : public render_target {
   void dragndrop_start(dragndrop_actions _supported_actions, clipboard_formats _supported_formats, send_dragndrop_data &&_callback);
 
  protected:
-  display &display_;
+  display &     display_;
   window_params params_;
 
   VkSurfaceKHR surface_ = VK_NULL_HANDLE;
 
-  VkPresentModeKHR present_mode_;
+  VkPresentModeKHR   present_mode_;
   VkSurfaceFormatKHR surface_format_;
 
-  VkExtent2D swapchain_extents_;
-  VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
-  std::vector<VkImage> swapchain_images_;
-  std::vector<VkImageView> swapchain_imageviews_;
+  VkExtent2D                   swapchain_extents_;
+  VkSwapchainKHR               swapchain_ = VK_NULL_HANDLE;
+  std::vector<VkImage>         swapchain_images_;
+  std::vector<VkImageView>     swapchain_imageviews_;
   std::vector<VkCommandBuffer> primary_cbs_;
   std::vector<VkCommandBuffer> cbs_;
-  std::vector<uint8_t> dirty_;
+  std::vector<u8>              dirty_;
 
   VkSemaphore sem_available_ = VK_NULL_HANDLE;
-  VkSemaphore sem_rendered_ = VK_NULL_HANDLE;
+  VkSemaphore sem_rendered_  = VK_NULL_HANDLE;
 
-  uvec2 size_, pos_;
-  uvec2 previous_size_, previous_pos_; // used to save rect before maximize/fullscreen
+  uvec2               size_, pos_;
   display::time_point last_frame_ = display::clock::now();
-  bool minimized_ = false;
+  bool                minimized_  = false;
 
   std::shared_ptr<drop_target_interface> drop_target_interface_;
 
@@ -160,35 +169,35 @@ class window : public render_target {
   void redraw(display::time_point);
 
  protected:
-  static void handle_xdg_configure(void*, xdg_surface*, uint32_t);
-  static void handle_toplevel_configure(void*, xdg_toplevel*, int32_t, int32_t, wl_array*);
-  static void handle_toplevel_close(void*, xdg_toplevel*);
-  static void clipboard_data_source_handle_target(void*, wl_data_source*, const char*);
-  static void clipboard_data_source_handle_send(void*, wl_data_source*, const char*, int32_t);
-  static void clipboard_data_source_handle_cancelled(void*, wl_data_source*);
-  static void clipboard_data_source_handle_dnd_drop_performed(void*, wl_data_source*);
-  static void clipboard_data_source_handle_dnd_finished(void*, wl_data_source*);
-  static void clipboard_data_source_handle_action(void*, wl_data_source*, uint32_t);
-  static void drag_data_source_handle_target(void*, wl_data_source*, const char*);
-  static void drag_data_source_handle_send(void*, wl_data_source*, const char*, int32_t);
-  static void drag_data_source_handle_cancelled(void*, wl_data_source*);
-  static void drag_data_source_handle_dnd_drop_performed(void*, wl_data_source*);
-  static void drag_data_source_handle_dnd_finished(void*, wl_data_source*);
-  static void drag_data_source_handle_action(void*, wl_data_source*, uint32_t);
+  static void handle_xdg_configure(void *, xdg_surface *, u32);
+  static void handle_toplevel_configure(void *, xdg_toplevel *, i32, i32, wl_array *);
+  static void handle_toplevel_close(void *, xdg_toplevel *);
+  static void clipboard_data_source_handle_target(void *, wl_data_source *, const char *);
+  static void clipboard_data_source_handle_send(void *, wl_data_source *, const char *, i32);
+  static void clipboard_data_source_handle_cancelled(void *, wl_data_source *);
+  static void clipboard_data_source_handle_dnd_drop_performed(void *, wl_data_source *);
+  static void clipboard_data_source_handle_dnd_finished(void *, wl_data_source *);
+  static void clipboard_data_source_handle_action(void *, wl_data_source *, u32);
+  static void drag_data_source_handle_target(void *, wl_data_source *, const char *);
+  static void drag_data_source_handle_send(void *, wl_data_source *, const char *, i32);
+  static void drag_data_source_handle_cancelled(void *, wl_data_source *);
+  static void drag_data_source_handle_dnd_drop_performed(void *, wl_data_source *);
+  static void drag_data_source_handle_dnd_finished(void *, wl_data_source *);
+  static void drag_data_source_handle_action(void *, wl_data_source *, u32);
 
-  wl_surface *wayland_surface_;
-  xdg_surface *window_;
+  wl_surface *  wayland_surface_;
+  xdg_surface * window_;
   xdg_toplevel *toplevel_;
 
-  std::atomic_bool invalidated_ = true;
-  vec2 mouse_lastmove_ = {0, 0};
-  cursor_type current_cursor_type_ = CDEFAULT;
+  std::atomic_bool invalidated_         = true;
+  vec2             mouse_lastmove_      = {0, 0};
+  cursor_type      current_cursor_type_ = CDEFAULT;
 
   struct dragndrop_async_writer {
     send_dragndrop_data callback_;
-    std::thread thread_;
-    clipboard_sender sender_;
-    dragndrop_action last_drag_action_handled_ = DNDNONE;
+    std::thread         thread_;
+    clipboard_sender    sender_;
+    dragndrop_action    last_drag_action_handled_ = DNDNONE;
 
     ~dragndrop_async_writer() {
       sender_.close();
@@ -196,10 +205,10 @@ class window : public render_target {
         thread_.join();
     }
   };
-  std::unordered_map<wl_data_source*, std::shared_ptr<dragndrop_async_writer>> dragndrop_async_writers_;
+  std::unordered_map<wl_data_source *, std::shared_ptr<dragndrop_async_writer>> dragndrop_async_writers_;
 
   struct clipboard_async_writer {
-    std::thread thread_;
+    std::thread      thread_;
     clipboard_sender sender_;
 
     ~clipboard_async_writer() {
@@ -209,8 +218,8 @@ class window : public render_target {
     }
   };
   struct clipboard_sender_context {
-    send_clipboard_data callback_;
-    wl_data_source *selection_ = nullptr;
+    send_clipboard_data               callback_;
+    wl_data_source *                  selection_ = nullptr;
     std::list<clipboard_async_writer> writers_;
 
     ~clipboard_sender_context() { clear(); }
@@ -229,10 +238,10 @@ class window : public render_target {
     void reset(wl_data_source *_selection, send_clipboard_data &&_callback) {
       clear();
       selection_ = _selection;
-      callback_ = std::move(_callback);
+      callback_  = std::move(_callback);
     }
   };
-  clipboard_sender_context clipboard_sender_context_;
+  clipboard_sender_context         clipboard_sender_context_;
   std::list<display::async_reader> async_readers_;
 };
 

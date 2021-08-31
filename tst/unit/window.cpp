@@ -35,12 +35,12 @@ using namespace hut;
 TEST(window, fastkill) {
   {
     display d("hut fastkill test");
-    window w(d);
+    window  w(d);
   }
   {
     display d("hut fastkill test");
-    window w1(d);
-    window w2(d);
+    window  w1(d);
+    window  w2(d);
     {
       window w3(d);
     }

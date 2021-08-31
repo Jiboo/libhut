@@ -29,6 +29,8 @@
 #include <iostream>
 #include <random>
 
+#include "hut/utils/string.hpp"
+
 #include "hut/display.hpp"
 #include "hut/window.hpp"
 
@@ -41,35 +43,35 @@ using namespace hut;
 static constexpr const auto BUFF_SIZE = 4096;
 
 struct drop_target {
-  std::unique_ptr<u8[]> buff_ = std::make_unique<u8[]>(BUFF_SIZE);
-  clipboard_formats allowed_formats_ = clipboard_formats{FTEXT_PLAIN};
-  dragndrop_actions allowed_actions_ = dragndrop_actions{DNDCOPY};
-  dragndrop_action preferred_action_ = DNDCOPY;
+  std::unique_ptr<u8[]>                                         buff_              = std::make_unique<u8[]>(BUFF_SIZE);
+  clipboard_formats                                             allowed_formats_   = clipboard_formats{FTEXT_PLAIN};
+  dragndrop_actions                                             allowed_actions_   = dragndrop_actions{DNDCOPY};
+  dragndrop_action                                              preferred_action_  = DNDCOPY;
   std::array<clipboard_format, CLIPBOARD_FORMAT_LAST_VALUE + 1> preferred_formats_ = {
-      FIMAGE_PNG, FIMAGE_JPEG, FIMAGE_BMP, FTEXT_HTML, FTEXT_URI_LIST, FTEXT_PLAIN
-  };
+      FIMAGE_PNG, FIMAGE_JPEG, FIMAGE_BMP, FTEXT_HTML, FTEXT_URI_LIST, FTEXT_PLAIN};
   vec4 bbox_ = {0, 0, 0, 0};
 };
 
 struct my_drop_target_interface : drop_target_interface {
   std::vector<drop_target> &targets_;
-  drop_target *target_ = nullptr;
-  clipboard_formats current_formats_;
-  clipboard_format preferred_format_ = FTEXT_PLAIN;
-  move_result last_printed_move_result_ = {dragndrop_actions{DNDNONE}, DNDNONE, FTEXT_PLAIN};
+  drop_target *             target_ = nullptr;
+  clipboard_formats         current_formats_;
+  clipboard_format          preferred_format_         = FTEXT_PLAIN;
+  move_result               last_printed_move_result_ = {dragndrop_actions{DNDNONE}, DNDNONE, FTEXT_PLAIN};
 
-  explicit my_drop_target_interface(std::vector<drop_target> &_targets) : targets_(_targets) {}
+  explicit my_drop_target_interface(std::vector<drop_target> &_targets)
+      : targets_(_targets) {}
 
   void on_enter(dragndrop_actions _actions, clipboard_formats _formats) override {
     std::cout << "my_drop_target_interface::on_enter " << _actions << ", " << _formats << std::endl;
     current_formats_ = _formats;
-    target_ = nullptr;
+    target_          = nullptr;
   }
 
   move_result on_move(vec2 _pos) override {
     //std::cout << "my_drop_target_interface::on_move " << _pos << std::endl;
     constexpr move_result default_result = {dragndrop_actions{DNDNONE}, DNDNONE, FTEXT_PLAIN};
-    move_result result = default_result;
+    move_result           result         = default_result;
 
     for (auto &target : targets_) {
       if (bbox_contains(target.bbox_, _pos) && (target.allowed_formats_ & current_formats_)) {
@@ -77,7 +79,7 @@ struct my_drop_target_interface : drop_target_interface {
           for (auto f : target.preferred_formats_) {
             if (target.allowed_formats_.query(f) && current_formats_.query(f)) {
               preferred_format_ = f;
-              target_ = &target;
+              target_           = &target;
               break;
             }
           }
@@ -93,7 +95,7 @@ struct my_drop_target_interface : drop_target_interface {
 
     if (result != last_printed_move_result_) {
       std::cout << "my_drop_target_interface::on_move returning " << result.possible_actions_ << ", "
-      << result.preferred_action_ << ", " << result.preferred_format_ << std::endl;
+                << result.preferred_action_ << ", " << result.preferred_format_ << std::endl;
       last_printed_move_result_ = result;
     }
     return result;
@@ -106,38 +108,39 @@ struct my_drop_target_interface : drop_target_interface {
     target_->buff_.get()[read] = 0;
     std::cout << "my_drop_target_interface::on_drop " << _action << ", read " << read << " bytes from dragndrop" << std::endl;
     u8 sink[1024];
-    while (_receiver.read(sink));
+    while (_receiver.read(sink))
+      ;
   }
 };
 
-int main(int, char**) {
-  display d("hut demo");
-  window w(d);
-  w.title("hut imgui demo");
-  w.clear_color({0, 0, 0, 1});
+int main(int, char **) {
+  display dsp("hut demo");
+  window  win(dsp);
+  win.title(u8"hut imgui demo");
+  win.clear_color({0, 0, 0, 1});
 
   auto last_item_pos = [](vec4 *_dst) {
     auto min = ImGui::GetItemRectMin();
     auto max = ImGui::GetItemRectMax();
-    *_dst = {min.x, min.y, max.x, max.y};
+    *_dst    = {min.x, min.y, max.x, max.y};
   };
 
   char source_data[BUFF_SIZE] = "Hello world from libhut";
-  auto source_formats = clipboard_formats{FTEXT_PLAIN};
-  auto source_actions = dragndrop_actions{DNDCOPY};
-  vec4 source_bbox {0, 0, 0, 0};
+  auto source_formats         = clipboard_formats{FTEXT_PLAIN};
+  auto source_actions         = dragndrop_actions{DNDCOPY};
+  vec4 source_bbox{0, 0, 0, 0};
 
   std::vector<drop_target> targets;
   targets.reserve(16);
   targets.emplace_back();
 
-  w.dragndrop_target(std::make_shared<my_drop_target_interface>(targets));
-  w.on_mouse.connect([&](uint8_t _button, mouse_event_type _type, vec2 _coords) {
+  win.dragndrop_target(std::make_shared<my_drop_target_interface>(targets));
+  win.on_mouse.connect([&](u8 _button, mouse_event_type _type, vec2 _coords) {
     if (_type == MDOWN && _button == 1 && bbox_contains(source_bbox, _coords)) {
       std::cout << "Starting drag with " << source_actions << ", " << source_formats << std::endl;
-      w.dragndrop_start(source_actions, source_formats, [&](dragndrop_action _action, clipboard_format _mime, clipboard_sender &_sender) {
-        auto size = strlen(source_data);
-        auto wrote = _sender.write({(u8*)source_data, size});
+      win.dragndrop_start(source_actions, source_formats, [&](dragndrop_action _action, clipboard_format _mime, clipboard_sender &_sender) {
+        auto size  = strlen(source_data);
+        auto wrote = _sender.write({(u8 *)source_data, size});
         std::cout << "Wrote " << wrote << "/" << size << " bytes to drag target in " << _mime << std::endl;
       });
       return true;
@@ -148,16 +151,16 @@ int main(int, char**) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!ImGui_ImplHut_Init(&d, &w, true))
+  if (!ImGui_ImplHut_Init(&dsp, &win, true))
     return EXIT_FAILURE;
-  install_test_events(d, w);
+  install_test_events(dsp, win);
 
-  w.on_draw.connect([&](VkCommandBuffer _buffer) {
+  win.on_draw.connect([&](VkCommandBuffer _buffer) {
     ImGui_ImplHut_NewFrame();
     ImGui::NewFrame();
 
     if (ImGui::Begin("Drag source")) {
-      ImVec2 size {ImGui::GetContentRegionAvailWidth(), 100};
+      ImVec2 size{ImGui::GetContentRegionAvailWidth(), 100};
       ImGui::Button("Drag me", size);
       last_item_pos(&source_bbox);
 
@@ -173,11 +176,11 @@ int main(int, char**) {
     ImGui::End();
 
     for (auto &target : targets) {
-      constexpr auto buff_size = sizeof("Target ") + sizeof(void*) * 2;
-      char title_buff[buff_size];
+      constexpr auto buff_size = sizeof("Target ") + sizeof(void *) * 2;
+      char           title_buff[buff_size];
       snprintf(title_buff, buff_size, "Target %p", &target);
       if (ImGui::Begin(title_buff)) {
-        ImVec2 size {ImGui::GetContentRegionAvailWidth(), 100};
+        ImVec2 size{ImGui::GetContentRegionAvailWidth(), 100};
         ImGui::Button("Drop here", size);
         last_item_pos(&target.bbox_);
 
@@ -196,7 +199,7 @@ int main(int, char**) {
     return false;
   });
 
-  d.dispatch();
+  dsp.dispatch();
 
   ImGui_ImplHut_Shutdown();
   ImGui::DestroyContext();

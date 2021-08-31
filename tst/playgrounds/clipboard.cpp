@@ -27,36 +27,37 @@
 
 #include <fstream>
 #include <iostream>
-#include <random>
+
+#include "hut/utils/string.hpp"
 
 #include "hut/display.hpp"
 #include "hut/window.hpp"
 
 #include "hut/imgui/imgui.hpp"
 
-#include "tst_png.hpp"
 #include "tst_events.hpp"
+#include "tst_png.hpp"
 
 using namespace hut;
 
-int main(int, char**) {
-  display d("hut clipboard playground");
+int main(int, char **) {
+  display dsp("hut clipboard playground");
 
-  window w(d);
-  w.title("hut clipboard playground");
-  w.clear_color({0, 0, 0, 1});
+  window win(dsp);
+  win.title(u8"hut clipboard playground");
+  win.clear_color({0, 0, 0, 1});
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!ImGui_ImplHut_Init(&d, &w, true))
+  if (!ImGui_ImplHut_Init(&dsp, &win, true))
     return EXIT_FAILURE;
-  install_test_events(d, w);
+  install_test_events(dsp, win);
 
   char text_input[4096];
   auto formats = clipboard_formats{} | FTEXT_PLAIN | FTEXT_HTML;
 
-  w.on_draw.connect([&](VkCommandBuffer _buffer) {
+  win.on_draw.connect([&](VkCommandBuffer _buffer) {
     ImGui_ImplHut_NewFrame();
     ImGui::NewFrame();
 
@@ -66,21 +67,22 @@ int main(int, char**) {
 
       if (ImGui::Button("Copy")) {
         std::cout << "Offering to clipboard" << std::endl;
-        w.clipboard_offer(formats, [&text_input](clipboard_format _mime, clipboard_sender &_sender) {
-          auto size = strlen(text_input);
-          auto wrote = _sender.write({(u8*)text_input, size});
+        win.clipboard_offer(formats, [&text_input](clipboard_format _mime, clipboard_sender &_sender) {
+          auto size  = strlen(text_input);
+          auto wrote = _sender.write({(u8 *)text_input, size});
           std::cout << "Wrote " << wrote << "/" << size << " bytes to clipboard in " << _mime << std::endl;
         });
       }
       if (ImGui::Button("Paste")) {
         std::cout << "Requesting from clipboard" << std::endl;
-        w.clipboard_receive(formats, [&text_input](clipboard_format _mime, clipboard_receiver &_receiver) {
-          auto read = _receiver.read({(u8*)text_input, sizeof(text_input) - 1});
+        win.clipboard_receive(formats, [&text_input](clipboard_format _mime, clipboard_receiver &_receiver) {
+          auto read        = _receiver.read({(u8 *)text_input, sizeof(text_input) - 1});
           text_input[read] = 0;
           std::cout << "Read " << read << " bytes from clipboard in " << _mime << std::endl;
           hexdump(text_input, read);
           u8 sink[1024];
-          while (_receiver.read(sink));
+          while (_receiver.read(sink))
+            ;
         });
       }
     }
@@ -89,20 +91,20 @@ int main(int, char**) {
     if (ImGui::Begin("Image tests")) {
       if (ImGui::Button("Copy")) {
         std::cout << "Offering to clipboard" << std::endl;
-        w.clipboard_offer(clipboard_formats{} | FIMAGE_PNG, [](clipboard_format _mime, clipboard_sender &_sender) {
+        win.clipboard_offer(clipboard_formats{} | FIMAGE_PNG, [](clipboard_format _mime, clipboard_sender &_sender) {
           auto wrote = _sender.write(tst_png::tex1_png);
           std::cout << "Wrote " << wrote << " bytes to clipboard in " << _mime << std::endl;
         });
       }
       if (ImGui::Button("Paste")) {
         std::cout << "Requesting from clipboard" << std::endl;
-        w.clipboard_receive(clipboard_formats{} | FIMAGE_PNG, [](clipboard_format _mime, clipboard_receiver &_receiver) {
+        win.clipboard_receive(clipboard_formats{} | FIMAGE_PNG, [](clipboard_format _mime, clipboard_receiver &_receiver) {
           std::ofstream ofs("clipboard.png", std::ios::binary);
           assert(ofs.is_open());
           u8 buffer[2048];
           while (auto read = _receiver.read(buffer)) {
             hexdump(buffer, read);
-            ofs.write((char*)buffer, read);
+            ofs.write((char *)buffer, read);
           }
           std::cout << "Read " << ofs.tellp() << " bytes from clipboard in " << _mime << " saved to clipboard.png" << std::endl;
         });
@@ -115,7 +117,7 @@ int main(int, char**) {
     return false;
   });
 
-  d.dispatch();
+  dsp.dispatch();
 
   ImGui_ImplHut_Shutdown();
   ImGui::DestroyContext();

@@ -1,10 +1,10 @@
-#version 450
+#version 460
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_EXT_nonuniform_qualifier : require
 
 layout(binding = 1) uniform sampler2D uni_samplers[4];
 
-layout(location = 0) in flat uvec4 in_box; // pos_box
+layout(location = 0) in flat vec4 in_box; // pos_box
 layout(location = 1) in flat uvec4 in_params; // (radius, smoothness, atlas_page, gradient)
 layout(location = 2) in vec4 in_col;
 layout(location = 3) in vec2 in_uv;

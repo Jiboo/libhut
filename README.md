@@ -1,4 +1,4 @@
-HUT (Hobby Ui Toolkit), attempt at a GUI library, still in early and unusable state (see todo.md).
+HUT (Hobby Ui Toolkit), attempt at a desktop GUI library, still in early and unusable state (see todo.md).
 
 Wayland and Vulkan only.
 

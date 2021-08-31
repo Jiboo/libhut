@@ -27,45 +27,39 @@
 
 #pragma once
 
-#include <chrono>
-#include <string>
-
-#include "hut/display.hpp"
-#include "hut/render_target.hpp"
 #include "hut/image.hpp"
-#include "hut/utils.hpp"
+#include "hut/render_target.hpp"
 
 namespace hut {
-  struct offscreen_params {
-    enum flag {
-      FDEPTH = render_target_params::flag::FDEPTH,
-      FMULTISAMPLING = render_target_params::flag::FMULTISAMPLING,
-      FLAG_LAST_VALUE = FMULTISAMPLING,
-    };
-    using flags = flagged<flag, flag::FLAG_LAST_VALUE>;
-
-    flags flags_ {};
-    image::subresource subres_ {};
+struct offscreen_params {
+  enum flag {
+    FDEPTH          = render_target_params::flag::FDEPTH,
+    FMULTISAMPLING  = render_target_params::flag::FMULTISAMPLING,
+    FLAG_LAST_VALUE = FMULTISAMPLING,
   };
+  using flags = flagged<flag, flag::FLAG_LAST_VALUE>;
 
-  class offscreen : public render_target {
-    template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
+  flags              flags_{};
+  image::subresource subres_{};
+};
 
-  public:
-    explicit offscreen(const shared_image &_dest, const offscreen_params &_init_params = {});
-    ~offscreen();
+class offscreen : public render_target {
+ public:
+  explicit offscreen(const shared_image &_dest, offscreen_params _init_params = {});
+  ~offscreen();
 
-    using draw_callback = std::function<void(VkCommandBuffer)>;
-    void draw(const draw_callback &_callback);
+  using draw_callback = std::function<void(VkCommandBuffer)>;
+  void draw(const draw_callback &_callback);
 
-    void download(std::span<u8> _dst, uint _dst_row_pitch, image::subresource _src = {});
-  protected:
-    offscreen_params params_;
-    shared_image target_;
-    VkCommandBuffer cb_ = VK_NULL_HANDLE;
-    VkFence fence_ = VK_NULL_HANDLE;
+  void download(std::span<u8> _dst, uint _dst_row_pitch, image::subresource _src = {});
 
-    void flush_cb();
-  };
+ protected:
+  offscreen_params params_;
+  shared_image     target_;
+  VkCommandBuffer  cb_    = VK_NULL_HANDLE;
+  VkFence          fence_ = VK_NULL_HANDLE;
+
+  void flush_cb();
+};
 
 }  // namespace hut

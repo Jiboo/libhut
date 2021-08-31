@@ -27,22 +27,27 @@
 
 #include <iostream>
 
-#include "hut/text/font.hpp"
+#include "hut/utils/profiling.hpp"
+#include "hut/utils/sstream.hpp"
 
-#include "hut/profiling.hpp"
+#include "hut/atlas.hpp"
+
+#include "hut/text/font.hpp"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_BITMAP_H
 
-#include <harfbuzz/hb.h>
 #include <harfbuzz/hb-ft.h>
+#include <harfbuzz/hb.h>
 
 using namespace hut;
+using namespace hut::text;
 
 struct FTLibraryHolder {
   FT_Library library_ = nullptr;
   FTLibraryHolder() {
+    HUT_PROFILE_SCOPE(PFONT, "FT_Init_FreeType");
     FT_Init_FreeType(&library_);
   }
   ~FTLibraryHolder() {
@@ -51,83 +56,82 @@ struct FTLibraryHolder {
   }
 };
 
-font::font(display &_display, const uint8_t *_addr, size_t _size, const shared_atlas &_atlas, bool _hinting)
-  : atlas_(_atlas) {
-
+font::font(std::span<const u8> _data, uint _size, bool _hinting) {
   static FTLibraryHolder lib_holder;
 
-  HUT_PROFILE_SCOPE(PFONT, "font::font");
   load_flags_ = FT_LOAD_COLOR | (_hinting ? FT_LOAD_FORCE_AUTOHINT : FT_LOAD_NO_HINTING);
-  auto result = FT_New_Memory_Face(lib_holder.library_, _addr, FT_Long(_size), 0, &face_);
-  if (result != 0)
-    throw std::runtime_error(sstream("couldn't load font: ") << result);
-  if (FT_HAS_COLOR(face_))
-    assert(_atlas->params_.format_ == VK_FORMAT_B8G8R8A8_UNORM);
+
+  {
+    HUT_PROFILE_SCOPE(PFONT, "font::font::ft");
+    auto result = FT_New_Memory_Face(lib_holder.library_, _data.data(), FT_Long(_data.size_bytes()), 0, &face_);
+    if (result != 0)
+      throw std::runtime_error(sstream("couldn't load face: ") << result);
+    FT_Set_Char_Size(face_, FT_F26Dot6(_size * font_scale), FT_F26Dot6(_size * font_scale), 0, 0);
+  }
+  {
+    HUT_PROFILE_SCOPE(PFONT, "font::font::hb");
+    font_ = hb_ft_font_create(face_, nullptr);
+    hb_ft_font_set_funcs(font_);
+    hb_ft_font_set_load_flags(font_, load_flags_);
+  }
 }
 
 font::~font() {
-  for (auto &cache : caches_)
-    hb_font_destroy(cache.second.font_);
+  hb_font_destroy(font_);
   FT_Done_Face(face_);
 }
 
-font::glyph &font::load_glyph(glyph_cache_t &_cache, uint _char_index) {
-  glyph &g = _cache[_char_index];
-  if (g)
-    return g;
+font::glyph font::load(const shared_atlas &_atlas, uint _char_index) {
+  if (FT_HAS_COLOR(face_))
+    assert(_atlas->format() == VK_FORMAT_B8G8R8A8_UNORM);
 
   HUT_PROFILE_SCOPE(PFONT, "font::load_glyph");
-  if(FT_Load_Glyph(face_, _char_index, load_flags_))
+
+  std::unique_lock lk{mutex_};
+
+  if (FT_Load_Glyph(face_, _char_index, load_flags_))
     throw std::runtime_error("couldn't load char");
 
   FT_GlyphSlot &ftg = face_->glyph;
-
   if (FT_Render_Glyph(ftg, FT_RENDER_MODE_NORMAL))
     throw std::runtime_error("couldn't render char");
 
   FT_Bitmap render = ftg->bitmap;
-  g.bearing_ = {ftg->bitmap_left, ftg->bitmap_top};
-  g.bounds_ = {render.width, render.rows};
-  if (g.bounds_.x == 0 || g.bounds_.y == 0)
-      return g;
+  glyph     result;
+  result.bearing_ = vec2{ftg->bitmap_left, ftg->bitmap_top};
+  result.size_    = vec2{render.width, render.rows};
 
-  auto atlas_format = atlas_->params_.format_;
+  if (render.width == 0 || render.rows == 0)
+    return result;
+
+  auto atlas_format = _atlas->format();
   if ((render.pixel_mode == FT_PIXEL_MODE_BGRA && atlas_format == VK_FORMAT_B8G8R8A8_UNORM)
-    || (render.pixel_mode == FT_PIXEL_MODE_GRAY && atlas_format == VK_FORMAT_R8_UNORM)) {
+      || (render.pixel_mode == FT_PIXEL_MODE_GRAY && atlas_format == VK_FORMAT_R8_UNORM)) {
     // same format as atlas, nothing to do
-    g.subimage_ = atlas_->pack(g.bounds_, std::span<const u8>{render.buffer, render.pitch * render.rows}, render.pitch);
-  }
-  else if (render.pixel_mode == FT_PIXEL_MODE_GRAY && atlas_format == VK_FORMAT_B8G8R8A8_UNORM) {
-    g.subimage_ = atlas_->alloc(g.bounds_);
-    auto update = g.subimage_->prepare_update();
-    auto *src = render.buffer;
-    auto *dst = update.data();
+    auto span        = std::span<const u8>{render.buffer, render.pitch * render.rows};
+    result.subimage_ = _atlas->pack(result.size_, span, render.pitch);
+  } else if (render.pixel_mode == FT_PIXEL_MODE_GRAY && atlas_format == VK_FORMAT_B8G8R8A8_UNORM) {
+    result.subimage_ = _atlas->alloc(result.size_);
+    auto  update     = result.subimage_->update();
+    auto *src        = render.buffer;
+    auto *dst        = update.data();
     for (uint y = 0; y < render.rows; y++) {
       auto *src_row = src + render.width * y;
-      auto *dst_row = (u8vec4*)(dst + update.staging_row_pitch() * y);
+      auto *dst_row = (u8vec4 *)(dst + update.staging_row_pitch() * y);
       for (uint x = 0; x < render.width; x++) {
-        auto src_pixel = *(src_row + x);
+        auto  src_pixel = *(src_row + x);
         auto &dst_pixel = *(dst_row + x);
-        dst_pixel.x = dst_pixel.y = dst_pixel.z = dst_pixel.w = src_pixel; // NOTE JBL: premultiplied, to be coherent with emoji BGRA which are too
+        dst_pixel.x = dst_pixel.y = dst_pixel.z = dst_pixel.w = src_pixel;  // NOTE JBL: premultiplied, to be coherent with emoji BGRA which are too
       }
     }
-  }
-  else {
+  } else {
     throw std::runtime_error("missmatch between glyph and atlas pixel formats");
   }
-  g.texcoords_ = g.subimage_->texcoords();
 
-  return g;
+  return result;
 }
 
-font::cache &font::load_cache(uint8_t _size) {
-  auto &cache = caches_[_size];
-  if (cache)
-    return cache;
-
-  cache.font_ = hb_ft_font_create(face_, nullptr);
-  hb_ft_font_set_funcs(cache.font_);
-  hb_ft_font_set_load_flags(cache.font_, load_flags_);
-  return cache;
+font::glyph font::load(const shared_atlas &_atlas, char32_t _unichar) {
+  uint index = FT_Get_Char_Index(face_, _unichar);
+  return load(_atlas, index);
 }
-

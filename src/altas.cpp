@@ -25,17 +25,16 @@
  * SOFTWARE.
  */
 
-#include "hut/atlas_pool.hpp"
-#include "hut/profiling.hpp"
+#include "hut/utils/math.hpp"
+#include "hut/utils/profiling.hpp"
+
+#include "hut/atlas.hpp"
 
 using namespace hut;
 
-atlas_pool::subimage::~subimage() {
-  if (valid())
-    pool_->free(*this);
-}
-
-atlas_pool::atlas_pool(display &_display, const image_params &_params) : display_(_display), params_(_params) {
+atlas::atlas(display &_display, const image_params &_params)
+    : display_(_display)
+    , params_(_params) {
   HUT_PROFILE_SCOPE(PIMAGE, "atlas::atlas");
   if (params_.size_ == u16vec2{0, 0}) {
     params_.size_ = {_display.limits().maxImageDimension2D, _display.limits().maxImageDimension2D};
@@ -43,11 +42,11 @@ atlas_pool::atlas_pool(display &_display, const image_params &_params) : display
   add_page();
 }
 
-void atlas_pool::add_page() {
-  pages_.emplace_back(std::make_shared<hut::image>(display_, params_));
+void atlas::add_page() {
+  pages_.emplace_back(std::make_shared<image>(display_, params_));
 }
 
-shared_subimage atlas_pool::alloc(const u16vec2 &_bounds) {
+shared_subimage atlas::alloc(const u16vec2 &_bounds) {
   assert(_bounds.x > 0);
   assert(_bounds.y > 0);
   auto padded = _bounds + padding;
@@ -64,15 +63,19 @@ shared_subimage atlas_pool::alloc(const u16vec2 &_bounds) {
   return std::make_shared<subimage>(this, pages_.size() - 1, make_bbox_with_origin_size(packed.value(), _bounds));
 }
 
-shared_subimage atlas_pool::pack(const u16vec2 &_bounds, std::span<const u8> _data, uint _src_row_pitch) {
-  auto result = alloc(_bounds);
-  auto &l = pages_[result->page_];
-  l.image_->update({result->bounds_}, _data, _src_row_pitch);
+shared_subimage atlas::pack(const u16vec2 &_bounds, std::span<const u8> _data, uint _src_row_pitch) {
+  shared_subimage result = alloc(_bounds);
+  pages_[result->page()].image_->update({result->bounds()}, _data, _src_row_pitch);
   return result;
 }
 
-void atlas_pool::free(subimage &_subimage) {
-  assert(_subimage.pool_ == this);
-  auto &l = pages_[_subimage.page_];
-  l.packer_.offer(_subimage.bounds_);
+image::updator atlas::update(const subimage &_sub, const u16vec4 &_bounds) {
+  assert(_sub.from(this));
+  return pages_[_sub.page()].image_->update({_bounds});
+}
+
+void atlas::free(subimage &&_sub) {
+  assert(_sub.from(this));
+  auto &l = pages_[_sub.page()];
+  l.packer_.offer(_sub.bounds());
 }

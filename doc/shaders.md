@@ -8,4 +8,5 @@ some prefix/suffix in the inputs name:
 - Format suffix, allows to override the default format for an input, for example:
   `in vec4 in_v_col_r8g8b8a8_unorm;` will result as
 `VkVertexInputAttributeDescription{.format = VK_FORMAT_R8G8B8A8_UNORM ...}`
-in the reflected info, but without the format specifier, it would be a `VK_FORMAT_R32G32B32A32_SFLOAT`.
+in the reflected info, but without the format specifier, it would be a `VK_FORMAT_R32G32B32A32_SFLOAT` which is the
+implicit default for vec4.

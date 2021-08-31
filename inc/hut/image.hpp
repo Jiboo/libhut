@@ -30,70 +30,71 @@
 #include <memory>
 #include <set>
 
-#include "hut/buffer_pool.hpp"
+#include "hut/utils/format.hpp"
+
+#include "hut/buffer.hpp"
 #include "hut/display.hpp"
-#include "hut/color.hpp"
-#include "hut/utils.hpp"
 
 namespace hut {
 
 class display;
 
 struct image_params {
-  u16vec2 size_;
-  VkFormat format_;
-  u16 levels_ = 1;
-  u16 layers_ = 1;
-  VkImageTiling tiling_ = VkImageTiling::VK_IMAGE_TILING_LINEAR;
-  VkImageUsageFlags usage_ = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-  VkImageAspectFlags aspect_ = VK_IMAGE_ASPECT_COLOR_BIT;
+  u16vec2               size_;
+  VkFormat              format_;
+  u16                   levels_     = 1;
+  u16                   layers_     = 1;
+  VkImageTiling         tiling_     = VkImageTiling::VK_IMAGE_TILING_LINEAR;
+  VkImageUsageFlags     usage_      = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+  VkImageAspectFlags    aspect_     = VK_IMAGE_ASPECT_COLOR_BIT;
   VkMemoryPropertyFlags properties_ = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-  VkSampleCountFlagBits samples_ = VK_SAMPLE_COUNT_1_BIT;
-  VkImageCreateFlags flags_ = 0;
+  VkSampleCountFlagBits samples_    = VK_SAMPLE_COUNT_1_BIT;
+  VkImageCreateFlags    flags_      = 0;
 };
 
 class image {
-  friend class display;
-  friend class font;
-  template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
-  friend class render_target;
-  friend class window;
   friend class offscreen;
 
  public:
   struct subresource {
     u16vec4 coords_;
-    u16 level_ = 0;
-    u16 layer_ = 0;
+    u16     level_ = 0;
+    u16     layer_ = 0;
   };
 
   class updator {
-    friend image;
+    friend class image;
 
-    image &target_;
-    buffer_pool::alloc staging_;
-    std::span<u8> data_;
-    uint staging_row_pitch_;
-    subresource subres_;
+    image &             target_;
+    shared_suballoc_raw staging_;
+    std::span<u8>       data_;
+    uint                staging_row_pitch_;
+    subresource         subres_;
 
-    updator(image &_target, buffer_pool::alloc _staging, std::span<u8> _data, uint _staging_row_pitch, subresource _subres)
-        : target_(_target), staging_(_staging), data_(_data), staging_row_pitch_(_staging_row_pitch), subres_(_subres) {
+    updator(image &_target, shared_suballoc_raw _staging, std::span<u8> _data, uint _staging_row_pitch, subresource _subres)
+        : target_(_target)
+        , staging_(std::move(_staging))
+        , data_(_data)
+        , staging_row_pitch_(_staging_row_pitch)
+        , subres_(_subres) {
     }
 
    public:
-    ~updator() { if (data_.size_bytes()) target_.finalize_update(*this); }
+    ~updator() {
+      if (data_.size_bytes()) target_.finalize_update(*this);
+    }
 
-    updator() = delete;
+    updator()                = delete;
     updator(const updator &) = delete;
-    updator(updator &&) = default;
-    updator& operator=(const updator&) = delete;
-    updator& operator=(updator&&) = delete;
+    updator(updator &&)      = default;
+    updator &operator=(const updator &) = delete;
+    updator &operator=(updator &&) = delete;
 
     [[nodiscard]] const u8 *data() const { return data_.data(); }
-    [[nodiscard]] u8 *data() { return data_.data(); }
-    [[nodiscard]] size_t size_bytes() const { return data_.size_bytes(); }
-    [[nodiscard]] uint staging_row_pitch() const { return staging_row_pitch_; }
-    [[nodiscard]] uint image_row_pitch() const { return target_.bpp() * bbox_size(subres_.coords_).x / 8; }
+    [[nodiscard]] u8 *      data() { return data_.data(); }
+    [[nodiscard]] size_t    size_bytes() const { return data_.size_bytes(); }
+    [[nodiscard]] uint      staging_row_pitch() const { return staging_row_pitch_; }
+    [[nodiscard]] uint      image_row_pitch() const { return target_.bpp() * bbox_size(subres_.coords_).x / 8; }
   };
 
   static std::shared_ptr<image> load_raw(display &, std::span<const u8> _data, uint _data_row_pitch, const image_params &_params);
@@ -101,65 +102,31 @@ class image {
   image(display &_display, const image_params &_params);
   ~image();
 
-  void update(subresource _subres, std::span<const u8>, uint _srcRowPitch);
-  updator prepare_update(subresource _subres);
-  updator prepare_update() { return prepare_update({make_bbox_with_origin_size({0,0}, params_.size_)}); }
+  void    update(subresource _subres, std::span<const u8>, uint _srcRowPitch);
+  updator update(subresource _subres);
+  updator update() { return update({make_bbox_with_origin_size({0, 0}, params_.size_)}); }
 
-  [[nodiscard]] u8 bpp() const { return info(params_.format_).bpp(); }
+  [[nodiscard]] u8       bpp() const { return info(params_.format_).bpp(); }
   [[nodiscard]] VkFormat format() const { return params_.format_; }
-  [[nodiscard]] u16vec2 size() const { return params_.size_; }
-  [[nodiscard]] u16 levels() const { return params_.levels_; }
-  [[nodiscard]] u16 layers() const { return params_.layers_; }
+  [[nodiscard]] u16vec2  size() const { return params_.size_; }
+  [[nodiscard]] u16      levels() const { return params_.levels_; }
+  [[nodiscard]] u16      layers() const { return params_.layers_; }
+
+  [[nodiscard]] VkImageView view() const { return view_; }
 
  private:
   static VkMemoryRequirements create(display &_display, const image_params &_params,
-                             VkImage *_image, VkDeviceMemory *_imageMemory);
+                                     VkImage *_image, VkDeviceMemory *_imageMemory);
 
   void finalize_update(updator &_update);
 
-  display &display_;
+  display &    display_;
   image_params params_;
 
-  VkImage image_;
-  VkDeviceMemory memory_;
+  VkImage              image_;
+  VkDeviceMemory       memory_;
   VkMemoryRequirements mem_reqs_;
-  VkImageView view_;
+  VkImageView          view_;
 };
-
-using shared_image = std::shared_ptr<image>;
-
-struct sampler_params {
-  VkFilter filter_ = VK_FILTER_LINEAR;
-  bool anisotropy_ = true;
-  VkSamplerAddressMode addressMode_ = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-  glm::vec2 lodRange_ = {0, 0};
-  float lodBias_ = 0;
-
-  sampler_params &fast() {
-    filter_ = VK_FILTER_NEAREST;
-    anisotropy_ = false;
-    return *this;
-  }
-
-  sampler_params &lod(float _max, float _min = 0, float _bias = 0) {
-    lodRange_.x = _min;
-    lodRange_.y = _max;
-    lodBias_ = _bias;
-    return *this;
-  }
-};
-
-class sampler {
-  template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
-
-  VkSampler sampler_;
-  VkDevice device_;
-
-public:
-  explicit sampler(display &_display, const sampler_params & _params = {});
-  ~sampler();
-};
-
-using shared_sampler = std::shared_ptr<sampler>;
 
 }  // namespace hut

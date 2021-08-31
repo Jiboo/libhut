@@ -38,7 +38,7 @@
 
 using namespace hut;
 
-std::shared_ptr<window> create_window(display &_display, window_params _params, std::string_view _title, vec4 _clearc) {
+std::shared_ptr<window> create_window(display &_display, window_params _params, std::u8string_view _title, vec4 _clearc) {
   auto result = std::make_shared<window>(_display, _params);
   result->title(_title);
   result->clear_color(_clearc);
@@ -59,13 +59,13 @@ const char *window_params_flag_name(window_params::flag _flag) {
   return "invalid";
 }
 
-int main(int, char**) {
+int main(int, char **) {
   display d("hut demo");
 
   window_params wp;
   wp.flags_.set(window_params::FTRANSPARENT);
   window w(d, wp);
-  w.title("hut imgui demo");
+  w.title(u8"hut imgui demo");
   w.clear_color({0, 0, 0, 1});
 
   IMGUI_CHECKVERSION();
@@ -75,15 +75,15 @@ int main(int, char**) {
     return EXIT_FAILURE;
   install_test_events(d, w);
 
-  int current_corsor = CDEFAULT;
-  bool set_maximize = true;
-  bool set_fullscreen = true;
-  char title[1024] = "Hello world";
-  vec4 clear_color {0, 0, 0, 1};
+  int     current_corsor = CDEFAULT;
+  bool    set_maximize   = true;
+  bool    set_fullscreen = true;
+  char8_t title[1024]    = u8"Hello world";
+  vec4    clear_color{0, 0, 0, 1};
 
-  window_params params;
-  char create_title[1024] = "Hello world";
-  vec4 create_clear_color {0, 0, 0, 1};
+  window_params                        params;
+  char8_t                              create_title[1024] = u8"Hello world";
+  vec4                                 create_clear_color{0, 0, 0, 1};
   std::vector<std::shared_ptr<window>> windows;
 
   w.on_draw.connect([&](VkCommandBuffer _buffer) {
@@ -107,13 +107,17 @@ int main(int, char**) {
         set_fullscreen = !set_fullscreen;
       }
 
-      if (ImGui::InputText("Title", title, sizeof(title)))
+      if (ImGui::Button("Minimize")) {
+        w.pause();
+      }
+
+      if (ImGui::InputText("Title", (char *)title, sizeof(title)))
         w.title(title);
 
       if (ImGui::ColorEdit4("Clear color", &clear_color.x))
         w.clear_color(clear_color);
 
-      auto item_getter = [](void*, int _cursor, const char** _dst) {
+      auto item_getter = [](void *, int _cursor, const char **_dst) {
         *_dst = cursor_css_name(static_cast<cursor_type>(_cursor));
         return true;
       };
@@ -128,13 +132,13 @@ int main(int, char**) {
       ImGui::InputScalarN("position", ImGuiDataType_U32, &params.size_, 2);
       ImGui::InputScalarN("min_size", ImGuiDataType_U32, &params.min_size_, 2);
       ImGui::InputScalarN("max_size", ImGuiDataType_U32, &params.max_size_, 2);
-      ImGui::InputText("Title", create_title, sizeof(create_title));
+      ImGui::InputText("Title", (char *)create_title, sizeof(create_title));
       ImGui::ColorEdit4("Clear color", &create_clear_color.x);
 
       if (ImGui::Button("create"))
         windows.emplace_back(create_window(d, params, create_title, create_clear_color));
       if (ImGui::Button("close all"))
-        d.post([&](auto){ windows.clear(); });
+        d.post([&](auto) { windows.clear(); });
     }
     ImGui::End();
 

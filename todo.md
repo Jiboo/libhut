@@ -1,6 +1,7 @@
 fix:
   - we probably want a resize event at window creation, before any draw event?
   - xdg_toplevel_resize seems to ignore xdg_toplevel_set_min/max_size (repro on mutter and weston)
+  - text renderer is making renderdoc crash, I'm probably doing something wrong
 
 refactor: 
   - (nothing yet)

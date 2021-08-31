@@ -24,8 +24,8 @@ option(HUT_COMPILE_UNITTESTS "Compile all unit tests" TRUE)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_PROFILING)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION_DEBUG)
-#set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_DEBUG_WL_DATA_LISTENERS)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_DEBUG_STAGING)
+#set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_DEBUG_WL_DATA_LISTENERS)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_PREFER_NONDESCRETE_DEVICES)
 
 ###########################################################
@@ -104,6 +104,8 @@ set(HUT_SOURCES ${HUT_SOURCES} ${HUT_WAYLAND_SOURCES} ${HUT_WAYLAND_GENERATED})
 ###########################################################
 # Checking for optional dependencies...
 ###########################################################
+find_package(GTest)
+
 string(FIND "${HUT_DEFINITIONS}" "HUT_ENABLE_PROFILING" HUT_ENABLE_PROFILING)
 if (NOT HUT_ENABLE_PROFILING EQUAL -1)
   find_package(fmt REQUIRED) #TODO Replace with std::format
@@ -185,7 +187,7 @@ target_include_directories(gen_spv PRIVATE inc)
 # hut library
 ###########################################################
 set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DVK_USE_PLATFORM_WAYLAND_KHR)
-file(GLOB_RECURSE HUT_HEADERS inc/hut/*.hpp)
+file(GLOB_RECURSE HUT_HEADERS inc/hut/*.hpp inc/hut/utils/*.hpp)
 file(GLOB HUT_COMMON_SOURCES src/*.cpp)
 set(HUT_SOURCES ${HUT_SOURCES} ${HUT_COMMON_SOURCES})
 
@@ -194,7 +196,7 @@ add_library(hut STATIC ${HUT_HEADERS} ${HUT_SOURCES})
 target_link_libraries(hut ${HUT_LIBS})
 target_compile_definitions(hut PUBLIC ${HUT_DEFINITIONS})
 target_include_directories(hut PUBLIC ${HUT_INCLUDES})
-target_precompile_headers(hut PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/inc/hut/utils.hpp>")
+target_precompile_headers(hut PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/inc/hut/utils/precomp.hpp>")
 
 #message("HUT_DEFINITIONS: ${HUT_DEFINITIONS}")
 #message("HUT_INCLUDES: ${HUT_INCLUDES}")
@@ -205,7 +207,7 @@ target_precompile_headers(hut PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT
 # hut extensions
 ###########################################################
 function(hut_add_extension)
-  cmake_parse_arguments(HUT_ADD_EXTENSION "" "NAME" "DEPENDENCIES" ${ARGN})
+  cmake_parse_arguments(HUT_ADD_EXTENSION "" "NAME" "DEPENDENCIES;EXTRA_LIBS" ${ARGN})
   if (NOT HUT_ADD_EXTENSION_NAME)
     message(FATAL_ERROR "No name specified for hut_add_extension")
   endif()
@@ -224,7 +226,7 @@ function(hut_add_extension)
     file(GLOB_RECURSE EXT_SHADERS ${EXT_SHADER_DIR}/*.vert ${EXT_SHADER_DIR}/*.frag)
 
     set(EXT_DEP_INCLUDES "")
-    set(EXT_DEP_LIBRARIES "")
+    set(EXT_DEP_LIBRARIES ${HUT_ADD_EXTENSION_EXTRA_LIBS})
     set(EXT_DEP_TARGETS "")
     foreach(EXT_DEPENDENCY ${HUT_ADD_EXTENSION_DEPENDENCIES})
       if (NOT TARGET ${EXT_DEPENDENCY})
@@ -270,7 +272,7 @@ hut_add_extension(NAME imgdec DEPENDENCIES SimplePNG)
 hut_add_extension(NAME imgui DEPENDENCIES DearImGui)
 hut_add_extension(NAME ktx2)
 hut_add_extension(NAME render2d)
-hut_add_extension(NAME renderdoc DEPENDENCIES Renderdoc)
+hut_add_extension(NAME renderdoc DEPENDENCIES Renderdoc EXTRA_LIBS ${CMAKE_DL_LIBS})
 hut_add_extension(NAME text DEPENDENCIES Freetype HarfBuzz)
 
 ###########################################################
@@ -285,6 +287,7 @@ add_custom_command(OUTPUT ${HUT_TST_PNG}
     DEPENDS gen_res ${HUT_TST_PNG_SOURCE}
     COMMENT "Generating ${HUT_TST_PNG}")
 add_library(hut_tst_data_png ${HUT_TST_PNG})
+target_link_libraries(hut_tst_data_png hut)
 target_include_directories(hut_tst_data_png PUBLIC ${HUT_TST_GEN_DIR}/png)
 
 file(GLOB_RECURSE HUT_TST_WOFF2_SOURCE tst/res/woff2/*.woff2)
@@ -294,11 +297,13 @@ add_custom_command(OUTPUT ${HUT_TST_WOFF2}
     DEPENDS gen_res ${HUT_TST_WOFF2_SOURCE}
     COMMENT "Generating ${HUT_TST_WOFF2}")
 add_library(hut_tst_data_woff2 ${HUT_TST_WOFF2})
+target_link_libraries(hut_tst_data_woff2 hut)
 target_include_directories(hut_tst_data_woff2 PUBLIC ${HUT_TST_GEN_DIR}/woff2)
 
 file(GLOB HUT_TST_SHADERS_SOURCE tst/res/spv/*.vert tst/res/spv/*.frag)
 hut_gen_spv_bundle(NAMESPACE tst_shaders OUTDIR ${HUT_TST_GEN_DIR}/shaders SHADER_SOURCES ${HUT_TST_SHADERS_SOURCE})
 add_library(hut_tst_data_shaders ${HUT_BUNDLE_tst_shaders_FILES})
+target_link_libraries(hut_tst_data_shaders hut)
 target_include_directories(hut_tst_data_shaders PUBLIC ${HUT_TST_GEN_DIR}/shaders)
 
 ###########################################################
@@ -332,7 +337,7 @@ endfunction()
 if (HUT_COMPILE_SAMPLES)
   hut_add_test(NAME hut_sample_3d PATH tst/samples/3d.cpp DEPENDENCIES hut_tst_data_shaders)
   hut_add_test(NAME hut_sample_imgui PATH tst/samples/imgui.cpp DEPENDENCIES hut_imgui)
-  hut_add_test(NAME hut_sample_pipelines PATH tst/samples/pipelines.cpp DEPENDENCIES hut_imgdec hut_text hut_tst_data_shaders hut_tst_data_png hut_tst_data_woff2)
+  hut_add_test(NAME hut_sample_pipelines PATH tst/samples/pipelines.cpp DEPENDENCIES hut_imgdec hut_tst_data_shaders hut_tst_data_png)
 endif()
 
 if (HUT_COMPILE_PLAYGROUNDS)
@@ -342,12 +347,11 @@ if (HUT_COMPILE_PLAYGROUNDS)
   hut_add_test(NAME hut_playground_window PATH tst/playgrounds/window.cpp DEPENDENCIES hut_imgui)
   hut_add_test(NAME hut_playground_clipboard PATH tst/playgrounds/clipboard.cpp DEPENDENCIES hut_imgui hut_tst_data_png)
   hut_add_test(NAME hut_playground_text PATH tst/playgrounds/text.cpp DEPENDENCIES hut_imgui hut_text hut_tst_data_woff2 hut_tst_data_shaders)
-  hut_add_test(NAME hut_playground_emoji PATH tst/playgrounds/emoji.cpp DEPENDENCIES hut_imgui hut_text hut_tst_data_woff2 hut_tst_data_shaders)
   hut_add_test(NAME hut_playground_render2d PATH tst/playgrounds/render2d.cpp DEPENDENCIES hut_render2d hut_imgui hut_imgdec hut_tst_data_png)
 endif()
 
 if (HUT_COMPILE_UNITTESTS AND GTEST_FOUND)
-  file(GLOB HUT_TST_UNIT_SOURCE tst/unit/*.cpp)
+  file(GLOB_RECURSE HUT_TST_UNIT_SOURCE tst/unit/*.cpp)
 
   set(HUT_UNIT_TESTS ${HUT_UNIT_TESTS} ${HUT_TST_UNIT_SOURCE})
   set(HUT_UNIT_TESTS_DEPS ${HUT_UNIT_TESTS_DEPS} ${GTEST_BOTH_LIBRARIES})
@@ -358,6 +362,6 @@ if (HUT_COMPILE_UNITTESTS AND GTEST_FOUND)
 
   add_executable(hut_unittests ${HUT_UNIT_TESTS} ${HUT_TST_SHADERS})
   add_test(NAME hut_unittests WORKING_DIRECTORY COMMAND unittests)
-  target_link_libraries(hut_unittests ${HUT_UNIT_TESTS_DEPS})
+  target_link_libraries(hut_unittests ${HUT_UNIT_TESTS_DEPS} hut_tst_data_shaders)
   target_include_directories(hut_unittests PRIVATE tst/common)
 endif()

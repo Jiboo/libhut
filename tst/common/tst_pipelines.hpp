@@ -29,44 +29,54 @@
 
 #include "tst_shaders_refl.hpp"
 
+namespace hut {
+
 struct proj_ubo {
-  hut::mat4 proj_ {1};
+  mat4 proj_{1};
+
+  explicit proj_ubo(u16vec2 _size) {
+    proj_ = ortho<float>(0.f, float(_size.x), 0.f, float(_size.y));
+  }
 };
+using shared_proj_ubo = buffer::shared_suballoc<proj_ubo>;
 
 struct vp_ubo {
-  hut::mat4 proj_;
-  hut::mat4 view_;
+  mat4 proj_{1};
+  mat4 view_{1};
 };
+using shared_vp_ubo = buffer::shared_suballoc<vp_ubo>;
 
-using atlas = hut::pipeline<uint16_t, hut::tst_shaders::tex_vert_spv_refl, hut::tst_shaders::atlas_frag_spv_refl,
-    const hut::shared_ref<proj_ubo> &, const hut::shared_atlas &, const hut::shared_sampler &>;
+using pipeline_atlas = pipeline<u16, tst_shaders::tex_vert_spv_refl, tst_shaders::atlas_frag_spv_refl,
+                                const shared_proj_ubo &, const shared_atlas &, const shared_sampler &>;
 
-using atlas_mask = hut::pipeline<uint16_t, hut::tst_shaders::tex_mask_vert_spv_refl, hut::tst_shaders::atlas_mask_frag_spv_refl,
-    const hut::shared_ref<proj_ubo> &, const hut::shared_atlas &, const hut::shared_sampler &>;
+using pipeleine_atlas_mask = pipeline<u16, tst_shaders::tex_mask_vert_spv_refl, tst_shaders::atlas_mask_frag_spv_refl,
+                                      const shared_proj_ubo &, const shared_atlas &, const shared_sampler &>;
 
-using box_rgba = hut::pipeline<uint16_t, hut::tst_shaders::box_rgba_vert_spv_refl, hut::tst_shaders::box_rgba_frag_spv_refl,
-    const hut::shared_ref<proj_ubo> &>;
+using pipeleine_box_rgba = pipeline<u16, tst_shaders::box_rgba_vert_spv_refl, tst_shaders::box_rgba_frag_spv_refl,
+                                    const shared_proj_ubo &>;
 
-using rgb = hut::pipeline<uint16_t, hut::tst_shaders::rgb_vert_spv_refl, hut::tst_shaders::rgb_frag_spv_refl,
-    const hut::shared_ref<proj_ubo> &>;
+using pipeleine_rgb = pipeline<u16, tst_shaders::rgb_vert_spv_refl, tst_shaders::rgb_frag_spv_refl,
+                               const shared_proj_ubo &>;
 
-using rgb3d = hut::pipeline<uint16_t, hut::tst_shaders::rgb3d_vert_spv_refl, hut::tst_shaders::rgb_frag_spv_refl,
-    const hut::shared_ref<vp_ubo>&>;
+using pipeleine_rgb3d = pipeline<u16, tst_shaders::rgb3d_vert_spv_refl, tst_shaders::rgb_frag_spv_refl,
+                                 const shared_vp_ubo &>;
 
-using rgba = hut::pipeline<uint16_t, hut::tst_shaders::rgba_vert_spv_refl, hut::tst_shaders::rgba_frag_spv_refl,
-    const hut::shared_ref<proj_ubo> &>;
+using pipeleine_rgba = pipeline<u16, tst_shaders::rgba_vert_spv_refl, tst_shaders::rgba_frag_spv_refl,
+                                const shared_proj_ubo &>;
 
-using skybox = hut::pipeline<uint16_t, hut::tst_shaders::skybox_vert_spv_refl, hut::tst_shaders::skybox_frag_spv_refl,
-    const hut::shared_ref<vp_ubo>&, const hut::shared_image&, const hut::shared_sampler&>;
+using pipeleine_skybox = pipeline<u16, tst_shaders::skybox_vert_spv_refl, tst_shaders::skybox_frag_spv_refl,
+                                  const shared_vp_ubo &, const shared_image &, const shared_sampler &>;
 
-using tex = hut::pipeline<uint16_t, hut::tst_shaders::tex_vert_spv_refl, hut::tst_shaders::tex_frag_spv_refl,
-    const hut::shared_ref<proj_ubo> &, const hut::shared_image &, const hut::shared_sampler &>;
+using pipeleine_tex = pipeline<u16, tst_shaders::tex_vert_spv_refl, tst_shaders::tex_frag_spv_refl,
+                               const shared_proj_ubo &, const shared_image &, const shared_sampler &>;
 
-using tex_rgb = hut::pipeline<uint16_t, hut::tst_shaders::tex_rgb_vert_spv_refl, hut::tst_shaders::tex_rgb_frag_spv_refl,
-    const hut::shared_ref<proj_ubo> &, const hut::shared_image &, const hut::shared_sampler &>;
+using pipeleine_tex_rgb = pipeline<u16, tst_shaders::tex_rgb_vert_spv_refl, tst_shaders::tex_rgb_frag_spv_refl,
+                                   const shared_proj_ubo &, const shared_image &, const shared_sampler &>;
 
-using tex_rgba = hut::pipeline<uint16_t, hut::tst_shaders::tex_rgba_vert_spv_refl, hut::tst_shaders::tex_rgba_frag_spv_refl,
-    const hut::shared_ref<proj_ubo> &, const hut::shared_image &, const hut::shared_sampler &>;
+using pipeleine_tex_rgba = pipeline<u16, tst_shaders::tex_rgba_vert_spv_refl, tst_shaders::tex_rgba_frag_spv_refl,
+                                    const shared_proj_ubo &, const shared_image &, const shared_sampler &>;
 
-using tex_mask = hut::pipeline<uint16_t, hut::tst_shaders::tex_mask_vert_spv_refl, hut::tst_shaders::tex_mask_frag_spv_refl,
-    const hut::shared_ref<proj_ubo> &, const hut::shared_image &, const hut::shared_sampler &>;
+using pipeleine_tex_mask = pipeline<u16, tst_shaders::tex_mask_vert_spv_refl, tst_shaders::tex_mask_frag_spv_refl,
+                                    const shared_proj_ubo &, const shared_image &, const shared_sampler &>;
+
+}  // namespace hut

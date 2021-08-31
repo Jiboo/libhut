@@ -29,10 +29,10 @@
 #include <iostream>
 #include <thread>
 
-#include "hut/color.hpp"
+#include "hut/utils/profiling.hpp"
+
 #include "hut/display.hpp"
 #include "hut/image.hpp"
-#include "hut/profiling.hpp"
 #include "hut/window.hpp"
 
 using namespace hut;
@@ -58,16 +58,16 @@ const char *hut::mouse_event_name(mouse_event_type _type) {
 }
 
 cursor_type hut::edge_cursor(edge _edge) {
-  switch (_edge.active_) {
-    case edge(TOP).active_: return CRESIZE_N;
-    case edge(RIGHT).active_: return CRESIZE_E;
-    case edge(LEFT).active_: return CRESIZE_W;
-    case edge(BOTTOM).active_: return CRESIZE_S;
+  switch (_edge.raw()) {
+    case edge{TOP}.raw(): return CRESIZE_N;
+    case edge{RIGHT}.raw(): return CRESIZE_E;
+    case edge{LEFT}.raw(): return CRESIZE_W;
+    case edge{BOTTOM}.raw(): return CRESIZE_S;
 
-    case edge({TOP, RIGHT}).active_: return CRESIZE_NE;
-    case edge({TOP, LEFT}).active_: return CRESIZE_NW;
-    case edge({BOTTOM, RIGHT}).active_: return CRESIZE_SE;
-    case edge({BOTTOM, LEFT}).active_: return CRESIZE_SW;
+    case edge{TOP, RIGHT}.raw(): return CRESIZE_NE;
+    case edge{TOP, LEFT}.raw(): return CRESIZE_NW;
+    case edge{BOTTOM, RIGHT}.raw(): return CRESIZE_SE;
+    case edge{BOTTOM, LEFT}.raw(): return CRESIZE_SW;
   }
   return CDEFAULT;
 }
@@ -80,49 +80,56 @@ void window::destroy_vulkan() {
   if (surface_ == VK_NULL_HANDLE)
     return;
 
-  HUT_PVK(vkDeviceWaitIdle, display_.device_);
+  HUT_PVK(vkDeviceWaitIdle, display_.device());
 
   if (sem_available_ != VK_NULL_HANDLE)
-    HUT_PVK(vkDestroySemaphore, display_.device_, sem_available_, nullptr);
+    HUT_PVK(vkDestroySemaphore, display_.device(), sem_available_, nullptr);
 
   if (sem_rendered_ != VK_NULL_HANDLE)
-    HUT_PVK(vkDestroySemaphore, display_.device_, sem_rendered_, nullptr);
+    HUT_PVK(vkDestroySemaphore, display_.device(), sem_rendered_, nullptr);
 
   for (auto &view : swapchain_imageviews_) {
     if (view != VK_NULL_HANDLE)
-      HUT_PVK(vkDestroyImageView, display_.device_, view, nullptr);
+      HUT_PVK(vkDestroyImageView, display_.device(), view, nullptr);
   }
 
   if (swapchain_ != VK_NULL_HANDLE) {
-    HUT_PVK(vkDestroySwapchainKHR, display_.device_, swapchain_, nullptr);
+    HUT_PVK(vkDestroySwapchainKHR, display_.device(), swapchain_, nullptr);
     swapchain_ = VK_NULL_HANDLE;
   }
 
   if (surface_ != VK_NULL_HANDLE) {
-    HUT_PVK(vkDestroySurfaceKHR, display_.instance_, surface_, nullptr);
+    HUT_PVK(vkDestroySurfaceKHR, display_.instance(), surface_, nullptr);
     surface_ = VK_NULL_HANDLE;
   }
 }
 
-VkPresentModeKHR select_best_mode(const std::span<VkPresentModeKHR> &_modes)
-{
-  VkPresentModeKHR preferred_modes[] = {
-      VK_PRESENT_MODE_MAILBOX_KHR,
+VkPresentModeKHR select_best_mode(const std::span<VkPresentModeKHR> &_modes, bool _vsync_only) {
+  constexpr VkPresentModeKHR preferred_tearing_modes[] = {
       VK_PRESENT_MODE_IMMEDIATE_KHR,
+      VK_PRESENT_MODE_MAILBOX_KHR,
+  };
+  constexpr VkPresentModeKHR preferred_vsync_modes[] = {
       VK_PRESENT_MODE_FIFO_RELAXED_KHR,
       VK_PRESENT_MODE_FIFO_KHR,
   };
 
-  for (const auto &preferred_mode : preferred_modes) {
-    for (const auto &mode : _modes) {
-      if (mode == preferred_mode) {
-        return preferred_mode;
+  if (!_vsync_only) {
+    for (const auto &preferred_mode : preferred_tearing_modes) {
+      for (const auto &mode : _modes) {
+        if (mode == preferred_mode)
+          return preferred_mode;
       }
     }
   }
+  for (const auto &preferred_mode : preferred_vsync_modes) {
+    for (const auto &mode : _modes) {
+      if (mode == preferred_mode)
+        return preferred_mode;
+    }
+  }
 
-  assert(false); // VK_PRESENT_MODE_FIFO_KHR should at least have been selected
-  return VK_PRESENT_MODE_MAX_ENUM_KHR;
+  return VK_PRESENT_MODE_FIFO_KHR;
 }
 
 void window::init_vulkan_surface() {
@@ -130,7 +137,7 @@ void window::init_vulkan_surface() {
   if (surface_ == VK_NULL_HANDLE)
     return;
 
-  const VkPhysicalDevice &pdevice = display_.pdevice_;
+  const VkPhysicalDevice &pdevice = display_.pdevice();
 
   // FIXME JBL: No need to request thus formats every resize, cache them or extract from there
   VkBool32 present;
@@ -141,7 +148,7 @@ void window::init_vulkan_surface() {
   VkSurfaceCapabilitiesKHR capabilities = {};
   HUT_PVK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR, pdevice, surface_, &capabilities);
 
-  uint32_t formats_count;
+  u32 formats_count;
   HUT_PVK(vkGetPhysicalDeviceSurfaceFormatsKHR, pdevice, surface_, &formats_count, nullptr);
   std::vector<VkSurfaceFormatKHR> surface_formats(formats_count);
   HUT_PVK(vkGetPhysicalDeviceSurfaceFormatsKHR, pdevice, surface_, &formats_count, surface_formats.data());
@@ -157,92 +164,92 @@ void window::init_vulkan_surface() {
     }
   }
 
-  uint32_t modes_count;
+  u32 modes_count;
   HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, pdevice, surface_, &modes_count, nullptr);
   std::vector<VkPresentModeKHR> modes(modes_count);
   HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, pdevice, surface_, &modes_count, modes.data());
-  present_mode_ = params_.flags_ & window_params::FVSYNC ? VK_PRESENT_MODE_FIFO_KHR : select_best_mode(modes);
+  present_mode_ = select_best_mode(modes, params_.flags_.query(window_params::FVSYNC));
 
-  if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+  if (capabilities.currentExtent.width != std::numeric_limits<u32>::max()) {
     swapchain_extents_ = capabilities.currentExtent;
   } else {
     swapchain_extents_ = {size_.x, size_.y};
   }
-  swapchain_extents_.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, swapchain_extents_.width));
-  swapchain_extents_.height = std::max(capabilities.minImageExtent.height,std::min(capabilities.maxImageExtent.height, swapchain_extents_.height));
+  swapchain_extents_.width  = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, swapchain_extents_.width));
+  swapchain_extents_.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, swapchain_extents_.height));
 
-  uint32_t images_count = capabilities.minImageCount + 1;
+  u32 images_count = capabilities.minImageCount + 1;
   if (capabilities.maxImageCount > 0 && images_count > capabilities.maxImageCount) {
     images_count = capabilities.maxImageCount;
   }
 
   VkSwapchainCreateInfoKHR swapchain_infos = {};
-  swapchain_infos.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-  swapchain_infos.surface = surface_;
-  swapchain_infos.minImageCount = images_count;
-  swapchain_infos.imageFormat = surface_format_.format;
-  swapchain_infos.imageColorSpace = surface_format_.colorSpace;
-  swapchain_infos.imageExtent = swapchain_extents_;
-  swapchain_infos.imageArrayLayers = 1;
-  swapchain_infos.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  swapchain_infos.sType                    = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+  swapchain_infos.surface                  = surface_;
+  swapchain_infos.minImageCount            = images_count;
+  swapchain_infos.imageFormat              = surface_format_.format;
+  swapchain_infos.imageColorSpace          = surface_format_.colorSpace;
+  swapchain_infos.imageExtent              = swapchain_extents_;
+  swapchain_infos.imageArrayLayers         = 1;
+  swapchain_infos.imageUsage               = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-  uint32_t iqueues[] = {display_.iqueueg_, display_.iqueuep_};
+  u32 iqueues[] = {display_.iqueueg_, display_.iqueuep_};
   if (iqueues[0] != iqueues[1]) {
-    swapchain_infos.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+    swapchain_infos.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
     swapchain_infos.queueFamilyIndexCount = 2;
-    swapchain_infos.pQueueFamilyIndices = iqueues;
+    swapchain_infos.pQueueFamilyIndices   = iqueues;
   } else {
-    swapchain_infos.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    swapchain_infos.imageSharingMode      = VK_SHARING_MODE_EXCLUSIVE;
     swapchain_infos.queueFamilyIndexCount = 0;
-    swapchain_infos.pQueueFamilyIndices = nullptr;
+    swapchain_infos.pQueueFamilyIndices   = nullptr;
   }
-  swapchain_infos.preTransform = capabilities.currentTransform;
+  swapchain_infos.preTransform   = capabilities.currentTransform;
   swapchain_infos.compositeAlpha = params_.flags_ & window_params::FTRANSPARENT ? VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR : VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-  swapchain_infos.presentMode = present_mode_;
-  swapchain_infos.clipped = VK_TRUE;
-  VkSwapchainKHR old_swapchain = swapchain_;
-  swapchain_infos.oldSwapchain = old_swapchain;
+  swapchain_infos.presentMode    = present_mode_;
+  swapchain_infos.clipped        = VK_TRUE;
+  VkSwapchainKHR old_swapchain   = swapchain_;
+  swapchain_infos.oldSwapchain   = old_swapchain;
 
   VkSwapchainKHR new_swapchain;
-  if (HUT_PVK(vkCreateSwapchainKHR, display_.device_, &swapchain_infos, nullptr, &new_swapchain) != VK_SUCCESS) {
+  if (HUT_PVK(vkCreateSwapchainKHR, display_.device(), &swapchain_infos, nullptr, &new_swapchain) != VK_SUCCESS) {
     throw std::runtime_error("failed to create swap chain!");
   }
 
-  HUT_PVK(vkDeviceWaitIdle, display_.device_);
+  HUT_PVK(vkDeviceWaitIdle, display_.device());
 
   swapchain_ = new_swapchain;
   if (old_swapchain != VK_NULL_HANDLE)
-    HUT_PVK(vkDestroySwapchainKHR, display_.device_, old_swapchain, nullptr);
+    HUT_PVK(vkDestroySwapchainKHR, display_.device(), old_swapchain, nullptr);
 
-  HUT_PVK(vkGetSwapchainImagesKHR, display_.device_, swapchain_, &images_count, nullptr);
+  HUT_PVK(vkGetSwapchainImagesKHR, display_.device(), swapchain_, &images_count, nullptr);
   swapchain_images_.resize(images_count);
-  HUT_PVK(vkGetSwapchainImagesKHR, display_.device_, swapchain_, &images_count, swapchain_images_.data());
+  HUT_PVK(vkGetSwapchainImagesKHR, display_.device(), swapchain_, &images_count, swapchain_images_.data());
 
   for (auto &imageview : swapchain_imageviews_) {
     if (imageview != VK_NULL_HANDLE)
-      HUT_PVK(vkDestroyImageView, display_.device_, imageview, nullptr);
+      HUT_PVK(vkDestroyImageView, display_.device(), imageview, nullptr);
   }
   swapchain_imageviews_.resize(images_count, VK_NULL_HANDLE);
-  for (uint32_t i = 0; i < images_count; i++) {
-    VkImageViewCreateInfo imagev_infos = {};
-    imagev_infos.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    imagev_infos.image = swapchain_images_[i];
-    imagev_infos.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    imagev_infos.format = surface_format_.format;
-    imagev_infos.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    imagev_infos.subresourceRange.baseMipLevel = 0;
-    imagev_infos.subresourceRange.levelCount = 1;
+  for (u32 i = 0; i < images_count; i++) {
+    VkImageViewCreateInfo imagev_infos           = {};
+    imagev_infos.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    imagev_infos.image                           = swapchain_images_[i];
+    imagev_infos.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+    imagev_infos.format                          = surface_format_.format;
+    imagev_infos.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+    imagev_infos.subresourceRange.baseMipLevel   = 0;
+    imagev_infos.subresourceRange.levelCount     = 1;
     imagev_infos.subresourceRange.baseArrayLayer = 0;
-    imagev_infos.subresourceRange.layerCount = 1;
+    imagev_infos.subresourceRange.layerCount     = 1;
     if (HUT_PVK(vkCreateImageView, display_.device_, &imagev_infos, nullptr, &swapchain_imageviews_[i]) != VK_SUCCESS)
       throw std::runtime_error("failed to create image views!");
   }
 
   render_target_params pass_params;
-  pass_params.clear_color_ = render_target_params_.clear_color_;
+  pass_params.clear_color_         = render_target_params_.clear_color_;
   pass_params.clear_depth_stencil_ = render_target_params_.clear_depth_stencil_;
-  pass_params.box_ = {0, 0, swapchain_extents_.width, swapchain_extents_.height};
-  pass_params.format_ = surface_format_.format;
+  pass_params.box_                 = {0, 0, swapchain_extents_.width, swapchain_extents_.height};
+  pass_params.format_              = surface_format_.format;
   if (params_.flags_ & window_params::FMULTISAMPLING)
     pass_params.flags_ |= render_target_params::FMULTISAMPLING;
   if (params_.flags_ & window_params::FDEPTH)
@@ -254,10 +261,10 @@ void window::init_vulkan_surface() {
 
   primary_cbs_.resize(images_count);
   VkCommandBufferAllocateInfo allocInfo = {};
-  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  allocInfo.commandBufferCount = images_count;
-  allocInfo.commandPool = display_.commandg_pool_;
+  allocInfo.sType                       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocInfo.level                       = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocInfo.commandBufferCount          = images_count;
+  allocInfo.commandPool                 = display_.commandg_pool_;
 
   if (HUT_PVK(vkAllocateCommandBuffers, display_.device_, &allocInfo, primary_cbs_.data()) != VK_SUCCESS)
     throw std::runtime_error("failed to allocate command buffers!");
@@ -268,9 +275,8 @@ void window::init_vulkan_surface() {
     HUT_PVK(vkDestroySemaphore, display_.device_, sem_rendered_, nullptr);
 
   VkSemaphoreCreateInfo semaphoreInfo = {};
-  semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  if (HUT_PVK(vkCreateSemaphore, display_.device_, &semaphoreInfo, nullptr, &sem_available_) != VK_SUCCESS ||
-      HUT_PVK(vkCreateSemaphore, display_.device_, &semaphoreInfo, nullptr, &sem_rendered_) != VK_SUCCESS) {
+  semaphoreInfo.sType                 = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+  if (HUT_PVK(vkCreateSemaphore, display_.device_, &semaphoreInfo, nullptr, &sem_available_) != VK_SUCCESS || HUT_PVK(vkCreateSemaphore, display_.device_, &semaphoreInfo, nullptr, &sem_rendered_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create semaphores!");
   }
 
@@ -283,9 +289,9 @@ void window::redraw(display::time_point _tp) {
   if (swapchain_ == VK_NULL_HANDLE)
     return;
 
-  uint32_t imageIndex;
-  VkResult result = HUT_PVK(vkAcquireNextImageKHR, display_.device_, swapchain_, std::numeric_limits<uint64_t>::max(),
-                                          sem_available_, VK_NULL_HANDLE, &imageIndex);
+  u32      imageIndex;
+  VkResult result = HUT_PVK(vkAcquireNextImageKHR, display_.device_, swapchain_, std::numeric_limits<u64>::max(),
+                            sem_available_, VK_NULL_HANDLE, &imageIndex);
 
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
     init_vulkan_surface();
@@ -308,35 +314,35 @@ void window::redraw(display::time_point _tp) {
   cbs_.emplace_back(primary_cbs_[imageIndex]);
 
   VkSubmitInfo submitInfo = {};
-  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submitInfo.sType        = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-  VkSemaphore waitSemaphores[] = {sem_available_};
-  VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-  submitInfo.waitSemaphoreCount = 1;
-  submitInfo.pWaitSemaphores = waitSemaphores;
-  submitInfo.pWaitDstStageMask = waitStages;
+  VkSemaphore          waitSemaphores[] = {sem_available_};
+  VkPipelineStageFlags waitStages[]     = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+  submitInfo.waitSemaphoreCount         = 1;
+  submitInfo.pWaitSemaphores            = waitSemaphores;
+  submitInfo.pWaitDstStageMask          = waitStages;
 
-  submitInfo.commandBufferCount = (uint32_t)cbs_.size();
-  submitInfo.pCommandBuffers = cbs_.data();
+  submitInfo.commandBufferCount = (u32)cbs_.size();
+  submitInfo.pCommandBuffers    = cbs_.data();
 
-  VkSemaphore signalSemaphores[] = {sem_rendered_};
+  VkSemaphore signalSemaphores[]  = {sem_rendered_};
   submitInfo.signalSemaphoreCount = 1;
-  submitInfo.pSignalSemaphores = signalSemaphores;
+  submitInfo.pSignalSemaphores    = signalSemaphores;
 
   if (HUT_PVK(vkQueueSubmit, display_.queueg_, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
     throw std::runtime_error("failed to submit draw command buffer!");
 
   VkPresentInfoKHR presentInfo = {};
-  presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+  presentInfo.sType            = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
   presentInfo.waitSemaphoreCount = 1;
-  presentInfo.pWaitSemaphores = signalSemaphores;
+  presentInfo.pWaitSemaphores    = signalSemaphores;
 
   VkSwapchainKHR swapChains[] = {swapchain_};
-  presentInfo.swapchainCount = 1;
-  presentInfo.pSwapchains = swapChains;
-  presentInfo.pImageIndices = &imageIndex;
-  presentInfo.pResults = nullptr;  // Optional
+  presentInfo.swapchainCount  = 1;
+  presentInfo.pSwapchains     = swapChains;
+  presentInfo.pImageIndices   = &imageIndex;
+  presentInfo.pResults        = nullptr;  // Optional
 
   result = HUT_PVK(vkQueuePresentKHR, display_.queuep_, &presentInfo);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
@@ -349,20 +355,13 @@ void window::redraw(display::time_point _tp) {
 
   constexpr auto min_frame_time = 1000ms / 144.f;
   constexpr auto max_frame_time = 1000ms / 10.f;
-  auto done = display::clock::now();
-  auto diff_frame = done - last_frame_;
+  auto           done           = display::clock::now();
+  auto           diff_frame     = done - last_frame_;
   if (diff_frame > max_frame_time) {
 #ifdef HUT_ENABLE_VALIDATION_DEBUG
     std::cout << "Frame overbudget " << diff_frame << " > " << max_frame_time << std::endl;
 #endif
     profiling::threads_data::request_dump();
-  }
-  else if (!params_.flags_.query(window_params::FVSYNC) && diff_frame < min_frame_time) {
-#ifdef HUT_ENABLE_VALIDATION_DEBUG
-    std::cout << "Frame underbudget " << diff_frame << " < " << min_frame_time << std::endl;
-#endif
-    std::this_thread::sleep_for(min_frame_time - diff_frame);
-    done = display::clock::now();
   }
   last_frame_ = done;
 }
