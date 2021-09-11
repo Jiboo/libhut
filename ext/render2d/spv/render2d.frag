@@ -2,7 +2,8 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_EXT_nonuniform_qualifier : require
 
-layout(binding = 1) uniform sampler2D uni_samplers[4];
+const int samplers_pages = 16;
+layout(binding = 1) uniform sampler2D uni_samplers[samplers_pages];
 
 layout(location = 0) in flat vec4 in_box; // pos_box
 layout(location = 1) in flat uvec4 in_params; // (radius, smoothness, atlas_page, gradient)
@@ -29,7 +30,7 @@ float box_effects(float _radius, float _softness) {
 void main() {
   uint atlas_page = in_params.z;
   out_col = in_col;
-  if (atlas_page < 4)
+  if (atlas_page < samplers_pages)
       out_col *= texture(uni_samplers[nonuniformEXT(atlas_page)], in_uv);
   const float radius = uintBitsToFloat(in_params.x);
   const float softness = uintBitsToFloat(in_params.y);

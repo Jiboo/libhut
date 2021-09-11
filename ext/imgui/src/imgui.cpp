@@ -59,21 +59,18 @@ struct tex_binding {
 
 struct hut_imgui_impl_ctx {
   display *display_ = nullptr;
-  window * window_  = nullptr;
+  window  *window_  = nullptr;
 
   shared_buffer                   buffer_;
-  std::unique_ptr<imgui_pipeline> pipeline_;
   shared_ubo                      ubo_;
+  std::unique_ptr<imgui_pipeline> pipeline_;
+  std::vector<hut_imgui_mesh>     meshes_;
+  std::vector<tex_binding>        bindings_;
+  std::vector<size_t>             reusable_bindings_ids_;
 
-  display::time_point         last_frame_;
-  std::vector<hut_imgui_mesh> meshes_;
-
-  std::vector<tex_binding> bindings_;
-  std::vector<size_t>      reusable_bindings_ids_;
-
-  std::string clipboard_buffer_;
-
-  cursor_type last_mouse_cursor_ = CDEFAULT;
+  display::time_point last_frame_;
+  std::string         clipboard_buffer_;
+  cursor_type         last_mouse_cursor_ = CDEFAULT;
 
   void reset() {
     meshes_.clear();
@@ -243,7 +240,7 @@ void ImGui_ImplHut_RenderDrawData(VkCommandBuffer _cmd_buffer, ImDrawData *_draw
 
 bool ImGui_ImplHut_CreateDeviceObjects() {
   // Build texture atlas
-  ImGuiIO &      io = ImGui::GetIO();
+  ImGuiIO       &io = ImGui::GetIO();
   unsigned char *data;
   int            width, height;
   io.Fonts->GetTexDataAsRGBA32(&data, &width, &height);
@@ -335,11 +332,11 @@ bool ImGui_ImplHut_HandleOnMouse(u8 _button, mouse_event_type _type, vec2 _pos) 
 
   switch (_type) {
     case MDOWN:
-      assert(_button > 0 && _button < 6);
+      assert(_button > 0 && _button < ImGuiMouseButton_COUNT);
       io.MouseDown[_button - 1] = true;
       break;
     case MUP:
-      assert(_button > 0 && _button < 6);
+      assert(_button > 0 && _button < ImGuiMouseButton_COUNT);
       io.MouseDown[_button - 1] = false;
       break;
     case MWHEEL_DOWN:

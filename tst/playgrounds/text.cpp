@@ -25,7 +25,7 @@
  * SOFTWARE.
  */
 
-//#define HUT_TEXT_SAMPLE_ENABLE_IMGUI
+#define HUT_TEXT_SAMPLE_ENABLE_IMGUI
 
 #include <random>
 
@@ -42,7 +42,7 @@
 #  include "hut/imgui/imgui.hpp"
 #endif
 
-#include "hut/text/render.hpp"
+#include "hut/text/renderer.hpp"
 
 #include "tst_events.hpp"
 #include "tst_woff2.hpp"
@@ -50,13 +50,13 @@
 using namespace hut;
 
 int main(int, char **) {
-  display dsp("hut demo");
+  display dsp("hut text playground");
 
   auto buf = std::make_shared<buffer>(dsp, 1024 * 1024);
 
   window win(dsp);
   win.clear_color({0, 0, 0, 1});
-  win.title(u8"hut imgui demo");
+  win.title(u8"hut text playground");
 
   auto ubo = buf->allocate<common_ubo>(1, dsp.ubo_align());
   ubo->set(common_ubo{win.size()});
@@ -322,6 +322,7 @@ int main(int, char **) {
 
       using msdur = std::chrono::duration<float, std::milli>;
       ImGui::Text("Words %zu, codepoints %zu, size %zu", words.size(), utf8codepointcount(text_input), strlen((char *)text_input));
+      ImGui::Text("Batch %d, Offset: %d, size: %d", paragraph->batch(), paragraph->offset_bytes(), paragraph->size_bytes());
       ImGui::Text("Split %fms", msdur(after_split - before_split).count());
       ImGui::Text("Release %fms", msdur(after_release - before_release).count());
       msdur alloc_dur = after_alloc - before_alloc;

@@ -114,9 +114,9 @@ struct my_drop_target_interface : drop_target_interface {
 };
 
 int main(int, char **) {
-  display dsp("hut demo");
+  display dsp("hut dragndrop playground");
   window  win(dsp);
-  win.title(u8"hut imgui demo");
+  win.title(u8"hut dragndrop playground");
   win.clear_color({0, 0, 0, 1});
 
   auto last_item_pos = [](vec4 *_dst) {

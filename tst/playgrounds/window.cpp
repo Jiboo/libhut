@@ -60,12 +60,12 @@ const char *window_params_flag_name(window_params::flag _flag) {
 }
 
 int main(int, char **) {
-  display d("hut demo");
+  display d("hut window playground");
 
   window_params wp;
   wp.flags_.set(window_params::FTRANSPARENT);
   window w(d, wp);
-  w.title(u8"hut imgui demo");
+  w.title(u8"hut window playground");
   w.clear_color({0, 0, 0, 1});
 
   IMGUI_CHECKVERSION();

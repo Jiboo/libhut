@@ -68,25 +68,32 @@ inline void set(instance &_target, u16vec4 _bbox,
                 const shared_subimage &_subimg = shared_subimage{}) {
   _target.col_from_ = _from;
   _target.col_to_   = _to;
-  assert(_bbox.x < 4096);
-  assert(_bbox.y < 4096);
-  assert(_bbox.z < 4096);
-  assert(_bbox.w < 4096);
+
+  assert(_bbox.x <= 0xFFF);
+  assert(_bbox.y <= 0xFFF);
+  assert(_bbox.z <= 0xFFF);
+  assert(_bbox.w <= 0xFFF);
   _target.pos_box_ = _bbox;
+
+  assert(_corner_radius <= 0xF);
   _target.pos_box_.x |= (_corner_radius & 0xF) << 12;
+  assert(_corner_softness <= 0xF);
   _target.pos_box_.y |= (_corner_softness & 0xF) << 12;
+
   if (_subimg) {
-    _target.uv_box_ = _subimg->texcoords() * std::numeric_limits<u16>::max();
-    assert(_subimg->page() < 4);
+    _target.uv_box_ =  hut::packSnorm<u16>(_subimg->texcoords());
+    assert(_subimg->page() <= 0xF);
     _target.pos_box_.z |= (_subimg->page() & 0xF) << 12;
   } else {
     _target.uv_box_ = vec4(0);
   }
+
+  assert(_gradient <= 0xF);
   _target.pos_box_.w |= (_gradient & 0xF) << 12;
 }
 
 struct renderer_params : pipeline_params {
-  uint initial_count_ = 1024;
+  uint initial_batch_size_bytes_ = 256 * sizeof(instance);
 };
 
 class renderer {
@@ -111,13 +118,15 @@ class renderer {
       if (parent_) renderer_suballoc::release();
     }
 
-    updator  update_raw(uint _offset_bytes, uint _size_bytes) override;
-    void     finalize(const updator &_updator) override;
-    void     zero_raw(uint _offset_bytes, uint _size_bytes) override;
-    VkBuffer underlying_buffer() const override;
-    u8 *     existing_mapping() override;
-    bool     valid() const override { return parent_ != nullptr; }
-    void     release() override;
+    updator  update_raw(uint _offset_bytes, uint _size_bytes) final;
+    void     finalize(const updator &_updator) final;
+    void     zero_raw(uint _offset_bytes, uint _size_bytes) final;
+    VkBuffer underlying_buffer() const final;
+    u8 *     existing_mapping() final;
+    bool     valid() const final { return parent_ != nullptr; }
+    void     release() final;
+
+    uint batch() const { return batch_; }
   };
   template<typename T> using suballoc        = suballoc<T, renderer_suballoc>;
   template<typename T> using shared_suballoc = std::shared_ptr<suballoc<T>>;

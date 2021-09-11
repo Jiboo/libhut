@@ -33,7 +33,7 @@
 
 #include "hut/display.hpp"
 
-#include "hut/text/render.hpp"
+#include "hut/text/renderer.hpp"
 
 using namespace hut;
 using namespace hut::text;
@@ -111,7 +111,7 @@ using flimits = std::numeric_limits<float>;
 
 renderer::word::word(renderer *_parent, batch &_batch, uint _alloc, uint _codepoints, std::u8string_view _text)
     : alloc_(_alloc)
-    , codepoints_(_codepoints)
+    , glyphs_(0)
     , bbox_(flimits::max(), flimits::max(), flimits::min(), flimits::min()) {
   const auto vertices_offset = sizeof(vertex) * 4 * _alloc;
   const auto indices_offset  = sizeof(index_t) * 6 * _alloc;
@@ -141,6 +141,7 @@ renderer::word::word(renderer *_parent, batch &_batch, uint _alloc, uint _codepo
     bbox_.y = std::min(bbox_.y, _coords.y);
     bbox_.z = std::max(bbox_.z, _coords.z);
     bbox_.w = std::max(bbox_.w, _coords.w);
+    glyphs_++;
   };
   _parent->shaper_.shape(_parent->atlas_, _text, callback);
 }
@@ -210,7 +211,7 @@ renderer::shared_suballoc<renderer::instance> renderer::allocate(std::span<const
     cptr->firstInstance = *draw_alloc + i;
     cptr->instanceCount = 1;
     cptr->firstIndex    = it->second.alloc_ * 6;
-    cptr->indexCount    = 6 * codepoints;
+    cptr->indexCount    = 6 * it->second.glyphs_;
     cptr->vertexOffset  = (int)it->second.alloc_ * 4;
   }
 
@@ -229,7 +230,7 @@ size_t renderer::find_best_fit(const words_info &_winfo) {
     for (uint iw = 0; iw < _winfo.size(); iw++) {
       auto it = b.cache_.find(_winfo.hashes_[iw]);
       if (it != b.cache_.end())
-        score += it->second.codepoints_;
+        score += it->second.glyphs_;
     }
     const uint needed_codepoints = _winfo.total_codepoints_ - score;
     if (!b.mstore_.suballocator_.try_fit(needed_codepoints))

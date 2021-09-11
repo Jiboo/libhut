@@ -180,11 +180,11 @@ void ImPacker(const char *_name = "Packer", u16vec2 _bounds = {8 * 1024, 8 * 102
 }
 
 int main(int, char **) {
-  display dsp("hut demo");
+  display dsp("hut binpack playground");
 
   window win(dsp);
   win.clear_color({0, 0, 0, 1});
-  win.title(u8"hut imgui demo");
+  win.title(u8"hut binpack playground");
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();

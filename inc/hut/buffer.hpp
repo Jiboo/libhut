@@ -68,13 +68,13 @@ class buffer {
       if (parent_) buffer_suballoc::release();
     }
 
-    updator  update_raw(uint _offset_bytes, uint _size_bytes) override;
-    void     finalize(const updator &_updator) override;
-    void     zero_raw(uint _offset_bytes, uint _size_bytes) override;
-    VkBuffer underlying_buffer() const override;
-    u8 *     existing_mapping() override;
-    bool     valid() const override { return parent_ != nullptr; }
-    void     release() override;
+    updator  update_raw(uint _offset_bytes, uint _size_bytes) final;
+    void     finalize(const updator &_updator) final;
+    void     zero_raw(uint _offset_bytes, uint _size_bytes) final;
+    VkBuffer underlying_buffer() const final;
+    u8 *     existing_mapping() final;
+    bool     valid() const final { return parent_ != nullptr; }
+    void     release() final;
   };
   template<typename T> using suballoc        = suballoc<T, buffer_suballoc>;
   template<typename T> using shared_suballoc = std::shared_ptr<suballoc<T>>;

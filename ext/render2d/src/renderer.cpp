@@ -25,7 +25,7 @@
  * SOFTWARE.
  */
 
-#include "hut/render2d/render2d.hpp"
+#include "hut/render2d/renderer.hpp"
 
 #include <utility>
 
@@ -38,8 +38,8 @@ renderer::renderer(render_target &_target, shared_buffer _buffer,
     : pipeline_(_target, _params)
     , buffer_(std::move(_buffer))
     , atlas_(std::move(_atlas)) {
-  if (_params.initial_count_ > 0)
-    grow(_params.initial_count_);
+  if (_params.initial_batch_size_bytes_ > 0)
+    grow(_params.initial_batch_size_bytes_);
   pipeline_.write(0, _ubo, atlas_, _sampler);
 }
 

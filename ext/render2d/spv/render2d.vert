@@ -32,6 +32,7 @@ const uint GRADIENT_T2B = 0;
 const uint GRADIENT_L2R = 1;
 const uint GRADIENT_TL2BR = 2;
 const uint GRADIENT_TR2BL = 3;
+const uint INVALID_ATLAS_PAGE = 0xFFFFFFFF;
 
 void main() {
   const vec4 uv_box = in_i_uv_box_r16g16b16a16_unorm;
@@ -46,7 +47,7 @@ void main() {
 
   out_params.x = floatBitsToUint(radius);
   out_params.y = floatBitsToUint(softness);
-  out_params.z = uv_box == vec4(0, 0, 0, 0) ? 4 : (in_i_pos_box_r16g16b16a16_uint.z >> 12);
+  out_params.z = uv_box == vec4(0, 0, 0, 0) ? INVALID_ATLAS_PAGE : (in_i_pos_box_r16g16b16a16_uint.z >> 12);
   out_params.w = in_i_pos_box_r16g16b16a16_uint.w >> 12;
 
   const uvec4 pos_box_raw = in_i_pos_box_r16g16b16a16_uint & 0x0FFF;

@@ -35,7 +35,7 @@
 
 #include "hut/imgdec/imgdec.hpp"
 #include "hut/imgui/imgui.hpp"
-#include "hut/render2d/render2d.hpp"
+#include "hut/render2d/renderer.hpp"
 
 #include "tst_events.hpp"
 #include "tst_png.hpp"
@@ -43,11 +43,11 @@
 using namespace hut;
 
 int main(int, char **) {
-  display dsp("hut demo");
+  display dsp("hut render2d playground");
   auto    buf = std::make_shared<buffer>(dsp, 256 * 1024 * 1024);
 
   window win(dsp);
-  win.title(u8"hut imgui demo");
+  win.title(u8"hut render2d playground");
   win.clear_color({1, 1, 1, 1});
 
   auto texatlas = std::make_shared<atlas>(dsp, image_params{.size_ = dsp.max_tex_size(), .format_ = VK_FORMAT_R8G8B8A8_UNORM});
@@ -132,7 +132,7 @@ int main(int, char **) {
       ImGui::SameLine();
       ImGui::Checkbox("Free before", &grid_release_before_realloc);
       ImGui::SameLine();
-      ImGui::Text("Offset: %d, size: %d", quads->offset_bytes(), quads->size_bytes());
+      ImGui::Text("Batch %d, Offset: %d, size: %d", quads->batch(), quads->offset_bytes(), quads->size_bytes());
 
       ImGui::SliderScalarN("Grid size", ImGuiDataType_U16, &grid_size, 2, &grid_min, &grid_max);
       ImGui::Checkbox("Grid use texture", &grid_use_tex);
