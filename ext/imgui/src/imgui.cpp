@@ -25,6 +25,8 @@
  * SOFTWARE.
  */
 
+#include "hut/imgui/imgui.hpp"
+
 #include <atomic>
 #include <iostream>
 
@@ -35,8 +37,6 @@
 #include "hut/image.hpp"
 #include "hut/pipeline.hpp"
 #include "hut/window.hpp"
-
-#include "hut/imgui/imgui.hpp"
 
 #include "imgui_refl.hpp"
 

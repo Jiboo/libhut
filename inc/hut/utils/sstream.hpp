@@ -38,14 +38,15 @@ class sstream {
   std::ostringstream stream_;
 
  public:
-  sstream() noexcept       = default;
-  sstream(const sstream &) = delete;
-  sstream(sstream &&_base) noexcept
-      : stream_(std::move(_base.stream_)) {}
-
+  sstream() noexcept = default;
   explicit sstream(const char *_base) { stream_ << _base; }
   explicit sstream(const std::string &_base) { stream_ << _base; }
   explicit sstream(const std::string_view _base) { stream_ << _base; }
+
+  sstream(const sstream &) = delete;
+  sstream &operator=(const sstream &) = delete;
+  sstream(sstream &&_base) noexcept   = default;
+  sstream &operator=(sstream &&) noexcept = default;
 
   template<typename T>
   sstream &operator<<(const T &_rhs) {

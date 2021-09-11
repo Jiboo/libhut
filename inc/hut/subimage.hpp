@@ -33,24 +33,37 @@ namespace hut {
 
 class subimage {
  private:
-  atlas * atlas_ = nullptr;
+  atlas  *atlas_ = nullptr;
   uint    page_{};
   u16vec4 bounds_{};
 
  public:
   subimage() = default;
+
+  subimage(const subimage &) = delete;
+
+  subimage(subimage &&_other) noexcept
+      : atlas_(std::exchange(_other.atlas_, nullptr))
+      , page_(_other.page_)
+      , bounds_(_other.bounds_) {}
+  subimage &operator=(subimage &&_other) noexcept {
+    if (&_other != this) {
+      atlas_  = std::exchange(_other.atlas_, nullptr);
+      page_   = _other.page_;
+      bounds_ = _other.bounds_;
+    }
+    return *this;
+  }
+
   subimage(atlas *_atlas, uint _page, uvec4 _bounds)
       : atlas_(_atlas)
       , page_(_page)
       , bounds_(_bounds) {}
-  subimage(const subimage &) = delete;
-  subimage(subimage &&_other) noexcept { *this = std::move(_other); }
   ~subimage() {
     if (atlas_) release();
   }
 
-  subimage &operator=(subimage &&_other) noexcept;
-  explicit  operator bool() const { return valid(); }
+  explicit operator bool() const { return valid(); }
 
   void               release();
   [[nodiscard]] bool from(const atlas *_pool) const { return atlas_ == _pool; }

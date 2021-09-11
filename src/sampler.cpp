@@ -25,6 +25,8 @@
  * SOFTWARE.
  */
 
+#include "hut/sampler.hpp"
+
 #include <cstring>
 
 #include <iostream>
@@ -33,7 +35,6 @@
 #include "hut/utils/profiling.hpp"
 
 #include "hut/display.hpp"
-#include "hut/sampler.hpp"
 
 using namespace hut;
 
@@ -64,6 +65,8 @@ sampler::sampler(display &_display, const sampler_params &_params)
 }
 
 sampler::~sampler() {
-  HUT_PVK(vkDeviceWaitIdle, device_);
-  HUT_PVK(vkDestroySampler, device_, sampler_, nullptr);
+  if (sampler_) {
+    HUT_PVK(vkDeviceWaitIdle, device_);
+    HUT_PVK(vkDestroySampler, device_, sampler_, nullptr);
+  }
 }

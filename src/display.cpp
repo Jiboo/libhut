@@ -25,6 +25,8 @@
  * SOFTWARE.
  */
 
+#include "hut/display.hpp"
+
 #include <cstring>
 
 #include <algorithm>
@@ -35,7 +37,6 @@
 #include "hut/utils/profiling.hpp"
 
 #include "hut/buffer.hpp"
-#include "hut/display.hpp"
 #include "hut/window.hpp"
 
 using namespace hut;

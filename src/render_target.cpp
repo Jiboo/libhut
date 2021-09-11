@@ -25,6 +25,8 @@
  * SOFTWARE.
  */
 
+#include "hut/render_target.hpp"
+
 #include <algorithm>
 #include <iostream>
 
@@ -33,12 +35,11 @@
 
 #include "hut/display.hpp"
 #include "hut/image.hpp"
-#include "hut/render_target.hpp"
 
 using namespace hut;
 
 render_target::render_target(display &_display)
-    : display_(_display) {
+    : display_(&_display) {
   HUT_PROFILE_SCOPE(PWINDOW, "render_target::render_target");
 }
 
@@ -47,11 +48,11 @@ render_target::~render_target() {
 
   for (auto &fbo : fbos_) {
     if (fbo != VK_NULL_HANDLE)
-      HUT_PVK(vkDestroyFramebuffer, display_.device(), fbo, nullptr);
+      HUT_PVK(vkDestroyFramebuffer, display_->device(), fbo, nullptr);
   }
 
   if (renderpass_ != VK_NULL_HANDLE)
-    HUT_PVK(vkDestroyRenderPass, display_.device(), renderpass_, nullptr);
+    HUT_PVK(vkDestroyRenderPass, display_->device(), renderpass_, nullptr);
 }
 
 void render_target::reinit_pass(const render_target_params &_init_params, std::span<VkImageView> _images) {
@@ -63,7 +64,8 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
   assert(size.x > 0 && size.y > 0);
 
   if (render_target_params_.flags_ & render_target_params::FMULTISAMPLING) {
-    VkSampleCountFlags counts = display_.limits().framebufferColorSampleCounts & display_.limits().framebufferDepthSampleCounts;
+    const auto        &limits = display_->limits();
+    VkSampleCountFlags counts = limits.framebufferColorSampleCounts & limits.framebufferDepthSampleCounts;
     if (counts & VK_SAMPLE_COUNT_8_BIT) sample_count_ = VK_SAMPLE_COUNT_8_BIT;
     else if (counts & VK_SAMPLE_COUNT_4_BIT)
       sample_count_ = VK_SAMPLE_COUNT_4_BIT;
@@ -78,12 +80,12 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
       params.usage_      = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
       params.aspect_     = VK_IMAGE_ASPECT_COLOR_BIT;
       params.samples_    = sample_count_;
-      msaa_rendertarget_ = std::make_shared<image>(display_, params);
+      msaa_rendertarget_ = std::make_shared<image>(*display_, params);
     }
   }
 
   VkFormat                depth_format = VK_FORMAT_UNDEFINED;
-  const VkPhysicalDevice &pdevice      = display_.pdevice();
+  const VkPhysicalDevice &pdevice      = display_->pdevice();
   if (render_target_params_.flags_ & render_target_params::FDEPTH) {
     VkFormat depth_candidates[] = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
     for (VkFormat format : depth_candidates) {
@@ -105,7 +107,7 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
     params.usage_   = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     params.aspect_  = VK_IMAGE_ASPECT_DEPTH_BIT;
     params.samples_ = sample_count_;
-    depth_          = std::make_shared<image>(display_, params);
+    depth_          = std::make_shared<image>(*display_, params);
   }
 
   VkSubpassDependency dependency = {};
@@ -116,111 +118,112 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
   dependency.dstStageMask        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   dependency.dstAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-  VkAttachmentDescription colorAttachment = {};
-  colorAttachment.format                  = _init_params.format_;
-  colorAttachment.samples                 = sample_count_;
-  colorAttachment.loadOp                  = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  colorAttachment.storeOp                 = VK_ATTACHMENT_STORE_OP_STORE;
-  colorAttachment.stencilLoadOp           = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  colorAttachment.stencilStoreOp          = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  colorAttachment.initialLayout           = _init_params.initial_layout_;
-  colorAttachment.finalLayout             = msaa_rendertarget_ ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : _init_params.final_layout_;
+  VkAttachmentDescription color_attachment = {};
+  color_attachment.format                  = _init_params.format_;
+  color_attachment.samples                 = sample_count_;
+  color_attachment.loadOp                  = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  color_attachment.storeOp                 = VK_ATTACHMENT_STORE_OP_STORE;
+  color_attachment.stencilLoadOp           = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+  color_attachment.stencilStoreOp          = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  color_attachment.initialLayout           = _init_params.initial_layout_;
+  color_attachment.finalLayout             = msaa_rendertarget_ ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : _init_params.final_layout_;
 
-  std::vector<VkAttachmentDescription> passAttachments{colorAttachment};
+  std::vector<VkAttachmentDescription> pass_attachments{color_attachment};
 
   if (depth_) {
-    VkAttachmentDescription depthAttachment = {};
-    depthAttachment.format                  = depth_format;
-    depthAttachment.samples                 = sample_count_;
-    depthAttachment.loadOp                  = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp                 = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.stencilLoadOp           = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp          = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout           = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachment.finalLayout             = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    VkAttachmentDescription depth_attachment = {};
+    depth_attachment.format                  = depth_format;
+    depth_attachment.samples                 = sample_count_;
+    depth_attachment.loadOp                  = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depth_attachment.storeOp                 = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth_attachment.stencilLoadOp           = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depth_attachment.stencilStoreOp          = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth_attachment.initialLayout           = VK_IMAGE_LAYOUT_UNDEFINED;
+    depth_attachment.finalLayout             = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-    passAttachments.emplace_back(depthAttachment);
+    pass_attachments.emplace_back(depth_attachment);
   }
 
   if (msaa_rendertarget_) {
-    VkAttachmentDescription colorAttachmentResolve{};
-    colorAttachmentResolve.format         = _init_params.format_;
-    colorAttachmentResolve.samples        = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachmentResolve.loadOp         = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachmentResolve.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachmentResolve.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachmentResolve.initialLayout  = _init_params.initial_layout_;
-    colorAttachmentResolve.finalLayout    = _init_params.final_layout_;
+    VkAttachmentDescription color_attachment_resolve{};
+    color_attachment_resolve.format         = _init_params.format_;
+    color_attachment_resolve.samples        = VK_SAMPLE_COUNT_1_BIT;
+    color_attachment_resolve.loadOp         = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    color_attachment_resolve.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
+    color_attachment_resolve.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    color_attachment_resolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    color_attachment_resolve.initialLayout  = _init_params.initial_layout_;
+    color_attachment_resolve.finalLayout    = _init_params.final_layout_;
 
-    passAttachments.emplace_back(colorAttachmentResolve);
+    pass_attachments.emplace_back(color_attachment_resolve);
   }
 
-  VkAttachmentReference colorAttachmentRef = {};
-  colorAttachmentRef.attachment            = 0;
-  colorAttachmentRef.layout                = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  VkAttachmentReference color_attachment_ref = {};
+  color_attachment_ref.attachment            = 0;
+  color_attachment_ref.layout                = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-  VkAttachmentReference depthAttachmentRef = {};
-  depthAttachmentRef.attachment            = 1;
-  depthAttachmentRef.layout                = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+  VkAttachmentReference depth_attachment_ref = {};
+  depth_attachment_ref.attachment            = 1;
+  depth_attachment_ref.layout                = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-  VkAttachmentReference colorAttachmentResolveRef{};
-  colorAttachmentResolveRef.attachment = depth_ ? 2 : 1;
-  colorAttachmentResolveRef.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  VkAttachmentReference color_attachment_resolve_ref{};
+  color_attachment_resolve_ref.attachment = depth_ ? 2 : 1;
+  color_attachment_resolve_ref.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
   VkSubpassDescription subpass    = {};
   subpass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
   subpass.colorAttachmentCount    = 1;
-  subpass.pColorAttachments       = &colorAttachmentRef;
-  subpass.pDepthStencilAttachment = depth_ ? &depthAttachmentRef : nullptr;
-  subpass.pResolveAttachments     = msaa_rendertarget_ ? &colorAttachmentResolveRef : nullptr;
+  subpass.pColorAttachments       = &color_attachment_ref;
+  subpass.pDepthStencilAttachment = depth_ ? &depth_attachment_ref : nullptr;
+  subpass.pResolveAttachments     = msaa_rendertarget_ ? &color_attachment_resolve_ref : nullptr;
 
-  VkRenderPassCreateInfo renderPassInfo = {};
-  renderPassInfo.sType                  = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-  renderPassInfo.attachmentCount        = passAttachments.size();
-  renderPassInfo.pAttachments           = passAttachments.data();
-  renderPassInfo.subpassCount           = 1;
-  renderPassInfo.pSubpasses             = &subpass;
-  renderPassInfo.dependencyCount        = 1;
-  renderPassInfo.pDependencies          = &dependency;
+  VkRenderPassCreateInfo render_pass_info = {};
+  render_pass_info.sType                  = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+  render_pass_info.attachmentCount        = pass_attachments.size();
+  render_pass_info.pAttachments           = pass_attachments.data();
+  render_pass_info.subpassCount           = 1;
+  render_pass_info.pSubpasses             = &subpass;
+  render_pass_info.dependencyCount        = 1;
+  render_pass_info.pDependencies          = &dependency;
 
+  const auto device = display_->device();
   if (renderpass_ != VK_NULL_HANDLE)
-    HUT_PVK(vkDestroyRenderPass, display_.device(), renderpass_, nullptr);
-  if (HUT_PVK(vkCreateRenderPass, display_.device(), &renderPassInfo, nullptr, &renderpass_) != VK_SUCCESS)
+    HUT_PVK(vkDestroyRenderPass, device, renderpass_, nullptr);
+  if (HUT_PVK(vkCreateRenderPass, device, &render_pass_info, nullptr, &renderpass_) != VK_SUCCESS)
     throw std::runtime_error("failed to create render pass!");
 
   for (auto &fbo : fbos_) {
     if (fbo != VK_NULL_HANDLE)
-      HUT_PVK(vkDestroyFramebuffer, display_.device(), fbo, nullptr);
+      HUT_PVK(vkDestroyFramebuffer, device, fbo, nullptr);
   }
   fbos_.clear();
   fbos_.resize(_images.size());
 
-  std::vector<VkImageView> fbAttachments;
+  std::vector<VkImageView> fb_attachments;
   for (size_t i = 0; i < fbos_.size(); i++) {
-    fbAttachments.clear();
+    fb_attachments.clear();
 
     if (msaa_rendertarget_)
-      fbAttachments.emplace_back(msaa_rendertarget_->view());
+      fb_attachments.emplace_back(msaa_rendertarget_->view());
     else
-      fbAttachments.emplace_back(_images[i]);
+      fb_attachments.emplace_back(_images[i]);
 
     if (depth_)
-      fbAttachments.emplace_back(depth_->view());
+      fb_attachments.emplace_back(depth_->view());
 
     if (msaa_rendertarget_)
-      fbAttachments.emplace_back(_images[i]);
+      fb_attachments.emplace_back(_images[i]);
 
-    VkFramebufferCreateInfo framebufferInfo = {};
-    framebufferInfo.sType                   = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    framebufferInfo.renderPass              = renderpass_;
-    framebufferInfo.attachmentCount         = fbAttachments.size();
-    framebufferInfo.pAttachments            = fbAttachments.data();
-    framebufferInfo.width                   = offset.x + size.x;
-    framebufferInfo.height                  = offset.y + size.y;
-    framebufferInfo.layers                  = 1;
+    VkFramebufferCreateInfo fb_info = {};
+    fb_info.sType                   = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    fb_info.renderPass              = renderpass_;
+    fb_info.attachmentCount         = fb_attachments.size();
+    fb_info.pAttachments            = fb_attachments.data();
+    fb_info.width                   = offset.x + size.x;
+    fb_info.height                  = offset.y + size.y;
+    fb_info.layers                  = 1;
 
-    if (HUT_PVK(vkCreateFramebuffer, display_.device(), &framebufferInfo, nullptr, &fbos_[i]) != VK_SUCCESS)
+    if (HUT_PVK(vkCreateFramebuffer, device, &fb_info, nullptr, &fbos_[i]) != VK_SUCCESS)
       throw std::runtime_error("failed to create framebuffer!");
   }
 }
@@ -230,31 +233,31 @@ void render_target::begin_rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
   auto offset = bbox_origin(render_target_params_.box_);
   auto size   = bbox_size(render_target_params_.box_);
 
-  VkCommandBufferBeginInfo beginInfo = {};
-  beginInfo.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  beginInfo.flags                    = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-  beginInfo.pInheritanceInfo         = nullptr;  // Optional
+  VkCommandBufferBeginInfo begin_info = {};
+  begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  begin_info.flags                    = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+  begin_info.pInheritanceInfo         = nullptr;  // Optional
 
-  HUT_PVK(vkBeginCommandBuffer, _cb, &beginInfo);
+  HUT_PVK(vkBeginCommandBuffer, _cb, &begin_info);
 
-  VkRenderPassBeginInfo renderPassInfo = {};
-  renderPassInfo.sType                 = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-  renderPassInfo.renderPass            = renderpass_;
-  renderPassInfo.framebuffer           = _fbo;
-  renderPassInfo.renderArea.offset     = {offset.x, offset.y};
-  renderPassInfo.renderArea.extent     = {size.x, size.y};
+  VkRenderPassBeginInfo render_pass_info = {};
+  render_pass_info.sType                 = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+  render_pass_info.renderPass            = renderpass_;
+  render_pass_info.framebuffer           = _fbo;
+  render_pass_info.renderArea.offset     = {offset.x, offset.y};
+  render_pass_info.renderArea.extent     = {size.x, size.y};
 
-  std::vector<VkClearValue> clearColors;
-  clearColors.emplace_back(VkClearValue{.color = render_target_params_.clear_color_});
+  std::vector<VkClearValue> clear_colors;
+  clear_colors.emplace_back(VkClearValue{.color = render_target_params_.clear_color_});
   if (depth_)
-    clearColors.emplace_back(VkClearValue{.depthStencil = render_target_params_.clear_depth_stencil_});
+    clear_colors.emplace_back(VkClearValue{.depthStencil = render_target_params_.clear_depth_stencil_});
   if (msaa_rendertarget_)
-    clearColors.emplace_back(VkClearValue{.color = render_target_params_.clear_color_});
+    clear_colors.emplace_back(VkClearValue{.color = render_target_params_.clear_color_});
 
-  renderPassInfo.clearValueCount = clearColors.size();
-  renderPassInfo.pClearValues    = clearColors.data();
+  render_pass_info.clearValueCount = clear_colors.size();
+  render_pass_info.pClearValues    = clear_colors.data();
 
-  HUT_PVK(vkCmdBeginRenderPass, _cb, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);  // FIXME
+  HUT_PVK(vkCmdBeginRenderPass, _cb, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);  // FIXME
   // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS
   // to enable secondary command buffers
 

@@ -25,6 +25,8 @@
  * SOFTWARE.
  */
 
+#include "hut/display.hpp"
+
 #include <charconv>
 #include <iostream>
 
@@ -34,7 +36,6 @@
 
 #include "hut/utils/profiling.hpp"
 
-#include "hut/display.hpp"
 #include "hut/window.hpp"
 
 using namespace hut;
@@ -491,7 +492,7 @@ void display::data_offer_handle_action(void *_data, wl_data_offer *_offer, u32 _
 #ifdef HUT_DEBUG_WL_DATA_LISTENERS
   std::cout << "data_offer_handle_action " << _offer << ", " << _action << std::endl;
 #endif
-  auto *           d = static_cast<display *>(_data);
+  auto            *d = static_cast<display *>(_data);
   dragndrop_action action;
   switch (_action) {
     case WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY: action = DNDCOPY; break;
@@ -693,7 +694,7 @@ display::display(const char *_app_name, u32 _app_version, const char *_name)
   info.display                       = display_;
   info.surface                       = dummy;
 
-  auto *       func = get_proc<PFN_vkCreateWaylandSurfaceKHR>("vkCreateWaylandSurfaceKHR");
+  auto        *func = get_proc<PFN_vkCreateWaylandSurfaceKHR>("vkCreateWaylandSurfaceKHR");
   VkSurfaceKHR dummy_surface;
   VkResult     vkr;
   if ((vkr = func(instance_, &info, nullptr, &dummy_surface)) != VK_SUCCESS)
@@ -705,8 +706,8 @@ display::display(const char *_app_name, u32 _app_version, const char *_name)
   wl_surface_destroy(dummy);
 
   if (shm_ != nullptr) {
-    char * env_cursor_theme       = getenv("XCURSOR_THEME");
-    char * env_cursor_size        = getenv("XCURSOR_SIZE");
+    char  *env_cursor_theme       = getenv("XCURSOR_THEME");
+    char  *env_cursor_size        = getenv("XCURSOR_SIZE");
     size_t env_cursor_size_length = env_cursor_size == nullptr ? 0 : strlen(env_cursor_size);
     int    cursor_size            = 24;
     if (env_cursor_size_length > 0)
@@ -814,7 +815,7 @@ void display::cursor_frame(wl_cursor *_cursor, size_t _frame) {
   if (_cursor != nullptr) {
     assert(_frame < _cursor->image_count);
     wl_cursor_image *image  = _cursor->images[_frame];
-    wl_buffer *      buffer = wl_cursor_image_get_buffer(image);
+    wl_buffer       *buffer = wl_cursor_image_get_buffer(image);
     wl_surface_attach(cursor_surface_, buffer, 0, 0);
     wl_surface_damage(cursor_surface_, 0, 0, i32(image->width), i32(image->height));
     wl_surface_commit(cursor_surface_);

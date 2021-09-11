@@ -81,7 +81,7 @@ inline void set(instance &_target, u16vec4 _bbox,
   _target.pos_box_.y |= (_corner_softness & 0xF) << 12;
 
   if (_subimg) {
-    _target.uv_box_ =  hut::packSnorm<u16>(_subimg->texcoords());
+    _target.uv_box_ = hut::packSnorm<u16>(_subimg->texcoords());
     assert(_subimg->page() <= 0xF);
     _target.pos_box_.z |= (_subimg->page() & 0xF) << 12;
   } else {
@@ -100,20 +100,32 @@ class renderer {
  public:
   class renderer_suballoc : public suballoc_raw {
     renderer *parent_ = nullptr;
-    uint      batch_;
+    uint      batch_  = -1;
 
    public:
-    renderer_suballoc()                          = delete;
+    renderer_suballoc() = delete;
+
     renderer_suballoc(const renderer_suballoc &) = delete;
     renderer_suballoc &operator=(const renderer_suballoc &) = delete;
+
+    renderer_suballoc(renderer_suballoc &&_other) noexcept
+        : suballoc_raw(_other.offset_bytes(), _other.size_bytes())
+        , parent_(std::exchange(_other.parent_, nullptr))
+        , batch_(_other.batch_) {}
+    renderer_suballoc &operator=(renderer_suballoc &&_other) noexcept {
+      if (&_other != this) {
+        offset_bytes_ = _other.offset_bytes_;
+        size_bytes_   = _other.size_bytes_;
+        parent_       = std::exchange(_other.parent_, nullptr);
+        batch_        = _other.batch_;
+      }
+      return *this;
+    }
 
     renderer_suballoc(renderer *_parent, uint _batch, uint _offset_bytes, uint _size_bytes)
         : suballoc_raw(_offset_bytes, _size_bytes)
         , parent_(_parent)
         , batch_(_batch) {}
-    renderer_suballoc(renderer_suballoc &&_other) noexcept = default;
-    renderer_suballoc &operator=(renderer_suballoc &&_other) noexcept = default;
-
     ~renderer_suballoc() override {
       if (parent_) renderer_suballoc::release();
     }
@@ -122,7 +134,7 @@ class renderer {
     void     finalize(const updator &_updator) final;
     void     zero_raw(uint _offset_bytes, uint _size_bytes) final;
     VkBuffer underlying_buffer() const final;
-    u8 *     existing_mapping() final;
+    u8      *existing_mapping() final;
     bool     valid() const final { return parent_ != nullptr; }
     void     release() final;
 

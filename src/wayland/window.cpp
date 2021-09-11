@@ -25,7 +25,10 @@
  * SOFTWARE.
  */
 
+#include "hut/window.hpp"
+
 #include <cstring>
+
 #include <iostream>
 
 #include <unistd.h>
@@ -33,7 +36,6 @@
 #include "hut/utils/profiling.hpp"
 
 #include "hut/display.hpp"
-#include "hut/window.hpp"
 
 using namespace hut;
 

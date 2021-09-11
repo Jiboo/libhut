@@ -25,6 +25,8 @@
  * SOFTWARE.
  */
 
+#include "hut/window.hpp"
+
 #include <algorithm>
 #include <iostream>
 #include <thread>
@@ -33,7 +35,6 @@
 
 #include "hut/display.hpp"
 #include "hut/image.hpp"
-#include "hut/window.hpp"
 
 using namespace hut;
 

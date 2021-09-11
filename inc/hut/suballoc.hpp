@@ -44,21 +44,22 @@ class suballoc_raw : public std::enable_shared_from_this<suballoc_raw> {
     uint                offset_bytes_ = 0;
 
    public:
-    updator()                = delete;
+    updator() = delete;
+
     updator(const updator &) = delete;
+    updator &operator=(const updator &) = delete;
+
+    updator(updator &&_other) = default;
+    updator &operator=(updator &&) noexcept = default;
 
     updator(shared_suballoc_raw _parent, shared_suballoc_raw &&_staging_alloc, std::span<u8> _staging, uint _offset_bytes)
         : parent_alloc_(std::move(_parent))
         , staging_alloc_(_staging_alloc)
         , staging_(_staging)
         , offset_bytes_(_offset_bytes) {}
-    updator(updator &&_other) = default;
     ~updator() {
       if (parent_alloc_) parent_alloc_->finalize(*this);
     }
-
-    updator &operator=(const updator &) = delete;
-    updator &operator=(updator &&) noexcept = default;
 
     [[nodiscard]] std::span<u8>       staging() { return staging_; };
     [[nodiscard]] std::span<const u8> staging() const { return staging_; };
@@ -72,16 +73,17 @@ class suballoc_raw : public std::enable_shared_from_this<suballoc_raw> {
   };
 
  public:
-  suballoc_raw()                     = delete;
+  suballoc_raw() = delete;
+
   suballoc_raw(const suballoc_raw &) = delete;
   suballoc_raw &operator=(const suballoc_raw &) = delete;
+
+  suballoc_raw(suballoc_raw &&_other) noexcept = delete;
+  suballoc_raw &operator=(suballoc_raw &&_other) noexcept = delete;
 
   suballoc_raw(uint _offset_bytes, uint _size_bytes)
       : offset_bytes_(_offset_bytes)
       , size_bytes_(_size_bytes) {}
-  suballoc_raw(suballoc_raw &&_other) noexcept = default;
-  suballoc_raw &operator=(suballoc_raw &&_other) noexcept = default;
-
   virtual ~suballoc_raw() = default;
 
   explicit operator bool() const { return valid(); }
@@ -93,11 +95,11 @@ class suballoc_raw : public std::enable_shared_from_this<suballoc_raw> {
   virtual void                   finalize(const updator &_updator)                = 0;
   virtual void                   zero_raw(uint _offset_bytes, uint _size_bytes)   = 0;
   [[nodiscard]] virtual VkBuffer underlying_buffer() const                        = 0;
-  [[nodiscard]] virtual u8 *     existing_mapping()                               = 0;
+  [[nodiscard]] virtual u8      *existing_mapping()                               = 0;
   [[nodiscard]] virtual bool     valid() const                                    = 0;
   virtual void                   release()                                        = 0;
 
- private:
+ protected:
   uint offset_bytes_ = 0, size_bytes_ = 0;
 };
 

@@ -32,7 +32,7 @@
 
 #include "text_refl.hpp"
 
-#define HUT_TEXT_DEBUG_NO_INDIRECT
+//#define HUT_TEXT_DEBUG_NO_INDIRECT
 
 namespace hut::text {
 
@@ -58,23 +58,39 @@ class renderer {
   class renderer_suballoc : public suballoc_raw {
     friend class renderer;
 
-    renderer *                     parent_ = nullptr;
+    renderer                      *parent_ = nullptr;
     uint                           batch_;
     std::unique_ptr<i16vec4[]>     bboxes_;
     std::unique_ptr<string_hash[]> hashes_;
 
    public:
-    renderer_suballoc()                          = delete;
+    renderer_suballoc() = delete;
+
     renderer_suballoc(const renderer_suballoc &) = delete;
     renderer_suballoc &operator=(const renderer_suballoc &) = delete;
+
+    renderer_suballoc(renderer_suballoc &&_other) noexcept
+        : suballoc_raw(_other.offset_bytes(), _other.size_bytes())
+        , parent_(std::exchange(_other.parent_, nullptr))
+        , batch_(_other.batch_)
+        , bboxes_(std::move(_other.bboxes_))
+        , hashes_(std::move(_other.hashes_)) {}
+    renderer_suballoc &operator=(renderer_suballoc &&_other) noexcept {
+      if (&_other != this) {
+        offset_bytes_ = _other.offset_bytes_;
+        size_bytes_   = _other.size_bytes_;
+        parent_       = std::exchange(_other.parent_, nullptr);
+        batch_        = _other.batch_;
+        bboxes_       = std::move(_other.bboxes_);
+        hashes_       = std::move(_other.hashes_);
+      }
+      return *this;
+    }
 
     renderer_suballoc(renderer *_parent, uint _batch, uint _offset_bytes, uint _size_bytes)
         : suballoc_raw(_offset_bytes, _size_bytes)
         , parent_(_parent)
         , batch_(_batch) {}
-    renderer_suballoc(renderer_suballoc &&_other) noexcept = default;
-    renderer_suballoc &operator=(renderer_suballoc &&_other) noexcept = default;
-
     ~renderer_suballoc() override {
       if (parent_) renderer_suballoc::release();
     }
@@ -83,7 +99,7 @@ class renderer {
     void     finalize(const updator &_updator) final;
     void     zero_raw(uint _offset_bytes, uint _size_bytes) final;
     VkBuffer underlying_buffer() const final;
-    u8 *     existing_mapping() final;
+    u8      *existing_mapping() final;
     bool     valid() const final { return parent_ != nullptr; }
     void     release() final;
 
@@ -143,7 +159,6 @@ class renderer {
 
     std::unordered_map<string_hash, word> cache_;
 
-    batch(batch &&) = default;
     batch(renderer *_parent, uint _mesh_store_size, uint _draw_store_size)
         : mstore_(_parent, _mesh_store_size)
         , dstore_(_parent, _draw_store_size) {}

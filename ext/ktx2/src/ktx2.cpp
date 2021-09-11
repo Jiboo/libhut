@@ -25,11 +25,11 @@
  * SOFTWARE.
  */
 
+#include "hut/ktx2/ktx2.hpp"
+
 #include <cstring>
 
 #include <bit>
-
-#include "hut/ktx2/ktx2.hpp"
 
 namespace hut::ktx {
 

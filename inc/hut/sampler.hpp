@@ -53,10 +53,26 @@ struct sampler_params {
 };
 
 class sampler {
-  VkSampler sampler_;
+  VkSampler sampler_ = VK_NULL_HANDLE;
   VkDevice  device_;
 
  public:
+  sampler() = delete;
+
+  sampler(const sampler &) = delete;
+  sampler &operator=(const sampler &) = delete;
+
+  sampler(sampler &&_other) noexcept
+      : sampler_(std::exchange(_other.sampler_, (VkSampler)VK_NULL_HANDLE))
+      , device_(_other.device_) {}
+  sampler &operator=(sampler &&_other) noexcept {
+    if (&_other != this) {
+      sampler_ = std::exchange(_other.sampler_, (VkSampler)VK_NULL_HANDLE);
+      device_  = _other.device_;
+    }
+    return *this;
+  }
+
   explicit sampler(display &_display, const sampler_params &_params = {});
   ~sampler();
 

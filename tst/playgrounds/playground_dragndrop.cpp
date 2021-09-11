@@ -54,7 +54,7 @@ struct drop_target {
 
 struct my_drop_target_interface : drop_target_interface {
   std::vector<drop_target> &targets_;
-  drop_target *             target_ = nullptr;
+  drop_target              *target_ = nullptr;
   clipboard_formats         current_formats_;
   clipboard_format          preferred_format_         = FTEXT_PLAIN;
   move_result               last_printed_move_result_ = {dragndrop_actions{DNDNONE}, DNDNONE, FTEXT_PLAIN};

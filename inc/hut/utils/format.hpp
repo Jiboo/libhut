@@ -60,6 +60,8 @@ struct format_info {
   format_target target_;
   u8            pack_;
 
+  static constexpr format_info from(VkFormat);
+
   [[nodiscard]] constexpr bool valid() const {
     return components_ > 0;
   }
@@ -97,7 +99,7 @@ struct format_info {
 constexpr format_info invalid_format_info{{0, 0, 0, 0}, 0, format_suffix::UNORM, format_target::COLOR, 0};
 static_assert(!invalid_format_info.valid());
 
-constexpr format_info info(VkFormat _input) {
+constexpr format_info format_info::from(VkFormat _input) {
   switch (_input) {
     case VK_FORMAT_R4G4_UNORM_PACK8: return format_info{{4, 4, 0, 0}, 2, format_suffix::UNORM, format_target::COLOR, 8};
     case VK_FORMAT_R4G4B4A4_UNORM_PACK16: [[fallthrough]];

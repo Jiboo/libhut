@@ -27,9 +27,9 @@
 
 #pragma once
 
-#include <glm/glm.hpp>
+#include <imgui.h>
 
-#include "imgui.h"
+#include "hut/utils/math.hpp"
 
 #include "hut/display.hpp"
 #include "hut/window.hpp"

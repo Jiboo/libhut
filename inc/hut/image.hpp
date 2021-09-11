@@ -65,48 +65,71 @@ class image {
   class updator {
     friend class image;
 
-    image &             target_;
+    image              *target_ = nullptr;
     shared_suballoc_raw staging_;
     std::span<u8>       data_;
-    uint                staging_row_pitch_;
+    uint                staging_row_pitch_ = -1;
     subresource         subres_;
 
     updator(image &_target, shared_suballoc_raw _staging, std::span<u8> _data, uint _staging_row_pitch, subresource _subres)
-        : target_(_target)
+        : target_(&_target)
         , staging_(std::move(_staging))
         , data_(_data)
         , staging_row_pitch_(_staging_row_pitch)
-        , subres_(_subres) {
-    }
+        , subres_(_subres) {}
 
    public:
-    ~updator() {
-      if (data_.size_bytes()) target_.finalize_update(*this);
+    updator() = delete;
+
+    updator(const updator &) = delete;
+    updator &operator=(const updator &) = delete;
+
+    updator(updator &&_other) noexcept
+        : target_(std::exchange(_other.target_, nullptr))
+        , staging_(std::move(_other.staging_))
+        , data_(std::exchange(_other.data_, {}))
+        , staging_row_pitch_(std::exchange(_other.staging_row_pitch_, 1))
+        , subres_(std::exchange(_other.subres_, {})) {}
+    updator &operator=(updator &&_other) noexcept {
+      if (&_other != this) {
+        target_            = std::exchange(_other.target_, nullptr);
+        staging_           = std::move(_other.staging_);
+        data_              = std::exchange(_other.data_, {});
+        staging_row_pitch_ = std::exchange(_other.staging_row_pitch_, 1);
+        subres_            = std::exchange(_other.subres_, {});
+      }
+      return *this;
     }
 
-    updator()                = delete;
-    updator(const updator &) = delete;
-    updator(updator &&)      = default;
-    updator &operator=(const updator &) = delete;
-    updator &operator=(updator &&) = delete;
+    ~updator() {
+      if (data_.size_bytes()) target_->finalize_update(*this);
+    }
 
     [[nodiscard]] const u8 *data() const { return data_.data(); }
-    [[nodiscard]] u8 *      data() { return data_.data(); }
+    [[nodiscard]] u8       *data() { return data_.data(); }
     [[nodiscard]] size_t    size_bytes() const { return data_.size_bytes(); }
     [[nodiscard]] uint      staging_row_pitch() const { return staging_row_pitch_; }
-    [[nodiscard]] uint      image_row_pitch() const { return target_.bpp() * bbox_size(subres_.coords_).x / 8; }
+    [[nodiscard]] uint      image_row_pitch() const { return target_->bpp() * bbox_size(subres_.coords_).x / 8; }
   };
 
   static std::shared_ptr<image> load_raw(display &, std::span<const u8> _data, uint _data_row_pitch, const image_params &_params);
 
+  image() = delete;
+
+  image(const image &) = delete;
+  image &operator=(const image &) = delete;
+
+  image(image &&) noexcept = delete;
+  image &operator=(image &&) noexcept = delete;
+
   image(display &_display, const image_params &_params);
   ~image();
 
-  void    update(subresource _subres, std::span<const u8>, uint _srcRowPitch);
+  void    update(subresource _subres, std::span<const u8>, uint _src_row_pitch);
   updator update(subresource _subres);
   updator update() { return update({make_bbox_with_origin_size({0, 0}, params_.size_)}); }
 
-  [[nodiscard]] u8       bpp() const { return info(params_.format_).bpp(); }
+  [[nodiscard]] u8       bpp() const { return format_info::from(params_.format_).bpp(); }
   [[nodiscard]] VkFormat format() const { return params_.format_; }
   [[nodiscard]] u16vec2  size() const { return params_.size_; }
   [[nodiscard]] u16      levels() const { return params_.levels_; }
@@ -116,17 +139,17 @@ class image {
 
  private:
   static VkMemoryRequirements create(display &_display, const image_params &_params,
-                                     VkImage *_image, VkDeviceMemory *_imageMemory);
+                                     VkImage *_image, VkDeviceMemory *_image_memory);
 
   void finalize_update(updator &_update);
 
-  display &    display_;
+  display     *display_;
   image_params params_;
 
-  VkImage              image_;
-  VkDeviceMemory       memory_;
-  VkMemoryRequirements mem_reqs_;
-  VkImageView          view_;
+  VkImage              image_  = VK_NULL_HANDLE;
+  VkDeviceMemory       memory_ = VK_NULL_HANDLE;
+  VkMemoryRequirements mem_reqs_{};
+  VkImageView          view_ = VK_NULL_HANDLE;
 };
 
 }  // namespace hut

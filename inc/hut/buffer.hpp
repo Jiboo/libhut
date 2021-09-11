@@ -38,12 +38,12 @@ struct buffer_params {
   bool                  permanent_map_ = false;
   VkMemoryPropertyFlags type_          = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
   VkBufferUsageFlagBits usage_         = VkBufferUsageFlagBits(
-      VK_BUFFER_USAGE_TRANSFER_DST_BIT
-      | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
-      | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT
-      | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
-      | VK_BUFFER_USAGE_INDEX_BUFFER_BIT
-      | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
+              VK_BUFFER_USAGE_TRANSFER_DST_BIT
+              | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+              | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT
+              | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+              | VK_BUFFER_USAGE_INDEX_BUFFER_BIT
+              | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
 };
 
 class buffer {
@@ -53,17 +53,18 @@ class buffer {
     uint    page_;
 
    public:
-    buffer_suballoc()                        = delete;
+    buffer_suballoc() = delete;
+
     buffer_suballoc(const buffer_suballoc &) = delete;
     buffer_suballoc &operator=(const buffer_suballoc &) = delete;
+
+    buffer_suballoc(buffer_suballoc &&_other) noexcept = default;
+    buffer_suballoc &operator=(buffer_suballoc &&_other) noexcept = default;
 
     buffer_suballoc(buffer *_parent, uint _page, uint _offset_bytes, uint _size_bytes)
         : suballoc_raw(_offset_bytes, _size_bytes)
         , parent_(_parent)
         , page_(_page) {}
-    buffer_suballoc(buffer_suballoc &&_other) noexcept = default;
-    buffer_suballoc &operator=(buffer_suballoc &&_other) noexcept = default;
-
     ~buffer_suballoc() override {
       if (parent_) buffer_suballoc::release();
     }
@@ -72,7 +73,7 @@ class buffer {
     void     finalize(const updator &_updator) final;
     void     zero_raw(uint _offset_bytes, uint _size_bytes) final;
     VkBuffer underlying_buffer() const final;
-    u8 *     existing_mapping() final;
+    u8      *existing_mapping() final;
     bool     valid() const final { return parent_ != nullptr; }
     void     release() final;
   };
@@ -92,19 +93,40 @@ class buffer {
 #endif
 
  protected:
-  display &     display_;
+  display      &display_;
   uint          size_ = 0;
   buffer_params params_;
 
   struct page_data {
-    buffer &                parent_;
+    buffer                 *parent_ = nullptr;
     binpack::linear1d<uint> suballocator_;
     VkBuffer                buffer_        = VK_NULL_HANDLE;
     VkDeviceMemory          memory_        = VK_NULL_HANDLE;
-    u8 *                    permanent_map_ = nullptr;
+    u8                     *permanent_map_ = nullptr;
+
+    page_data() = delete;
+
+    page_data(const page_data &) = delete;
+    page_data &operator=(const page_data &) = delete;
+
+    page_data(page_data &&_other) noexcept
+        : parent_(std::exchange(_other.parent_, nullptr))
+        , suballocator_(std::move(_other.suballocator_))
+        , buffer_(std::exchange(_other.buffer_, (VkBuffer)VK_NULL_HANDLE))
+        , memory_(std::exchange(_other.memory_, (VkDeviceMemory)VK_NULL_HANDLE))
+        , permanent_map_(std::exchange(_other.permanent_map_, nullptr)) {}
+    page_data &operator=(page_data &&_other) noexcept {
+      if (&_other != this) {
+        parent_        = std::exchange(_other.parent_, nullptr);
+        suballocator_  = std::move(_other.suballocator_);
+        buffer_        = std::exchange(_other.buffer_, (VkBuffer)VK_NULL_HANDLE);
+        memory_        = std::exchange(_other.memory_, (VkDeviceMemory)VK_NULL_HANDLE);
+        permanent_map_ = std::exchange(_other.permanent_map_, nullptr);
+      }
+      return *this;
+    }
 
     page_data(buffer &_parent, uint _size);
-    page_data(page_data &&) noexcept;
     ~page_data();
 
     [[nodiscard]] uint size() const { return suballocator_.capacity(); }

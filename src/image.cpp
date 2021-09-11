@@ -25,6 +25,8 @@
  * SOFTWARE.
  */
 
+#include "hut/image.hpp"
+
 #include <cstring>
 
 #include <iostream>
@@ -34,11 +36,11 @@
 
 #include "hut/buffer.hpp"
 #include "hut/display.hpp"
-#include "hut/image.hpp"
 
 using namespace hut;
 
-std::shared_ptr<image> image::load_raw(display &_display, std::span<const u8> _data, uint _data_row_pitch, const image_params &_params) {
+std::shared_ptr<image> image::load_raw(display &_display, std::span<const u8> _data, uint _data_row_pitch,
+                                       const image_params &_params) {
   HUT_PROFILE_SCOPE(PIMAGE, "image::load_raw");
   assert(_params.levels_ == 1);
   assert(_params.layers_ == 1);
@@ -50,13 +52,14 @@ std::shared_ptr<image> image::load_raw(display &_display, std::span<const u8> _d
 }
 
 image::~image() {
-  HUT_PVK(vkDestroyImageView, display_.device(), view_, nullptr);
-  HUT_PVK(vkDestroyImage, display_.device(), image_, nullptr);
-  HUT_PVK(vkFreeMemory, display_.device(), memory_, nullptr);
+  const auto device = display_->device();
+  HUT_PVK(vkDestroyImageView, device, view_, nullptr);
+  HUT_PVK(vkDestroyImage, device, image_, nullptr);
+  HUT_PVK(vkFreeMemory, device, memory_, nullptr);
 }
 
 image::image(display &_display, const image_params &_params)
-    : display_(_display)
+    : display_(&_display)
     , params_(_params) {
   mem_reqs_ = create(_display, _params, &image_, &memory_);
 
@@ -96,19 +99,19 @@ image::image(display &_display, const image_params &_params)
   clear.destination              = image_;
   clear.color                    = {};
 
-  std::lock_guard lk(display_.staging_mutex_);
-  display_.staging_jobs_++;
-  display_.preflush([this, pre, post, clear, range]() {
-    display_.stage_transition(pre, range);
+  std::lock_guard lk(display_->staging_mutex_);
+  display_->staging_jobs_++;
+  display_->preflush([this, pre, post, clear, range]() {
+    display_->stage_transition(pre, range);
     if (params_.tiling_ & VK_IMAGE_TILING_LINEAR)  // FIXME
-      display_.stage_clear(clear, range);
-    display_.stage_transition(post, range);
-    display_.staging_jobs_--;
+      display_->stage_clear(clear, range);
+    display_->stage_transition(post, range);
+    display_->staging_jobs_--;
   });
 }
 
 VkMemoryRequirements image::create(display &_display, const image_params &_params,
-                                   VkImage *_image, VkDeviceMemory *_imageMemory) {
+                                   VkImage *_image, VkDeviceMemory *_image_memory) {
   VkImageCreateInfo imageInfo = {};
   imageInfo.sType             = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   imageInfo.imageType         = VK_IMAGE_TYPE_2D;
@@ -138,23 +141,23 @@ VkMemoryRequirements image::create(display &_display, const image_params &_param
   auto memtype                   = _display.find_memory_type(memReq.memoryTypeBits, _params.properties_);
   allocInfo.memoryTypeIndex      = memtype.first;
 
-  if (vkAllocateMemory(_display.device(), &allocInfo, nullptr, _imageMemory) != VK_SUCCESS) {
+  if (vkAllocateMemory(_display.device(), &allocInfo, nullptr, _image_memory) != VK_SUCCESS) {
     throw std::runtime_error("failed to allocate image memory!");
   }
 
-  HUT_PVK(vkBindImageMemory, _display.device(), *_image, *_imageMemory, 0);
+  HUT_PVK(vkBindImageMemory, _display.device(), *_image, *_image_memory, 0);
 
   return memReq;
 }
 
-void image::update(subresource _subres, std::span<const u8> _data, uint _data_row_pitch) {
+void image::update(subresource _subres, std::span<const u8> _data, uint _src_row_pitch) {
   auto updto = update(_subres);
   auto size  = bbox_size(_subres.coords_);
-  assert(_data.size_bytes() == (_data_row_pitch * size.y));
+  assert(_data.size_bytes() == (_src_row_pitch * size.y));
   auto mip_size = params_.size_ >> _subres.level_;
   assert(mip_size.x >= size.x && mip_size.y >= size.y);
 
-  if (_data_row_pitch == updto.staging_row_pitch() || params_.tiling_ == VK_IMAGE_TILING_OPTIMAL) {
+  if (_src_row_pitch == updto.staging_row_pitch() || params_.tiling_ == VK_IMAGE_TILING_OPTIMAL) {
     memcpy(updto.data(), _data.data(), _data.size_bytes());
   } else {
     uint row_bit_size = size.x * bpp();
@@ -162,25 +165,27 @@ void image::update(subresource _subres, std::span<const u8> _data, uint _data_ro
     uint row_byte_size = row_bit_size / 8;
     for (uint y = 0; y < size.y; y++) {
       auto *dst_row = updto.data() + y * updto.staging_row_pitch();
-      auto *src_row = _data.data() + y * _data_row_pitch;
+      auto *src_row = _data.data() + y * _src_row_pitch;
       memcpy(dst_row, src_row, row_byte_size);
     }
   }
 }
 
 image::updator image::update(subresource _subres) {
-  auto size         = bbox_size(_subres.coords_);
-  uint buffer_align = display_.properties().limits.optimalBufferCopyRowPitchAlignment;
-  uint offset_align = std::max(VkDeviceSize(4), display_.properties().limits.optimalBufferCopyOffsetAlignment);
-  uint row_bit_size = size.x * bpp();
+  auto        size         = bbox_size(_subres.coords_);
+  const auto &limits       = display_->limits();
+  uint        buffer_align = limits.optimalBufferCopyRowPitchAlignment;
+  uint        offset_align = std::max(VkDeviceSize(4), limits.optimalBufferCopyOffsetAlignment);
+  uint        row_bit_size = size.x * bpp();
   assert(row_bit_size >= 8);
   uint row_byte_size     = row_bit_size / 8;
   uint staging_row_pitch = align(row_byte_size, buffer_align);
   auto byte_size         = size.y * staging_row_pitch;
 
-  std::lock_guard lk(display_.staging_mutex_);
-  auto            staging_alloc = display_.staging_->allocate_raw(byte_size, offset_align);
-  auto            span          = std::span<u8>{staging_alloc->existing_mapping(), byte_size};
+  std::lock_guard lk(display_->staging_mutex_);
+
+  auto staging_alloc = display_->staging_->allocate_raw(byte_size, offset_align);
+  auto span          = std::span<u8>{staging_alloc->existing_mapping(), byte_size};
   return {*this, std::move(staging_alloc), span, staging_row_pitch, _subres};
 }
 
@@ -201,14 +206,16 @@ void image::finalize_update(image::updator &_update) {
   subresRange.baseArrayLayer          = _update.subres_.layer_;
   subresRange.layerCount              = 1;
 
-  display::image_transition pre   = {};
-  pre.destination                 = image_;
-  pre.oldLayout                   = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  pre.newLayout                   = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-  display::image_transition post  = {};
-  post.destination                = image_;
-  post.oldLayout                  = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-  post.newLayout                  = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  display::image_transition pre = {};
+  pre.destination               = image_;
+  pre.oldLayout                 = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  pre.newLayout                 = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
+  display::image_transition post = {};
+  post.destination               = image_;
+  post.oldLayout                 = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  post.newLayout                 = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
   display::buffer2image_copy copy = {};
   copy.imageExtent                = {(uint)size.x, (uint)size.y, 1};
   copy.imageOffset                = {origin.x, origin.y, 0};
@@ -220,13 +227,13 @@ void image::finalize_update(image::updator &_update) {
   copy.destination                = image_;
   copy.bytesSize                  = _update.size_bytes();
 
-  std::lock_guard lk(display_.staging_mutex_);
-  display_.staging_jobs_++;
-  display_.preflush([this, pre, post, copy, subresRange]() {
-    display_.stage_transition(pre, subresRange);
-    display_.stage_copy(copy);
-    display_.stage_transition(post, subresRange);
-    display_.staging_jobs_--;
+  std::lock_guard lk(display_->staging_mutex_);
+  display_->staging_jobs_++;
+  display_->preflush([this, pre, post, copy, subresRange]() {
+    display_->stage_transition(pre, subresRange);
+    display_->stage_copy(copy);
+    display_->stage_transition(post, subresRange);
+    display_->staging_jobs_--;
   });
-  display_.postflush([staging = _update.staging_]() {});
+  display_->postflush([staging = _update.staging_]() {});
 }

@@ -25,6 +25,8 @@
  * SOFTWARE.
  */
 
+#include "hut/text/renderer.hpp"
+
 #include <string_view>
 #include <utility>
 
@@ -32,8 +34,6 @@
 #include "hut/utils/utf.hpp"
 
 #include "hut/display.hpp"
-
-#include "hut/text/renderer.hpp"
 
 using namespace hut;
 using namespace hut::text;
@@ -176,7 +176,7 @@ renderer::batch &renderer::grow(uint _mesh_store_size, uint _draw_store_size) {
 renderer::shared_suballoc<renderer::instance> renderer::allocate(std::span<const std::u8string_view> _words) {
   words_info winfo{_words};
   auto       best_batch_id = find_best_fit(winfo);
-  auto &     best_batch    = batches_[best_batch_id];
+  auto      &best_batch    = batches_[best_batch_id];
 
   auto draw_alloc = best_batch.dstore_.suballocator_.pack(_words.size());
   assert(draw_alloc);

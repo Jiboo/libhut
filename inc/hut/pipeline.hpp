@@ -381,6 +381,14 @@ class pipeline {
   }
 
  public:
+  pipeline() = delete;
+
+  pipeline(const pipeline &) = delete;
+  pipeline &operator=(const pipeline &) = delete;
+
+  pipeline(pipeline &&) noexcept = delete;
+  pipeline &operator=(pipeline &&) noexcept = delete;
+
   explicit pipeline(render_target &_target, const pipeline_params &_params = {})
       : device_ref_(_target.parent().device())
       , render_pass_(_target.renderpass()) {
@@ -397,7 +405,7 @@ class pipeline {
     init_pipeline(_target.params().box_, _target.sample_count(), _params);
   }
 
-  virtual ~pipeline() {
+  ~pipeline() {
     HUT_PVK(vkDeviceWaitIdle, device_ref_);
     if (descriptor_layout_ != VK_NULL_HANDLE)
       HUT_PVK(vkDestroyDescriptorSetLayout, device_ref_, descriptor_layout_, nullptr);
@@ -670,9 +678,9 @@ class pipeline {
   }
 
   void draw(VkCommandBuffer _buffer, uint _descriptor_index,
-            const shared_indices &  _indices,
+            const shared_indices   &_indices,
             const shared_instances &_instances,
-            const shared_vertices & _vertices) {
+            const shared_vertices  &_vertices) {
     draw(_buffer, _descriptor_index,
          _indices, 0, _indices->size(),
          _instances, 0, _instances ? _instances->size() : 1,
@@ -682,7 +690,7 @@ class pipeline {
   void draw(VkCommandBuffer _buffer, uint _descriptor_index,
             const shared_indices &_indices, uint _indices_count,
             const shared_instances &_instances,
-            const shared_vertices & _vertices) {
+            const shared_vertices  &_vertices) {
     draw(_buffer, _descriptor_index,
          _indices, 0, _indices_count,
          _instances, 0, _instances ? _instances->size() : 1,

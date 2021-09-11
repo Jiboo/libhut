@@ -25,7 +25,7 @@
  * SOFTWARE.
  */
 
-#define HUT_TEXT_SAMPLE_ENABLE_IMGUI
+//#define HUT_TEXT_SAMPLE_ENABLE_IMGUI
 
 #include <random>
 
@@ -251,7 +251,7 @@ int main(int, char **) {
                                     "Phasellus ullamcorper ipsum eget porttitor facilisis. Pellentesque et erat gravida nisl dictum dignissim. Nullam vel quam ante. Quisque nec tellus accumsan, scelerisque orci id, accumsan eros. Suspendisse vel eros lorem. Sed hendrerit sem a sem fermentum dignissim. Quisque sit amet sem lobortis, aliquam lectus et, malesuada mauris. Mauris luctus, nisl eget facilisis volutpat, ex diam vestibulum risus, et condimentum dolor nisl eu mi.\n"
                                     "Praesent at neque id est lobortis egestas. Sed dui nulla, hendrerit eget malesuada a, dignissim sit amet mauris. Suspendisse sit amet metus quis tortor commodo venenatis. Praesent maximus metus a lacus condimentum pretium. Donec eleifend gravida diam, ac condimentum lorem mattis a. Ut tortor urna, suscipit id ullamcorper eget, mattis sed lorem. Integer nibh nisi, molestie et fermentum a, tempus non tellus. Donec pulvinar finibus arcu, in sollicitudin libero aliquam ac. Donec a justo sit amet risus maximus bibendum a id ex. Aliquam ac mauris blandit, consectetur libero faucibus, hendrerit turpis. Vestibulum sed nulla cursus, dictum nisi vel, commodo tellus. Nam placerat orci a nisl porta mollis. Nam sed tempor arcu. Morbi vehicula quam quis arcu elementum, sit amet laoreet tortor commodo. Ut eu vehicula leo. Nam imperdiet, nibh nec pretium nulla.";
 
-  std::vector<std::u8string_view> words;
+  std::vector<std::u8string_view> words{16000};
 
   auto dosplit = [&words, &text_input]() {
     words.clear();

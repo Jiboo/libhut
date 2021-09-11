@@ -41,8 +41,23 @@ class shaper {
   shared_font  font_;
 
  public:
+  shaper() = delete;
+
+  shaper(const shaper &) = delete;
+  shaper &operator=(const shaper &) = delete;
+
+  shaper(shaper &&_other) noexcept
+      : buffer_(std::exchange(_other.buffer_, nullptr))
+      , font_(std::move(_other.font_)) {}
+  shaper &operator=(shaper &&_other) noexcept {
+    if (&_other != this) {
+      buffer_ = std::exchange(_other.buffer_, nullptr);
+      font_   = std::move(_other.font_);
+    }
+    return *this;
+  }
+
   explicit shaper(shared_font _font);
-  shaper(shaper &&_other) noexcept;
   ~shaper();
 
   using shape_callback = std::function<void(uint /*index*/, i16vec4 /*quad*/, vec4 /*uv*/, uint /*atlas_page*/)>;

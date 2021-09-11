@@ -25,21 +25,20 @@
  * SOFTWARE.
  */
 
+#include "hut/text/font.hpp"
+
 #include <iostream>
+
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#include FT_BITMAP_H
+#include <harfbuzz/hb-ft.h>
+#include <harfbuzz/hb.h>
 
 #include "hut/utils/profiling.hpp"
 #include "hut/utils/sstream.hpp"
 
 #include "hut/atlas.hpp"
-
-#include "hut/text/font.hpp"
-
-#include <ft2build.h>
-#include FT_FREETYPE_H
-#include FT_BITMAP_H
-
-#include <harfbuzz/hb-ft.h>
-#include <harfbuzz/hb.h>
 
 using namespace hut;
 using namespace hut::text;

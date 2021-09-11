@@ -52,17 +52,25 @@ struct render_target_params {
 
 class render_target {
  public:
+  render_target() = delete;
+
+  render_target(const render_target &) = delete;
+  render_target &operator=(const render_target &) = delete;
+
+  render_target(render_target &&) noexcept = delete;
+  render_target &operator=(render_target &&) noexcept = delete;
+
   explicit render_target(display &_display);
   ~render_target();
 
   [[nodiscard]] const render_target_params &params() const { return render_target_params_; }
-  [[nodiscard]] display &                   parent() { return display_; }
+  [[nodiscard]] display                    &parent() { return *display_; }
 
   [[nodiscard]] VkSampleCountFlagBits sample_count() const { return sample_count_; }
   [[nodiscard]] VkRenderPass          renderpass() const { return renderpass_; }
 
  protected:
-  display &            display_;
+  display             *display_;
   render_target_params render_target_params_;
 
   shared_image          depth_;

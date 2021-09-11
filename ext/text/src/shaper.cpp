@@ -25,12 +25,12 @@
  * SOFTWARE.
  */
 
-#include "hut/utils/profiling.hpp"
-
 #include "hut/text/shaper.hpp"
 
 #include <harfbuzz/hb-ft.h>
 #include <harfbuzz/hb.h>
+
+#include "hut/utils/profiling.hpp"
 
 using namespace hut::text;
 
@@ -44,12 +44,6 @@ shaper::~shaper() {
     hb_buffer_destroy(buffer_);
 }
 
-shaper::shaper(shaper &&_other) noexcept
-    : buffer_(_other.buffer_)
-    , font_(std::move(_other.font_)) {
-  _other.buffer_ = nullptr;
-}
-
 void shaper::shape(const shared_atlas &_atlas, std::u8string_view _text, const shape_callback &_cb) {
   HUT_PROFILE_SCOPE_NAMED(PFONT, "shaper::bake {}", ("text"), make_fixed<40>(_text));
 
@@ -60,7 +54,7 @@ void shaper::shape(const shared_atlas &_atlas, std::u8string_view _text, const s
   hb_shape(font_->font_, buffer_, nullptr, 0);
 
   uint                 codepoints;
-  hb_glyph_info_t *    info = hb_buffer_get_glyph_infos(buffer_, &codepoints);
+  hb_glyph_info_t     *info = hb_buffer_get_glyph_infos(buffer_, &codepoints);
   hb_glyph_position_t *pos  = hb_buffer_get_glyph_positions(buffer_, nullptr);
 
   // https://github.com/tangrams/harfbuzz-example/blob/master/src/hbshaper.h

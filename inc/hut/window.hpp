@@ -52,7 +52,7 @@ cursor_type edge_cursor(edge);
 enum touch_event_type { TDOWN,
                         TUP,
                         TMOVE };
-const char *         touch_event_name(touch_event_type);
+const char          *touch_event_name(touch_event_type);
 inline std::ostream &operator<<(std::ostream &_os, touch_event_type _c) {
   return _os << touch_event_name(_c);
 }
@@ -62,7 +62,7 @@ enum mouse_event_type { MDOWN,
                         MMOVE,
                         MWHEEL_UP,
                         MWHEEL_DOWN };
-const char *         mouse_event_name(mouse_event_type);
+const char          *mouse_event_name(mouse_event_type);
 inline std::ostream &operator<<(std::ostream &_os, mouse_event_type _c) {
   return _os << mouse_event_name(_c);
 }
@@ -103,6 +103,14 @@ class window : public render_target {
   event<keycode, keysym, bool /*down*/> on_key;
   event<char32_t /*utf32_char*/>        on_char;
 
+  window() = delete;
+
+  window(const window &) = delete;
+  window &operator=(const window &) = delete;
+
+  window(window &&) noexcept = delete;
+  window &operator=(window &&) noexcept = delete;
+
   explicit window(display &_display, const window_params &_init_params = {});
   ~window();
 
@@ -139,7 +147,7 @@ class window : public render_target {
   void dragndrop_start(dragndrop_actions _supported_actions, clipboard_formats _supported_formats, send_dragndrop_data &&_callback);
 
  protected:
-  display &     display_;
+  display      &display_;
   window_params params_;
 
   VkSurfaceKHR surface_ = VK_NULL_HANDLE;
@@ -185,8 +193,8 @@ class window : public render_target {
   static void drag_data_source_handle_dnd_finished(void *, wl_data_source *);
   static void drag_data_source_handle_action(void *, wl_data_source *, u32);
 
-  wl_surface *  wayland_surface_;
-  xdg_surface * window_;
+  wl_surface   *wayland_surface_;
+  xdg_surface  *window_;
   xdg_toplevel *toplevel_;
 
   std::atomic_bool invalidated_         = true;
@@ -219,7 +227,7 @@ class window : public render_target {
   };
   struct clipboard_sender_context {
     send_clipboard_data               callback_;
-    wl_data_source *                  selection_ = nullptr;
+    wl_data_source                   *selection_ = nullptr;
     std::list<clipboard_async_writer> writers_;
 
     ~clipboard_sender_context() { clear(); }

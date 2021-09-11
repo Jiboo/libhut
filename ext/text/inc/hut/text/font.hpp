@@ -47,6 +47,14 @@ class font {
   friend class shaper;
 
  public:
+  font() = delete;
+
+  font(const font &) = delete;
+  font &operator=(const font &) = delete;
+
+  font(font &&) noexcept = delete;
+  font &operator=(font &&) noexcept = delete;
+
   font(std::span<const u8> _data, uint _size, bool _hinting = true);
   ~font();
 

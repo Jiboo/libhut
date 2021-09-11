@@ -27,8 +27,9 @@
 
 #include "hut/renderdoc/renderdoc.hpp"
 
-#include <dlfcn.h>
 #include <filesystem>
+
+#include <dlfcn.h>
 #include <renderdoc_app.h>
 
 namespace hut::renderdoc {

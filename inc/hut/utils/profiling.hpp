@@ -58,7 +58,6 @@
 #  include <boost/preprocessor/tuple/enum.hpp>
 #  include <boost/preprocessor/variadic/to_seq.hpp>
 #  include <boost/stacktrace.hpp>
-
 #  include <fmt/chrono.h>
 #  include <fmt/core.h>
 #  include <fmt/ostream.h>
@@ -422,6 +421,7 @@ class basic_event : public TFirstParent {
   static constexpr size_t data_size   = total_size - header_size;
 
  private:
+
  public:
   static_assert(total_size > header_size, "Total size is too small");
 
@@ -708,7 +708,7 @@ template<fixed_string TFormat, fixed_string_array TArgNames, typename TEventType
 struct complete_event_scope {
   using dispatcher = typename TEventType::dispatcher;
 
-  std::vector<TEventType> & buffer_;
+  std::vector<TEventType>  &buffer_;
   profiling_category        cat_;
   clock_f32::time_point     start_;
   stacktrace                stacktrace_;

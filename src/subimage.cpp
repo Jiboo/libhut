@@ -26,19 +26,10 @@
  */
 
 #include "hut/subimage.hpp"
+
 #include "hut/atlas.hpp"
 
 using namespace hut;
-
-subimage &subimage::operator=(subimage &&_other) noexcept {
-  atlas_        = _other.atlas_;
-  _other.atlas_ = nullptr;
-
-  page_   = _other.page_;
-  bounds_ = _other.bounds_;
-
-  return *this;
-}
 
 void subimage::release() {
   if (atlas_)

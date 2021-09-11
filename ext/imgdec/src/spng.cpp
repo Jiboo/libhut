@@ -25,9 +25,9 @@
  * SOFTWARE.
  */
 
-#include "hut/imgdec/imgdec.hpp"
-
 #include "spng.h"
+
+#include "hut/imgdec/imgdec.hpp"
 
 namespace hut::imgdec {
 
@@ -82,7 +82,7 @@ bool do_read(image::updator &&_target, spng_ctx &_ctx, uint _rows, spng_format _
 
   auto img_row_pitch = _target.image_row_pitch();
   for (uint row = 0; row < _rows; row++) {
-    u8 * target  = _target.data() + (row * _target.staging_row_pitch());
+    u8  *target  = _target.data() + (row * _target.staging_row_pitch());
     auto errcode = spng_decode_row(&_ctx, target, img_row_pitch);
     if (errcode != SPNG_OK && errcode != SPNG_EOI)
       return false;

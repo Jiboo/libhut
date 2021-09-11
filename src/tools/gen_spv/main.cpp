@@ -1,6 +1,7 @@
 #include <cassert>
-#include <chrono>
 #include <cstring>
+
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -24,14 +25,14 @@ inline string_view get_sv(const svsub_match &m) {
 }
 
 inline bool regex_match(string_view                      sv,
-                        svmatch &                        m,
-                        const regex &                    e,
+                        svmatch                         &m,
+                        const regex                     &e,
                         regex_constants::match_flag_type flags = regex_constants::match_default) {
   return regex_match(sv.begin(), sv.end(), m, e, flags);
 }
 
 inline bool regex_match(string_view                      sv,
-                        const regex &                    e,
+                        const regex                     &e,
                         regex_constants::match_flag_type flags = regex_constants::match_default) {
   return regex_match(sv.begin(), sv.end(), e, flags);
 }

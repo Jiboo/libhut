@@ -43,7 +43,7 @@ buffer::buffer(display &_display, uint _size, const buffer_params &_params)
 }
 
 buffer::page_data::page_data(buffer &_parent, uint _size)
-    : parent_(_parent)
+    : parent_(&_parent)
     , suballocator_(_size) {
   VkBufferCreateInfo create_info = {};
   create_info.sType              = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -73,7 +73,7 @@ buffer::page_data::page_data(buffer &_parent, uint _size)
   }
   HUT_PVK(vkBindBufferMemory, device, buffer_, memory_, 0);
 
-  if (parent_.params_.permanent_map_) {
+  if (parent_->params_.permanent_map_) {
     HUT_PVK(vkMapMemory, device, memory_, 0, _size, 0, reinterpret_cast<void **>(&permanent_map_));
     assert(permanent_map_);
   } else {
@@ -81,26 +81,17 @@ buffer::page_data::page_data(buffer &_parent, uint _size)
   }
 }
 
-buffer::page_data::page_data(page_data &&_other) noexcept
-    : parent_(_other.parent_)
-    , suballocator_(std::move(_other.suballocator_))
-    , buffer_(_other.buffer_)
-    , memory_(_other.memory_)
-    , permanent_map_(_other.permanent_map_) {
-  _other.buffer_        = VK_NULL_HANDLE;
-  _other.memory_        = VK_NULL_HANDLE;
-  _other.permanent_map_ = nullptr;
-}
-
 buffer::page_data::~page_data() {
-  auto device = parent_.display_.device();
+  if (parent_) {
+    auto device = parent_->display_.device();
 
-  if (permanent_map_)
-    HUT_PVK(vkUnmapMemory, device, memory_);
-  if (buffer_)
-    HUT_PVK(vkDestroyBuffer, device, buffer_, nullptr);
-  if (memory_)
-    HUT_PVK(vkFreeMemory, device, memory_, nullptr);
+    if (permanent_map_)
+      HUT_PVK(vkUnmapMemory, device, memory_);
+    if (buffer_)
+      HUT_PVK(vkDestroyBuffer, device, buffer_, nullptr);
+    if (memory_)
+      HUT_PVK(vkFreeMemory, device, memory_, nullptr);
+  }
 }
 
 shared_suballoc_raw buffer::allocate_raw(uint _size_bytes, uint _align) {
@@ -119,7 +110,7 @@ shared_suballoc_raw buffer::allocate_raw(uint _size_bytes, uint _align) {
 
 suballoc_raw::updator buffer::buffer_suballoc::update_raw(uint _offset_bytes, uint _size_bytes) {
   assert(parent_);
-  auto &          display = parent_->display_;
+  auto           &display = parent_->display_;
   std::lock_guard lk(display.staging_mutex_);
   auto            staging_suballoc = display.staging_->allocate_raw(_size_bytes);
   std::span<u8>   staging_span{staging_suballoc->existing_mapping(), _size_bytes};
@@ -135,7 +126,7 @@ void buffer::buffer_suballoc::finalize(const suballoc_raw::updator &_updator) {
   copy.dstOffset            = _updator.total_offset_bytes();
   copy.destination          = _updator.parent_alloc()->underlying_buffer();
 
-  auto &          dsp = parent_->display_;
+  auto           &dsp = parent_->display_;
   std::lock_guard lk(dsp.staging_mutex_);
   dsp.staging_jobs_++;
   dsp.preflush([&dsp, copy]() {

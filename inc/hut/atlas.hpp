@@ -54,15 +54,17 @@ class atlas {
   void add_page();
 
   struct page_data {
-    shared_image                                                  image_;
-    binpack::shelve<u16, binpack::shelve_separator_align<u16, 8>> packer_;
+    using packer_t = binpack::shelve<u16, binpack::shelve_separator_align<u16, 8>>;
+
+    shared_image image_;
+    packer_t     packer_;
 
     explicit page_data(const shared_image &_image)
         : image_(_image)
         , packer_(_image->size()) {}
   };
 
-  display &              display_;
+  display               &display_;
   image_params           params_;
   std::vector<page_data> pages_;
 };

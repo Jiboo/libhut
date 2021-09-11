@@ -39,11 +39,27 @@ CompactNamespaces: false
 ContinuationIndentWidth: 4
 Cpp11BracedListStyle: true
 
-#EmptyLineAfterAccessModifier: Never
+EmptyLineAfterAccessModifier: Never
 EmptyLineBeforeAccessModifier: Always
 
 FixNamespaceComments: true
 
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '(<assert.h>)|(<complex.h>)|(<ctype.h>)|(<errno.h>)|(<fenv.h>)|(<float.h>)|(<inttypes.h>)|(<iso646.h>)|(<limits.h>)|(<locale.h>)|(<math.h>)|(<setjmp.h>)|(<signal.h>)|(<stdalign.h>)|(<stdarg.h>)|(<stdbool.h>)|(<stddef.h>)|(<stdint.h>)|(<stdio.h>)|(<stdlib.h>)|(<string.h>)|(<tgmath.h>)|(<time.h>)|(<uchar.h>)|(<wchar.h>)|(<wctype.h>)'
+    Priority: 100
+  - Regex: '(<cassert>)|(<ccomplex>)|(<cctype>)|(<cerrno>)|(<cfenv>)|(<cfloat>)|(<cinttypes>)|(<ciso646>)|(<climits>)|(<clocale>)|(<cmath>)|(<csetjmp>)|(<csignal>)|(<cstdalign>)|(<cstdarg>)|(<cstdbool>)|(<cstddef>)|(<cstdint>)|(<cstdio>)|(<cstdlib>)|(<cstring>)|(<ctgmath>)|(<ctime>)|(<cuchar>)|(<cwchar>)|(<cwctype>)'
+    Priority: 200
+  - Regex: '(<algorithm>)|(<any>)|(<array>)|(<atomic>)|(<barrier>)|(<bit>)|(<bitset>)|(<charconv>)|(<chrono>)|(<codecvt>)|(<compare>)|(<complex>)|(<concepts>)|(<condition_variable>)|(<coroutine>)|(<deque>)|(<exception>)|(<execution>)|(<filesystem>)|(<format>)|(<forward_list>)|(<fstream>)|(<functional>)|(<future>)|(<initializer_list>)|(<iomanip>)|(<ios>)|(<iosfwd>)|(<iostream>)|(<istream>)|(<iterator>)|(<latch>)|(<limits>)|(<list>)|(<locale>)|(<map>)|(<memory>)|(<memory_resource>)|(<mutex>)|(<new>)|(<numbers>)|(<numeric>)|(<optional>)|(<ostream>)|(<queue>)|(<random>)|(<ranges>)|(<ratio>)|(<regex>)|(<scoped_allocator>)|(<semaphore>)|(<set>)|(<shared_mutex>)|(<source_location>)|(<span>)|(<sstream>)|(<stack>)|(<stdexcept>)|(<stop_token>)|(<streambuf>)|(<string>)|(<string_view>)|(<strstream>)|(<syncstream>)|(<system_error>)|(<thread>)|(<tuple>)|(<typeindex>)|(<typeinfo>)|(<type_traits>)|(<unordered_map>)|(<unordered_set>)|(<utility>)|(<valarray>)|(<variant>)|(<vector>)|(<version>)'
+    Priority: 300
+  - Regex: '<.*>'
+    Priority: 400
+  - Regex: '"hut/utils/[0-9a-z_]*.hpp"'
+    Priority: 500
+  - Regex: '"hut/[0-9a-z_]*.hpp"'
+    Priority: 600
+  - Regex: '"hut/[0-9a-z_]*/[0-9a-z_]*.hpp"'
+    Priority: 700
 IndentCaseBlocks: true
 IndentCaseLabels: true
 IndentPPDirectives: AfterHash
@@ -63,7 +79,7 @@ PointerAlignment: Right
 #ReferenceAlignment: Right
 ReflowComments: false
 
-#ShortNamespaceLines: 0
+ShortNamespaceLines: 0
 SortUsingDeclarations: true
 
 SpaceAfterCStyleCast: false

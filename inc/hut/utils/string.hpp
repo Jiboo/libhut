@@ -47,7 +47,7 @@ inline void split(std::basic_string_view<TInput> _input, std::basic_string_view<
 
 inline void hexdump(const void *ptr, size_t buflen) {
   // https://stackoverflow.com/questions/29242/off-the-shelf-c-hex-dump-code
-  auto * buf = (unsigned char *)ptr;
+  auto  *buf = (unsigned char *)ptr;
   size_t i, j;
   for (i = 0; i < buflen; i += 16) {
     printf("%06zx: ", i);

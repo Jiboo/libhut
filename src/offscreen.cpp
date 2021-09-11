@@ -25,6 +25,8 @@
  * SOFTWARE.
  */
 
+#include "hut/offscreen.hpp"
+
 #include <algorithm>
 #include <utility>
 
@@ -33,12 +35,11 @@
 
 #include "hut/display.hpp"
 #include "hut/image.hpp"
-#include "hut/offscreen.hpp"
 
 using namespace hut;
 
 offscreen::offscreen(const shared_image &_target, offscreen_params _init_params)
-    : render_target(_target->display_)
+    : render_target(*_target->display_)
     , target_(_target)
     , params_(std::move(_init_params)) {
   HUT_PROFILE_SCOPE(PWINDOW, "offscreen::offscreen");
@@ -60,17 +61,17 @@ offscreen::offscreen(const shared_image &_target, offscreen_params _init_params)
 
   reinit_pass(pass_params, std::span<VkImageView>{&_target->view_, 1});
 
-  VkCommandBufferAllocateInfo allocInfo = {};
-  allocInfo.sType                       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  allocInfo.level                       = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  allocInfo.commandBufferCount          = 1;
-  allocInfo.commandPool                 = display_.commandg_pool_;
-  if (HUT_PVK(vkAllocateCommandBuffers, display_.device_, &allocInfo, &cb_) != VK_SUCCESS)
+  VkCommandBufferAllocateInfo alloc_info = {};
+  alloc_info.sType                       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  alloc_info.level                       = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  alloc_info.commandBufferCount          = 1;
+  alloc_info.commandPool                 = display_->commandg_pool_;
+  if (HUT_PVK(vkAllocateCommandBuffers, display_->device_, &alloc_info, &cb_) != VK_SUCCESS)
     throw std::runtime_error("failed to allocate command buffers!");
 
-  VkFenceCreateInfo fenceInfo = {};
-  fenceInfo.sType             = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-  if (HUT_PVK(vkCreateFence, display_.device_, &fenceInfo, nullptr, &fence_) != VK_SUCCESS)
+  VkFenceCreateInfo fence_info = {};
+  fence_info.sType             = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+  if (HUT_PVK(vkCreateFence, display_->device_, &fence_info, nullptr, &fence_) != VK_SUCCESS)
     throw std::runtime_error("failed to allocate fence!");
 }
 
@@ -78,33 +79,33 @@ offscreen::~offscreen() {
   HUT_PROFILE_SCOPE(PWINDOW, "offscreen::~offscreen");
 
   if (cb_ != VK_NULL_HANDLE)
-    HUT_PVK(vkFreeCommandBuffers, display_.device_, display_.commandg_pool_, 1, &cb_);
+    HUT_PVK(vkFreeCommandBuffers, display_->device_, display_->commandg_pool_, 1, &cb_);
   if (fence_ != VK_NULL_HANDLE)
-    HUT_PVK(vkDestroyFence, display_.device_, fence_, nullptr);
+    HUT_PVK(vkDestroyFence, display_->device_, fence_, nullptr);
 }
 
 void offscreen::flush_cb() {
-  VkSubmitInfo submitInfo       = {};
-  submitInfo.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers    = &cb_;
+  VkSubmitInfo submit_info       = {};
+  submit_info.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submit_info.commandBufferCount = 1;
+  submit_info.pCommandBuffers    = &cb_;
 
-  if (HUT_PVK(vkQueueSubmit, display_.queueg_, 1, &submitInfo, fence_) != VK_SUCCESS)
+  if (HUT_PVK(vkQueueSubmit, display_->queueg_, 1, &submit_info, fence_) != VK_SUCCESS)
     throw std::runtime_error("failed to submit draw command buffer!");
 
-  if (HUT_PVK(vkWaitForFences, display_.device_, 1, &fence_, VK_TRUE, 10ull * 1000 * 1000 * 1000) != VK_SUCCESS)  // 10s timeout
+  if (HUT_PVK(vkWaitForFences, display_->device_, 1, &fence_, VK_TRUE, 10ull * 1000 * 1000 * 1000) != VK_SUCCESS)  // 10s timeout
     throw std::runtime_error("error (or time out) while waiting for offscreen render");
 
-  HUT_PVK(vkResetFences, display_.device_, 1, &fence_);
+  HUT_PVK(vkResetFences, display_->device_, 1, &fence_);
 }
 
 void offscreen::draw(const draw_callback &_callback) {
-  VkImageSubresourceRange subresRange;
-  subresRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-  subresRange.baseMipLevel   = params_.subres_.level_;
-  subresRange.levelCount     = 1;
-  subresRange.baseArrayLayer = params_.subres_.layer_;
-  subresRange.layerCount     = 1;
+  VkImageSubresourceRange subres_range;
+  subres_range.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+  subres_range.baseMipLevel   = params_.subres_.level_;
+  subres_range.levelCount     = 1;
+  subres_range.baseArrayLayer = params_.subres_.layer_;
+  subres_range.layerCount     = 1;
 
   begin_rebuild_cb(fbos_[0], cb_);
   _callback(cb_);
@@ -123,48 +124,49 @@ void offscreen::download(std::span<u8> _dst, uint _data_row_pitch, image::subres
   assert(_src.coords_.z <= target_->size().x);
   assert(_src.coords_.w <= target_->size().y);
 
-  const uint buffer_align = display_.device_props_.limits.optimalBufferCopyRowPitchAlignment;
-  const uint offset_align = std::max(VkDeviceSize(4), display_.device_props_.limits.optimalBufferCopyOffsetAlignment);
-  const uint row_bit_size = size.x * target_->bpp();
+  const auto &limits       = display_->device_props_.limits;
+  const uint  buffer_align = limits.optimalBufferCopyRowPitchAlignment;
+  const uint  offset_align = std::max(VkDeviceSize(4), limits.optimalBufferCopyOffsetAlignment);
+  const uint  row_bit_size = size.x * target_->bpp();
   assert(row_bit_size >= 8);
   const uint row_byte_size    = row_bit_size / 8;
   const uint buffer_row_pitch = align(row_byte_size, buffer_align);
   const auto byte_size        = size.y * buffer_row_pitch;
 
-  VkCommandBufferBeginInfo beginInfo = {};
-  beginInfo.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  beginInfo.flags                    = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-  beginInfo.pInheritanceInfo         = nullptr;  // Optional
+  VkCommandBufferBeginInfo begin_info = {};
+  begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  begin_info.flags                    = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+  begin_info.pInheritanceInfo         = nullptr;  // Optional
 
-  VkImageSubresourceRange subresRange;
-  subresRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-  subresRange.baseMipLevel   = _src.level_;
-  subresRange.levelCount     = 1;
-  subresRange.baseArrayLayer = _src.layer_;
-  subresRange.layerCount     = 1;
+  VkImageSubresourceRange subres_range;
+  subres_range.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+  subres_range.baseMipLevel   = _src.level_;
+  subres_range.levelCount     = 1;
+  subres_range.baseArrayLayer = _src.layer_;
+  subres_range.layerCount     = 1;
 
-  VkImageSubresourceLayers subresLayers = {};
-  subresLayers.aspectMask               = VK_IMAGE_ASPECT_COLOR_BIT;
-  subresLayers.mipLevel                 = _src.level_;
-  subresLayers.baseArrayLayer           = _src.layer_;
-  subresLayers.layerCount               = 1;
+  VkImageSubresourceLayers subres_layers = {};
+  subres_layers.aspectMask               = VK_IMAGE_ASPECT_COLOR_BIT;
+  subres_layers.mipLevel                 = _src.level_;
+  subres_layers.baseArrayLayer           = _src.layer_;
+  subres_layers.layerCount               = 1;
 
   VkBufferImageCopy region;
   region.imageExtent       = {(uint)size.x, (uint)size.y, 1};
   region.imageOffset       = {origin.x, origin.y, 0};
   region.bufferRowLength   = (buffer_row_pitch * 8) / target_->bpp();
   region.bufferImageHeight = size.y;
-  region.imageSubresource  = subresLayers;
+  region.imageSubresource  = subres_layers;
 
-  std::lock_guard lk(display_.staging_mutex_);
-  auto            staging_alloc = display_.staging_->allocate_raw(byte_size, offset_align);
+  std::lock_guard lk(display_->staging_mutex_);
+  auto            staging_alloc = display_->staging_->allocate_raw(byte_size, offset_align);
   region.bufferOffset           = staging_alloc->offset_bytes();
 
-  HUT_PVK(vkBeginCommandBuffer, cb_, &beginInfo);
+  HUT_PVK(vkBeginCommandBuffer, cb_, &begin_info);
 
-  display::transition_image(cb_, target_->image_, subresRange, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  display::transition_image(cb_, target_->image_, subres_range, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   vkCmdCopyImageToBuffer(cb_, target_->image_, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging_alloc->underlying_buffer(), 1, &region);
-  display::transition_image(cb_, target_->image_, subresRange, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  display::transition_image(cb_, target_->image_, subres_range, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
   HUT_PVK(vkEndCommandBuffer, cb_);
   flush_cb();

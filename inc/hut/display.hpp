@@ -41,6 +41,9 @@
 #include <vector>
 
 #include <vulkan/vulkan.h>
+#include <wayland-client.h>
+#include <wayland-cursor.h>
+#include <xkbcommon/xkbcommon.h>
 
 #include "hut/utils/flagged.hpp"
 #include "hut/utils/fwd.hpp"
@@ -48,9 +51,6 @@
 #include "hut/utils/sstream.hpp"
 
 #include "xdg-shell-client-protocol.h"
-#include <wayland-client.h>
-#include <wayland-cursor.h>
-#include <xkbcommon/xkbcommon.h>
 
 namespace hut {
 
@@ -65,7 +65,7 @@ enum keysym {
 #undef HUT_MAP_KEYSYM
   KSYM_LAST_VALUE = KSYM_RIGHTMETA,
 };
-const char *         keysym_name(keysym);
+const char          *keysym_name(keysym);
 inline std::ostream &operator<<(std::ostream &_os, keysym _k) {
   return _os << keysym_name(_k);
 }
@@ -112,7 +112,7 @@ enum cursor_type {
   CZOOM_OUT,
   CURSOR_TYPE_LAST_VALUE = CZOOM_OUT,
 };
-const char *         cursor_css_name(cursor_type);
+const char          *cursor_css_name(cursor_type);
 inline std::ostream &operator<<(std::ostream &_os, cursor_type _c) {
   return _os << cursor_css_name(_c);
 }
@@ -127,7 +127,7 @@ enum clipboard_format {
   CLIPBOARD_FORMAT_LAST_VALUE = FTEXT_PLAIN,
 };
 using clipboard_formats = flagged<clipboard_format, CLIPBOARD_FORMAT_LAST_VALUE>;
-const char *         format_mime_type(clipboard_format _f);
+const char          *format_mime_type(clipboard_format _f);
 inline std::ostream &operator<<(std::ostream &_os, clipboard_format _f) {
   return _os << format_mime_type(_f);
 }
@@ -140,7 +140,7 @@ enum dragndrop_action {
   DRAGNDROP_ACTION_LAST_VALUE = DNDMOVE,
 };
 using dragndrop_actions = flagged<dragndrop_action, DRAGNDROP_ACTION_LAST_VALUE>;
-const char *         action_name(dragndrop_action _a);
+const char          *action_name(dragndrop_action _a);
 inline std::ostream &operator<<(std::ostream &_os, dragndrop_action _a) {
   return _os << action_name(_a);
 }
@@ -152,7 +152,7 @@ enum modifier {
   MODIFIER_LAST_VALUE = KMOD_SHIFT,
 };
 using modifiers = flagged<modifier, MODIFIER_LAST_VALUE>;
-const char *         modifier_name(modifier _m);
+const char          *modifier_name(modifier _m);
 inline std::ostream &operator<<(std::ostream &_os, modifier _a) {
   return _os << modifier_name(_a);
 }
@@ -210,6 +210,14 @@ class display {
   using callback       = std::function<void(time_point)>;
   using scheduled_item = std::tuple<callback, duration>;
 
+  display() = delete;
+
+  display(const display &) = delete;
+  display &operator=(const display &) = delete;
+
+  display(display &&) noexcept = delete;
+  display &operator=(display &&) noexcept = delete;
+
   explicit display(const char *_app_name, u32 _app_version = VK_MAKE_VERSION(1, 0, 0),
                    const char *_display_name = nullptr);
   ~display();
@@ -222,14 +230,14 @@ class display {
   VkInstance                        instance() { return instance_; }
   VkPhysicalDevice                  pdevice() { return pdevice_; }
   VkDevice                          device() { return device_; }
-  const VkPhysicalDeviceFeatures &  features() const { return device_features_; }
+  const VkPhysicalDeviceFeatures   &features() const { return device_features_; }
   const VkPhysicalDeviceProperties &properties() const { return device_props_; }
-  const VkPhysicalDeviceLimits &    limits() const { return device_props_.limits; }
+  const VkPhysicalDeviceLimits     &limits() const { return device_props_.limits; }
 
   void post(const callback &_callback);
 
   char32_t keycode_idle_char(keycode _in) const;
-  char *   keycode_name(std::span<char> _out, keycode _in) const;
+  char    *keycode_name(std::span<char> _out, keycode _in) const;
 
   template<typename T>
   T get_proc(const std::string &_name) {
@@ -362,7 +370,7 @@ class display {
   static void data_device_handle_selection(void *, wl_data_device *, wl_data_offer *);
 
   struct animate_cursor_context {
-    display &               display_;
+    display                &display_;
     std::thread             thread_;
     std::mutex              mutex_;
     std::condition_variable cv_;
@@ -377,7 +385,7 @@ class display {
   static void animate_cursor_thread(animate_cursor_context *_ctx);
 
   struct keyboard_repeat_context {
-    display &               display_;
+    display                &display_;
     std::thread             thread_;
     std::mutex              mutex_;
     std::condition_variable cv_;
@@ -396,34 +404,35 @@ class display {
   std::unordered_map<wl_surface *, window *> windows_;
   bool                                       loop_ = true;
 
-  wl_display *   display_;
-  wl_registry *  registry_    = nullptr;
+  wl_display    *display_;
+  wl_registry   *registry_    = nullptr;
   wl_compositor *compositor_  = nullptr;
-  xdg_wm_base *  xdg_wm_base_ = nullptr;
-  wl_shm *       shm_         = nullptr;
+  xdg_wm_base   *xdg_wm_base_ = nullptr;
+  wl_shm        *shm_         = nullptr;
+  wl_seat       *seat_        = nullptr;
+  wl_pointer    *pointer_     = nullptr;
+  wl_keyboard   *keyboard_    = nullptr;
+  xkb_context   *xkb_context_ = nullptr;
+  xkb_state     *xkb_state_ = nullptr, *xkb_state_empty_ = nullptr;
+  xkb_keymap    *keymap_ = nullptr;
 
-  wl_seat *                         seat_        = nullptr;
-  wl_pointer *                      pointer_     = nullptr;
-  wl_keyboard *                     keyboard_    = nullptr;
-  xkb_context *                     xkb_context_ = nullptr;
-  xkb_state *                       xkb_state_ = nullptr, *xkb_state_empty_ = nullptr;
-  xkb_keymap *                      keymap_                  = nullptr;
-  u32                               mod_index_alt_           = 0;
-  u32                               mod_index_ctrl_          = 0;
-  u32                               mod_index_shift_         = 0;
-  u32                               last_serial_             = 0;
-  u32                               last_mouse_enter_serial_ = 0;
-  u32                               last_mouse_click_serial_ = 0;
+  u32 mod_index_alt_           = 0;
+  u32 mod_index_ctrl_          = 0;
+  u32 mod_index_shift_         = 0;
+  u32 last_serial_             = 0;
+  u32 last_mouse_enter_serial_ = 0;
+  u32 last_mouse_click_serial_ = 0;
+
   std::pair<wl_surface *, window *> pointer_current_{nullptr, nullptr};
   std::pair<wl_surface *, window *> keyboard_current_{nullptr, nullptr};
   keyboard_repeat_context           keyboard_repeat_ctx_;
 
-  wl_cursor_theme *      cursor_theme_   = nullptr;
-  wl_surface *           cursor_surface_ = nullptr;
+  wl_cursor_theme       *cursor_theme_   = nullptr;
+  wl_surface            *cursor_surface_ = nullptr;
   animate_cursor_context animate_cursor_ctx_;
 
   wl_data_device_manager *data_device_manager_ = nullptr;
-  wl_data_device *        data_device_         = nullptr;
+  wl_data_device         *data_device_         = nullptr;
   struct offer_params {
     clipboard_formats formats_;
     dragndrop_actions actions_;
@@ -431,8 +440,8 @@ class display {
     clipboard_format  drop_format_;
   };
   std::unordered_map<wl_data_offer *, offer_params> offer_params_;
-  wl_data_offer *                                   last_offer_from_clipboard_ = nullptr;
-  wl_data_offer *                                   last_offer_from_dropenter_ = nullptr;
+  wl_data_offer                                    *last_offer_from_clipboard_ = nullptr;
+  wl_data_offer                                    *last_offer_from_dropenter_ = nullptr;
   std::shared_ptr<drop_target_interface>            current_drop_target_interface_;
   u32                                               drag_enter_serial_ = 0;
 
