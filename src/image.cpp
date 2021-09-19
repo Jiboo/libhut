@@ -185,7 +185,7 @@ image::updator image::update(subresource _subres) {
   std::lock_guard lk(display_->staging_mutex_);
 
   auto staging_alloc = display_->staging_->allocate_raw(byte_size, offset_align);
-  auto span          = std::span<u8>{staging_alloc->existing_mapping(), byte_size};
+  auto span          = std::span<u8>{staging_alloc.parent()->permanent_map_ + staging_alloc.offset_bytes(), byte_size};
   return {*this, std::move(staging_alloc), span, staging_row_pitch, _subres};
 }
 
@@ -221,9 +221,9 @@ void image::finalize_update(image::updator &_update) {
   copy.imageOffset                = {origin.x, origin.y, 0};
   copy.bufferRowLength            = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : ((_update.staging_row_pitch_ * 8) / bpp());
   copy.bufferImageHeight          = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : size.y;
-  copy.bufferOffset               = _update.staging_->offset_bytes();
+  copy.bufferOffset               = _update.staging_.offset_bytes();
   copy.imageSubresource           = subresLayers;
-  copy.source                     = _update.staging_->underlying_buffer();
+  copy.source                     = _update.staging_.parent()->buffer_;
   copy.destination                = image_;
   copy.bytesSize                  = _update.size_bytes();
 
@@ -235,5 +235,5 @@ void image::finalize_update(image::updator &_update) {
     display_->stage_transition(post, subresRange);
     display_->staging_jobs_--;
   });
-  display_->postflush([staging = _update.staging_]() {});
+  display_->postflush_collect(std::move(_update.staging_));
 }

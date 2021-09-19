@@ -34,6 +34,63 @@
 
 namespace hut {
 
+namespace details {
+struct buffer_page_data {
+  buffer                 *parent_ = nullptr;
+  binpack::linear1d<uint> suballocator_;
+  VkBuffer                buffer_        = VK_NULL_HANDLE;
+  VkDeviceMemory          memory_        = VK_NULL_HANDLE;
+  u8                     *permanent_map_ = nullptr;
+
+  buffer_page_data() = delete;
+  ~buffer_page_data();
+
+  buffer_page_data(const buffer_page_data &) = delete;
+  buffer_page_data &operator=(const buffer_page_data &) = delete;
+
+  buffer_page_data(buffer_page_data &&_other) noexcept
+      : parent_(std::exchange(_other.parent_, nullptr))
+      , suballocator_(std::move(_other.suballocator_))
+      , buffer_(std::exchange(_other.buffer_, (VkBuffer)VK_NULL_HANDLE))
+      , memory_(std::exchange(_other.memory_, (VkDeviceMemory)VK_NULL_HANDLE))
+      , permanent_map_(std::exchange(_other.permanent_map_, nullptr)) {}
+  buffer_page_data &operator=(buffer_page_data &&_other) noexcept {
+    if (&_other != this) {
+      parent_        = std::exchange(_other.parent_, nullptr);
+      suballocator_  = std::move(_other.suballocator_);
+      buffer_        = std::exchange(_other.buffer_, (VkBuffer)VK_NULL_HANDLE);
+      memory_        = std::exchange(_other.memory_, (VkDeviceMemory)VK_NULL_HANDLE);
+      permanent_map_ = std::exchange(_other.permanent_map_, nullptr);
+    }
+    return *this;
+  }
+
+  buffer_page_data(buffer &_parent, uint _size);
+
+  void                             release_impl(buffer_suballoc<u8> *);
+  [[nodiscard]] buffer_updator<u8> update_raw_impl(uint _offset_bytes, uint _size_bytes);
+  void                             finalize_impl(buffer_updator<u8> *);
+  void                             zero_raw(uint _offset_bytes, uint _size_bytes);
+
+  template<typename TContained>
+  void release(buffer_suballoc<TContained> *_suballoc) {
+    release_impl(_suballoc->template reinterpret_as<u8>());
+  }
+
+  template<typename TContained>
+  void finalize(buffer_updator<TContained> *_updator) {
+    finalize_impl(_updator->template reinterpret_as<u8>());
+  }
+
+  template<typename TContained>
+  [[nodiscard]] buffer_updator<TContained> update_raw(uint _offset_bytes, uint _size_bytes) {
+    return std::move(*update_raw_impl(_offset_bytes, _size_bytes).template reinterpret_as<TContained>());
+  }
+
+  [[nodiscard]] uint size() const { return suballocator_.capacity(); }
+};
+}  // namespace details
+
 struct buffer_params {
   bool                  permanent_map_ = false;
   VkMemoryPropertyFlags type_          = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -47,45 +104,15 @@ struct buffer_params {
 };
 
 class buffer {
- public:
-  class buffer_suballoc : public suballoc_raw {
-    buffer *parent_ = nullptr;
-    uint    page_;
-
-   public:
-    buffer_suballoc() = delete;
-
-    buffer_suballoc(const buffer_suballoc &) = delete;
-    buffer_suballoc &operator=(const buffer_suballoc &) = delete;
-
-    buffer_suballoc(buffer_suballoc &&_other) noexcept = default;
-    buffer_suballoc &operator=(buffer_suballoc &&_other) noexcept = default;
-
-    buffer_suballoc(buffer *_parent, uint _page, uint _offset_bytes, uint _size_bytes)
-        : suballoc_raw(_offset_bytes, _size_bytes)
-        , parent_(_parent)
-        , page_(_page) {}
-    ~buffer_suballoc() override {
-      if (parent_) buffer_suballoc::release();
-    }
-
-    updator  update_raw(uint _offset_bytes, uint _size_bytes) final;
-    void     finalize(const updator &_updator) final;
-    void     zero_raw(uint _offset_bytes, uint _size_bytes) final;
-    VkBuffer underlying_buffer() const final;
-    u8      *existing_mapping() final;
-    bool     valid() const final { return parent_ != nullptr; }
-    void     release() final;
-  };
-  template<typename T> using suballoc        = suballoc<T, buffer_suballoc>;
-  template<typename T> using shared_suballoc = std::shared_ptr<suballoc<T>>;
+  friend class details::buffer_page_data;
 
  public:
   buffer(display &_display, uint _size, const buffer_params &_params = {});
 
-  shared_suballoc_raw                     allocate_raw(uint _size_bytes, uint _align = 4);
-  template<typename T> shared_suballoc<T> allocate(uint _count, uint _align = 4) {
-    return std::static_pointer_cast<suballoc<T>>(allocate_raw(_count * sizeof(T), _align));
+  buffer_suballoc<u8>                            allocate_raw(uint _size_bytes, uint _align = 4);
+  template<typename T> shared_buffer_suballoc<T> allocate(uint _count, uint _align = 4) {
+    auto raw_alloc = allocate_raw(_count * sizeof(T), _align);
+    return std::make_shared<buffer_suballoc<T>>(std::move(*raw_alloc.template reinterpret_as<T>()));
   }
 
 #ifdef HUT_DEBUG_STAGING
@@ -94,46 +121,11 @@ class buffer {
 
  protected:
   display      &display_;
-  uint          size_ = 0;
   buffer_params params_;
 
-  struct page_data {
-    buffer                 *parent_ = nullptr;
-    binpack::linear1d<uint> suballocator_;
-    VkBuffer                buffer_        = VK_NULL_HANDLE;
-    VkDeviceMemory          memory_        = VK_NULL_HANDLE;
-    u8                     *permanent_map_ = nullptr;
+  std::list<details::buffer_page_data> pages_;
 
-    page_data() = delete;
-
-    page_data(const page_data &) = delete;
-    page_data &operator=(const page_data &) = delete;
-
-    page_data(page_data &&_other) noexcept
-        : parent_(std::exchange(_other.parent_, nullptr))
-        , suballocator_(std::move(_other.suballocator_))
-        , buffer_(std::exchange(_other.buffer_, (VkBuffer)VK_NULL_HANDLE))
-        , memory_(std::exchange(_other.memory_, (VkDeviceMemory)VK_NULL_HANDLE))
-        , permanent_map_(std::exchange(_other.permanent_map_, nullptr)) {}
-    page_data &operator=(page_data &&_other) noexcept {
-      if (&_other != this) {
-        parent_        = std::exchange(_other.parent_, nullptr);
-        suballocator_  = std::move(_other.suballocator_);
-        buffer_        = std::exchange(_other.buffer_, (VkBuffer)VK_NULL_HANDLE);
-        memory_        = std::exchange(_other.memory_, (VkDeviceMemory)VK_NULL_HANDLE);
-        permanent_map_ = std::exchange(_other.permanent_map_, nullptr);
-      }
-      return *this;
-    }
-
-    page_data(buffer &_parent, uint _size);
-    ~page_data();
-
-    [[nodiscard]] uint size() const { return suballocator_.capacity(); }
-  };
-  std::vector<page_data> pages_;
-
-  page_data &grow(uint new_size) { return pages_.emplace_back(*this, new_size); }
+  details::buffer_page_data &grow(uint new_size) { return pages_.emplace_back(*this, new_size); }
 };
 
 }  // namespace hut

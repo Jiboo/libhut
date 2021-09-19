@@ -69,7 +69,7 @@ void install_resizable_movable(window &_win) {
 }
 
 template<typename TUBO>
-void install_resizable_ubo(window &_win, buffer::shared_suballoc<TUBO> _ubo) {
+void install_resizable_ubo(window &_win, shared_buffer_suballoc<TUBO> _ubo) {
   _win.on_resize.connect([_ubo](const uvec2 &_size) {
     mat4 proj = ortho<float>(0.f, float(_size.x), 0.f, float(_size.y));
     _ubo->set_subone(0, offsetof(TUBO, proj_), sizeof(mat4), &proj);
@@ -93,7 +93,7 @@ void install_test_events(display &_display, window &_win) {
 }
 
 template<typename TUBO>
-void install_test_events(display &_display, window &_win, buffer::shared_suballoc<TUBO> _ubo) {
+void install_test_events(display &_display, window &_win, shared_buffer_suballoc<TUBO> _ubo) {
   install_test_events(_display, _win);
   install_resizable_ubo<TUBO>(_win, _ubo);
 }

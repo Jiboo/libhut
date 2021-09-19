@@ -255,15 +255,19 @@ function(hut_add_extension)
     target_compile_definitions(${EXT_TARGET} PUBLIC -DHUT_ENABLE_${HUT_ADD_EXTENSION_NAME_UPPER})
 
     if (HUT_COMPILE_UNITTESTS)
-      file(GLOB_RECURSE EXT_TST_DATA ${EXT_UNITTESTS_DIR}/res/*.*)
-      add_custom_command(OUTPUT ${EXT_GEN_DIR}/tst_data.cpp
-          COMMAND $<TARGET_FILE:gen_res> tst_data ${EXT_GEN_DIR} ${EXT_TST_DATA}
-          DEPENDS gen_res ${EXT_TST_DATA}
-          COMMENT "Generating ${HUT_ADD_EXTENSION_NAME} unittests data")
-
       file(GLOB_RECURSE EXT_UNIT_TESTS ${EXT_UNITTESTS_DIR}/*.cpp)
-      set(HUT_UNIT_TESTS ${HUT_UNIT_TESTS} ${EXT_UNIT_TESTS} ${EXT_GEN_DIR}/tst_data.cpp)
-      set(HUT_UNIT_TESTS_DEPS ${HUT_UNIT_TESTS_DEPS} ${EXT_TARGET})
+      if (EXT_UNIT_TESTS)
+        file(GLOB_RECURSE EXT_TST_DATA ${EXT_UNITTESTS_DIR}/res/*.*)
+        if (EXT_TST_DATA)
+          add_custom_command(OUTPUT ${EXT_GEN_DIR}/tst_data.cpp
+              COMMAND $<TARGET_FILE:gen_res> tst_data ${EXT_GEN_DIR} ${EXT_TST_DATA}
+              DEPENDS gen_res ${EXT_TST_DATA}
+              COMMENT "Generating ${HUT_ADD_EXTENSION_NAME} unittests data")
+          set(EXT_UNIT_TESTS ${EXT_UNIT_TESTS} ${EXT_GEN_DIR}/tst_data.cpp)
+        endif()
+        set(HUT_UNIT_TESTS_DEPS ${HUT_UNIT_TESTS_DEPS} ${EXT_TARGET} PARENT_SCOPE)
+        set(HUT_UNIT_TESTS ${HUT_UNIT_TESTS} ${EXT_UNIT_TESTS} PARENT_SCOPE)
+      endif()
     endif()
   endif()
 endfunction()

@@ -66,12 +66,12 @@ class image {
     friend class image;
 
     image              *target_ = nullptr;
-    shared_suballoc_raw staging_;
+    buffer_suballoc<u8> staging_;
     std::span<u8>       data_;
     uint                staging_row_pitch_ = -1;
     subresource         subres_;
 
-    updator(image &_target, shared_suballoc_raw _staging, std::span<u8> _data, uint _staging_row_pitch, subresource _subres)
+    updator(image &_target, buffer_suballoc<u8> &&_staging, std::span<u8> _data, uint _staging_row_pitch, subresource _subres)
         : target_(&_target)
         , staging_(std::move(_staging))
         , data_(_data)

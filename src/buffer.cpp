@@ -35,14 +35,9 @@
 #include "hut/display.hpp"
 
 using namespace hut;
+using namespace hut::details;
 
-buffer::buffer(display &_display, uint _size, const buffer_params &_params)
-    : display_(_display)
-    , params_(_params) {
-  grow(_size);
-}
-
-buffer::page_data::page_data(buffer &_parent, uint _size)
+buffer_page_data::buffer_page_data(buffer &_parent, uint _size)
     : parent_(&_parent)
     , suballocator_(_size) {
   VkBufferCreateInfo create_info = {};
@@ -81,7 +76,7 @@ buffer::page_data::page_data(buffer &_parent, uint _size)
   }
 }
 
-buffer::page_data::~page_data() {
+buffer_page_data::~buffer_page_data() {
   if (parent_) {
     auto device = parent_->display_.device();
 
@@ -94,56 +89,68 @@ buffer::page_data::~page_data() {
   }
 }
 
-shared_suballoc_raw buffer::allocate_raw(uint _size_bytes, uint _align) {
-  for (uint i = 0; i < pages_.size(); i++) {
-    auto fit = pages_[i].suballocator_.pack(_size_bytes, _align);
+buffer::buffer(display &_display, uint _size, const buffer_params &_params)
+    : display_(_display)
+    , params_(_params) {
+  grow(_size);
+}
+
+buffer_suballoc<u8> buffer::allocate_raw(uint _size_bytes, uint _align) {
+  for (auto &page : pages_) {
+    auto fit = page.suballocator_.pack(_size_bytes, _align);
     if (fit)
-      return std::make_shared<buffer_suballoc>(this, i, *fit, _size_bytes);
+      return {&page, *fit, _size_bytes};
   }
 
   auto &new_buffer = grow(std::max<uint>(_size_bytes, pages_.back().size() * 2));
   auto  fit        = new_buffer.suballocator_.pack(_size_bytes, _align);
   assert(fit);
 
-  return std::make_shared<buffer_suballoc>(this, uint(pages_.size()) - 1, *fit, _size_bytes);
+  return {&new_buffer, *fit, _size_bytes};
 }
 
-suballoc_raw::updator buffer::buffer_suballoc::update_raw(uint _offset_bytes, uint _size_bytes) {
+void buffer_page_data::release_impl(buffer_suballoc<u8> *_suballoc) {
   assert(parent_);
-  auto           &display = parent_->display_;
+  assert(_suballoc->parent_ == this);
+  suballocator_.offer(_suballoc->offset_bytes());
+}
+
+buffer_updator<u8> buffer_page_data::update_raw_impl(uint _offset_bytes, uint _size_bytes) {
+  assert(parent_);
+  auto         &display = parent_->display_;
+  auto          lk      = std::lock_guard{display.staging_mutex_};
+  auto          staging = display.staging_->allocate_raw(_size_bytes);
+  std::span<u8> staging_span{staging.parent_->permanent_map_ + staging.offset_bytes(), _size_bytes};
+  return buffer_updator<u8>{*this, std::move(staging), staging_span, _offset_bytes};
+}
+
+void buffer_page_data::finalize_impl(buffer_updator<u8> *_updator) {
+  assert(parent_);
+  assert(_updator->parent_ == this);
+  auto &display = parent_->display_;
+
+  auto copy        = display::buffer_copy{};
+  copy.size        = _updator->size_bytes();
+  copy.srcOffset   = _updator->staging_alloc_.offset_bytes();
+  copy.source      = _updator->staging_alloc_.parent_->buffer_;
+  copy.dstOffset   = _updator->offset_bytes();
+  copy.destination = buffer_;
+
   std::lock_guard lk(display.staging_mutex_);
-  auto            staging_suballoc = display.staging_->allocate_raw(_size_bytes);
-  std::span<u8>   staging_span{staging_suballoc->existing_mapping(), _size_bytes};
-  return {shared_from_this(), std::move(staging_suballoc), staging_span, _offset_bytes};
-}
-
-void buffer::buffer_suballoc::finalize(const suballoc_raw::updator &_updator) {
-  assert(parent_);
-  display::buffer_copy copy = {};
-  copy.size                 = _updator.size_bytes();
-  copy.srcOffset            = _updator.staging_alloc()->offset_bytes();
-  copy.source               = _updator.staging_alloc()->underlying_buffer();
-  copy.dstOffset            = _updator.total_offset_bytes();
-  copy.destination          = _updator.parent_alloc()->underlying_buffer();
-
-  auto           &dsp = parent_->display_;
-  std::lock_guard lk(dsp.staging_mutex_);
-  dsp.staging_jobs_++;
-  dsp.preflush([&dsp, copy]() {
-    dsp.stage_copy(copy);
-    dsp.staging_jobs_--;
+  display.staging_jobs_++;
+  display.preflush([&display, copy]() {
+    display.stage_copy(copy);
+    display.staging_jobs_--;
   });
-  dsp.postflush([staging = _updator.staging_alloc()]() {});
+  display.postflush_collect(std::move(_updator->staging_alloc_));
 }
 
-void buffer::buffer_suballoc::zero_raw(uint _offset_bytes, uint _size_bytes) {
+void buffer_page_data::zero_raw(uint _offset_bytes, uint _size_bytes) {
   assert(parent_);
-  const uint total_offset_bytes = offset_bytes() + _offset_bytes;
-
   display::buffer_zero zero = {};
   zero.size                 = _size_bytes;
-  zero.offset               = total_offset_bytes;
-  zero.destination          = underlying_buffer();
+  zero.offset               = _offset_bytes;
+  zero.destination          = buffer_;
 
   auto &dsp = parent_->display_;
   dsp.staging_jobs_++;
@@ -151,23 +158,6 @@ void buffer::buffer_suballoc::zero_raw(uint _offset_bytes, uint _size_bytes) {
     dsp.stage_zero(zero);
     dsp.staging_jobs_--;
   });
-}
-
-VkBuffer buffer::buffer_suballoc::underlying_buffer() const {
-  assert(parent_);
-  return parent_->pages_[page_].buffer_;
-}
-
-u8 *buffer::buffer_suballoc::existing_mapping() {
-  assert(parent_);
-  auto map = parent_->pages_[page_].permanent_map_;
-  return map ? map + offset_bytes() : nullptr;
-}
-
-void buffer::buffer_suballoc::release() {
-  assert(parent_);
-  parent_->pages_[page_].suballocator_.offer(offset_bytes());
-  parent_ = nullptr;
 }
 
 #ifdef HUT_DEBUG_STAGING

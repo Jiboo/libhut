@@ -47,40 +47,40 @@ namespace hut {
 struct common_ubo {
   mat4  proj_{1};
   mat4  view_{1};
-  float dpi_scale = 1;
+  float dpi_scale_ = 1;
 
   explicit common_ubo(u16vec2 _size) {
     proj_ = ortho<float>(0.f, float(_size.x), 0.f, float(_size.y));
   }
 };
 
-using shared_ubo = buffer::shared_suballoc<common_ubo>;
+using shared_ubo = shared_buffer_suballoc<common_ubo>;
 
-using shared_commands         = buffer::shared_suballoc<VkDrawIndirectCommand>;
-using shared_indexed_commands = buffer::shared_suballoc<VkDrawIndexedIndirectCommand>;
+using shared_commands         = shared_buffer_suballoc<VkDrawIndirectCommand>;
+using shared_indexed_commands = shared_buffer_suballoc<VkDrawIndexedIndirectCommand>;
 
 struct pipeline_params {
-  VkPrimitiveTopology topology_       = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-  VkPolygonMode       polygonMode_    = VK_POLYGON_MODE_FILL;
-  VkCompareOp         depthCompare_   = VK_COMPARE_OP_LESS_OR_EQUAL;
-  VkCullModeFlagBits  cullMode_       = VK_CULL_MODE_NONE;
-  VkFrontFace         frontFace_      = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-  VkBool32            enableBlending_ = VK_TRUE;
+  VkPrimitiveTopology topology_        = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  VkPolygonMode       polygon_mode_    = VK_POLYGON_MODE_FILL;
+  VkCompareOp         depth_compare_   = VK_COMPARE_OP_LESS_OR_EQUAL;
+  VkCullModeFlagBits  cull_mode_       = VK_CULL_MODE_NONE;
+  VkFrontFace         front_face_      = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  VkBool32            enable_blending_ = VK_TRUE;
   u32                 max_sets_ = 16, initial_sets_ = 1;
 };
 
 namespace details {
 template<typename TIndex>
 struct vulkan_index_type {
-  constexpr static VkIndexType type = VK_INDEX_TYPE_MAX_ENUM;
+  constexpr static VkIndexType type_ = VK_INDEX_TYPE_MAX_ENUM;
 };
 template<>
 struct vulkan_index_type<u16> {
-  constexpr static VkIndexType type = VK_INDEX_TYPE_UINT16;
+  constexpr static VkIndexType type_ = VK_INDEX_TYPE_UINT16;
 };
 template<>
 struct vulkan_index_type<u32> {
-  constexpr static VkIndexType type = VK_INDEX_TYPE_UINT32;
+  constexpr static VkIndexType type_ = VK_INDEX_TYPE_UINT32;
 };
 }  // namespace details
 
@@ -90,9 +90,9 @@ class pipeline {
   using index_t          = TIndice;
   using vertex           = typename TVertexRefl::vertex;
   using instance         = typename TVertexRefl::instance;
-  using shared_indices   = buffer::shared_suballoc<index_t>;
-  using shared_vertices  = buffer::shared_suballoc<vertex>;
-  using shared_instances = buffer::shared_suballoc<instance>;
+  using shared_indices   = shared_buffer_suballoc<index_t>;
+  using shared_vertices  = shared_buffer_suballoc<vertex>;
+  using shared_instances = shared_buffer_suballoc<instance>;
 
  private:
   using extra_attachments = std::tuple<TExtraAttachments...>;
@@ -293,10 +293,10 @@ class pipeline {
     rasterizer_create_info.sType                                  = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizer_create_info.depthClampEnable                       = VK_FALSE;
     rasterizer_create_info.rasterizerDiscardEnable                = VK_FALSE;
-    rasterizer_create_info.polygonMode                            = _params.polygonMode_;
+    rasterizer_create_info.polygonMode                            = _params.polygon_mode_;
     rasterizer_create_info.lineWidth                              = 1.0f;
-    rasterizer_create_info.cullMode                               = _params.cullMode_;
-    rasterizer_create_info.frontFace                              = _params.frontFace_;
+    rasterizer_create_info.cullMode                               = _params.cull_mode_;
+    rasterizer_create_info.frontFace                              = _params.front_face_;
     rasterizer_create_info.depthBiasEnable                        = VK_FALSE;
     rasterizer_create_info.depthBiasConstantFactor                = 0.0f;
     rasterizer_create_info.depthBiasClamp                         = 0.0f;
@@ -317,7 +317,7 @@ class pipeline {
                                   | VK_COLOR_COMPONENT_A_BIT;
     VkPipelineColorBlendAttachmentState blend_attachment = {};
     blend_attachment.colorWriteMask                      = component_mask;
-    blend_attachment.blendEnable                         = _params.enableBlending_;
+    blend_attachment.blendEnable                         = _params.enable_blending_;
     blend_attachment.srcColorBlendFactor                 = VK_BLEND_FACTOR_SRC_ALPHA;
     blend_attachment.dstColorBlendFactor                 = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     blend_attachment.colorBlendOp                        = VK_BLEND_OP_ADD;
@@ -346,37 +346,37 @@ class pipeline {
     dynamic_states_create_info.dynamicStateCount                = (u32)dynamic_states.size();
     dynamic_states_create_info.pDynamicStates                   = dynamic_states.data();
 
-    VkPipelineDepthStencilStateCreateInfo depthStencil = {};
-    depthStencil.sType                                 = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable                       = VK_TRUE;
-    depthStencil.depthWriteEnable                      = VK_TRUE;
-    depthStencil.depthCompareOp                        = _params.depthCompare_;
-    depthStencil.depthBoundsTestEnable                 = VK_FALSE;
-    depthStencil.minDepthBounds                        = 0.0f;  // Optional
-    depthStencil.maxDepthBounds                        = 1.0f;  // Optional
-    depthStencil.stencilTestEnable                     = VK_FALSE;
-    depthStencil.front                                 = {};  // Optional
-    depthStencil.back                                  = {};  // Optional
+    VkPipelineDepthStencilStateCreateInfo depth_stencil = {};
+    depth_stencil.sType                                 = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depth_stencil.depthTestEnable                       = VK_TRUE;
+    depth_stencil.depthWriteEnable                      = VK_TRUE;
+    depth_stencil.depthCompareOp                        = _params.depth_compare_;
+    depth_stencil.depthBoundsTestEnable                 = VK_FALSE;
+    depth_stencil.minDepthBounds                        = 0.0f;  // Optional
+    depth_stencil.maxDepthBounds                        = 1.0f;  // Optional
+    depth_stencil.stencilTestEnable                     = VK_FALSE;
+    depth_stencil.front                                 = {};  // Optional
+    depth_stencil.back                                  = {};  // Optional
 
-    VkGraphicsPipelineCreateInfo pipelineInfo = {};
-    pipelineInfo.sType                        = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount                   = 2;
-    pipelineInfo.pStages                      = shader_create_infos;
-    pipelineInfo.pVertexInputState            = &vertex_create_info;
-    pipelineInfo.pInputAssemblyState          = &assembly_create_info;
-    pipelineInfo.pViewportState               = &viewport_create_info;
-    pipelineInfo.pRasterizationState          = &rasterizer_create_info;
-    pipelineInfo.pMultisampleState            = &msaa_create_info;
-    pipelineInfo.pColorBlendState             = &blend_create_info;
-    pipelineInfo.pDynamicState                = &dynamic_states_create_info;
-    pipelineInfo.pDepthStencilState           = &depthStencil;
-    pipelineInfo.layout                       = layout_;
-    pipelineInfo.renderPass                   = render_pass_;
-    pipelineInfo.subpass                      = 0;
-    pipelineInfo.basePipelineHandle           = VK_NULL_HANDLE;
-    pipelineInfo.basePipelineIndex            = -1;  // Optional
+    VkGraphicsPipelineCreateInfo pipeline_info = {};
+    pipeline_info.sType                        = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipeline_info.stageCount                   = 2;
+    pipeline_info.pStages                      = shader_create_infos;
+    pipeline_info.pVertexInputState            = &vertex_create_info;
+    pipeline_info.pInputAssemblyState          = &assembly_create_info;
+    pipeline_info.pViewportState               = &viewport_create_info;
+    pipeline_info.pRasterizationState          = &rasterizer_create_info;
+    pipeline_info.pMultisampleState            = &msaa_create_info;
+    pipeline_info.pColorBlendState             = &blend_create_info;
+    pipeline_info.pDynamicState                = &dynamic_states_create_info;
+    pipeline_info.pDepthStencilState           = &depth_stencil;
+    pipeline_info.layout                       = layout_;
+    pipeline_info.renderPass                   = render_pass_;
+    pipeline_info.subpass                      = 0;
+    pipeline_info.basePipelineHandle           = VK_NULL_HANDLE;
+    pipeline_info.basePipelineIndex            = -1;  // Optional
 
-    if (HUT_PVK(vkCreateGraphicsPipelines, device_ref_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_) != VK_SUCCESS)
+    if (HUT_PVK(vkCreateGraphicsPipelines, device_ref_, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &pipeline_) != VK_SUCCESS)
       throw std::runtime_error("failed to create graphics pipeline!");
   }
 
@@ -459,9 +459,9 @@ class pipeline {
     }
 
     template<typename TUBO>
-    void buffer(uint _binding, const buffer::shared_suballoc<TUBO> &_ubo) {
+    void buffer(uint _binding, const shared_buffer_suballoc<TUBO> &_ubo) {
       VkDescriptorBufferInfo info = {};
-      info.buffer                 = _ubo->underlying_buffer();
+      info.buffer                 = _ubo->parent()->buffer_;
       info.offset                 = _ubo->offset_bytes();
       info.range                  = _ubo->size_bytes();
       buffers_.emplace_back(info);
@@ -519,7 +519,7 @@ class pipeline {
   void write_continue(int _binding, descriptor_write_context &_context) {}
 
   template<typename TBufferType, typename... TRest>
-  void write_continue(int _binding, descriptor_write_context &_context, const buffer::shared_suballoc<TBufferType> &_buffer, const TRest &..._rest) {
+  void write_continue(int _binding, descriptor_write_context &_context, const shared_buffer_suballoc<TBufferType> &_buffer, const TRest &..._rest) {
     _context.buffer(_binding, _buffer);
     write_continue(_binding + 1, _context, std::forward<const TRest &>(_rest)...);
   }
@@ -626,25 +626,25 @@ class pipeline {
 
   void bind_vertices(VkCommandBuffer _buffer, const shared_vertices &_vertices) {
     assert(_vertices);
-    VkBuffer     verticesBuffers[] = {_vertices->underlying_buffer()};
-    VkDeviceSize verticesOffsets[] = {_vertices->offset_bytes()};
-    HUT_PVK(vkCmdBindVertexBuffers, _buffer, 0, 1, verticesBuffers, verticesOffsets);
+    VkBuffer     vertices_buffers[] = {_vertices->parent()->buffer_};
+    VkDeviceSize vertices_offsets[] = {_vertices->offset_bytes()};
+    HUT_PVK(vkCmdBindVertexBuffers, _buffer, 0, 1, vertices_buffers, vertices_offsets);
   }
 
   void bind_instances(VkCommandBuffer _buffer, const shared_instances &_instances) {
     if constexpr (sizeof(instance) > 1) {
       assert(_instances);
-      VkBuffer     instancesBuffers[] = {_instances->underlying_buffer()};
-      VkDeviceSize instancesOffsets[] = {_instances->offset_bytes()};
-      HUT_PVK(vkCmdBindVertexBuffers, _buffer, 1, 1, instancesBuffers, instancesOffsets);
+      VkBuffer     instances_buffers[] = {_instances->parent()->buffer_};
+      VkDeviceSize instances_offsets[] = {_instances->offset_bytes()};
+      HUT_PVK(vkCmdBindVertexBuffers, _buffer, 1, 1, instances_buffers, instances_offsets);
     }
   }
 
   void bind_indices(VkCommandBuffer _buffer, const shared_indices &_indices) {
     assert(_indices);
-    constexpr auto vulkan_index_type = details::vulkan_index_type<index_t>::type;
+    constexpr auto vulkan_index_type = details::vulkan_index_type<index_t>::type_;
     static_assert(vulkan_index_type != VK_INDEX_TYPE_MAX_ENUM, "Unsupported index type");
-    HUT_PVK(vkCmdBindIndexBuffer, _buffer, _indices->underlying_buffer(), _indices->offset_bytes(), vulkan_index_type);
+    HUT_PVK(vkCmdBindIndexBuffer, _buffer, _indices->parent()->buffer_, _indices->offset_bytes(), vulkan_index_type);
   }
 
   void draw(VkCommandBuffer _buffer, uint _vertex_count, uint _instances_count, uint _vertex_offset, uint _instances_offset) {
@@ -656,11 +656,11 @@ class pipeline {
   }
 
   void draw(VkCommandBuffer _buffer, const shared_commands &_commands, uint _commands_count, uint _stride_bytes) {
-    HUT_PVK(vkCmdDrawIndirect, _buffer, _commands->underlying_buffer(), _commands->offset_bytes(), _commands_count, _stride_bytes);
+    HUT_PVK(vkCmdDrawIndirect, _buffer, _commands->parent()->buffer_, _commands->offset_bytes(), _commands_count, _stride_bytes);
   }
 
   void draw_indexed(VkCommandBuffer _buffer, const shared_indexed_commands &_commands, uint _commands_count, uint _stride_bytes) {
-    HUT_PVK(vkCmdDrawIndexedIndirect, _buffer, _commands->underlying_buffer(), _commands->offset_bytes(), _commands_count, _stride_bytes);
+    HUT_PVK(vkCmdDrawIndexedIndirect, _buffer, _commands->parent()->buffer_, _commands->offset_bytes(), _commands_count, _stride_bytes);
   }
 
   void draw(VkCommandBuffer _buffer, uint _descriptor_index,

@@ -36,6 +36,7 @@
 
 #include "hut/utils/profiling.hpp"
 
+#include "hut/buffer.hpp"
 #include "hut/window.hpp"
 
 using namespace hut;
@@ -726,7 +727,7 @@ display::display(const char *_app_name, u32 _app_version, const char *_name)
 
 display::~display() {
   preflush_jobs_.clear();
-  postflush_jobs_.clear();
+  postflush_garbage_.clear();
   posted_jobs_.clear();
 
   destroy_vulkan();

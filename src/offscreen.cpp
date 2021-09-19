@@ -160,18 +160,18 @@ void offscreen::download(std::span<u8> _dst, uint _data_row_pitch, image::subres
 
   std::lock_guard lk(display_->staging_mutex_);
   auto            staging_alloc = display_->staging_->allocate_raw(byte_size, offset_align);
-  region.bufferOffset           = staging_alloc->offset_bytes();
+  region.bufferOffset           = staging_alloc.offset_bytes();
 
   HUT_PVK(vkBeginCommandBuffer, cb_, &begin_info);
 
   display::transition_image(cb_, target_->image_, subres_range, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  vkCmdCopyImageToBuffer(cb_, target_->image_, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging_alloc->underlying_buffer(), 1, &region);
+  vkCmdCopyImageToBuffer(cb_, target_->image_, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging_alloc.parent()->buffer_, 1, &region);
   display::transition_image(cb_, target_->image_, subres_range, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
   HUT_PVK(vkEndCommandBuffer, cb_);
   flush_cb();
 
-  std::span<u8> staging_data{staging_alloc->existing_mapping(), byte_size};
+  std::span<u8> staging_data{staging_alloc.parent()->permanent_map_ + staging_alloc.offset_bytes(), byte_size};
   if (_data_row_pitch == buffer_row_pitch) {
     assert(_dst.size_bytes() >= staging_data.size_bytes());
     memcpy(_dst.data(), staging_data.data(), staging_data.size());

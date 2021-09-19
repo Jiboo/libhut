@@ -91,9 +91,11 @@ int main(int, char **) {
   bool    grid_fixed_colors           = false;
   bool    grid_fixed_gradient         = false;
   bool    grid_release_before_realloc = false;
+  bool    grid_no_params              = false;
   u16vec2 grid_size                   = {75, 75};
-  u16     grid_min = 10, grid_max = 200, scroll_min = 0, scroll_max = 800;
-  u16vec2 scroll = {0, 0};
+  u16     grid_min = 10, grid_max = 200;
+  float   scroll_min = -800, scroll_max = 800;
+  vec2    scroll = {0, 0};
 
   win.on_draw.connect([&](VkCommandBuffer _buffer) {
     ImGui_ImplHut_NewFrame();
@@ -126,21 +128,22 @@ int main(int, char **) {
 
       if (ImGui::Button("Realloc grid")) {
         if (grid_release_before_realloc)
-          quads->release();
+          quads.release();
         quads = box_renderer.allocate(15 * 15 + 1);
       }
       ImGui::SameLine();
       ImGui::Checkbox("Free before", &grid_release_before_realloc);
       ImGui::SameLine();
-      ImGui::Text("Batch %d, Offset: %d, size: %d", quads->batch(), quads->offset_bytes(), quads->size_bytes());
+      ImGui::Text("Batch %p, Offset: %d, size: %d", quads.parent(), quads.offset_bytes(), quads.size_bytes());
 
       ImGui::SliderScalarN("Grid size", ImGuiDataType_U16, &grid_size, 2, &grid_min, &grid_max);
       ImGui::Checkbox("Grid use texture", &grid_use_tex);
       ImGui::Checkbox("Grid fixed colors", &grid_fixed_colors);
       ImGui::Checkbox("Grid fixed gradient", &grid_fixed_gradient);
+      ImGui::Checkbox("Grid no feather/corner", &grid_no_params);
 
-      auto iupdator = quads->update();
-      for (int i = 0; i < quads->size() - 1; i++) {
+      auto iupdator = quads.update();
+      for (int i = 0; i < quads.size() - 1; i++) {
         auto line = i / 15;
         auto col  = i % 15;
         auto bbox = make_bbox_with_origin_size(u16vec2{8} + u16vec2{col * (grid_size.x + 8), line * (grid_size.y + 8)}, grid_size);
@@ -148,15 +151,16 @@ int main(int, char **) {
                       grid_fixed_colors ? custom_col_from : rand_color(),
                       grid_fixed_colors ? custom_col_to : rand_color(),
                       grid_fixed_gradient ? render2d::gradient(custom_gradient) : render2d::gradient(i % 4),
-                      col, line, grid_use_tex ? tex : shared_subimage{});
+                      grid_no_params ? 0 : col, grid_no_params ? 0 : line,
+                      grid_use_tex ? tex : shared_subimage{});
       }
-      render2d::set(iupdator[quads->size() - 1], custom_bbox, custom_col_from, custom_col_to,
+      render2d::set(iupdator[quads.size() - 1], custom_bbox, custom_col_from, custom_col_to,
                     render2d::gradient(custom_gradient), custom_radius, custom_softness,
                     custom_use_tex ? tex : shared_subimage{});
 
       ImGui::Separator();
 
-      if (ImGui::SliderScalarN("Scroll", ImGuiDataType_U16, &scroll, 2, &scroll_min, &scroll_max)) {
+      if (ImGui::SliderScalarN("Scroll", ImGuiDataType_Float, &scroll, 2, &scroll_min, &scroll_max)) {
         mat4 translate = make_transform_mat4(scroll);
         ubo->set_subone(0, offsetof(common_ubo, view_), sizeof(hut::mat4), &translate);
       }

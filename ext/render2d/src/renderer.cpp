@@ -31,6 +31,7 @@
 
 using namespace hut;
 using namespace hut::render2d;
+using namespace hut::render2d::details;
 
 renderer::renderer(render_target &_target, shared_buffer _buffer,
                    const shared_ubo &_ubo, shared_atlas _atlas, const shared_sampler &_sampler,
@@ -43,7 +44,7 @@ renderer::renderer(render_target &_target, shared_buffer _buffer,
   pipeline_.write(0, _ubo, atlas_, _sampler);
 }
 
-renderer::batch &renderer::grow(uint _count) {
+batch &renderer::grow(uint _count) {
   return batches_.emplace_back(batch{
       buffer_->allocate<instance>(_count),
       binpack::linear1d<uint>{_count}});
@@ -59,52 +60,31 @@ void renderer::draw(VkCommandBuffer _buffer) {
   }
 }
 
-renderer::shared_suballoc<instance> renderer::allocate(uint _count, uint _align) {
-  auto size_bytes = sizeof(instance) * _count;
-  for (uint i = 0; i < batches_.size(); i++) {
-    auto fit = batches_[i].suballocator_.pack(size_bytes, _align);
+suballoc<instance, batch> renderer::allocate(uint _count, uint _align) {
+  uint size_bytes = sizeof(instance) * _count;
+  for (auto &batch : batches_) {
+    auto fit = batch.suballocator_.pack(size_bytes, _align);
     if (fit)
-      return std::make_shared<suballoc<instance>>(this, i, *fit, size_bytes);
+      return {&batch, *fit, size_bytes};
   }
 
-  auto &new_buffer = grow(std::max<uint>(size_bytes, batches_.back().size() * 2));
-  auto  fit        = new_buffer.suballocator_.pack(size_bytes, _align);
+  auto &new_batch = grow(std::max<uint>(size_bytes, batches_.back().size() * 2));
+  auto  fit       = new_batch.suballocator_.pack(size_bytes, _align);
   assert(fit);
 
-  return std::make_shared<suballoc<instance>>(this, uint(batches_.size()) - 1, *fit, size_bytes);
+  return {&new_batch, *fit, size_bytes};
 }
 
-suballoc_raw::updator renderer::renderer_suballoc::update_raw(uint _offset_bytes, uint _size_bytes) {
-  assert(parent_);
-  auto total_offset_bytes = offset_bytes() + _offset_bytes;
-  return parent_->batches_[batch_].buffer_->update_raw(total_offset_bytes, _size_bytes);
+void batch::release(render2d_suballoc *_suballoc) {
+  assert(_suballoc->parent() == this);
+  buffer_->zero_raw(_suballoc->offset_bytes(), _suballoc->size_bytes());
+  suballocator_.offer(_suballoc->offset_bytes());
 }
 
-void renderer::renderer_suballoc::finalize(const suballoc_raw::updator &_updator) {
-  assert(parent_);
-  return parent_->batches_[batch_].buffer_->finalize(_updator);
+render2d_updator batch::update_raw_impl(uint _offset_bytes, uint _size_bytes) {
+  return buffer_->update_raw(_offset_bytes, _size_bytes);
 }
 
-void renderer::renderer_suballoc::zero_raw(uint _offset_bytes, uint _size_bytes) {
-  assert(parent_);
-  auto total_offset_bytes = offset_bytes() + _offset_bytes;
-  return parent_->batches_[batch_].buffer_->zero_raw(total_offset_bytes, _size_bytes);
-}
-
-VkBuffer renderer::renderer_suballoc::underlying_buffer() const {
-  assert(parent_);
-  return parent_->batches_[batch_].buffer_->underlying_buffer();
-}
-
-u8 *renderer::renderer_suballoc::existing_mapping() {
-  assert(parent_);
-  return parent_->batches_[batch_].buffer_->existing_mapping() + offset_bytes();
-}
-
-void renderer::renderer_suballoc::release() {
-  assert(parent_);
-  auto &b = parent_->batches_[batch_];
-  b.buffer_->zero_raw(offset_bytes(), size_bytes());
-  b.suballocator_.offer(offset_bytes());
-  parent_ = nullptr;
+void batch::zero_raw(uint _offset_bytes, uint _size_bytes) {
+  buffer_->zero_raw(_offset_bytes, _size_bytes);
 }

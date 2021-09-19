@@ -1,6 +1,4 @@
-HUT (Hobby Ui Toolkit), attempt at a desktop GUI library, still in early and unusable state (see todo.md).
-
-Wayland and Vulkan only.
+Hobby graphics and GUI library, Wayland and Vulkan only.
 
 Dependencies (Fedora):
 - common: mesa-vulkan-devel, glm-devel.

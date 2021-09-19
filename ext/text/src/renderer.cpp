@@ -37,6 +37,7 @@
 
 using namespace hut;
 using namespace hut::text;
+using namespace hut::text::details;
 
 ivec2 encode_atlas_page_xy(vec2 _in, uint _atlas_page) {
   assert(_atlas_page < 4);
@@ -77,13 +78,13 @@ renderer::renderer(render_target &_target, shared_buffer _buffer, const shared_f
   pipeline_.write(0, _ubo, atlas_, _sampler);
 }
 
-renderer::mesh_store::mesh_store(renderer *_parent, uint _size)
+mesh_store::mesh_store(renderer *_parent, uint _size)
     : vertices_(_parent->buffer_->allocate<vertex>(_size * 4))
     , indices_(_parent->buffer_->allocate<index_t>(_size * 6))
     , suballocator_(_size) {
 }
 
-renderer::draw_store::draw_store(renderer *_parent, uint _size)
+draw_store::draw_store(renderer *_parent, uint _size)
     : instances_(_parent->buffer_->allocate<instance>(_size))
 #ifndef HUT_TEXT_DEBUG_NO_INDIRECT
     , commands_(_parent->buffer_->allocate<VkDrawIndexedIndirectCommand>(_size))
@@ -109,7 +110,7 @@ renderer::words_info::words_info(std::span<const std::u8string_view> _words)
 
 using flimits = std::numeric_limits<float>;
 
-renderer::word::word(renderer *_parent, batch &_batch, uint _alloc, uint _codepoints, std::u8string_view _text)
+word::word(renderer *_parent, batch &_batch, uint _alloc, uint _codepoints, std::u8string_view _text)
     : alloc_(_alloc)
     , glyphs_(0)
     , bbox_(flimits::max(), flimits::max(), flimits::min(), flimits::min()) {
@@ -124,11 +125,11 @@ renderer::word::word(renderer *_parent, batch &_batch, uint _alloc, uint _codepo
   auto *vertices = reinterpret_cast<vertex *>(vupdator.staging().data());
   auto *indices  = reinterpret_cast<index_t *>(iupdator.staging().data());
 
-  auto callback = [vertices, indices, this](uint _index, i16vec4 _coords, vec4 _uv, uint atlas_page) {
-    vertices[_index * 4 + 0] = {{_coords.x, _coords.y}, encode_atlas_page_xy({_uv.x, _uv.y}, atlas_page)};
-    vertices[_index * 4 + 1] = {{_coords.x, _coords.w}, encode_atlas_page_xy({_uv.x, _uv.w}, atlas_page)};
-    vertices[_index * 4 + 2] = {{_coords.z, _coords.y}, encode_atlas_page_xy({_uv.z, _uv.y}, atlas_page)};
-    vertices[_index * 4 + 3] = {{_coords.z, _coords.w}, encode_atlas_page_xy({_uv.z, _uv.w}, atlas_page)};
+  auto callback = [vertices, indices, this](uint _index, i16vec4 _coords, vec4 _uv, uint _atlas_page) {
+    vertices[_index * 4 + 0] = {{_coords.x, _coords.y}, encode_atlas_page_xy({_uv.x, _uv.y}, _atlas_page)};
+    vertices[_index * 4 + 1] = {{_coords.x, _coords.w}, encode_atlas_page_xy({_uv.x, _uv.w}, _atlas_page)};
+    vertices[_index * 4 + 2] = {{_coords.z, _coords.y}, encode_atlas_page_xy({_uv.z, _uv.y}, _atlas_page)};
+    vertices[_index * 4 + 3] = {{_coords.z, _coords.w}, encode_atlas_page_xy({_uv.z, _uv.w}, _atlas_page)};
 
     indices[_index * 6 + 0] = _index * 4 + 0;
     indices[_index * 6 + 1] = _index * 4 + 1;
@@ -164,7 +165,7 @@ void renderer::draw(VkCommandBuffer _buff) {
   }
 }
 
-renderer::batch &renderer::grow(uint _mesh_store_size, uint _draw_store_size) {
+batch &renderer::grow(uint _mesh_store_size, uint _draw_store_size) {
   auto mesh_back_size  = batches_.empty() ? 0 : batches_.back().mstore_.suballocator_.capacity();
   auto draw_back_size  = batches_.empty() ? 0 : batches_.back().dstore_.suballocator_.capacity();
   auto mesh_store_size = std::max(_mesh_store_size, mesh_back_size * 2);
@@ -172,16 +173,14 @@ renderer::batch &renderer::grow(uint _mesh_store_size, uint _draw_store_size) {
   assert(mesh_store_size > 0 && draw_store_size > 0);
   return batches_.emplace_back(batch{this, mesh_store_size, draw_store_size});
 }
-
-renderer::shared_suballoc<renderer::instance> renderer::allocate(std::span<const std::u8string_view> _words) {
+renderer::paragraph_holder renderer::allocate(std::span<const std::u8string_view> _words) {
   words_info winfo{_words};
-  auto       best_batch_id = find_best_fit(winfo);
-  auto      &best_batch    = batches_[best_batch_id];
+  auto      &best_batch = find_best_fit(winfo);
 
   auto draw_alloc = best_batch.dstore_.suballocator_.pack(_words.size());
   assert(draw_alloc);
-  shared_suballoc<instance> result = std::make_shared<suballoc<instance>>(this, best_batch_id, *draw_alloc, _words.size() * sizeof(instance));
-  result->bboxes_                  = std::make_unique<i16vec4[]>(_words.size());
+  paragraph_holder result{&best_batch, *draw_alloc, uint(_words.size() * sizeof(instance))};
+  result.bboxes_ = std::make_unique<i16vec4[]>(_words.size());
 
 #ifndef HUT_TEXT_DEBUG_NO_INDIRECT
   auto cupdator = best_batch.dstore_.commands_->update_raw(sizeof(VkDrawIndexedIndirectCommand) * *draw_alloc,
@@ -200,7 +199,7 @@ renderer::shared_suballoc<renderer::instance> renderer::allocate(std::span<const
       it = emplaced.first;
     }
     it->second.ref_count_++;
-    result->bboxes_[i] = it->second.bbox_;
+    result.bboxes_[i] = it->second.bbox_;
 
 #ifndef HUT_TEXT_DEBUG_NO_INDIRECT
     VkDrawIndexedIndirectCommand *cptr = reinterpret_cast<VkDrawIndexedIndirectCommand *>(cupdator.staging().data()) + i;
@@ -215,16 +214,15 @@ renderer::shared_suballoc<renderer::instance> renderer::allocate(std::span<const
     cptr->vertexOffset  = (int)it->second.alloc_ * 4;
   }
 
-  result->hashes_ = std::move(winfo.hashes_);
+  result.hashes_ = std::move(winfo.hashes_);
   return result;
 }
 
-size_t renderer::find_best_fit(const words_info &_winfo) {
-  uint best_batch = -1;
-  uint best_score = 0;
-  for (uint ib = 0; ib < batches_.size(); ib++) {
-    uint  score = 0;
-    auto &b     = batches_[ib];
+batch &renderer::find_best_fit(const words_info &_winfo) {
+  details::batch *best_batch = nullptr;
+  uint            best_score = 0;
+  for (auto &b : batches_) {
+    uint score = 0;
     if (!b.dstore_.suballocator_.try_fit(_winfo.size()))
       continue;
     for (uint iw = 0; iw < _winfo.size(); iw++) {
@@ -237,76 +235,49 @@ size_t renderer::find_best_fit(const words_info &_winfo) {
       continue;
     score += b.dstore_.suballocator_.free() * 8 + b.mstore_.suballocator_.free();
     if (score > best_score) {
-      best_batch = ib;
+      best_batch = &b;
       best_score = score;
     }
   }
 
-  if (best_batch == -1) {
-    best_batch = batches_.size();
-    grow(_winfo.total_codepoints_, _winfo.size());
-  }
-
-  return best_batch;
+  if (best_batch != nullptr)
+    return *best_batch;
+  return grow(_winfo.total_codepoints_, _winfo.size());
 }
 
-suballoc_raw::updator renderer::renderer_suballoc::update_raw(uint _offset_bytes, uint _size_bytes) {
-  assert(parent_);
-  auto total_offset_bytes = offset_bytes() + _offset_bytes;
-  return parent_->batches_[batch_].dstore_.instances_->update_raw(total_offset_bytes, _size_bytes);
-}
-
-void renderer::renderer_suballoc::finalize(const suballoc_raw::updator &_updator) {
-  assert(parent_);
-  return parent_->batches_[batch_].dstore_.instances_->finalize(_updator);
-}
-
-void renderer::renderer_suballoc::zero_raw(uint _offset_bytes, uint _size_bytes) {
-  assert(parent_);
-  auto total_offset_bytes = offset_bytes() + _offset_bytes;
-  return parent_->batches_[batch_].dstore_.instances_->zero_raw(total_offset_bytes, _size_bytes);
-}
-
-VkBuffer renderer::renderer_suballoc::underlying_buffer() const {
-  assert(parent_);
-  return parent_->batches_[batch_].dstore_.instances_->underlying_buffer();
-}
-
-u8 *renderer::renderer_suballoc::existing_mapping() {
-  assert(parent_);
-  return parent_->batches_[batch_].dstore_.instances_->existing_mapping() + offset_bytes();
-}
-
-void renderer::renderer_suballoc::release() {
-  assert(parent_);
-  auto &batch  = parent_->batches_[batch_];
-  auto &dstore = batch.dstore_;
-  auto &mstore = batch.mstore_;
+void batch::release(text_suballoc *_suballoc) {
 #ifndef HUT_TEXT_DEBUG_NO_INDIRECT
-  dstore.commands_->zero_raw(offset_bytes(), size_bytes());
+  dstore_.commands_->zero_raw(_suballoc->offset_bytes(), _suballoc->size_bytes());
 #else
   auto offset_elements = offset_bytes() / sizeof(instance);
   auto size_elements   = size_bytes() / sizeof(instance);
   std::fill(dstore.commands_.data() + offset_elements, dstore.commands_.data() + offset_elements + size_elements, VkDrawIndexedIndirectCommand{0});
 #endif
-  dstore.suballocator_.offer(offset_bytes());
-  auto &cache       = batch.cache_;
-  auto  words_count = size_bytes() / sizeof(instance);
-  for (uint i = 0; i < words_count; i++) {
-    const auto hash = hashes_[i];
-    auto       it   = cache.find(hash);
-    assert(it != cache.end());
+  dstore_.suballocator_.offer(_suballoc->offset_bytes());
+}
+
+void batch::release_words(std::span<string_hash> _hashes) {
+  for (auto hash : _hashes) {
+    auto it = cache_.find(hash);
+    assert(it != cache_.end());
     auto &word = it->second;
     word.ref_count_--;
     if (word.ref_count_ == 0) {
-      mstore.suballocator_.offer(word.alloc_);
+      mstore_.suballocator_.offer(word.alloc_);
       /*mstore.vertices_->zero(word.alloc_ * 4, word.codepoints_ * 4);
       mstore.indices_->zero(word.alloc_ * 6, word.codepoints_ * 6);*/
-      // NOTE JBL: Assumes we don't need to clear, the commands were removed..
+      // NOTE JBL: Assume we don't need to clear, the commands were removed..
       // TODO JBL: Also decrease refcount of glyphs cache in shaper?
-      auto result = cache.erase(hash);
+      auto result = cache_.erase(hash);
       assert(result == 1);
     }
   }
-  parent_ = nullptr;
+}
+
+text_updator batch::update_raw_impl(uint _offset_bytes, uint _size_bytes) {
+  return dstore_.instances_->update_raw(_offset_bytes, _size_bytes);
+}
+
+void batch::zero_raw(uint _offset_bytes, uint _size_bytes) {
+  dstore_.instances_->zero_raw(_offset_bytes, _size_bytes);
 }

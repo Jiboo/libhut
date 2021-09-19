@@ -31,25 +31,34 @@
 
 namespace hut {
 
+namespace details {
+class buffer_page_data;
+}  // namespace details
+
 class atlas;
 class buffer;
 class display;
 class image;
 class offscreen;
-template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> class pipeline;
 class render_target;
 class sampler;
-class suballoc_raw;
-template<typename T, typename TSpecialisation> class suballoc;
 class subimage;
 class window;
 
-using shared_atlas                                                   = std::shared_ptr<atlas>;
-using shared_buffer                                                  = std::shared_ptr<buffer>;
-using shared_image                                                   = std::shared_ptr<image>;
-using shared_sampler                                                 = std::shared_ptr<sampler>;
-using shared_suballoc_raw                                            = std::shared_ptr<suballoc_raw>;
-template<typename T, typename TSpecialisation> using shared_suballoc = std::shared_ptr<suballoc<T, TSpecialisation>>;
-using shared_subimage                                                = std::shared_ptr<subimage>;
+using shared_atlas    = std::shared_ptr<atlas>;
+using shared_buffer   = std::shared_ptr<buffer>;
+using shared_image    = std::shared_ptr<image>;
+using shared_sampler  = std::shared_ptr<sampler>;
+using shared_subimage = std::shared_ptr<subimage>;
+
+template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> class pipeline;
+
+template<typename TContained, typename TParent> class suballoc;
+template<typename TContained, typename TParent> using shared_suballoc = std::shared_ptr<suballoc<TContained, TParent>>;
+template<typename TContained> using buffer_suballoc                   = suballoc<TContained, details::buffer_page_data>;
+template<typename TContained> using shared_buffer_suballoc            = std::shared_ptr<buffer_suballoc<TContained>>;
+
+template<typename TContained, typename TParent> class updator;
+template<typename TContained> using buffer_updator = updator<TContained, details::buffer_page_data>;
 
 }  // namespace hut

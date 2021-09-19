@@ -38,13 +38,13 @@ struct proj_ubo {
     proj_ = ortho<float>(0.f, float(_size.x), 0.f, float(_size.y));
   }
 };
-using shared_proj_ubo = buffer::shared_suballoc<proj_ubo>;
+using shared_proj_ubo = shared_buffer_suballoc<proj_ubo>;
 
 struct vp_ubo {
   mat4 proj_{1};
   mat4 view_{1};
 };
-using shared_vp_ubo = buffer::shared_suballoc<vp_ubo>;
+using shared_vp_ubo = shared_buffer_suballoc<vp_ubo>;
 
 using pipeline_atlas = pipeline<u16, tst_shaders::tex_vert_spv_refl, tst_shaders::atlas_frag_spv_refl,
                                 const shared_proj_ubo &, const shared_atlas &, const shared_sampler &>;

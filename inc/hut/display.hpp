@@ -202,6 +202,7 @@ class display {
   friend class offscreen;
   friend class window;
   friend class image;
+  friend class details::buffer_page_data;
 
  public:
   using clock          = std::chrono::steady_clock;
@@ -285,15 +286,13 @@ class display {
   uint            staging_jobs_ = 0;
   std::mutex      staging_mutex_;
   using flush_callback = std::function<void()>;
-  std::vector<flush_callback> preflush_jobs_;
-  std::vector<flush_callback> postflush_jobs_;
+  std::vector<flush_callback>      preflush_jobs_;
+  std::vector<buffer_suballoc<u8>> postflush_garbage_;
 
   inline void preflush(const flush_callback &_callback) {
     preflush_jobs_.emplace_back(_callback);
   }
-  inline void postflush(const flush_callback &_callback) {
-    postflush_jobs_.emplace_back(_callback);
-  }
+  void postflush_collect(buffer_suballoc<u8> &&_callback);
 
   struct buffer_copy : public VkBufferCopy {
     VkBuffer source;

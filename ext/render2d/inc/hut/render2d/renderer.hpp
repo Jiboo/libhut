@@ -92,57 +92,33 @@ inline void set(instance &_target, u16vec4 _bbox,
   _target.pos_box_.w |= (_gradient & 0xF) << 12;
 }
 
+namespace details {
+struct batch;
+using render2d_suballoc = suballoc<instance, batch>;
+using render2d_updator  = buffer_updator<instance>;
+
+struct batch {
+  shared_instances        buffer_;
+  binpack::linear1d<uint> suballocator_;
+
+  void                           release(render2d_suballoc *);
+  [[nodiscard]] render2d_updator update_raw_impl(uint _offset_bytes, uint _size_bytes);
+  void                           zero_raw(uint _offset_bytes, uint _size_bytes);
+
+  template<typename TContained>
+  [[nodiscard]] buffer_updator<TContained> update_raw(uint _offset_bytes, uint _size_bytes) {
+    return update_raw_impl(_offset_bytes, _size_bytes);
+  }
+
+  [[nodiscard]] uint size() const { return suballocator_.capacity(); }
+};
+}  // namespace details
+
 struct renderer_params : pipeline_params {
   uint initial_batch_size_bytes_ = 256 * sizeof(instance);
 };
 
 class renderer {
- public:
-  class renderer_suballoc : public suballoc_raw {
-    renderer *parent_ = nullptr;
-    uint      batch_  = -1;
-
-   public:
-    renderer_suballoc() = delete;
-
-    renderer_suballoc(const renderer_suballoc &) = delete;
-    renderer_suballoc &operator=(const renderer_suballoc &) = delete;
-
-    renderer_suballoc(renderer_suballoc &&_other) noexcept
-        : suballoc_raw(_other.offset_bytes(), _other.size_bytes())
-        , parent_(std::exchange(_other.parent_, nullptr))
-        , batch_(_other.batch_) {}
-    renderer_suballoc &operator=(renderer_suballoc &&_other) noexcept {
-      if (&_other != this) {
-        offset_bytes_ = _other.offset_bytes_;
-        size_bytes_   = _other.size_bytes_;
-        parent_       = std::exchange(_other.parent_, nullptr);
-        batch_        = _other.batch_;
-      }
-      return *this;
-    }
-
-    renderer_suballoc(renderer *_parent, uint _batch, uint _offset_bytes, uint _size_bytes)
-        : suballoc_raw(_offset_bytes, _size_bytes)
-        , parent_(_parent)
-        , batch_(_batch) {}
-    ~renderer_suballoc() override {
-      if (parent_) renderer_suballoc::release();
-    }
-
-    updator  update_raw(uint _offset_bytes, uint _size_bytes) final;
-    void     finalize(const updator &_updator) final;
-    void     zero_raw(uint _offset_bytes, uint _size_bytes) final;
-    VkBuffer underlying_buffer() const final;
-    u8      *existing_mapping() final;
-    bool     valid() const final { return parent_ != nullptr; }
-    void     release() final;
-
-    uint batch() const { return batch_; }
-  };
-  template<typename T> using suballoc        = suballoc<T, renderer_suballoc>;
-  template<typename T> using shared_suballoc = std::shared_ptr<suballoc<T>>;
-
  public:
   renderer(render_target &_target, shared_buffer _buffer,
            const shared_ubo &_ubo, shared_atlas _atlas, const shared_sampler &_sampler,
@@ -150,22 +126,16 @@ class renderer {
 
   void draw(VkCommandBuffer);
 
-  shared_suballoc<instance> allocate(uint _count, uint _align = 4);
+  suballoc<instance, details::batch> allocate(uint _count, uint _align = 4);
 
  private:
-  struct batch {
-    shared_instances        buffer_;
-    binpack::linear1d<uint> suballocator_;
-
-    [[nodiscard]] uint size() const { return suballocator_.capacity(); }
-  };
-  std::vector<batch> batches_;
+  std::list<details::batch> batches_;
 
   pipeline      pipeline_;
   shared_buffer buffer_;
   shared_atlas  atlas_;
 
-  batch &grow(uint _count);
+  details::batch &grow(uint _count);
 };
 
 }  // namespace hut::render2d

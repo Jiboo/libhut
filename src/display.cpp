@@ -627,6 +627,10 @@ void display::transition_image(VkCommandBuffer _cb, VkImage _image, VkImageSubre
                         _cb, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
+void display::postflush_collect(buffer_suballoc<u8> &&_callback) {
+  postflush_garbage_.emplace_back(std::move(_callback));
+}
+
 void display::stage_transition(const image_transition &_info, VkImageSubresourceRange _range) {
 #ifdef HUT_DEBUG_STAGING
   std::cout << "[staging] transition " << _info.destination << " from " << _info.oldLayout << " to "
@@ -738,9 +742,7 @@ void display::flush_staged() {
 
   HUT_PVK(vkBeginCommandBuffer, staging_cb_, &beginInfo);
 
-  for (auto &postflush : postflush_jobs_)
-    postflush();
-  postflush_jobs_.clear();
+  postflush_garbage_.clear();
 
 #ifdef HUT_DEBUG_STAGING
   std::cout << "[staging] done, staging pool status:" << std::endl;

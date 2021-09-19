@@ -25,7 +25,7 @@
  * SOFTWARE.
  */
 
-//#define HUT_TEXT_SAMPLE_ENABLE_IMGUI
+#define HUT_TEXT_SAMPLE_ENABLE_IMGUI
 
 #include <random>
 
@@ -275,9 +275,9 @@ int main(int, char **) {
     constexpr uint line_height = 16;
     constexpr uint space_width = 6;
     uvec2          offset      = {0, line_height - 3};
-    auto           staging     = paragraph->update();
-    for (uint i = 0; i < paragraph->size(); i++) {
-      const auto bbox       = paragraph->bbox(i);
+    auto           staging     = paragraph.instances().update();
+    for (uint i = 0; i < paragraph.size(); i++) {
+      const auto bbox       = paragraph.bbox(i);
       const auto line_break = (offset.x + bbox.z) > win_width;
       if (line_break) {
         offset.x = 0;
@@ -308,7 +308,7 @@ int main(int, char **) {
         after_split = clock::now();
 
         before_release = clock::now();
-        paragraph->release();
+        paragraph.release();
         after_release = clock::now();
 
         before_alloc = clock::now();
@@ -322,7 +322,7 @@ int main(int, char **) {
 
       using msdur = std::chrono::duration<float, std::milli>;
       ImGui::Text("Words %zu, codepoints %zu, size %zu", words.size(), utf8codepointcount(text_input), strlen((char *)text_input));
-      ImGui::Text("Batch %d, Offset: %d, size: %d", paragraph->batch(), paragraph->offset_bytes(), paragraph->size_bytes());
+      ImGui::Text("Parent %p, Offset: %d, size: %d", paragraph.instances().parent(), paragraph.instances().offset_bytes(), paragraph.instances().size_bytes());
       ImGui::Text("Split %fms", msdur(after_split - before_split).count());
       ImGui::Text("Release %fms", msdur(after_release - before_release).count());
       msdur alloc_dur = after_alloc - before_alloc;
