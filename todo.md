@@ -10,6 +10,7 @@ features:
   - specialization constants support for shaders reflection
     - https://github.com/KhronosGroup/SPIRV-Reflect/issues/110
   - push constants support for shaders reflection
+  - consider moving to spriv-cross for reflection
   - [imgdec] support more codecs than png, possible avif hardware decode through vulkan video?
   - [imgdec] add streaming and progressive decoding APIs
   - moar unit tests

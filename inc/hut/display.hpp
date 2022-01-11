@@ -60,7 +60,7 @@ using keycode = u32;
 /** ID of function/character, which depends on keymap */
 enum keysym {
   KSYM_INVALID,
-#define HUT_MAP_KEYSYM(KEYCODE) KSYM_##KEYCODE,
+#define HUT_MAP_KEYSYM(FORMAT_LINUX, FORMAT_X11, FORMAT_IMGUI) KSYM_##FORMAT_LINUX,
 #include "hut/keysyms.inc"
 #undef HUT_MAP_KEYSYM
   KSYM_LAST_VALUE = KSYM_RIGHTMETA,

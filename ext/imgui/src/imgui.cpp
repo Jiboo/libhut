@@ -123,29 +123,6 @@ bool ImGui_ImplHut_Init(display *_d, window *_w, bool _install_callbacks) {
   io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
   io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
 
-  io.KeyMap[ImGuiKey_Tab]         = KSYM_TAB;
-  io.KeyMap[ImGuiKey_LeftArrow]   = KSYM_LEFT;
-  io.KeyMap[ImGuiKey_RightArrow]  = KSYM_RIGHT;
-  io.KeyMap[ImGuiKey_UpArrow]     = KSYM_UP;
-  io.KeyMap[ImGuiKey_DownArrow]   = KSYM_DOWN;
-  io.KeyMap[ImGuiKey_PageUp]      = KSYM_PAGEUP;
-  io.KeyMap[ImGuiKey_PageDown]    = KSYM_PAGEDOWN;
-  io.KeyMap[ImGuiKey_Home]        = KSYM_HOME;
-  io.KeyMap[ImGuiKey_End]         = KSYM_END;
-  io.KeyMap[ImGuiKey_Insert]      = KSYM_INSERT;
-  io.KeyMap[ImGuiKey_Delete]      = KSYM_DELETE;
-  io.KeyMap[ImGuiKey_Backspace]   = KSYM_BACKSPACE;
-  io.KeyMap[ImGuiKey_Space]       = KSYM_SPACE;
-  io.KeyMap[ImGuiKey_Enter]       = KSYM_ENTER;
-  io.KeyMap[ImGuiKey_Escape]      = KSYM_ESC;
-  io.KeyMap[ImGuiKey_KeyPadEnter] = KSYM_KPENTER;
-  io.KeyMap[ImGuiKey_A]           = KSYM_A;
-  io.KeyMap[ImGuiKey_C]           = KSYM_C;
-  io.KeyMap[ImGuiKey_V]           = KSYM_V;
-  io.KeyMap[ImGuiKey_X]           = KSYM_X;
-  io.KeyMap[ImGuiKey_Y]           = KSYM_Y;
-  io.KeyMap[ImGuiKey_Z]           = KSYM_Z;
-
   io.GetClipboardTextFn = GetClipboardText;
   io.SetClipboardTextFn = SetClipboardText;
 
@@ -159,6 +136,8 @@ bool ImGui_ImplHut_Init(display *_d, window *_w, bool _install_callbacks) {
     _w->on_key.connect(ImGui_ImplHut_HandleOnKey);
     _w->on_kmods.connect(ImGui_ImplHut_HandleOnKMods);
     _w->on_char.connect(ImGui_ImplHut_HandleOnChar);
+    _w->on_blur.connect(ImGui_ImplHut_HandleOnBlur);
+    _w->on_focus.connect(ImGui_ImplHut_HandleOnFocus);
   }
 
   ImGui_ImplHut_HandleOnResize(_w->size());
@@ -357,11 +336,21 @@ bool ImGui_ImplHut_HandleOnMouse(u8 _button, mouse_event_type _type, vec2 _pos) 
   return ImGui::GetIO().WantCaptureMouse;
 }
 
+ImGuiKey imgui_keysym(hut::keysym _ksym) {
+  ImGuiKey ImGuiKey_Linefeed = ImGuiKey_None;
+  ImGuiKey ImGuiKey_SysReq = ImGuiKey_None;
+
+  switch (_ksym) {
+#define HUT_MAP_KEYSYM(FORMAT_LINUX, FORMAT_X11, FORMAT_IMGUI) case KSYM_##FORMAT_LINUX: return ImGuiKey_##FORMAT_IMGUI;
+#include "hut/keysyms.inc"
+#undef HUT_MAP_KEYSYM
+  }
+
+  return ImGuiKey_None;
+}
+
 bool ImGui_ImplHut_HandleOnKey(keycode _kcode, keysym _ksym, bool _down) {
   ImGuiIO &io = ImGui::GetIO();
-
-  if (!io.WantCaptureKeyboard)
-    return false;
 
 #if !defined(NDEBUG) && 0
   char  kcode_name[64];
@@ -380,8 +369,7 @@ bool ImGui_ImplHut_HandleOnKey(keycode _kcode, keysym _ksym, bool _down) {
             << std::endl;
 #endif
 
-  static_assert(KSYM_LAST_VALUE <= IM_ARRAYSIZE(io.KeysDown));
-  io.KeysDown[_ksym] = _down;
+  io.AddKeyEvent(imgui_keysym(_ksym), _down);
 
   return ImGui::GetIO().WantCaptureKeyboard;
 }
@@ -397,28 +385,46 @@ bool ImGui_ImplHut_HandleOnKMods(modifiers _mods) {
             << std::endl;
 #endif
 
-  io.KeyShift = _mods.query(KMOD_SHIFT);
-  io.KeyCtrl  = _mods.query(KMOD_CTRL);
-  io.KeyAlt   = _mods.query(KMOD_ALT);
-  io.KeySuper = false;
+  ImGuiKeyModFlags flags = 0;
+  flags |= _mods.query(KMOD_SHIFT) ? ImGuiKeyModFlags_Shift : 0;
+  flags |= _mods.query(KMOD_CTRL) ? ImGuiKeyModFlags_Ctrl : 0;
+  flags |= _mods.query(KMOD_ALT) ? ImGuiKeyModFlags_Alt : 0;
+  io.AddKeyModsEvent(flags);
 
   return false;
 }
 
-bool ImGui_ImplHut_HandleOnChar(char32_t _utf32_char) {
+bool ImGui_ImplHut_HandleOnChar(char32_t _utf32) {
   ImGuiIO &io = ImGui::GetIO();
 
-  if (!io.WantCaptureKeyboard)
-    return false;
-
-  char8_t  buffer[5];
-  char8_t *end = to_utf8(buffer, _utf32_char);
-  *end         = 0;
-
 #if !defined(NDEBUG) && 0
-  std::cout << "OnChar " << (char *)buffer << " (0x" << std::hex << (u32)_utf32_char << std::dec << "), " << std::endl;
+  char8_t utf8[6];
+  *to_utf8(utf8, _utf32) = 0;
+  std::cout << "OnChar " << (char*)utf8 << " (0x" << std::hex << u32(_utf32) << std::dec << "), " << std::endl;
 #endif
 
-  io.AddInputCharactersUTF8((const char *)buffer);
+  io.AddInputCharacter(_utf32);
+  return true;
+}
+
+bool ImGui_ImplHut_HandleOnBlur() {
+  ImGuiIO &io = ImGui::GetIO();
+
+#if !defined(NDEBUG) && 0
+  std::cout << "OnBlur" << std::endl;
+#endif
+
+  io.AddFocusEvent(false);
+  return true;
+}
+
+bool ImGui_ImplHut_HandleOnFocus() {
+  ImGuiIO &io = ImGui::GetIO();
+
+#if !defined(NDEBUG) && 0
+  std::cout << "OnFocus" << std::endl;
+#endif
+
+  io.AddFocusEvent(true);
   return true;
 }

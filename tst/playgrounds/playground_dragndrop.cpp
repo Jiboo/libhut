@@ -160,7 +160,7 @@ int main(int, char **) {
     ImGui::NewFrame();
 
     if (ImGui::Begin("Drag source")) {
-      ImVec2 size{ImGui::GetContentRegionAvailWidth(), 100};
+      ImVec2 size{ImGui::GetContentRegionAvail().x, 100};
       ImGui::Button("Drag me", size);
       last_item_pos(&source_bbox);
 
@@ -180,7 +180,7 @@ int main(int, char **) {
       char           title_buff[buff_size];
       snprintf(title_buff, buff_size, "Target %p", &target);
       if (ImGui::Begin(title_buff)) {
-        ImVec2 size{ImGui::GetContentRegionAvailWidth(), 100};
+        ImVec2 size{ImGui::GetContentRegionAvail().x, 100};
         ImGui::Button("Drop here", size);
         last_item_pos(&target.bbox_);
 

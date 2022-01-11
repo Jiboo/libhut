@@ -75,9 +75,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT flags
 
 const char *hut::keysym_name(keysym _keysym) {
   switch (_keysym) {
-#define HUT_MAP_KEYSYM(KEYSYM) \
-  case KSYM_##KEYSYM:          \
-    return "KSYM_" #KEYSYM;
+#define HUT_MAP_KEYSYM(FORMAT_LINUX, FORMAT_X11, FORMAT_IMGUI) \
+  case KSYM_##FORMAT_LINUX:          \
+    return "KSYM_" #FORMAT_LINUX;
 #include "hut/keysyms.inc"
 #undef HUT_MAP_KEYSYM
     default: return "KSYM_INVALID";

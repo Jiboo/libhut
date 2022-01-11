@@ -87,7 +87,7 @@ void install_continuous_redraw(display &_display, window &_win) {
 }
 
 void install_test_events(display &_display, window &_win) {
-  install_esc_close(_win);
+  //install_esc_close(_win);
   install_resizable_movable(_win);
   install_continuous_redraw(_display, _win);
 }

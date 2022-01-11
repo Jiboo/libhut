@@ -52,6 +52,9 @@ IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnMouse(hut::u8 _button, hut::mouse_even
 IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnKey(hut::keycode _kcode, hut::keysym _ksym, bool _down);
 IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnKMods(hut::modifiers _mods);
 IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnChar(char32_t _utf32_char);
+IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnChar(char32_t _utf32_char);
+IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnBlur();
+IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnFocus();
 
 template<typename TEnum, TEnum TEnd, typename TUnderlying = hut::u32>
 bool ImGui_HutFlag(const char *_label, hut::flagged<TEnum, TEnd, TUnderlying> *_flags,

@@ -45,8 +45,8 @@ void debug(const binpack::linear1d<T> &_packer) {
   _packer.visit_blocks([p, draw_list](const auto &block) {
     if (!block.used_) {
       u16vec4 rect{block.offset_, 0, block.offset_ + block.size_, 100};
-      draw_list->AddRectFilled(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w), IM_COL32(0, 255, 0, 63), 0.0f, ImDrawCornerFlags_All);
-      draw_list->AddRect(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w), IM_COL32(0, 255, 0, 127), 0.0f, ImDrawCornerFlags_All);
+      draw_list->AddRectFilled(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w), IM_COL32(0, 255, 0, 63));
+      draw_list->AddRect(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w), IM_COL32(0, 255, 0, 127));
     }
     return true;
   });
@@ -167,10 +167,10 @@ void ImPacker(const char *_name = "Packer", u16vec2 _bounds = {8 * 1024, 8 * 102
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     ImVec2      p         = ImGui::GetCursorScreenPos();
 
-    draw_list->AddRect(ImVec2(p.x, p.y), ImVec2(p.x + _bounds.x, p.y + _bounds.y), IM_COL32(255, 0, 0, 255), 0.0f, ImDrawCornerFlags_All, 1.0f);
+    draw_list->AddRect(ImVec2(p.x, p.y), ImVec2(p.x + _bounds.x, p.y + _bounds.y), IM_COL32(255, 0, 0, 255));
     for (auto &rect : packed) {
-      draw_list->AddRectFilled(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w), IM_COL32(255, 255, 0, 127), 0.0f, ImDrawCornerFlags_All);
-      draw_list->AddRect(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w), IM_COL32(255, 255, 0, 255), 0.0f, ImDrawCornerFlags_All);
+      draw_list->AddRectFilled(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w), IM_COL32(255, 255, 0, 127));
+      draw_list->AddRect(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w), IM_COL32(255, 255, 0, 255));
     }
     debug(packer);
 
