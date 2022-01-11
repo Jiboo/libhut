@@ -6,7 +6,7 @@
 #   RENDERDOC_LIBRARIES - The libraries needed to use Renderdoc
 #   RENDERDOC_DEFINITIONS - Compiler switches required for using Renderdoc
 
-find_path(RENDERDOC_INCLUDE_DIR NAMES renderdoc_app.h )
+find_path(RENDERDOC_INCLUDE_DIR NAMES renderdoc_app.h)
 find_library(RENDERDOC_LIBRARY NAMES renderdoc)
 
 set(RENDERDOC_LIBRARIES ${RENDERDOC_LIBRARY})

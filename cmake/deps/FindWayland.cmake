@@ -23,7 +23,7 @@
 find_package(PkgConfig)
 
 if (NOT Wayland_FIND_COMPONENTS)
-  set(Wayland_FIND_COMPONENTS wayland-client)
+    set(Wayland_FIND_COMPONENTS wayland-client)
 endif ()
 
 include(FindPackageHandleStandardArgs)
@@ -32,39 +32,39 @@ set(WAYLAND_INCLUDE_DIRS "")
 set(WAYLAND_LIBRARIES "")
 
 foreach (comp ${Wayland_FIND_COMPONENTS})
-  string(TOUPPER ${comp} compname)
-  string(REPLACE "-" "_" compname ${compname})
-  set(libname ${comp})
-  set(headername ${comp}.h)
+    string(TOUPPER ${comp} compname)
+    string(REPLACE "-" "_" compname ${compname})
+    set(libname ${comp})
+    set(headername ${comp}.h)
 
-  #message("searching for ${comp}: ${comp} and ${libname}")
-  pkg_check_modules(PC_${comp} ${comp})
+    #message("searching for ${comp}: ${comp} and ${libname}")
+    pkg_check_modules(PC_${comp} ${comp})
 
-  if(NOT PC_${comp}_FOUND)
-    message("Couldn't find wayland component: ${comp}")
-    set(WAYLAND_FOUND FALSE)
-  else()
-    find_path(${compname}_INCLUDE_DIR NAMES ${headername}
-        HINTS
-        ${PC_${comp}_INCLUDEDIR}
-        ${PC_${comp}_INCLUDE_DIRS}
-        )
-    list(APPEND WAYLAND_INCLUDE_DIRS ${${compname}_INCLUDE_DIR})
+    if (NOT PC_${comp}_FOUND)
+        message("Couldn't find wayland component: ${comp}")
+        set(WAYLAND_FOUND FALSE)
+    else ()
+        find_path(${compname}_INCLUDE_DIR NAMES ${headername}
+                HINTS
+                ${PC_${comp}_INCLUDEDIR}
+                ${PC_${comp}_INCLUDE_DIRS}
+                )
+        list(APPEND WAYLAND_INCLUDE_DIRS ${${compname}_INCLUDE_DIR})
 
-    find_library(${compname}_LIBRARY NAMES ${libname}
-        HINTS
-        ${PC_${comp}_LIBDIR}
-        ${PC_${comp}_LIBRARY_DIRS}
-        )
-    list(APPEND WAYLAND_LIBRARIES ${${compname}_LIBRARY})
+        find_library(${compname}_LIBRARY NAMES ${libname}
+                HINTS
+                ${PC_${comp}_LIBDIR}
+                ${PC_${comp}_LIBRARY_DIRS}
+                )
+        list(APPEND WAYLAND_LIBRARIES ${${compname}_LIBRARY})
 
-    #message("${comp} results: ${${compname}_INCLUDE_DIR} ${${compname}_LIBRARY}")
-  endif()
-endforeach()
+        #message("${comp} results: ${${compname}_INCLUDE_DIR} ${${compname}_LIBRARY}")
+    endif ()
+endforeach ()
 
 #message("FindWayland results: ${WAYLAND_FOUND} ${WAYLAND_INCLUDE_DIRS} ${WAYLAND_LIBRARIES}")
 
 find_package_handle_standard_args(Wayland
-    FOUND_VAR WAYLAND_FOUND
-    REQUIRED_VARS WAYLAND_INCLUDE_DIRS WAYLAND_LIBRARIES)
+        FOUND_VAR WAYLAND_FOUND
+        REQUIRED_VARS WAYLAND_INCLUDE_DIRS WAYLAND_LIBRARIES)
 mark_as_advanced(WAYLAND_INCLUDE_DIRS WAYLAND_LIBRARIES)
