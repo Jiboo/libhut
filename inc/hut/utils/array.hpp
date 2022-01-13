@@ -34,7 +34,8 @@
 namespace hut {
 
 template<typename T, size_t TLeftSize, size_t TRightSize>
-constexpr std::array<T, TLeftSize + TRightSize> combine(std::array<T, TLeftSize> _left, std::array<T, TRightSize> _right) {
+constexpr std::array<T, TLeftSize + TRightSize> combine(std::array<T, TLeftSize>  _left,
+                                                        std::array<T, TRightSize> _right) {
   std::array<T, TLeftSize + TRightSize> result;
   for (size_t i = 0; i < TLeftSize; i++) {
     result[i] = _left[i];

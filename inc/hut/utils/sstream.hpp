@@ -54,21 +54,13 @@ class sstream {
     return *this;
   }
 
-  std::string str() const {
-    return stream_.str();
-  }
+  std::string str() const { return stream_.str(); }
 
-  std::string_view view() const {
-    return stream_.view();
-  }
+  std::string_view view() const { return stream_.view(); }
 
-  operator std::string() const {
-    return str();
-  }
+  operator std::string() const { return str(); }
 
-  operator std::string_view() const {
-    return view();
-  }
+  operator std::string_view() const { return view(); }
 };
 
 }  // namespace hut

@@ -45,9 +45,7 @@ bool prepare_read(image_params *_params, spng_format *_format, spng_ctx &_ctx, s
   bool has_srgb         = spng_get_srgb(&_ctx, &rendering_intent) == 0;
 
   switch (ihdr.color_type) {
-    case spng_color_type::SPNG_COLOR_TYPE_GRAYSCALE:
-      format = SPNG_FMT_G8;
-      break;
+    case spng_color_type::SPNG_COLOR_TYPE_GRAYSCALE: format = SPNG_FMT_G8; break;
     case spng_color_type::SPNG_COLOR_TYPE_GRAYSCALE_ALPHA:
       format = (ihdr.bit_depth == 16) ? SPNG_FMT_GA16 : SPNG_FMT_GA8;
       break;

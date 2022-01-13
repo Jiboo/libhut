@@ -44,9 +44,7 @@ class suballoc {
   using raw_updator_t = updator<u8, TParent>;
 
   suballoc() = delete;
-  ~suballoc() {
-    release();
-  }
+  ~suballoc() { release(); }
 
   suballoc(const suballoc &) = delete;
   suballoc &operator=(const suballoc &) = delete;
@@ -72,7 +70,9 @@ class suballoc {
       , size_bytes_(_size_bytes) {}
 
   template<typename TOtherContained>
-  suballoc<TOtherContained, TParent> *reinterpret_as() { return reinterpret_cast<suballoc<TOtherContained, TParent> *>(this); }
+  suballoc<TOtherContained, TParent> *reinterpret_as() {
+    return reinterpret_cast<suballoc<TOtherContained, TParent> *>(this);
+  }
 
   void release() {
     if (parent_)
@@ -99,9 +99,7 @@ class suballoc {
   void zero_raw(uint _offset_bytes, uint _size_bytes) {
     return parent_->zero_raw(offset_bytes_ + _offset_bytes, _size_bytes);
   }
-  void zero(uint _offset, uint _size = 1) {
-    zero_raw(_offset * sizeof(TContained), _size * sizeof(TContained));
-  }
+  void zero(uint _offset, uint _size = 1) { zero_raw(_offset * sizeof(TContained), _size * sizeof(TContained)); }
   void zero() { zero(0, size()); }
 
   void set(std::span<const TContained> _data) { update().set(_data); }
@@ -168,7 +166,9 @@ class updator {
       , offset_bytes_(_offset_bytes) {}
 
   template<typename TOtherContained>
-  updator<TOtherContained, TParent> *reinterpret_as() { return reinterpret_cast<updator<TOtherContained, TParent> *>(this); }
+  updator<TOtherContained, TParent> *reinterpret_as() {
+    return reinterpret_cast<updator<TOtherContained, TParent> *>(this);
+  }
 
   [[nodiscard]] std::span<u8> staging() { return staging_; };
   [[nodiscard]] uint          total_offset_bytes() const { return parent_->offset_bytes() + offset_bytes_; }

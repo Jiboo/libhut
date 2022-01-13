@@ -93,7 +93,8 @@ void offscreen::flush_cb() {
   if (HUT_PVK(vkQueueSubmit, display_->queueg_, 1, &submit_info, fence_) != VK_SUCCESS)
     throw std::runtime_error("failed to submit draw command buffer!");
 
-  if (HUT_PVK(vkWaitForFences, display_->device_, 1, &fence_, VK_TRUE, 10ull * 1000 * 1000 * 1000) != VK_SUCCESS)  // 10s timeout
+  if (HUT_PVK(vkWaitForFences, display_->device_, 1, &fence_, VK_TRUE, 10ull * 1000 * 1000 * 1000)
+      != VK_SUCCESS)  // 10s timeout
     throw std::runtime_error("error (or time out) while waiting for offscreen render");
 
   HUT_PVK(vkResetFences, display_->device_, 1, &fence_);
@@ -164,9 +165,12 @@ void offscreen::download(std::span<u8> _dst, uint _data_row_pitch, image::subres
 
   HUT_PVK(vkBeginCommandBuffer, cb_, &begin_info);
 
-  display::transition_image(cb_, target_->image_, subres_range, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  vkCmdCopyImageToBuffer(cb_, target_->image_, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging_alloc.parent()->buffer_, 1, &region);
-  display::transition_image(cb_, target_->image_, subres_range, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  display::transition_image(cb_, target_->image_, subres_range, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  vkCmdCopyImageToBuffer(cb_, target_->image_, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging_alloc.parent()->buffer_, 1,
+                         &region);
+  display::transition_image(cb_, target_->image_, subres_range, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
   HUT_PVK(vkEndCommandBuffer, cb_);
   flush_cb();

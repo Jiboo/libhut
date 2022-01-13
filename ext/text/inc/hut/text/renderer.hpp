@@ -40,8 +40,8 @@ class renderer;
 
 using index_t        = uint16;
 using string_hash    = size_t;
-using glyph_pipeline = pipeline<index_t, glyph_vert_spv_refl, glyph_frag_spv_refl,
-                                const hut::shared_ubo &, const hut::shared_atlas &, const hut::shared_sampler &>;
+using glyph_pipeline = pipeline<index_t, glyph_vert_spv_refl, glyph_frag_spv_refl, const hut::shared_ubo &,
+                                const hut::shared_atlas &, const hut::shared_sampler &>;
 
 using vertex   = glyph_pipeline::vertex;
 using instance = glyph_pipeline::instance;
@@ -120,9 +120,7 @@ class paragraph_holder {
 
  public:
   paragraph_holder() = delete;
-  ~paragraph_holder() {
-    release();
-  }
+  ~paragraph_holder() { release(); }
 
   paragraph_holder(const paragraph_holder &) = delete;
   paragraph_holder &operator=(const paragraph_holder &) = delete;
@@ -170,9 +168,8 @@ class renderer {
  public:
   using paragraph_holder = details::paragraph_holder;
 
-  renderer(render_target &_target, shared_buffer _buffer, const shared_font &_font,
-           const shared_ubo &_ubo, shared_atlas _atlas, const shared_sampler &_sampler,
-           renderer_params _params = renderer_params{});
+  renderer(render_target &_target, shared_buffer _buffer, const shared_font &_font, const shared_ubo &_ubo,
+           shared_atlas _atlas, const shared_sampler &_sampler, renderer_params _params = renderer_params{});
 
   paragraph_holder allocate(std::span<const std::u8string_view> _words);
 

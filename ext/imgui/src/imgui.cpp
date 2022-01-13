@@ -43,7 +43,8 @@
 using namespace hut;
 using namespace imgui;
 
-using imgui_pipeline = pipeline<ImDrawIdx, imgui_vert_spv_refl, imgui_frag_spv_refl, const shared_ubo &, const shared_image &, const shared_sampler &>;
+using imgui_pipeline = pipeline<ImDrawIdx, imgui_vert_spv_refl, imgui_frag_spv_refl, const shared_ubo &,
+                                const shared_image &, const shared_sampler &>;
 
 constexpr size_t HUT_IMGUI_MAX_DESCRIPTORS = 256;
 
@@ -194,15 +195,11 @@ void ImGui_ImplHut_RenderDrawData(VkCommandBuffer _cmd_buffer, ImDrawData *_draw
       } else {
         VkRect2D scissor = {};
         scissor.offset   = {(i32)pcmd->ClipRect.x, (i32)pcmd->ClipRect.y};
-        scissor.extent   = {(u32)(pcmd->ClipRect.z - pcmd->ClipRect.x),
-                          (u32)(pcmd->ClipRect.w - pcmd->ClipRect.y)};
+        scissor.extent   = {(u32)(pcmd->ClipRect.z - pcmd->ClipRect.x), (u32)(pcmd->ClipRect.w - pcmd->ClipRect.y)};
         HUT_PVK(vkCmdSetScissor, _cmd_buffer, 0, 1, &scissor);
 
-        g_ctx.pipeline_->draw(_cmd_buffer,
-                              (size_t)pcmd->TextureId,
-                              m.indices_, pcmd->IdxOffset, pcmd->ElemCount,
-                              imgui_pipeline::shared_instances{}, 0, 1,
-                              m.vertices_, pcmd->VtxOffset);
+        g_ctx.pipeline_->draw(_cmd_buffer, (size_t)pcmd->TextureId, m.indices_, pcmd->IdxOffset, pcmd->ElemCount,
+                              imgui_pipeline::shared_instances{}, 0, 1, m.vertices_, pcmd->VtxOffset);
       }
     }
 
@@ -299,8 +296,7 @@ cursor_type hut_cursor_type(ImGuiMouseCursor _input) {
     case ImGuiMouseCursor_ResizeNWSE: result = CRESIZE_NWSE; break;
     case ImGuiMouseCursor_Hand: result = CPOINTER; break;
     case ImGuiMouseCursor_NotAllowed: result = CNOT_ALLOWED; break;
-    default:
-      assert(false);
+    default: assert(false);
   }
   return result;
 }
@@ -318,12 +314,8 @@ bool ImGui_ImplHut_HandleOnMouse(u8 _button, mouse_event_type _type, vec2 _pos) 
       assert(_button > 0 && _button < ImGuiMouseButton_COUNT);
       io.MouseDown[_button - 1] = false;
       break;
-    case MWHEEL_DOWN:
-      io.MouseWheel -= 1;
-      break;
-    case MWHEEL_UP:
-      io.MouseWheel += 1;
-      break;
+    case MWHEEL_DOWN: io.MouseWheel -= 1; break;
+    case MWHEEL_UP: io.MouseWheel += 1; break;
     case MMOVE: /*do nothing*/ break;
   }
 
@@ -338,10 +330,12 @@ bool ImGui_ImplHut_HandleOnMouse(u8 _button, mouse_event_type _type, vec2 _pos) 
 
 ImGuiKey imgui_keysym(hut::keysym _ksym) {
   ImGuiKey ImGuiKey_Linefeed = ImGuiKey_None;
-  ImGuiKey ImGuiKey_SysReq = ImGuiKey_None;
+  ImGuiKey ImGuiKey_SysReq   = ImGuiKey_None;
 
   switch (_ksym) {
-#define HUT_MAP_KEYSYM(FORMAT_LINUX, FORMAT_X11, FORMAT_IMGUI) case KSYM_##FORMAT_LINUX: return ImGuiKey_##FORMAT_IMGUI;
+#define HUT_MAP_KEYSYM(FORMAT_LINUX, FORMAT_X11, FORMAT_IMGUI)                                                         \
+  case KSYM_##FORMAT_LINUX:                                                                                            \
+    return ImGuiKey_##FORMAT_IMGUI;
 #include "hut/keysyms.inc"
 #undef HUT_MAP_KEYSYM
   }
@@ -365,8 +359,7 @@ bool ImGui_ImplHut_HandleOnKey(keycode _kcode, keysym _ksym, bool _down) {
   std::cout << "OnKey "
             << "keycode:" << _kcode << " (name: " << kcode_name << ", char:" << (char *)kcode_idle_char_utf8 << "), "
             << "keysym: " << _ksym << " (" << keysym_name(_ksym) << "), "
-            << "down:" << _down
-            << std::endl;
+            << "down:" << _down << std::endl;
 #endif
 
   io.AddKeyEvent(imgui_keysym(_ksym), _down);
@@ -378,11 +371,9 @@ bool ImGui_ImplHut_HandleOnKMods(modifiers _mods) {
   ImGuiIO &io = ImGui::GetIO();
 
 #if !defined(NDEBUG) && 0
-  std::cout << "OnMods " << _mods
-            << "(shift: " << _mods.query(KMOD_SHIFT) << ", "
+  std::cout << "OnMods " << _mods << "(shift: " << _mods.query(KMOD_SHIFT) << ", "
             << "ctrl: " << _mods.query(KMOD_CTRL) << ", "
-            << "alt: " << _mods.query(KMOD_ALT) << ")"
-            << std::endl;
+            << "alt: " << _mods.query(KMOD_ALT) << ")" << std::endl;
 #endif
 
   ImGuiKeyModFlags flags = 0;
@@ -400,7 +391,7 @@ bool ImGui_ImplHut_HandleOnChar(char32_t _utf32) {
 #if !defined(NDEBUG) && 0
   char8_t utf8[6];
   *to_utf8(utf8, _utf32) = 0;
-  std::cout << "OnChar " << (char*)utf8 << " (0x" << std::hex << u32(_utf32) << std::dec << "), " << std::endl;
+  std::cout << "OnChar " << (char *)utf8 << " (0x" << std::hex << u32(_utf32) << std::dec << "), " << std::endl;
 #endif
 
   io.AddInputCharacter(_utf32);

@@ -233,18 +233,22 @@ int main(int, char **) {
 
     float angle = radians(time * 10);
     if (tex1_ready) {
-      tex1_instances->set_one(1, pipeleine_tex::instance{make_transform_mat4({300, 100}, angle, tex1->size() / 4, {tex1->size() / 2, 1})});
+      tex1_instances->set_one(
+          1, pipeleine_tex::instance{make_transform_mat4({300, 100}, angle, tex1->size() / 4, {tex1->size() / 2, 1})});
     }
     if (tex2_ready) {
-      tex2_instances->set_one(1, pipeleine_tex::instance{make_transform_mat4({400, 100}, angle, tex2->size() / 4, {tex2->size() / 2, 1})});
+      tex2_instances->set_one(
+          1, pipeleine_tex::instance{make_transform_mat4({400, 100}, angle, tex2->size() / 4, {tex2->size() / 2, 1})});
     }
 
     float border_radius  = (sin(time * 4) + 1) * 20 + 1;
     vec2  new_box_params = {border_radius, 1};
-    box_rgba_instances->set_subone(0, offsetof(pipeleine_box_rgba::instance, params_), sizeof(new_box_params), &new_box_params);
+    box_rgba_instances->set_subone(0, offsetof(pipeleine_box_rgba::instance, params_), sizeof(new_box_params),
+                                   &new_box_params);
 
     new_box_params[1] = (sin(time * 4) + 1) * 10 + 1;
-    shadow_instances->set_subone(0, offsetof(pipeleine_box_rgba::instance, params_), sizeof(new_box_params), &new_box_params);
+    shadow_instances->set_subone(0, offsetof(pipeleine_box_rgba::instance, params_), sizeof(new_box_params),
+                                 &new_box_params);
 
     return false;
   });

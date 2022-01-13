@@ -55,10 +55,11 @@ sampler::sampler(display &_display, const sampler_params &_params)
   samplerInfo.unnormalizedCoordinates = VK_FALSE;
   samplerInfo.compareEnable           = VK_FALSE;
   samplerInfo.compareOp               = VK_COMPARE_OP_NEVER;
-  samplerInfo.mipmapMode              = _params.filter_ == VK_FILTER_NEAREST ? VK_SAMPLER_MIPMAP_MODE_NEAREST : VK_SAMPLER_MIPMAP_MODE_LINEAR;
-  samplerInfo.mipLodBias              = _params.lodBias_;
-  samplerInfo.minLod                  = _params.lodRange_.x;
-  samplerInfo.maxLod                  = _params.lodRange_.y;
+  samplerInfo.mipmapMode
+      = _params.filter_ == VK_FILTER_NEAREST ? VK_SAMPLER_MIPMAP_MODE_NEAREST : VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  samplerInfo.mipLodBias = _params.lodBias_;
+  samplerInfo.minLod     = _params.lodRange_.x;
+  samplerInfo.maxLod     = _params.lodRange_.y;
   if (vkCreateSampler(device_, &samplerInfo, nullptr, &sampler_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create texture sampler!");
   }

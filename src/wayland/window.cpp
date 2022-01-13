@@ -54,9 +54,8 @@ void window::handle_toplevel_configure(void *_data, xdg_toplevel *, i32 _width, 
       HUT_PROFILE_EVENT(w, on_resize, new_size);
     }
   }
-  std::span<xdg_toplevel_state> states{
-      reinterpret_cast<xdg_toplevel_state *>(_states->data),
-      static_cast<std::size_t>(_states->size / sizeof(xdg_toplevel_state))};
+  std::span<xdg_toplevel_state> states{reinterpret_cast<xdg_toplevel_state *>(_states->data),
+                                       static_cast<std::size_t>(_states->size / sizeof(xdg_toplevel_state))};
   bool minimized = std::find(states.begin(), states.end(), XDG_TOPLEVEL_STATE_ACTIVATED) == states.end();
   // FIXME: This doesn't really represents minimized state, loosing focus also lose this state
   if (!minimized && w->minimized_) {
@@ -82,8 +81,7 @@ window::window(display &_display, const window_params &_init_params)
   static const xdg_surface_listener xdg_surface_listeners = {
       handle_xdg_configure,
   };
-  static const xdg_toplevel_listener xdg_toplevel_listeners = {
-      handle_toplevel_configure, handle_toplevel_close};
+  static const xdg_toplevel_listener xdg_toplevel_listeners = {handle_toplevel_configure, handle_toplevel_close};
 
   wayland_surface_ = wl_compositor_create_surface(_display.compositor_);
   if (!wayland_surface_)
@@ -198,9 +196,7 @@ void window::clipboard_data_source_handle_send(void *_data, wl_data_source *_sou
     writerit->thread_ = std::thread([w, cb = ctx.callback_, writerit, f = format.value()]() {
       cb(f, writerit->sender_);
       writerit->sender_.close();
-      w->display_.post([w, writerit](auto) {
-        w->clipboard_sender_context_.writers_.erase(writerit);
-      });
+      w->display_.post([w, writerit](auto) { w->clipboard_sender_context_.writers_.erase(writerit); });
     });
   }
 }
@@ -236,13 +232,10 @@ void window::clipboard_data_source_handle_action(void *_data, wl_data_source *_s
 }
 
 void window::clipboard_offer(clipboard_formats _supported_formats, send_clipboard_data &&_callback) {
-  static const wl_data_source_listener wl_data_source_listeners = {
-      clipboard_data_source_handle_target,
-      clipboard_data_source_handle_send,
-      clipboard_data_source_handle_cancelled,
-      clipboard_data_source_handle_dnd_drop_performed,
-      clipboard_data_source_handle_dnd_finished,
-      clipboard_data_source_handle_action};
+  static const wl_data_source_listener wl_data_source_listeners
+      = {clipboard_data_source_handle_target,       clipboard_data_source_handle_send,
+         clipboard_data_source_handle_cancelled,    clipboard_data_source_handle_dnd_drop_performed,
+         clipboard_data_source_handle_dnd_finished, clipboard_data_source_handle_action};
 
   if (!display_.data_device_manager_ || !display_.data_device_)
     return;
@@ -288,9 +281,7 @@ bool window::clipboard_receive(clipboard_formats _supported_formats, receive_cli
       reader->receiver_.open(fds[0]);
       reader->thread_ = std::thread([this, cb = std::move(_callback), mime, reader]() {
         cb(mime, reader->receiver_);
-        this->display_.post([this, reader](auto) {
-          this->async_readers_.erase(reader);
-        });
+        this->display_.post([this, reader](auto) { this->async_readers_.erase(reader); });
       });
       return true;
     }
@@ -371,14 +362,12 @@ void window::drag_data_source_handle_dnd_finished(void *_data, wl_data_source *_
   w->dragndrop_async_writers_.erase(it);
 }
 
-void window::dragndrop_start(dragndrop_actions _supported_actions, clipboard_formats _supported_formats, send_dragndrop_data &&_callback) {
-  static const wl_data_source_listener wl_data_source_listeners = {
-      drag_data_source_handle_target,
-      drag_data_source_handle_send,
-      drag_data_source_handle_cancelled,
-      drag_data_source_handle_dnd_drop_performed,
-      drag_data_source_handle_dnd_finished,
-      drag_data_source_handle_action};
+void window::dragndrop_start(dragndrop_actions _supported_actions, clipboard_formats _supported_formats,
+                             send_dragndrop_data &&_callback) {
+  static const wl_data_source_listener wl_data_source_listeners
+      = {drag_data_source_handle_target,       drag_data_source_handle_send,
+         drag_data_source_handle_cancelled,    drag_data_source_handle_dnd_drop_performed,
+         drag_data_source_handle_dnd_finished, drag_data_source_handle_action};
 
   if (!display_.data_device_manager_ || !display_.data_device_)
     return;
@@ -408,7 +397,8 @@ void window::dragndrop_start(dragndrop_actions _supported_actions, clipboard_for
   display_.cursor(CGRABBING);
 
   assert(display_.last_mouse_click_serial_ != 0);
-  wl_data_device_start_drag(display_.data_device_, source, wayland_surface_, nullptr, display_.last_mouse_click_serial_);
+  wl_data_device_start_drag(display_.data_device_, source, wayland_surface_, nullptr,
+                            display_.last_mouse_click_serial_);
 }
 
 void window::interactive_resize(edge _edge) {

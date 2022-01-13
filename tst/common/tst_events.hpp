@@ -54,7 +54,8 @@ void install_resizable_movable(window &_win) {
     _win.cursor(edge_cursor(coords_edge));
 
     static bool clicked = false;
-    if (_type == MDOWN && _button == 1) clicked = true;
+    if (_type == MDOWN && _button == 1)
+      clicked = true;
     else if (_type == MUP && _button == 1)
       clicked = false;
     else if (_type == MMOVE && clicked) {
@@ -79,9 +80,7 @@ void install_resizable_ubo(window &_win, shared_buffer_suballoc<TUBO> _ubo) {
 
 void install_continuous_redraw(display &_display, window &_win) {
   _win.on_frame.connect([&](display::duration _dt) {
-    _display.post([&](auto) {
-      _win.invalidate(true);
-    });
+    _display.post([&](auto) { _win.invalidate(true); });
     return false;
   });
 }

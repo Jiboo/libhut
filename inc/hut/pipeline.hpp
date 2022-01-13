@@ -49,9 +49,7 @@ struct common_ubo {
   mat4  view_{1};
   float dpi_scale_ = 1;
 
-  explicit common_ubo(u16vec2 _size) {
-    proj_ = ortho<float>(0.f, float(_size.x), 0.f, float(_size.y));
-  }
+  explicit common_ubo(u16vec2 _size) { proj_ = ortho<float>(0.f, float(_size.x), 0.f, float(_size.y)); }
 };
 
 using shared_ubo = shared_buffer_suballoc<common_ubo>;
@@ -154,7 +152,9 @@ class pipeline {
     for (auto binding : bindings_) {
       switch (binding.descriptorType) {
         case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER: descriptor_pools[0].descriptorCount += binding.descriptorCount; break;
-        case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER: descriptor_pools[1].descriptorCount += binding.descriptorCount; break;
+        case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+          descriptor_pools[1].descriptorCount += binding.descriptorCount;
+          break;
         default: assert(false);
       }
     }
@@ -187,9 +187,9 @@ class pipeline {
     }
 
     VkDescriptorSetLayoutBindingFlagsCreateInfo bindings_flags_info = {};
-    bindings_flags_info.sType                                       = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
-    bindings_flags_info.bindingCount                                = bindings_flags.size();
-    bindings_flags_info.pBindingFlags                               = bindings_flags.data();
+    bindings_flags_info.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
+    bindings_flags_info.bindingCount  = bindings_flags.size();
+    bindings_flags_info.pBindingFlags = bindings_flags.data();
 
     VkDescriptorSetLayoutCreateInfo create_info = {};
     create_info.sType                           = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -254,9 +254,11 @@ class pipeline {
 
     std::vector<VkVertexInputBindingDescription> vertices_bindings;
     if (sizeof(vertex) >= 4)
-      vertices_bindings.emplace_back(VkVertexInputBindingDescription{.binding = 0, .stride = sizeof(vertex), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX});
+      vertices_bindings.emplace_back(VkVertexInputBindingDescription{
+          .binding = 0, .stride = sizeof(vertex), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX});
     if (sizeof(instance) >= 4)
-      vertices_bindings.emplace_back(VkVertexInputBindingDescription{.binding = 1, .stride = sizeof(instance), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE});
+      vertices_bindings.emplace_back(VkVertexInputBindingDescription{
+          .binding = 1, .stride = sizeof(instance), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE});
 
     VkPipelineVertexInputStateCreateInfo vertex_create_info = {};
     vertex_create_info.sType                                = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -266,9 +268,9 @@ class pipeline {
     vertex_create_info.pVertexAttributeDescriptions         = TVertexRefl::vertices_description_.data();
 
     VkPipelineInputAssemblyStateCreateInfo assembly_create_info = {};
-    assembly_create_info.sType                                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    assembly_create_info.topology                               = _params.topology_;
-    assembly_create_info.primitiveRestartEnable                 = VK_FALSE;
+    assembly_create_info.sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    assembly_create_info.topology               = _params.topology_;
+    assembly_create_info.primitiveRestartEnable = VK_FALSE;
 
     VkViewport viewport = {};
     viewport.x          = origin.x;
@@ -290,17 +292,17 @@ class pipeline {
     viewport_create_info.pScissors                         = &scissor;
 
     VkPipelineRasterizationStateCreateInfo rasterizer_create_info = {};
-    rasterizer_create_info.sType                                  = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer_create_info.depthClampEnable                       = VK_FALSE;
-    rasterizer_create_info.rasterizerDiscardEnable                = VK_FALSE;
-    rasterizer_create_info.polygonMode                            = _params.polygon_mode_;
-    rasterizer_create_info.lineWidth                              = 1.0f;
-    rasterizer_create_info.cullMode                               = _params.cull_mode_;
-    rasterizer_create_info.frontFace                              = _params.front_face_;
-    rasterizer_create_info.depthBiasEnable                        = VK_FALSE;
-    rasterizer_create_info.depthBiasConstantFactor                = 0.0f;
-    rasterizer_create_info.depthBiasClamp                         = 0.0f;
-    rasterizer_create_info.depthBiasSlopeFactor                   = 0.0f;
+    rasterizer_create_info.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer_create_info.depthClampEnable        = VK_FALSE;
+    rasterizer_create_info.rasterizerDiscardEnable = VK_FALSE;
+    rasterizer_create_info.polygonMode             = _params.polygon_mode_;
+    rasterizer_create_info.lineWidth               = 1.0f;
+    rasterizer_create_info.cullMode                = _params.cull_mode_;
+    rasterizer_create_info.frontFace               = _params.front_face_;
+    rasterizer_create_info.depthBiasEnable         = VK_FALSE;
+    rasterizer_create_info.depthBiasConstantFactor = 0.0f;
+    rasterizer_create_info.depthBiasClamp          = 0.0f;
+    rasterizer_create_info.depthBiasSlopeFactor    = 0.0f;
 
     VkPipelineMultisampleStateCreateInfo msaa_create_info = {};
     msaa_create_info.sType                                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -311,10 +313,8 @@ class pipeline {
     msaa_create_info.alphaToCoverageEnable                = VK_FALSE;
     msaa_create_info.alphaToOneEnable                     = VK_FALSE;
 
-    constexpr uint component_mask = VK_COLOR_COMPONENT_R_BIT
-                                  | VK_COLOR_COMPONENT_G_BIT
-                                  | VK_COLOR_COMPONENT_B_BIT
-                                  | VK_COLOR_COMPONENT_A_BIT;
+    constexpr uint component_mask
+        = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     VkPipelineColorBlendAttachmentState blend_attachment = {};
     blend_attachment.colorWriteMask                      = component_mask;
     blend_attachment.blendEnable                         = _params.enable_blending_;
@@ -376,7 +376,8 @@ class pipeline {
     pipeline_info.basePipelineHandle           = VK_NULL_HANDLE;
     pipeline_info.basePipelineIndex            = -1;  // Optional
 
-    if (HUT_PVK(vkCreateGraphicsPipelines, device_ref_, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &pipeline_) != VK_SUCCESS)
+    if (HUT_PVK(vkCreateGraphicsPipelines, device_ref_, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &pipeline_)
+        != VK_SUCCESS)
       throw std::runtime_error("failed to create graphics pipeline!");
   }
 
@@ -441,9 +442,7 @@ class pipeline {
       throw std::runtime_error("failed to allocate descriptor set!");
   }
 
-  uint count_descriptors() {
-    return descriptors_.size();
-  }
+  uint count_descriptors() { return descriptors_.size(); }
 
   struct descriptor_write_context {
     std::vector<VkWriteDescriptorSet>   writes_;
@@ -519,26 +518,31 @@ class pipeline {
   void write_continue(int _binding, descriptor_write_context &_context) {}
 
   template<typename TBufferType, typename... TRest>
-  void write_continue(int _binding, descriptor_write_context &_context, const shared_buffer_suballoc<TBufferType> &_buffer, const TRest &..._rest) {
+  void write_continue(int _binding, descriptor_write_context &_context,
+                      const shared_buffer_suballoc<TBufferType> &_buffer, const TRest &..._rest) {
     _context.buffer(_binding, _buffer);
     write_continue(_binding + 1, _context, std::forward<const TRest &>(_rest)...);
   }
 
   template<typename... TRest>
-  void write_continue(int _binding, descriptor_write_context &_context, const shared_image &_image, const shared_sampler &_sampler, const TRest &..._rest) {
+  void write_continue(int _binding, descriptor_write_context &_context, const shared_image &_image,
+                      const shared_sampler &_sampler, const TRest &..._rest) {
     _context.texture(_binding, _image, _sampler);
     write_continue(_binding + 1, _context, std::forward<const TRest &>(_rest)...);
   }
 
   template<typename... TRest>
-  void write_continue(int _binding, descriptor_write_context &_context, const shared_image &_image0, const shared_image &_image1, const shared_sampler &_sampler, const TRest &..._rest) {
+  void write_continue(int _binding, descriptor_write_context &_context, const shared_image &_image0,
+                      const shared_image &_image1, const shared_sampler &_sampler, const TRest &..._rest) {
     _context.texture(_binding, _image0, _sampler);
     _context.texture(_binding + 1, _image1, _sampler);
     write_continue(_binding + 2, _context, std::forward<const TRest &>(_rest)...);
   }
 
   template<typename... TRest>
-  void write_continue(int _binding, descriptor_write_context &_context, const shared_image &_image0, const shared_image &_image1, const shared_image &_image2, const shared_sampler &_sampler, const TRest &..._rest) {
+  void write_continue(int _binding, descriptor_write_context &_context, const shared_image &_image0,
+                      const shared_image &_image1, const shared_image &_image2, const shared_sampler &_sampler,
+                      const TRest &..._rest) {
     _context.texture(_binding, _image0, _sampler);
     _context.texture(_binding + 1, _image1, _sampler);
     _context.texture(_binding + 2, _image2, _sampler);
@@ -546,7 +550,9 @@ class pipeline {
   }
 
   template<typename... TRest>
-  void write_continue(int _binding, descriptor_write_context &_context, const shared_image &_image0, const shared_image &_image1, const shared_image &_image2, const shared_image &_image3, const shared_sampler &_sampler, const TRest &..._rest) {
+  void write_continue(int _binding, descriptor_write_context &_context, const shared_image &_image0,
+                      const shared_image &_image1, const shared_image &_image2, const shared_image &_image3,
+                      const shared_sampler &_sampler, const TRest &..._rest) {
     _context.texture(_binding, _image0, _sampler);
     _context.texture(_binding + 1, _image1, _sampler);
     _context.texture(_binding + 2, _image2, _sampler);
@@ -555,7 +561,8 @@ class pipeline {
   }
 
   template<typename... TRest>
-  void write_continue(int _binding, descriptor_write_context &_context, const shared_atlas &_atlas, const shared_sampler &_sampler, const TRest &..._rest) {
+  void write_continue(int _binding, descriptor_write_context &_context, const shared_atlas &_atlas,
+                      const shared_sampler &_sampler, const TRest &..._rest) {
     _context.atlas(_binding, _atlas, _sampler);
     write_continue(_binding + 1, _context, std::forward<const TRest &>(_rest)...);
 
@@ -621,7 +628,8 @@ class pipeline {
 
   void bind_descriptor(VkCommandBuffer _buffer, uint _descriptor_index) {
     assert(descriptor_attached(_descriptor_index));
-    HUT_PVK(vkCmdBindDescriptorSets, _buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout_, 0, 1, descriptors_.data() + _descriptor_index, 0, nullptr);
+    HUT_PVK(vkCmdBindDescriptorSets, _buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout_, 0, 1,
+            descriptors_.data() + _descriptor_index, 0, nullptr);
   }
 
   void bind_vertices(VkCommandBuffer _buffer, const shared_vertices &_vertices) {
@@ -647,25 +655,30 @@ class pipeline {
     HUT_PVK(vkCmdBindIndexBuffer, _buffer, _indices->parent()->buffer_, _indices->offset_bytes(), vulkan_index_type);
   }
 
-  void draw(VkCommandBuffer _buffer, uint _vertex_count, uint _instances_count, uint _vertex_offset, uint _instances_offset) {
+  void draw(VkCommandBuffer _buffer, uint _vertex_count, uint _instances_count, uint _vertex_offset,
+            uint _instances_offset) {
     HUT_PVK(vkCmdDraw, _buffer, _vertex_count, _instances_count, _vertex_offset, _instances_offset);
   }
 
-  void draw_indexed(VkCommandBuffer _buffer, uint _indices_count, uint _instances_count, uint _indices_offset, uint _vertex_offset, uint _instances_offset) {
-    HUT_PVK(vkCmdDrawIndexed, _buffer, _indices_count, _instances_count, _indices_offset, _vertex_offset, _instances_offset);
+  void draw_indexed(VkCommandBuffer _buffer, uint _indices_count, uint _instances_count, uint _indices_offset,
+                    uint _vertex_offset, uint _instances_offset) {
+    HUT_PVK(vkCmdDrawIndexed, _buffer, _indices_count, _instances_count, _indices_offset, _vertex_offset,
+            _instances_offset);
   }
 
   void draw(VkCommandBuffer _buffer, const shared_commands &_commands, uint _commands_count, uint _stride_bytes) {
-    HUT_PVK(vkCmdDrawIndirect, _buffer, _commands->parent()->buffer_, _commands->offset_bytes(), _commands_count, _stride_bytes);
+    HUT_PVK(vkCmdDrawIndirect, _buffer, _commands->parent()->buffer_, _commands->offset_bytes(), _commands_count,
+            _stride_bytes);
   }
 
-  void draw_indexed(VkCommandBuffer _buffer, const shared_indexed_commands &_commands, uint _commands_count, uint _stride_bytes) {
-    HUT_PVK(vkCmdDrawIndexedIndirect, _buffer, _commands->parent()->buffer_, _commands->offset_bytes(), _commands_count, _stride_bytes);
+  void draw_indexed(VkCommandBuffer _buffer, const shared_indexed_commands &_commands, uint _commands_count,
+                    uint _stride_bytes) {
+    HUT_PVK(vkCmdDrawIndexedIndirect, _buffer, _commands->parent()->buffer_, _commands->offset_bytes(), _commands_count,
+            _stride_bytes);
   }
 
-  void draw(VkCommandBuffer _buffer, uint _descriptor_index,
-            const shared_indices &_indices, uint _indices_offset, uint _indices_count,
-            const shared_instances &_instances, uint _instances_offset, uint _instances_count,
+  void draw(VkCommandBuffer _buffer, uint _descriptor_index, const shared_indices &_indices, uint _indices_offset,
+            uint _indices_count, const shared_instances &_instances, uint _instances_offset, uint _instances_count,
             const shared_vertices &_vertices, uint _vertex_offset) {
     HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
 
@@ -677,23 +690,15 @@ class pipeline {
     draw_indexed(_buffer, _indices_count, _instances_count, _indices_offset, _vertex_offset, _instances_offset);
   }
 
-  void draw(VkCommandBuffer _buffer, uint _descriptor_index,
-            const shared_indices   &_indices,
-            const shared_instances &_instances,
-            const shared_vertices  &_vertices) {
-    draw(_buffer, _descriptor_index,
-         _indices, 0, _indices->size(),
-         _instances, 0, _instances ? _instances->size() : 1,
+  void draw(VkCommandBuffer _buffer, uint _descriptor_index, const shared_indices &_indices,
+            const shared_instances &_instances, const shared_vertices &_vertices) {
+    draw(_buffer, _descriptor_index, _indices, 0, _indices->size(), _instances, 0, _instances ? _instances->size() : 1,
          _vertices, 0);
   }
 
-  void draw(VkCommandBuffer _buffer, uint _descriptor_index,
-            const shared_indices &_indices, uint _indices_count,
-            const shared_instances &_instances,
-            const shared_vertices  &_vertices) {
-    draw(_buffer, _descriptor_index,
-         _indices, 0, _indices_count,
-         _instances, 0, _instances ? _instances->size() : 1,
+  void draw(VkCommandBuffer _buffer, uint _descriptor_index, const shared_indices &_indices, uint _indices_count,
+            const shared_instances &_instances, const shared_vertices &_vertices) {
+    draw(_buffer, _descriptor_index, _indices, 0, _indices_count, _instances, 0, _instances ? _instances->size() : 1,
          _vertices, 0);
   }
 };

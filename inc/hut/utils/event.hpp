@@ -37,9 +37,7 @@ class event {
  public:
   using callback = std::function<bool(TArgTypes...)>;
 
-  void connect(const callback &_callback) {
-    cbs_.emplace_back(_callback);
-  }
+  void connect(const callback &_callback) { cbs_.emplace_back(_callback); }
 
   bool fire(const TArgTypes &..._args) {
     bool handled = false;
@@ -53,9 +51,7 @@ class event {
     return handled;
   }
 
-  void clear() {
-    cbs_.clear();
-  }
+  void clear() { cbs_.clear(); }
 
  protected:
   std::vector<callback> cbs_;

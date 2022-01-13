@@ -60,7 +60,8 @@ class subimage {
       , page_(_page)
       , bounds_(_bounds) {}
   ~subimage() {
-    if (atlas_) release();
+    if (atlas_)
+      release();
   }
 
   explicit operator bool() const { return valid(); }

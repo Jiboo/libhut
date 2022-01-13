@@ -71,7 +71,8 @@ class image {
     uint                staging_row_pitch_ = -1;
     subresource         subres_;
 
-    updator(image &_target, buffer_suballoc<u8> &&_staging, std::span<u8> _data, uint _staging_row_pitch, subresource _subres)
+    updator(image &_target, buffer_suballoc<u8> &&_staging, std::span<u8> _data, uint _staging_row_pitch,
+            subresource _subres)
         : target_(&_target)
         , staging_(std::move(_staging))
         , data_(_data)
@@ -102,7 +103,8 @@ class image {
     }
 
     ~updator() {
-      if (data_.size_bytes()) target_->finalize_update(*this);
+      if (data_.size_bytes())
+        target_->finalize_update(*this);
     }
 
     [[nodiscard]] const u8 *data() const { return data_.data(); }
@@ -112,7 +114,8 @@ class image {
     [[nodiscard]] uint      image_row_pitch() const { return target_->bpp() * bbox_size(subres_.coords_).x / 8; }
   };
 
-  static std::shared_ptr<image> load_raw(display &, std::span<const u8> _data, uint _data_row_pitch, const image_params &_params);
+  static std::shared_ptr<image> load_raw(display &, std::span<const u8> _data, uint _data_row_pitch,
+                                         const image_params &_params);
 
   image() = delete;
 
@@ -138,8 +141,8 @@ class image {
   [[nodiscard]] VkImageView view() const { return view_; }
 
  private:
-  static VkMemoryRequirements create(display &_display, const image_params &_params,
-                                     VkImage *_image, VkDeviceMemory *_image_memory);
+  static VkMemoryRequirements create(display &_display, const image_params &_params, VkImage *_image,
+                                     VkDeviceMemory *_image_memory);
 
   void finalize_update(updator &_update);
 

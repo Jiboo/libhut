@@ -53,14 +53,16 @@ RENDERDOC_API_1_4_1 *renderdoc_get() {
 
 void frame_begin() {
   auto *api = renderdoc_get();
-  if (!api) return;
+  if (!api)
+    return;
 
   api->StartFrameCapture(nullptr, nullptr);
 }
 
 void frame_end(const char *_comment) {
   auto *api = renderdoc_get();
-  if (!api) return;
+  if (!api)
+    return;
 
   api->EndFrameCapture(nullptr, nullptr);
   if (_comment != nullptr)

@@ -41,7 +41,8 @@
 
 using namespace hut;
 
-void display::pointer_handle_enter(void *_data, wl_pointer *_pointer, u32 _serial, wl_surface *_surface, wl_fixed_t _sx, wl_fixed_t _sy) {
+void display::pointer_handle_enter(void *_data, wl_pointer *_pointer, u32 _serial, wl_surface *_surface, wl_fixed_t _sx,
+                                   wl_fixed_t _sy) {
   //std::cout << "pointer_handle_enter " << _pointer << ", " << _surface << ", " << wl_fixed_to_double(_sx) << ", " << wl_fixed_to_double(_sy) << std::endl;
   auto *d   = static_cast<display *>(_data);
   auto  wit = d->windows_.find(_surface);
@@ -81,7 +82,8 @@ void display::pointer_handle_motion(void *_data, wl_pointer *_pointer, u32 _time
   }
 }
 
-void display::pointer_handle_button(void *_data, wl_pointer *_pointer, u32 _serial, u32 _time, u32 _button, u32 _state) {
+void display::pointer_handle_button(void *_data, wl_pointer *_pointer, u32 _serial, u32 _time, u32 _button,
+                                    u32 _state) {
   //std::cout << "pointer_handle_button " << _pointer << ", " << _button << ", " << _state << std::endl;
   auto *d = static_cast<display *>(_data);
   if (_pointer == d->pointer_) {
@@ -102,7 +104,8 @@ void display::pointer_handle_axis(void *_data, wl_pointer *_pointer, u32 _time, 
     auto *w = d->pointer_current_.second;
     assert(w);
 
-    HUT_PROFILE_EVENT_NAMED(w, on_mouse, ("button", "mouse_event_type", "coords"), 0, wl_fixed_to_int(_value) > 0 ? MWHEEL_DOWN : MWHEEL_UP, w->mouse_lastmove_);
+    HUT_PROFILE_EVENT_NAMED(w, on_mouse, ("button", "mouse_event_type", "coords"), 0,
+                            wl_fixed_to_int(_value) > 0 ? MWHEEL_DOWN : MWHEEL_UP, w->mouse_lastmove_);
   }
 }
 
@@ -128,7 +131,9 @@ void display::pointer_handle_axis_discrete(void *_data, wl_pointer *_pointer, u3
 
 keysym display::map_xkb_keysym(xkb_keysym_t _in) {
   switch (_in) {
-#define HUT_MAP_KEYSYM(FORMAT_LINUX, FORMAT_X11, FORMAT_IMGUI) case XKB_KEY_##FORMAT_X11: return KSYM_##FORMAT_LINUX;
+#define HUT_MAP_KEYSYM(FORMAT_LINUX, FORMAT_X11, FORMAT_IMGUI)                                                         \
+  case XKB_KEY_##FORMAT_X11:                                                                                           \
+    return KSYM_##FORMAT_LINUX;
 #include "hut/keysyms.inc"
 #undef HUT_MAP_KEYSYM
     default: return KSYM_INVALID;
@@ -161,7 +166,8 @@ void display::keyboard_handle_keymap(void *_data, wl_keyboard *_keyboard, u32 _f
   if (_format != WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1)
     throw std::runtime_error(sstream("Unexpected keymap format: ") << _format);
 
-  d->keymap_ = xkb_keymap_new_from_buffer(d->xkb_context_, (const char *)buf, _size - 1, XKB_KEYMAP_FORMAT_TEXT_V1, XKB_KEYMAP_COMPILE_NO_FLAGS);
+  d->keymap_ = xkb_keymap_new_from_buffer(d->xkb_context_, (const char *)buf, _size - 1, XKB_KEYMAP_FORMAT_TEXT_V1,
+                                          XKB_KEYMAP_COMPILE_NO_FLAGS);
   munmap(buf, _size);
   close(_fd);
   if (!d->keymap_)
@@ -177,7 +183,8 @@ void display::keyboard_handle_keymap(void *_data, wl_keyboard *_keyboard, u32 _f
   d->mod_index_shift_ = xkb_keymap_mod_get_index(d->keymap_, XKB_MOD_NAME_SHIFT);
 }
 
-void display::keyboard_handle_enter(void *_data, wl_keyboard *_keyboard, u32 _serial, wl_surface *_surface, wl_array *) {
+void display::keyboard_handle_enter(void *_data, wl_keyboard *_keyboard, u32 _serial, wl_surface *_surface,
+                                    wl_array *) {
   //std::cout << "keyboard_handle_enter " << _keyboard << ", " << _surface << std::endl;
   auto *d   = static_cast<display *>(_data);
   auto  wit = d->windows_.find(_surface);
@@ -238,7 +245,8 @@ void display::keyboard_handle_repeat_info(void *_data, wl_keyboard *_keyboard, i
   d->keyboard_repeat_ctx_.sleep_ = std::chrono::milliseconds(1000 / _rate);
 }
 
-void display::keyboard_handle_modifiers(void *_data, wl_keyboard *_keyboard, u32 _serial, u32 _mods_depressed, u32 _mods_latched, u32 _mods_locked, u32 _group) {
+void display::keyboard_handle_modifiers(void *_data, wl_keyboard *_keyboard, u32 _serial, u32 _mods_depressed,
+                                        u32 _mods_latched, u32 _mods_locked, u32 _group) {
   //std::cout << "keyboard_handle_modifiers " << _mods_depressed << ", " << _mods_latched << ", " << _mods_locked << std::endl;
   auto *d = static_cast<display *>(_data);
   xkb_state_update_mask(d->xkb_state_, _mods_depressed, _mods_latched, _mods_locked, 0, 0, _group);
@@ -260,11 +268,14 @@ void display::keyboard_handle_modifiers(void *_data, wl_keyboard *_keyboard, u32
 
 void display::seat_handler(void *_data, wl_seat *_seat, u32 _caps) {
   //std::cout << "seat_handler " << _seat << ", " << _caps << std::endl;
-  static const wl_keyboard_listener wl_keyboard_listeners = {
-      keyboard_handle_keymap, keyboard_handle_enter, keyboard_handle_leave, keyboard_handle_key, keyboard_handle_modifiers, keyboard_handle_repeat_info};
+  static const wl_keyboard_listener wl_keyboard_listeners
+      = {keyboard_handle_keymap, keyboard_handle_enter,     keyboard_handle_leave,
+         keyboard_handle_key,    keyboard_handle_modifiers, keyboard_handle_repeat_info};
 
-  static const wl_pointer_listener wl_pointer_listeners = {
-      pointer_handle_enter, pointer_handle_leave, pointer_handle_motion, pointer_handle_button, pointer_handle_axis, pointer_handle_frame, pointer_handle_axis_source, pointer_handle_axis_stop, pointer_handle_axis_discrete};
+  static const wl_pointer_listener wl_pointer_listeners
+      = {pointer_handle_enter,       pointer_handle_leave,     pointer_handle_motion,
+         pointer_handle_button,      pointer_handle_axis,      pointer_handle_frame,
+         pointer_handle_axis_source, pointer_handle_axis_stop, pointer_handle_axis_discrete};
 
   auto *d = static_cast<display *>(_data);
   if ((_caps & WL_SEAT_CAPABILITY_POINTER) && !d->pointer_) {
@@ -291,14 +302,12 @@ void handle_xdg_ping(void *, struct xdg_wm_base *_shell, u32 _serial) {
   xdg_wm_base_pong(_shell, _serial);
 }
 
-void display::registry_handler(void *_data, wl_registry *_registry, u32 _id,
-                               const char *_interface, u32 _version) {
+void display::registry_handler(void *_data, wl_registry *_registry, u32 _id, const char *_interface, u32 _version) {
 #ifdef HUT_ENABLE_VALIDATION_DEBUG
   std::cout << "[hut] wayland registry item " << _id << ", " << _interface << ", " << _version << std::endl;
 #endif
 
-  static const wl_seat_listener wl_seat_listeners = {
-      seat_handler, seat_name};
+  static const wl_seat_listener     wl_seat_listeners     = {seat_handler, seat_name};
   static const xdg_wm_base_listener xdg_wm_base_listeners = {
       handle_xdg_ping,
   };
@@ -315,7 +324,8 @@ void display::registry_handler(void *_data, wl_registry *_registry, u32 _id,
   } else if (strcmp(_interface, wl_shm_interface.name) == 0) {
     d->shm_ = static_cast<wl_shm *>(wl_registry_bind(_registry, _id, &wl_shm_interface, 1));
   } else if (strcmp(_interface, wl_data_device_manager_interface.name) == 0) {
-    d->data_device_manager_ = static_cast<wl_data_device_manager *>(wl_registry_bind(_registry, _id, &wl_data_device_manager_interface, 3));
+    d->data_device_manager_
+        = static_cast<wl_data_device_manager *>(wl_registry_bind(_registry, _id, &wl_data_device_manager_interface, 3));
   }
 }
 
@@ -402,8 +412,8 @@ void display::data_offer_handle_action(void *_data, wl_data_offer *_offer, u32 _
 }
 
 void display::data_device_handle_data_offer(void *_data, wl_data_device *, wl_data_offer *_offer) {
-  static const struct wl_data_offer_listener data_offer_listeners = {
-      data_offer_handle_offer, data_offer_handle_source_actions, data_offer_handle_action};
+  static const struct wl_data_offer_listener data_offer_listeners
+      = {data_offer_handle_offer, data_offer_handle_source_actions, data_offer_handle_action};
 
 #ifdef HUT_DEBUG_WL_DATA_LISTENERS
   std::cout << "data_device_handle_data_offer " << _offer << std::endl;
@@ -416,9 +426,11 @@ void display::data_device_handle_data_offer(void *_data, wl_data_device *, wl_da
   wl_data_offer_add_listener(_offer, &data_offer_listeners, _data);
 }
 
-void display::data_device_handle_enter(void *_data, wl_data_device *_device, u32 _serial, wl_surface *_surface, wl_fixed_t _x, wl_fixed_t _y, wl_data_offer *_offer) {
+void display::data_device_handle_enter(void *_data, wl_data_device *_device, u32 _serial, wl_surface *_surface,
+                                       wl_fixed_t _x, wl_fixed_t _y, wl_data_offer *_offer) {
 #ifdef HUT_DEBUG_WL_DATA_LISTENERS
-  std::cout << "data_device_handle_enter " << _offer << ", " << _serial << ", " << wl_fixed_to_double(_x) << ", " << wl_fixed_to_double(_y) << std::endl;
+  std::cout << "data_device_handle_enter " << _offer << ", " << _serial << ", " << wl_fixed_to_double(_x) << ", "
+            << wl_fixed_to_double(_y) << std::endl;
 #endif
   auto *d               = static_cast<display *>(_data);
   d->drag_enter_serial_ = _serial;
@@ -521,9 +533,7 @@ void display::data_device_handle_drop(void *_data, wl_data_device *_device) {
       itf->on_drop(action, reader->receiver_);
       wl_data_offer_finish(offer);
       wl_data_offer_destroy(offer);
-      d->post([d, reader](auto) {
-        d->current_drop_readers_.erase(reader);
-      });
+      d->post([d, reader](auto) { d->current_drop_readers_.erase(reader); });
     });
   }
 }
@@ -552,15 +562,10 @@ display::display(const char *_app_name, u32 _app_version, const char *_name)
   if (!display_)
     throw std::runtime_error("couldn't connect to wayland server");
 
-  static const wl_registry_listener reg_listeners = {
-      registry_handler, registry_remove};
+  static const wl_registry_listener    reg_listeners         = {registry_handler, registry_remove};
   static const wl_data_device_listener data_device_listeners = {
-      data_device_handle_data_offer,
-      data_device_handle_enter,
-      data_device_handle_leave,
-      data_device_handle_motion,
-      data_device_handle_drop,
-      data_device_handle_selection,
+      data_device_handle_data_offer, data_device_handle_enter, data_device_handle_leave,
+      data_device_handle_motion,     data_device_handle_drop,  data_device_handle_selection,
   };
 
   xkb_context_ = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
@@ -575,9 +580,12 @@ display::display(const char *_app_name, u32 _app_version, const char *_name)
     }
   }
 
-  if (!compositor_) throw std::runtime_error("couldn't retrieve a wl_compositor in the wayland registry");
-  if (!xdg_wm_base_) throw std::runtime_error("couldn't retrieve a xdg_wm_base in the wayland registry");
-  if (!seat_) throw std::runtime_error("couldn't retrieve a wl_seat in the wayland registry");
+  if (!compositor_)
+    throw std::runtime_error("couldn't retrieve a wl_compositor in the wayland registry");
+  if (!xdg_wm_base_)
+    throw std::runtime_error("couldn't retrieve a xdg_wm_base in the wayland registry");
+  if (!seat_)
+    throw std::runtime_error("couldn't retrieve a wl_seat in the wayland registry");
 
   if (data_device_manager_) {
     data_device_ = wl_data_device_manager_get_data_device(data_device_manager_, seat_);
@@ -649,25 +657,43 @@ display::~display() {
     keyboard_repeat_ctx_.thread_.join();
   }
 
-  if (keymap_) xkb_keymap_unref(keymap_);
-  if (xkb_state_) xkb_state_unref(xkb_state_);
-  if (xkb_state_empty_) xkb_state_unref(xkb_state_empty_);
-  if (xkb_context_) xkb_context_unref(xkb_context_);
+  if (keymap_)
+    xkb_keymap_unref(keymap_);
+  if (xkb_state_)
+    xkb_state_unref(xkb_state_);
+  if (xkb_state_empty_)
+    xkb_state_unref(xkb_state_empty_);
+  if (xkb_context_)
+    xkb_context_unref(xkb_context_);
 
-  if (last_offer_from_clipboard_) wl_data_offer_destroy(last_offer_from_clipboard_);
-  if (last_offer_from_dropenter_) wl_data_offer_destroy(last_offer_from_dropenter_);
-  if (data_device_) wl_data_device_destroy(data_device_);
-  if (data_device_manager_) wl_data_device_manager_destroy(data_device_manager_);
-  if (cursor_surface_) wl_surface_destroy(cursor_surface_);
-  if (cursor_theme_) wl_cursor_theme_destroy(cursor_theme_);
-  if (shm_) wl_shm_destroy(shm_);
-  if (keyboard_) wl_keyboard_destroy(keyboard_);
-  if (pointer_) wl_pointer_destroy(pointer_);
-  if (seat_) wl_seat_destroy(seat_);
-  if (xdg_wm_base_) xdg_wm_base_destroy(xdg_wm_base_);
-  if (compositor_) wl_compositor_destroy(compositor_);
-  if (registry_) wl_registry_destroy(registry_);
-  if (display_) wl_display_disconnect(display_);
+  if (last_offer_from_clipboard_)
+    wl_data_offer_destroy(last_offer_from_clipboard_);
+  if (last_offer_from_dropenter_)
+    wl_data_offer_destroy(last_offer_from_dropenter_);
+  if (data_device_)
+    wl_data_device_destroy(data_device_);
+  if (data_device_manager_)
+    wl_data_device_manager_destroy(data_device_manager_);
+  if (cursor_surface_)
+    wl_surface_destroy(cursor_surface_);
+  if (cursor_theme_)
+    wl_cursor_theme_destroy(cursor_theme_);
+  if (shm_)
+    wl_shm_destroy(shm_);
+  if (keyboard_)
+    wl_keyboard_destroy(keyboard_);
+  if (pointer_)
+    wl_pointer_destroy(pointer_);
+  if (seat_)
+    wl_seat_destroy(seat_);
+  if (xdg_wm_base_)
+    xdg_wm_base_destroy(xdg_wm_base_);
+  if (compositor_)
+    wl_compositor_destroy(compositor_);
+  if (registry_)
+    wl_registry_destroy(registry_);
+  if (display_)
+    wl_display_disconnect(display_);
 }
 
 void display::flush() {
@@ -718,8 +744,8 @@ void display::cursor_frame(wl_cursor *_cursor, size_t _frame) {
     wl_surface_attach(cursor_surface_, buffer, 0, 0);
     wl_surface_damage(cursor_surface_, 0, 0, i32(image->width), i32(image->height));
     wl_surface_commit(cursor_surface_);
-    wl_pointer_set_cursor(pointer_, last_mouse_enter_serial_, cursor_surface_,
-                          int(image->hotspot_x), int(image->hotspot_y));
+    wl_pointer_set_cursor(pointer_, last_mouse_enter_serial_, cursor_surface_, int(image->hotspot_x),
+                          int(image->hotspot_y));
   } else {
     wl_pointer_set_cursor(pointer_, last_mouse_enter_serial_, nullptr, 0, 0);
   }
@@ -795,9 +821,7 @@ void display::keyboard_repeat_thread(keyboard_repeat_context *_ctx) {
         auto initial_delay_remaining = _ctx->delay_ - elapsed;
         _ctx->cv_.wait_for(lock, initial_delay_remaining);
       } else {
-        _ctx->display_.post([w, k = _ctx->key_](auto tp) {
-          HUT_PROFILE_EVENT(w, on_char, (u32)k);
-        });
+        _ctx->display_.post([w, k = _ctx->key_](auto tp) { HUT_PROFILE_EVENT(w, on_char, (u32)k); });
         _ctx->cv_.wait_for(lock, _ctx->sleep_);
       }
     }

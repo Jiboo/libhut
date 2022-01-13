@@ -66,7 +66,8 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
   if (render_target_params_.flags_ & render_target_params::FMULTISAMPLING) {
     const auto        &limits = display_->limits();
     VkSampleCountFlags counts = limits.framebufferColorSampleCounts & limits.framebufferDepthSampleCounts;
-    if (counts & VK_SAMPLE_COUNT_8_BIT) sample_count_ = VK_SAMPLE_COUNT_8_BIT;
+    if (counts & VK_SAMPLE_COUNT_8_BIT)
+      sample_count_ = VK_SAMPLE_COUNT_8_BIT;
     else if (counts & VK_SAMPLE_COUNT_4_BIT)
       sample_count_ = VK_SAMPLE_COUNT_4_BIT;
     else if (counts & VK_SAMPLE_COUNT_2_BIT)
@@ -126,7 +127,8 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
   color_attachment.stencilLoadOp           = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
   color_attachment.stencilStoreOp          = VK_ATTACHMENT_STORE_OP_DONT_CARE;
   color_attachment.initialLayout           = _init_params.initial_layout_;
-  color_attachment.finalLayout             = msaa_rendertarget_ ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : _init_params.final_layout_;
+  color_attachment.finalLayout
+      = msaa_rendertarget_ ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : _init_params.final_layout_;
 
   std::vector<VkAttachmentDescription> pass_attachments{color_attachment};
 

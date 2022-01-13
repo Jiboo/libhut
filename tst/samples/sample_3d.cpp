@@ -52,42 +52,7 @@ int main(int, char **) {
   {
     auto iupdator = indices->update();
     iupdator.set({
-        0,
-        1,
-        2,
-        2,
-        3,
-        0,
-        1,
-        5,
-        6,
-        6,
-        2,
-        1,
-        7,
-        6,
-        5,
-        5,
-        4,
-        7,
-        4,
-        0,
-        3,
-        3,
-        7,
-        4,
-        4,
-        5,
-        1,
-        1,
-        0,
-        4,
-        3,
-        2,
-        6,
-        6,
-        7,
-        3,
+        0, 1, 2, 2, 3, 0, 1, 5, 6, 6, 2, 1, 7, 6, 5, 5, 4, 7, 4, 0, 3, 3, 7, 4, 4, 5, 1, 1, 0, 4, 3, 2, 6, 6, 7, 3,
     });
   }
 
@@ -202,10 +167,7 @@ int main(int, char **) {
     mrot       = rotate(mrot, -camera_rot.y, vec3{1, 0, 0});
     vec3 orbit = mrot * vec4(orbit_base, 1);
 
-    mat4 m = lookAt(
-        orbit,
-        vec3(0, 0, 0),
-        vec3{0, -1, 0});
+    mat4 m = lookAt(orbit, vec3(0, 0, 0), vec3{0, -1, 0});
     ubo->set_subone(0, offsetof(vp_ubo, view_), sizeof(mat4), &m);
 
     w.invalidate(false);

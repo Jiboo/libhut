@@ -120,7 +120,8 @@ font::glyph font::load(const shared_atlas &_atlas, uint _char_index) {
       for (uint x = 0; x < render.width; x++) {
         auto  src_pixel = *(src_row + x);
         auto &dst_pixel = *(dst_row + x);
-        dst_pixel.x = dst_pixel.y = dst_pixel.z = dst_pixel.w = src_pixel;  // NOTE JBL: premultiplied, to be coherent with emoji BGRA which are too
+        dst_pixel.x = dst_pixel.y = dst_pixel.z = dst_pixel.w
+            = src_pixel;  // NOTE JBL: premultiplied, to be coherent with emoji BGRA which are too
       }
     }
   } else {

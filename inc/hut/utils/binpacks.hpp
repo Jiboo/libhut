@@ -83,7 +83,8 @@ class linear1d {
       result.index_ = (last_found_fit_ + i) % blocks_count;  // Start from last found fit
       auto block    = blocks_[result.index_];
 
-      if (block.used_) continue;  // In use
+      if (block.used_)
+        continue;  // In use
       const auto size = block.size_;
       if (size < _size)
         continue;  // Too small even without considering alignment
@@ -158,7 +159,9 @@ class linear1d {
 
  public:
   explicit linear1d(T _pool_size)
-      : pool_size_(_pool_size) { reset(); }
+      : pool_size_(_pool_size) {
+    reset();
+  }
 
   std::optional<T> pack(T _size, T _align = 0) {
     assert(_size > 0);
@@ -170,9 +173,7 @@ class linear1d {
     return split(*first_fit);
   }
 
-  [[nodiscard]] bool try_fit(T _size, T _align = 0) const {
-    return find_first_fit(_size, _align).has_value();
-  }
+  [[nodiscard]] bool try_fit(T _size, T _align = 0) const { return find_first_fit(_size, _align).has_value(); }
 
   void offer(T _offset) {
     auto found = find_offset(_offset);
@@ -238,16 +239,12 @@ struct adaptor1d_dummy2d {
 
 template<typename T, T TAlignment>
 struct shelve_separator_align {
-  u16 select_shelve(u16 _size) {
-    return align(_size, TAlignment);
-  }
+  u16 select_shelve(u16 _size) { return align(_size, TAlignment); }
 };
 
 template<typename T, T TMin>
 struct shelve_separator_pow {
-  u16 select_shelve(u16 _size) {
-    return std::max(std::bit_ceil(_size), u16(16));
-  }
+  u16 select_shelve(u16 _size) { return std::max(std::bit_ceil(_size), u16(16)); }
 };
 
 template<typename T, typename TShelveSelector>
@@ -271,7 +268,9 @@ struct shelve {
 
   explicit shelve(const type &_size)
       : size_(_size)
-      , shelves_allocator_(_size.y) { reset(); }
+      , shelves_allocator_(_size.y) {
+    reset();
+  }
 
   std::optional<type> pack(const type &_size) {
     auto pow   = TShelveSelector{}.select_shelve(_size.y);
@@ -311,9 +310,7 @@ struct shelve {
     shelves_allocator_.reset();
   }
 
-  bool empty() {
-    return shelves_allocator_.empty();
-  }
+  bool empty() { return shelves_allocator_.empty(); }
 };
 
 }  // namespace hut::binpack

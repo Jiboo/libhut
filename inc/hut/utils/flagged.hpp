@@ -56,7 +56,8 @@ class flagged {
   constexpr flagged() = default;
   constexpr explicit flagged(TEnum _init) { set(_init); }
   constexpr flagged(std::initializer_list<TEnum> _inits) {
-    for (auto flag : _inits) set(flag);
+    for (auto flag : _inits)
+      set(flag);
   }
 
   constexpr flagged &operator=(const flagged &_other) {

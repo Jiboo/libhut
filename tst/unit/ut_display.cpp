@@ -33,10 +33,6 @@
 using namespace hut;
 
 TEST(display, fastkill) {
-  {
-    display d("hut fastkill test");
-  }
-  {
-    display d("hut fastkill tests");
-  }
+  { display d("hut fastkill test"); }
+  { display d("hut fastkill tests"); }
 }

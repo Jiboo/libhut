@@ -95,12 +95,8 @@ struct buffer_params {
   bool                  permanent_map_ = false;
   VkMemoryPropertyFlags type_          = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
   VkBufferUsageFlagBits usage_         = VkBufferUsageFlagBits(
-              VK_BUFFER_USAGE_TRANSFER_DST_BIT
-              | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
-              | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT
-              | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
-              | VK_BUFFER_USAGE_INDEX_BUFFER_BIT
-              | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
+              VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT
+              | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
 };
 
 class buffer {
@@ -109,8 +105,10 @@ class buffer {
  public:
   buffer(display &_display, uint _size, const buffer_params &_params = {});
 
-  buffer_suballoc<u8>                            allocate_raw(uint _size_bytes, uint _align = 4);
-  template<typename T> shared_buffer_suballoc<T> allocate(uint _count, uint _align = 4) {
+  buffer_suballoc<u8> allocate_raw(uint _size_bytes, uint _align = 4);
+
+  template<typename T>
+  shared_buffer_suballoc<T> allocate(uint _count, uint _align = 4) {
     auto raw_alloc = allocate_raw(_count * sizeof(T), _align);
     return std::make_shared<buffer_suballoc<T>>(std::move(*raw_alloc.template reinterpret_as<T>()));
   }

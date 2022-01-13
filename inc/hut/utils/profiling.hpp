@@ -66,17 +66,19 @@
 #include "hut/utils/math.hpp"
 
 namespace hut {
-enum profiling_category : u8 { PDEFAULT,
-                               PDISPLAY,
-                               PWINDOW,
-                               PSTAGING,
-                               PBUFFER,
-                               PIMAGE,
-                               PFONT,
-                               PVULKAN,
-                               PGPU,
-                               PEVENT,
-                               PPIPELINE };
+enum profiling_category : u8 {
+  PDEFAULT,
+  PDISPLAY,
+  PWINDOW,
+  PSTAGING,
+  PBUFFER,
+  PIMAGE,
+  PFONT,
+  PVULKAN,
+  PGPU,
+  PEVENT,
+  PPIPELINE
+};
 
 inline std::ostream &operator<<(std::ostream &_os, const profiling_category &_in) {
   switch (_in) {
@@ -188,12 +190,11 @@ struct fixed_string_array {
   fixed_string_array(const fixed_string_array &)     = default;
   fixed_string_array(fixed_string_array &&) noexcept = default;
 
-  constexpr fixed_string_array(const char (&..._in)[TSizes]) {
-    init(0, 0, _in...);
-  }
+  constexpr fixed_string_array(const char (&..._in)[TSizes]) { init(0, 0, _in...); }
 
   template<size_t TFirstSize, size_t... TRestSizes>
-  constexpr void init(size_t _index, size_t _byte_offset, const char (&_first)[TFirstSize], const char (&..._rest)[TRestSizes]) {
+  constexpr void init(size_t _index, size_t _byte_offset, const char (&_first)[TFirstSize],
+                      const char (&..._rest)[TRestSizes]) {
     offsets_[_index] = _byte_offset;
     for (size_t i = 0; i != TFirstSize; ++i)
       data_[i + _byte_offset] = _first[i];
@@ -284,9 +285,7 @@ class diff_clock_wrapper {
 
   static inline const typename TInternalClock::time_point epoch = TInternalClock::now();
 
-  static time_point now() {
-    return time_point{std::chrono::duration_cast<duration>(TInternalClock::now() - epoch)};
-  }
+  static time_point now() { return time_point{std::chrono::duration_cast<duration>(TInternalClock::now() - epoch)}; }
 };
 using clock_f32 = diff_clock_wrapper<std::chrono::steady_clock, float>;
 
@@ -306,7 +305,9 @@ struct timestamp_component : TNextParent {
       , timestamp_{_tp} {}
 
   void dump(std::ostream &_os) {
-    _os << ",\"ts\":\"" << std::chrono::duration_cast<std::chrono::duration<double, std::micro>>(timestamp_.time_since_epoch()).count() << '\"';
+    _os << ",\"ts\":\""
+        << std::chrono::duration_cast<std::chrono::duration<double, std::micro>>(timestamp_.time_since_epoch()).count()
+        << '\"';
     TNextParent::dump(_os);
   }
 };
@@ -323,7 +324,8 @@ struct duration_component : TNextParent {
       , duration_{_dur} {}
 
   void dump(std::ostream &_os) {
-    _os << ",\"dur\":\"" << std::chrono::duration_cast<std::chrono::duration<double, std::micro>>(duration_).count() << '\"';
+    _os << ",\"dur\":\"" << std::chrono::duration_cast<std::chrono::duration<double, std::micro>>(duration_).count()
+        << '\"';
     TNextParent::dump(_os);
   }
 };
@@ -395,18 +397,13 @@ using arg_names = std::array<std::string_view, TArgCount>;
 template<typename... TArgs>
 using args_tuple = std::tuple<std::decay_t<TArgs>...>;
 
-enum dispatch_op { DUMP,
-                   DESTROY };
+enum dispatch_op { DUMP, DESTROY };
 
 template<fixed_string TFormat, fixed_string_array TArgNames, typename TEventType, typename... TEventArgs>
 void dispatcher_impl(TEventType &_thiz, dispatch_op _op, void *_data) {
   switch (_op) {
-    case DUMP:
-      _thiz.template dump_impl<TFormat, TArgNames, TEventArgs...>(*static_cast<std::ostream *>(_data));
-      break;
-    case DESTROY:
-      _thiz.template destroy_impl<TEventArgs...>();
-      break;
+    case DUMP: _thiz.template dump_impl<TFormat, TArgNames, TEventArgs...>(*static_cast<std::ostream *>(_data)); break;
+    case DESTROY: _thiz.template destroy_impl<TEventArgs...>(); break;
   }
 }
 
@@ -445,8 +442,7 @@ class basic_event : public TFirstParent {
     args_as<TArgs...>().~tuple();
   }
 
-  static void dump_impl_rec(std::ostream &_os, size_t _index) {
-  }
+  static void dump_impl_rec(std::ostream &_os, size_t _index) {}
 
   template<fixed_string_array TArgNames, typename TLast>
   static void dump_impl_rec(std::ostream &_os, size_t _index, TLast &&_last) {
@@ -467,24 +463,24 @@ class basic_event : public TFirstParent {
   void dump_impl(std::ostream &_os) {
     _os << "{\"name\":\"";
 
-    escape_json(_os, std::apply([](auto &&..._args) {
-                  try {
-                    return fmt::format(TFormat.data_, std::forward<decltype(_args)>(_args)...);
-                  } catch (...) {
-                    return std::string(TFormat.data_);
-                  }
-                },
-                                args_as<TArgs...>()));
+    escape_json(_os, std::apply(
+                         [](auto &&..._args) {
+                           try {
+                             return fmt::format(TFormat.data_, std::forward<decltype(_args)>(_args)...);
+                           } catch (...) { return std::string(TFormat.data_); }
+                         },
+                         args_as<TArgs...>()));
 
     _os << "\",\"pid\":1";
     TFirstParent::dump(_os);
     if constexpr (sizeof...(TArgs) > 0) {
       _os << ",\"args\":{";
 
-      std::apply([&_os](auto &&..._args) {
-        basic_event::dump_impl_rec<TArgNames>(_os, 0, std::forward<decltype(_args)>(_args)...);
-      },
-                 args_as<TArgs...>());
+      std::apply(
+          [&_os](auto &&..._args) {
+            basic_event::dump_impl_rec<TArgNames>(_os, 0, std::forward<decltype(_args)>(_args)...);
+          },
+          args_as<TArgs...>());
 
       _os << "}";
     }
@@ -493,7 +489,8 @@ class basic_event : public TFirstParent {
 
  public:
   template<typename... TEventArgs, typename... TParentsCtorArgs>
-  basic_event(const dispatcher &_dispatcher, std::tuple<TEventArgs...> &&_event_args, TParentsCtorArgs &&..._parent_args)
+  basic_event(const dispatcher &_dispatcher, std::tuple<TEventArgs...> &&_event_args,
+              TParentsCtorArgs &&..._parent_args)
       : TFirstParent{std::forward<TParentsCtorArgs>(_parent_args)...}
       , dispatcher_{_dispatcher} {
     static_assert(data_size >= sizeof(_event_args), "Not enough args storage");
@@ -505,13 +502,9 @@ class basic_event : public TFirstParent {
       : TFirstParent{std::forward<TParentsCtorArgs>(_parent_args)...}
       , dispatcher_{_dispatcher} {}
 
-  void dump(std::ostream &_os) {
-    dispatcher_(*this, DUMP, &_os);
-  }
+  void dump(std::ostream &_os) { dispatcher_(*this, DUMP, &_os); }
 
-  ~basic_event() {
-    dispatcher_(*this, DESTROY, nullptr);
-  }
+  ~basic_event() { dispatcher_(*this, DESTROY, nullptr); }
 };
 
 using complete_components = timestamp_component<  //4
@@ -571,9 +564,7 @@ struct threads_data {
     return *tls_data_;
   }
 
-  static std::vector<complete_event> &my_queue() {
-    return get().completed_[frame_index_];
-  }
+  static std::vector<complete_event> &my_queue() { return get().completed_[frame_index_]; }
 
   static void next_frame() {
     std::scoped_lock lock{mapping_mutex_};
@@ -591,9 +582,7 @@ struct threads_data {
     frame_index_.store(next);
   }
 
-  static void request_dump() {
-    dump_requested_ = true;
-  }
+  static void request_dump() { dump_requested_ = true; }
 
   struct frame_cache {
     std::string name_, source_file_;
@@ -618,8 +607,9 @@ struct threads_data {
           auto frame   = vec[i];
           auto itcache = cache.find(frame.address());
           if (itcache == cache.end()) {
-            auto result = cache.emplace(frame.address(), frame_cache{frame.name(), frame.source_file(), frame.source_line()});
-            itcache     = result.first;
+            auto result
+                = cache.emplace(frame.address(), frame_cache{frame.name(), frame.source_file(), frame.source_line()});
+            itcache = result.first;
           }
 
           _os << "\":{\"name\":\"";
@@ -715,7 +705,8 @@ struct complete_event_scope {
   std::tuple<TEventArgs...> args_;
   dispatcher                dispatcher_;
 
-  complete_event_scope(std::vector<TEventType> &_buffer, profiling_category _cat, clock_f32::time_point _start, stacktrace &&_stacktrace, std::tuple<TEventArgs...> &&_event_args)
+  complete_event_scope(std::vector<TEventType> &_buffer, profiling_category _cat, clock_f32::time_point _start,
+                       stacktrace &&_stacktrace, std::tuple<TEventArgs...> &&_event_args)
       : buffer_{_buffer}
       , cat_{_cat}
       , start_{_start}
@@ -724,13 +715,16 @@ struct complete_event_scope {
       , dispatcher_{dispatcher_impl<TFormat, TArgNames, TEventType, TEventArgs...>} {}
 
   ~complete_event_scope() {
-    buffer_.emplace_back(dispatcher_, std::move(args_), start_, (clock_f32::now() - start_), std::move(stacktrace_), type::COMPLETE, cat_);
+    buffer_.emplace_back(dispatcher_, std::move(args_), start_, (clock_f32::now() - start_), std::move(stacktrace_),
+                         type::COMPLETE, cat_);
   }
 };
 
 template<fixed_string TFormat, fixed_string_array TArgNames, typename TEventType, typename... TEventArgs>
-auto make_complete_event_scope(std::vector<TEventType> &_buffer, profiling_category _cat, clock_f32::time_point _start, stacktrace &&_stacktrace, std::tuple<TEventArgs...> &&_event_args) {
-  return complete_event_scope<TFormat, TArgNames, TEventType, TEventArgs...>{_buffer, _cat, _start, std::move(_stacktrace), std::move(_event_args)};
+auto make_complete_event_scope(std::vector<TEventType> &_buffer, profiling_category _cat, clock_f32::time_point _start,
+                               stacktrace &&_stacktrace, std::tuple<TEventArgs...> &&_event_args) {
+  return complete_event_scope<TFormat, TArgNames, TEventType, TEventArgs...>{
+      _buffer, _cat, _start, std::move(_stacktrace), std::move(_event_args)};
 }
 
 #  define HUT_PROFILE_TRANSFORM_STRINGIFY(MR, MData, MElement) BOOST_PP_STRINGIZE(MElement)
@@ -740,40 +734,49 @@ auto make_complete_event_scope(std::vector<TEventType> &_buffer, profiling_categ
 
 #  define HUT_PROFILE_UNIQUE_SYMBOL(MPrefix) BOOST_PP_CAT(MPrefix##_scope, __COUNTER__)
 
-#  define HUT_PROFILE_SCOPE_IMPL_DATANAMED(MCat, MFormat, MArgNames, MArgNamesVar, MDataVar, ...) \
-    auto HUT_PROFILE_UNIQUE_SYMBOL(_scope) = ::hut::profiling::make_complete_event_scope<MFormat, ::hut::fixed_string_array{BOOST_PP_TUPLE_ENUM(MArgNames)}>(::hut::profiling::threads_data::my_queue(), MCat, ::hut::profiling::clock_f32::now(), ::hut::profiling::stacktrace{1, 8}, std::make_tuple(__VA_ARGS__))
+#  define HUT_PROFILE_SCOPE_IMPL_DATANAMED(MCat, MFormat, MArgNames, MArgNamesVar, MDataVar, ...)                      \
+    auto HUT_PROFILE_UNIQUE_SYMBOL(_scope)                                                                             \
+        = ::hut::profiling::make_complete_event_scope<MFormat,                                                         \
+                                                      ::hut::fixed_string_array{BOOST_PP_TUPLE_ENUM(MArgNames)}>(      \
+            ::hut::profiling::threads_data::my_queue(), MCat, ::hut::profiling::clock_f32::now(),                      \
+            ::hut::profiling::stacktrace{1, 8}, std::make_tuple(__VA_ARGS__))
 
-#  define HUT_PROFILE_SCOPE_IMPL(MCat, MFormat, MArgNames, ...) HUT_PROFILE_SCOPE_IMPL_DATANAMED(MCat, MFormat, MArgNames, HUT_PROFILE_UNIQUE_SYMBOL(_names), HUT_PROFILE_UNIQUE_SYMBOL(_data), __VA_ARGS__)
+#  define HUT_PROFILE_SCOPE_IMPL(MCat, MFormat, MArgNames, ...)                                                        \
+    HUT_PROFILE_SCOPE_IMPL_DATANAMED(MCat, MFormat, MArgNames, HUT_PROFILE_UNIQUE_SYMBOL(_names),                      \
+                                     HUT_PROFILE_UNIQUE_SYMBOL(_data), __VA_ARGS__)
 
-#  define HUT_PROFILE_SCOPE(MCat, MFormat, ...)                  HUT_PROFILE_SCOPE_IMPL(MCat, MFormat, HUT_PROFILE_MAP(HUT_PROFILE_TRANSFORM_STRINGIFY, __VA_ARGS__), __VA_ARGS__)
-#  define HUT_PROFILE_SCOPE_NAMED(MCat, MFormat, MArgNames, ...) HUT_PROFILE_SCOPE_IMPL(MCat, MFormat, MArgNames, __VA_ARGS__)
+#  define HUT_PROFILE_SCOPE(MCat, MFormat, ...)                                                                        \
+    HUT_PROFILE_SCOPE_IMPL(MCat, MFormat, HUT_PROFILE_MAP(HUT_PROFILE_TRANSFORM_STRINGIFY, __VA_ARGS__), __VA_ARGS__)
+#  define HUT_PROFILE_SCOPE_NAMED(MCat, MFormat, MArgNames, ...)                                                       \
+    HUT_PROFILE_SCOPE_IMPL(MCat, MFormat, MArgNames, __VA_ARGS__)
 
-#  define HUT_PROFILE_EVENT(MTarget, MEvent, ...)                                  \
-    [&]() -> bool {                                                                \
-      HUT_PROFILE_SCOPE(PEVENT, "Event " BOOST_PP_STRINGIZE(MEvent), __VA_ARGS__); \
-      return MTarget->MEvent.fire(__VA_ARGS__);                                    \
+#  define HUT_PROFILE_EVENT(MTarget, MEvent, ...)                                                                      \
+    [&]() -> bool {                                                                                                    \
+      HUT_PROFILE_SCOPE(PEVENT, "Event " BOOST_PP_STRINGIZE(MEvent), __VA_ARGS__);                                     \
+      return MTarget->MEvent.fire(__VA_ARGS__);                                                                        \
     }()
-#  define HUT_PROFILE_EVENT_NAMED(MTarget, MEvent, MArgNames, ...)                                  \
-    [&]() -> bool {                                                                                 \
-      HUT_PROFILE_SCOPE_NAMED(PEVENT, "Event " BOOST_PP_STRINGIZE(MEvent), MArgNames, __VA_ARGS__); \
-      return MTarget->MEvent.fire(__VA_ARGS__);                                                     \
+#  define HUT_PROFILE_EVENT_NAMED(MTarget, MEvent, MArgNames, ...)                                                     \
+    [&]() -> bool {                                                                                                    \
+      HUT_PROFILE_SCOPE_NAMED(PEVENT, "Event " BOOST_PP_STRINGIZE(MEvent), MArgNames, __VA_ARGS__);                    \
+      return MTarget->MEvent.fire(__VA_ARGS__);                                                                        \
     }()
-#  define HUT_PROFILE_EVENT_NAMED_ALIASED(MTarget, MEvent, MArgNames, MArgValues, ...)                                  \
-    [&]() -> bool {                                                                                                     \
-      HUT_PROFILE_SCOPE_NAMED(PEVENT, "Event " BOOST_PP_STRINGIZE(MEvent), MArgNames, BOOST_PP_TUPLE_ENUM(MArgValues)); \
-      return MTarget->MEvent.fire(__VA_ARGS__);                                                                         \
-    }()
-
-#  define HUT_PVK(MName, ...)                                       \
-    [&]() {                                                         \
-      HUT_PROFILE_SCOPE(::hut::PVULKAN, BOOST_PP_STRINGIZE(MName)); \
-      return MName(__VA_ARGS__);                                    \
+#  define HUT_PROFILE_EVENT_NAMED_ALIASED(MTarget, MEvent, MArgNames, MArgValues, ...)                                 \
+    [&]() -> bool {                                                                                                    \
+      HUT_PROFILE_SCOPE_NAMED(PEVENT, "Event " BOOST_PP_STRINGIZE(MEvent), MArgNames,                                  \
+                                                                  BOOST_PP_TUPLE_ENUM(MArgValues));                    \
+      return MTarget->MEvent.fire(__VA_ARGS__);                                                                        \
     }()
 
-#  define HUT_PVK_NAMED_ALIASED(MName, MArgNames, MArgValues, ...)                                             \
-    [&]() {                                                                                                    \
-      HUT_PROFILE_SCOPE_NAMED(PVULKAN, BOOST_PP_STRINGIZE(MName), MArgNames, BOOST_PP_TUPLE_ENUM(MArgValues)); \
-      return MName(__VA_ARGS__);                                                                               \
+#  define HUT_PVK(MName, ...)                                                                                          \
+    [&]() {                                                                                                            \
+      HUT_PROFILE_SCOPE(::hut::PVULKAN, BOOST_PP_STRINGIZE(MName));                                                    \
+      return MName(__VA_ARGS__);                                                                                       \
+    }()
+
+#  define HUT_PVK_NAMED_ALIASED(MName, MArgNames, MArgValues, ...)                                                     \
+    [&]() {                                                                                                            \
+      HUT_PROFILE_SCOPE_NAMED(PVULKAN, BOOST_PP_STRINGIZE(MName), MArgNames, BOOST_PP_TUPLE_ENUM(MArgValues));         \
+      return MName(__VA_ARGS__);                                                                                       \
     }()
 
 #else  // HUT_ENABLE_PROFILING

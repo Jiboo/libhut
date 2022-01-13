@@ -26,17 +26,17 @@
  */
 
 #if __has_include(<linux/input.h>)
-  #include <linux/input.h>
+#  include <linux/input.h>
 
-  #define HUT_MAP_KEYSYM(FORMAT_LINUX, FORMAT_X11, FORMAT_IMGUI) int test_linux_##FORMAT_LINUX = KEY_##FORMAT_LINUX;
-  #include "hut/keysyms.inc"
-  #undef HUT_MAP_KEYSYM
+#  define HUT_MAP_KEYSYM(FORMAT_LINUX, FORMAT_X11, FORMAT_IMGUI) int test_linux_##FORMAT_LINUX = KEY_##FORMAT_LINUX;
+#  include "hut/keysyms.inc"
+#  undef HUT_MAP_KEYSYM
 #endif
 
 #if __has_include(<X11/keysym.h>)
-  #include <X11/keysym.h>
+#  include <X11/keysym.h>
 
-  #define HUT_MAP_KEYSYM(FORMAT_LINUX, FORMAT_X11, FORMAT_IMGUI) int test_x11_##FORMAT_X11 = XK_##FORMAT_X11;
-  #include "hut/keysyms.inc"
-  #undef HUT_MAP_KEYSYM
+#  define HUT_MAP_KEYSYM(FORMAT_LINUX, FORMAT_X11, FORMAT_IMGUI) int test_x11_##FORMAT_X11 = XK_##FORMAT_X11;
+#  include "hut/keysyms.inc"
+#  undef HUT_MAP_KEYSYM
 #endif

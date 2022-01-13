@@ -32,12 +32,7 @@
 using namespace hut;
 
 TEST(flagged, ctor) {
-  enum option {
-    F1,
-    F2,
-    F3,
-    LAST_OPTION = F3
-  };
+  enum option { F1, F2, F3, LAST_OPTION = F3 };
   using options = flagged<option, LAST_OPTION>;
 
   options a;

@@ -63,10 +63,11 @@ image::image(display &_display, const image_params &_params)
     , params_(_params) {
   mem_reqs_ = create(_display, _params, &image_, &memory_);
 
-  VkImageViewCreateInfo viewInfo           = {};
-  viewInfo.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-  viewInfo.image                           = image_;
-  viewInfo.viewType                        = (params_.flags_ & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT) ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
+  VkImageViewCreateInfo viewInfo = {};
+  viewInfo.sType                 = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+  viewInfo.image                 = image_;
+  viewInfo.viewType
+      = (params_.flags_ & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT) ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
   viewInfo.format                          = _params.format_;
   viewInfo.subresourceRange.aspectMask     = _params.aspect_;
   viewInfo.subresourceRange.baseMipLevel   = 0;
@@ -110,8 +111,8 @@ image::image(display &_display, const image_params &_params)
   });
 }
 
-VkMemoryRequirements image::create(display &_display, const image_params &_params,
-                                   VkImage *_image, VkDeviceMemory *_image_memory) {
+VkMemoryRequirements image::create(display &_display, const image_params &_params, VkImage *_image,
+                                   VkDeviceMemory *_image_memory) {
   VkImageCreateInfo imageInfo = {};
   imageInfo.sType             = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   imageInfo.imageType         = VK_IMAGE_TYPE_2D;
@@ -219,13 +220,13 @@ void image::finalize_update(image::updator &_update) {
   display::buffer2image_copy copy = {};
   copy.imageExtent                = {(uint)size.x, (uint)size.y, 1};
   copy.imageOffset                = {origin.x, origin.y, 0};
-  copy.bufferRowLength            = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : ((_update.staging_row_pitch_ * 8) / bpp());
-  copy.bufferImageHeight          = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : size.y;
-  copy.bufferOffset               = _update.staging_.offset_bytes();
-  copy.imageSubresource           = subresLayers;
-  copy.source                     = _update.staging_.parent()->buffer_;
-  copy.destination                = image_;
-  copy.bytesSize                  = _update.size_bytes();
+  copy.bufferRowLength   = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : ((_update.staging_row_pitch_ * 8) / bpp());
+  copy.bufferImageHeight = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : size.y;
+  copy.bufferOffset      = _update.staging_.offset_bytes();
+  copy.imageSubresource  = subresLayers;
+  copy.source            = _update.staging_.parent()->buffer_;
+  copy.destination       = image_;
+  copy.bytesSize         = _update.size_bytes();
 
   std::lock_guard lk(display_->staging_mutex_);
   display_->staging_jobs_++;

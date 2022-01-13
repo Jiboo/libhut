@@ -50,10 +50,11 @@ int main(int, char **) {
   win.title(u8"hut render2d playground");
   win.clear_color({1, 1, 1, 1});
 
-  auto texatlas = std::make_shared<atlas>(dsp, image_params{.size_ = dsp.max_tex_size(), .format_ = VK_FORMAT_R8G8B8A8_UNORM});
-  auto samp     = std::make_shared<sampler>(dsp);
-  auto tex      = imgdec::load_png(texatlas, tst_png::tex1_png);
-  auto ubo      = buf->allocate<common_ubo>(1, dsp.ubo_align());
+  auto texatlas
+      = std::make_shared<atlas>(dsp, image_params{.size_ = dsp.max_tex_size(), .format_ = VK_FORMAT_R8G8B8A8_UNORM});
+  auto samp = std::make_shared<sampler>(dsp);
+  auto tex  = imgdec::load_png(texatlas, tst_png::tex1_png);
+  auto ubo  = buf->allocate<common_ubo>(1, dsp.ubo_align());
   ubo->set(common_ubo{win.size()});
 
   render2d::renderer box_renderer(win, buf, ubo, texatlas, samp);
@@ -109,12 +110,14 @@ int main(int, char **) {
       ImGui::SliderScalarN("Size", ImGuiDataType_U16, &size, 2, &bbox_min, &bbox_max);
       custom_bbox = make_bbox_with_origin_size(origin, size);
       {
-        float color_buff[4] = {custom_col_from.r / 255.f, custom_col_from.g / 255.f, custom_col_from.b / 255.f, custom_col_from.a / 255.f};
+        float color_buff[4] = {custom_col_from.r / 255.f, custom_col_from.g / 255.f, custom_col_from.b / 255.f,
+                               custom_col_from.a / 255.f};
         ImGui::ColorEdit4("From", color_buff);
         custom_col_from = u16vec4{color_buff[0] * 255, color_buff[1] * 255, color_buff[2] * 255, color_buff[3] * 255};
       }
       {
-        float color_buff[4] = {custom_col_to.r / 255.f, custom_col_to.g / 255.f, custom_col_to.b / 255.f, custom_col_to.a / 255.f};
+        float color_buff[4]
+            = {custom_col_to.r / 255.f, custom_col_to.g / 255.f, custom_col_to.b / 255.f, custom_col_to.a / 255.f};
         ImGui::ColorEdit4("To", color_buff);
         custom_col_to = u16vec4{color_buff[0] * 255, color_buff[1] * 255, color_buff[2] * 255, color_buff[3] * 255};
       }
@@ -146,13 +149,12 @@ int main(int, char **) {
       for (int i = 0; i < quads.size() - 1; i++) {
         auto line = i / 15;
         auto col  = i % 15;
-        auto bbox = make_bbox_with_origin_size(u16vec2{8} + u16vec2{col * (grid_size.x + 8), line * (grid_size.y + 8)}, grid_size);
-        render2d::set(iupdator[i], bbox,
-                      grid_fixed_colors ? custom_col_from : rand_color(),
+        auto bbox = make_bbox_with_origin_size(u16vec2{8} + u16vec2{col * (grid_size.x + 8), line * (grid_size.y + 8)},
+                                               grid_size);
+        render2d::set(iupdator[i], bbox, grid_fixed_colors ? custom_col_from : rand_color(),
                       grid_fixed_colors ? custom_col_to : rand_color(),
                       grid_fixed_gradient ? render2d::gradient(custom_gradient) : render2d::gradient(i % 4),
-                      grid_no_params ? 0 : col, grid_no_params ? 0 : line,
-                      grid_use_tex ? tex : shared_subimage{});
+                      grid_no_params ? 0 : col, grid_no_params ? 0 : line, grid_use_tex ? tex : shared_subimage{});
       }
       render2d::set(iupdator[quads.size() - 1], custom_bbox, custom_col_from, custom_col_to,
                     render2d::gradient(custom_gradient), custom_radius, custom_softness,
@@ -165,7 +167,8 @@ int main(int, char **) {
         ubo->set_subone(0, offsetof(common_ubo, view_), sizeof(hut::mat4), &translate);
       }
 
-      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
+                  ImGui::GetIO().Framerate);
     }
     ImGui::End();
 

@@ -43,12 +43,12 @@ using namespace hut;
 static constexpr const auto BUFF_SIZE = 4096;
 
 struct drop_target {
-  std::unique_ptr<u8[]>                                         buff_              = std::make_unique<u8[]>(BUFF_SIZE);
-  clipboard_formats                                             allowed_formats_   = clipboard_formats{FTEXT_PLAIN};
-  dragndrop_actions                                             allowed_actions_   = dragndrop_actions{DNDCOPY};
-  dragndrop_action                                              preferred_action_  = DNDCOPY;
-  std::array<clipboard_format, CLIPBOARD_FORMAT_LAST_VALUE + 1> preferred_formats_ = {
-      FIMAGE_PNG, FIMAGE_JPEG, FIMAGE_BMP, FTEXT_HTML, FTEXT_URI_LIST, FTEXT_PLAIN};
+  std::unique_ptr<u8[]>                                         buff_             = std::make_unique<u8[]>(BUFF_SIZE);
+  clipboard_formats                                             allowed_formats_  = clipboard_formats{FTEXT_PLAIN};
+  dragndrop_actions                                             allowed_actions_  = dragndrop_actions{DNDCOPY};
+  dragndrop_action                                              preferred_action_ = DNDCOPY;
+  std::array<clipboard_format, CLIPBOARD_FORMAT_LAST_VALUE + 1> preferred_formats_
+      = {FIMAGE_PNG, FIMAGE_JPEG, FIMAGE_BMP, FTEXT_HTML, FTEXT_URI_LIST, FTEXT_PLAIN};
   vec4 bbox_ = {0, 0, 0, 0};
 };
 
@@ -106,7 +106,8 @@ struct my_drop_target_interface : drop_target_interface {
     auto read = _receiver.read(std::span(target_->buff_.get(), BUFF_SIZE));
     hexdump(target_->buff_.get(), read);
     target_->buff_.get()[read] = 0;
-    std::cout << "my_drop_target_interface::on_drop " << _action << ", read " << read << " bytes from dragndrop" << std::endl;
+    std::cout << "my_drop_target_interface::on_drop " << _action << ", read " << read << " bytes from dragndrop"
+              << std::endl;
     u8 sink[1024];
     while (_receiver.read(sink))
       ;
@@ -138,11 +139,13 @@ int main(int, char **) {
   win.on_mouse.connect([&](u8 _button, mouse_event_type _type, vec2 _coords) {
     if (_type == MDOWN && _button == 1 && bbox_contains(source_bbox, _coords)) {
       std::cout << "Starting drag with " << source_actions << ", " << source_formats << std::endl;
-      win.dragndrop_start(source_actions, source_formats, [&](dragndrop_action _action, clipboard_format _mime, clipboard_sender &_sender) {
-        auto size  = strlen(source_data);
-        auto wrote = _sender.write({(u8 *)source_data, size});
-        std::cout << "Wrote " << wrote << "/" << size << " bytes to drag target in " << _mime << std::endl;
-      });
+      win.dragndrop_start(source_actions, source_formats,
+                          [&](dragndrop_action _action, clipboard_format _mime, clipboard_sender &_sender) {
+                            auto size  = strlen(source_data);
+                            auto wrote = _sender.write({(u8 *)source_data, size});
+                            std::cout << "Wrote " << wrote << "/" << size << " bytes to drag target in " << _mime
+                                      << std::endl;
+                          });
       return true;
     }
     return false;

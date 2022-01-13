@@ -57,8 +57,7 @@ IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnBlur();
 IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnFocus();
 
 template<typename TEnum, TEnum TEnd, typename TUnderlying = hut::u32>
-bool ImGui_HutFlag(const char *_label, hut::flagged<TEnum, TEnd, TUnderlying> *_flags,
-                   const char *(*_name_cb)(TEnum)) {
+bool ImGui_HutFlag(const char *_label, hut::flagged<TEnum, TEnd, TUnderlying> *_flags, const char *(*_name_cb)(TEnum)) {
   bool changed = false;
   ImGui::Text("%s: ", _label);
   for (TUnderlying i = 0; i <= static_cast<TUnderlying>(TEnd); i++) {

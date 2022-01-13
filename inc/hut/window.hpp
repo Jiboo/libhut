@@ -49,19 +49,13 @@ enum side {
 using edge = flagged<side, LAST_SIDE>;
 cursor_type edge_cursor(edge);
 
-enum touch_event_type { TDOWN,
-                        TUP,
-                        TMOVE };
+enum touch_event_type { TDOWN, TUP, TMOVE };
 const char          *touch_event_name(touch_event_type);
 inline std::ostream &operator<<(std::ostream &_os, touch_event_type _c) {
   return _os << touch_event_name(_c);
 }
 
-enum mouse_event_type { MDOWN,
-                        MUP,
-                        MMOVE,
-                        MWHEEL_UP,
-                        MWHEEL_DOWN };
+enum mouse_event_type { MDOWN, MUP, MMOVE, MWHEEL_UP, MWHEEL_DOWN };
 const char          *mouse_event_name(mouse_event_type);
 inline std::ostream &operator<<(std::ostream &_os, mouse_event_type _c) {
   return _os << mouse_event_name(_c);
@@ -122,11 +116,9 @@ class window : public render_target {
 
   void  maximize(bool _set = true);
   void  fullscreen(bool _set = true);
-  uvec2 size() {
-    return size_;
-  }
-  void interactive_resize(edge);
-  void interactive_move();
+  uvec2 size() { return size_; }
+  void  interactive_resize(edge);
+  void  interactive_move();
 
   void title(std::u8string_view);
   void cursor(cursor_type _c);
@@ -143,8 +135,10 @@ class window : public render_target {
 
   void dragndrop_target(const std::shared_ptr<drop_target_interface> &_received) { drop_target_interface_ = _received; }
 
-  using send_dragndrop_data = std::function<void(dragndrop_action /*_action*/, clipboard_format /*_selected_format*/, clipboard_sender &)>;
-  void dragndrop_start(dragndrop_actions _supported_actions, clipboard_formats _supported_formats, send_dragndrop_data &&_callback);
+  using send_dragndrop_data
+      = std::function<void(dragndrop_action /*_action*/, clipboard_format /*_selected_format*/, clipboard_sender &)>;
+  void dragndrop_start(dragndrop_actions _supported_actions, clipboard_formats _supported_formats,
+                       send_dragndrop_data &&_callback);
 
  protected:
   display      &display_;

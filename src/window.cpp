@@ -176,8 +176,10 @@ void window::init_vulkan_surface() {
   } else {
     swapchain_extents_ = {size_.x, size_.y};
   }
-  swapchain_extents_.width  = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, swapchain_extents_.width));
-  swapchain_extents_.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, swapchain_extents_.height));
+  swapchain_extents_.width  = std::max(capabilities.minImageExtent.width,
+                                       std::min(capabilities.maxImageExtent.width, swapchain_extents_.width));
+  swapchain_extents_.height = std::max(capabilities.minImageExtent.height,
+                                       std::min(capabilities.maxImageExtent.height, swapchain_extents_.height));
 
   u32 images_count = capabilities.minImageCount + 1;
   if (capabilities.maxImageCount > 0 && images_count > capabilities.maxImageCount) {
@@ -205,7 +207,9 @@ void window::init_vulkan_surface() {
     swapchain_infos.pQueueFamilyIndices   = nullptr;
   }
   swapchain_infos.preTransform   = capabilities.currentTransform;
-  swapchain_infos.compositeAlpha = params_.flags_ & window_params::FTRANSPARENT ? VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR : VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+  swapchain_infos.compositeAlpha = params_.flags_ & window_params::FTRANSPARENT
+                                     ? VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR
+                                     : VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
   swapchain_infos.presentMode    = present_mode_;
   swapchain_infos.clipped        = VK_TRUE;
   VkSwapchainKHR old_swapchain   = swapchain_;
@@ -277,7 +281,8 @@ void window::init_vulkan_surface() {
 
   VkSemaphoreCreateInfo semaphoreInfo = {};
   semaphoreInfo.sType                 = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  if (HUT_PVK(vkCreateSemaphore, display_.device_, &semaphoreInfo, nullptr, &sem_available_) != VK_SUCCESS || HUT_PVK(vkCreateSemaphore, display_.device_, &semaphoreInfo, nullptr, &sem_rendered_) != VK_SUCCESS) {
+  if (HUT_PVK(vkCreateSemaphore, display_.device_, &semaphoreInfo, nullptr, &sem_available_) != VK_SUCCESS
+      || HUT_PVK(vkCreateSemaphore, display_.device_, &semaphoreInfo, nullptr, &sem_rendered_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create semaphores!");
   }
 

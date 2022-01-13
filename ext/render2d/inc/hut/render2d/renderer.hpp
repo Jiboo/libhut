@@ -44,8 +44,8 @@ class quads_set;
 
 using index = u32;
 
-using pipeline = hut::pipeline<index, render2d_vert_spv_refl, render2d_frag_spv_refl,
-                               const hut::shared_ubo &, const hut::shared_atlas &, const hut::shared_sampler &>;
+using pipeline = hut::pipeline<index, render2d_vert_spv_refl, render2d_frag_spv_refl, const hut::shared_ubo &,
+                               const hut::shared_atlas &, const hut::shared_sampler &>;
 
 using vertex   = pipeline::vertex;
 using instance = pipeline::instance;
@@ -54,16 +54,10 @@ using shared_indices   = pipeline::shared_indices;
 using shared_vertices  = pipeline::shared_vertices;
 using shared_instances = pipeline::shared_instances;
 
-enum gradient : u16 {
-  T2B,
-  L2R,
-  TL2BR,
-  TR2BL
-};
+enum gradient : u16 { T2B, L2R, TL2BR, TR2BL };
 
 // Helper to write to an instance
-inline void set(instance &_target, u16vec4 _bbox,
-                u8vec4 _from, u8vec4 _to, gradient _gradient = T2B,
+inline void set(instance &_target, u16vec4 _bbox, u8vec4 _from, u8vec4 _to, gradient _gradient = T2B,
                 uint _corner_radius = 0, uint _corner_softness = 0,
                 const shared_subimage &_subimg = shared_subimage{}) {
   _target.col_from_ = _from;
@@ -120,9 +114,8 @@ struct renderer_params : pipeline_params {
 
 class renderer {
  public:
-  renderer(render_target &_target, shared_buffer _buffer,
-           const shared_ubo &_ubo, shared_atlas _atlas, const shared_sampler &_sampler,
-           renderer_params _params = {});
+  renderer(render_target &_target, shared_buffer _buffer, const shared_ubo &_ubo, shared_atlas _atlas,
+           const shared_sampler &_sampler, renderer_params _params = {});
 
   void draw(VkCommandBuffer);
 

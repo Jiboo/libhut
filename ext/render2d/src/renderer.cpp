@@ -33,9 +33,8 @@ using namespace hut;
 using namespace hut::render2d;
 using namespace hut::render2d::details;
 
-renderer::renderer(render_target &_target, shared_buffer _buffer,
-                   const shared_ubo &_ubo, shared_atlas _atlas, const shared_sampler &_sampler,
-                   renderer_params _params)
+renderer::renderer(render_target &_target, shared_buffer _buffer, const shared_ubo &_ubo, shared_atlas _atlas,
+                   const shared_sampler &_sampler, renderer_params _params)
     : pipeline_(_target, _params)
     , buffer_(std::move(_buffer))
     , atlas_(std::move(_atlas)) {
@@ -45,9 +44,7 @@ renderer::renderer(render_target &_target, shared_buffer _buffer,
 }
 
 batch &renderer::grow(uint _count) {
-  return batches_.emplace_back(batch{
-      buffer_->allocate<instance>(_count),
-      binpack::linear1d<uint>{_count}});
+  return batches_.emplace_back(batch{buffer_->allocate<instance>(_count), binpack::linear1d<uint>{_count}});
 }
 
 void renderer::draw(VkCommandBuffer _buffer) {

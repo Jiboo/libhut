@@ -289,10 +289,8 @@ class display {
   std::vector<flush_callback>      preflush_jobs_;
   std::vector<buffer_suballoc<u8>> postflush_garbage_;
 
-  inline void preflush(const flush_callback &_callback) {
-    preflush_jobs_.emplace_back(_callback);
-  }
-  void postflush_collect(buffer_suballoc<u8> &&_callback);
+  inline void preflush(const flush_callback &_callback) { preflush_jobs_.emplace_back(_callback); }
+  void        postflush_collect(buffer_suballoc<u8> &&_callback);
 
   struct buffer_copy : public VkBufferCopy {
     VkBuffer source;
@@ -334,7 +332,8 @@ class display {
   void stage_transition(const image_transition &_info, VkImageSubresourceRange _range);
   void stage_clear(const image_clear &_info, VkImageSubresourceRange _range);
 
-  static void transition_image(VkCommandBuffer _cb, VkImage _image, VkImageSubresourceRange _range, VkImageLayout _oldLayout, VkImageLayout _newLayout);
+  static void transition_image(VkCommandBuffer _cb, VkImage _image, VkImageSubresourceRange _range,
+                               VkImageLayout _oldLayout, VkImageLayout _newLayout);
 
   std::list<callback> posted_jobs_;
   std::mutex          posted_mutex_;
@@ -362,7 +361,8 @@ class display {
   static void data_offer_handle_source_actions(void *, wl_data_offer *, u32);
   static void data_offer_handle_action(void *, wl_data_offer *, u32);
   static void data_device_handle_data_offer(void *, wl_data_device *, wl_data_offer *);
-  static void data_device_handle_enter(void *, wl_data_device *, u32, wl_surface *, wl_fixed_t, wl_fixed_t, wl_data_offer *);
+  static void data_device_handle_enter(void *, wl_data_device *, u32, wl_surface *, wl_fixed_t, wl_fixed_t,
+                                       wl_data_offer *);
   static void data_device_handle_leave(void *, wl_data_device *);
   static void data_device_handle_motion(void *, wl_data_device *, u32, wl_fixed_t, wl_fixed_t);
   static void data_device_handle_drop(void *, wl_data_device *);

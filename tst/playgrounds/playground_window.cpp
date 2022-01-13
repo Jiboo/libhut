@@ -38,7 +38,8 @@
 
 using namespace hut;
 
-std::shared_ptr<window> create_window(display &_display, window_params _params, std::u8string_view _title, vec4 _clearc) {
+std::shared_ptr<window> create_window(display &_display, window_params _params, std::u8string_view _title,
+                                      vec4 _clearc) {
   auto result = std::make_shared<window>(_display, _params);
   result->title(_title);
   result->clear_color(_clearc);

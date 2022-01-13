@@ -100,10 +100,8 @@ bool is_prohibited_format(VkFormat _format) {
     case VK_FORMAT_G16_B16R16_2PLANE_420_UNORM:
     case VK_FORMAT_G16_B16_R16_3PLANE_422_UNORM:
     case VK_FORMAT_G16_B16R16_2PLANE_422_UNORM:
-    case VK_FORMAT_G16_B16_R16_3PLANE_444_UNORM:
-      return true;
-    default:
-      return false;
+    case VK_FORMAT_G16_B16_R16_3PLANE_444_UNORM: return true;
+    default: return false;
   }
 }
 
@@ -112,10 +110,8 @@ bool is_special_depth_format(VkFormat _format) {
     case VK_FORMAT_D16_UNORM_S8_UINT:
     case VK_FORMAT_D24_UNORM_S8_UINT:
     case VK_FORMAT_X8_D24_UNORM_PACK32:
-    case VK_FORMAT_D32_SFLOAT_S8_UINT:
-      return true;
-    default:
-      return false;
+    case VK_FORMAT_D32_SFLOAT_S8_UINT: return true;
+    default: return false;
   }
 }
 
@@ -169,10 +165,9 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
       return true;
     };
 
-    constexpr static u8 zero_padding_[4] = {
-        0, 0, 0, 0};
-    constexpr static u8 expected_ktx2_header_[12] = {
-        0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A};
+    constexpr static u8 zero_padding_[4] = {0, 0, 0, 0};
+    constexpr static u8 expected_ktx2_header_[12]
+        = {0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A};
     if (!expect_data(expected_ktx2_header_, 12))
       return {};
 

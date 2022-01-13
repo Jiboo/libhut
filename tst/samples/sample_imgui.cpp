@@ -80,13 +80,16 @@ int main(int, char **) {
       ImGui::SameLine();
       ImGui::Text("counter = %d", counter);
 
-      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
+                  ImGui::GetIO().Framerate);
     }
     ImGui::End();
 
     // 3. Show another simple window.
     if (show_another_window) {
-      if (ImGui::Begin("Another Window", &show_another_window)) {  // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+      if (ImGui::Begin(
+              "Another Window",
+              &show_another_window)) {  // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
         ImGui::Text("Hello from another window!");
         if (ImGui::Button("Close Me"))
           show_another_window = false;

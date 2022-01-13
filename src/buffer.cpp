@@ -167,8 +167,7 @@ void buffer::debug() {
     std::cout << "\tVkBuffer " << page.buffer_ << " size:" << page.size() << std::endl;
 
     page.suballocator_.visit_blocks([](const auto &block) {
-      std::cout << "\t\trange " << block.offset_ << " - " << (block.offset_ + block.size_)
-                << ": " << block.used_
+      std::cout << "\t\trange " << block.offset_ << " - " << (block.offset_ + block.size_) << ": " << block.used_
                 << std::endl;
       return true;
     });

@@ -33,7 +33,8 @@
 namespace hut {
 
 class atlas {
-  template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> friend class pipeline;
+  template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments>
+  friend class pipeline;
 
   constexpr static u16vec2 padding = {1, 1};
 

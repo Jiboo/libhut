@@ -58,15 +58,13 @@ ivec2 encode_atlas_page_xy(vec2 _in, uint _atlas_page) {
       _in.x *= -1;
       _in.y *= -1;
       break;
-    default:
-      throw std::runtime_error("not enough bits to encode atlas page in uv signs");
+    default: throw std::runtime_error("not enough bits to encode atlas page in uv signs");
   }
   return packSnorm<i16>(_in);
 }
 
-renderer::renderer(render_target &_target, shared_buffer _buffer, const shared_font &_font,
-                   const shared_ubo &_ubo, shared_atlas _atlas, const shared_sampler &_sampler,
-                   renderer_params _params)
+renderer::renderer(render_target &_target, shared_buffer _buffer, const shared_font &_font, const shared_ubo &_ubo,
+                   shared_atlas _atlas, const shared_sampler &_sampler, renderer_params _params)
     : pipeline_(_target, _params)
     , buffer_(std::move(_buffer))
     , atlas_(std::move(_atlas))
@@ -155,11 +153,13 @@ void renderer::draw(VkCommandBuffer _buff) {
     pipeline_.bind_vertices(_buff, batch.mstore_.vertices_);
     pipeline_.bind_instances(_buff, batch.dstore_.instances_);
 #ifndef HUT_TEXT_DEBUG_NO_INDIRECT
-    pipeline_.draw_indexed(_buff, batch.dstore_.commands_, batch.dstore_.suballocator_.upper_bound(), sizeof(VkDrawIndexedIndirectCommand));
+    pipeline_.draw_indexed(_buff, batch.dstore_.commands_, batch.dstore_.suballocator_.upper_bound(),
+                           sizeof(VkDrawIndexedIndirectCommand));
 #else
     for (uint i = 0; i < batch.dstore_.suballocator_.upper_bound(); i++) {
       auto &command = batch.dstore_.commands_[i];
-      pipeline_.draw_indexed(_buff, command.indexCount, command.instanceCount, command.firstIndex, command.vertexOffset, command.firstInstance);
+      pipeline_.draw_indexed(_buff, command.indexCount, command.instanceCount, command.firstIndex, command.vertexOffset,
+                             command.firstInstance);
     }
 #endif
   }
@@ -202,7 +202,8 @@ renderer::paragraph_holder renderer::allocate(std::span<const std::u8string_view
     result.bboxes_[i] = it->second.bbox_;
 
 #ifndef HUT_TEXT_DEBUG_NO_INDIRECT
-    VkDrawIndexedIndirectCommand *cptr = reinterpret_cast<VkDrawIndexedIndirectCommand *>(cupdator.staging().data()) + i;
+    VkDrawIndexedIndirectCommand *cptr
+        = reinterpret_cast<VkDrawIndexedIndirectCommand *>(cupdator.staging().data()) + i;
 #else
     VkDrawIndexedIndirectCommand *cptr = best_batch.dstore_.commands_.data() + *draw_alloc + i;
 #endif
@@ -251,7 +252,8 @@ void batch::release(text_suballoc *_suballoc) {
 #else
   auto offset_elements = offset_bytes() / sizeof(instance);
   auto size_elements   = size_bytes() / sizeof(instance);
-  std::fill(dstore.commands_.data() + offset_elements, dstore.commands_.data() + offset_elements + size_elements, VkDrawIndexedIndirectCommand{0});
+  std::fill(dstore.commands_.data() + offset_elements, dstore.commands_.data() + offset_elements + size_elements,
+            VkDrawIndexedIndirectCommand{0});
 #endif
   dstore_.suballocator_.offer(_suballoc->offset_bytes());
 }

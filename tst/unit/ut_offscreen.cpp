@@ -20,7 +20,8 @@ void dump(u8vec4 *_data, u16vec4 _box) {
   for (int x = _box.x; x < _box.z; x++) {
     for (int y = _box.y; y < _box.w; y++) {
       auto pixel = _data[_box.z * y + x];
-      if (pixel == D) std::cout << "D";
+      if (pixel == D)
+        std::cout << "D";
       else if (pixel == C)
         std::cout << "C";
       else if (pixel == W)
@@ -137,9 +138,7 @@ TEST(offscreen, offscreen_basic) {
 
   d.flush_staged();  // staging has to be explicitly flushed in offscreen mode
 
-  ofs.draw([&](VkCommandBuffer _cb) {
-    rgb_pipeline->draw(_cb, 0, indices, instances, vertices);
-  });
+  ofs.draw([&](VkCommandBuffer _cb) { rgb_pipeline->draw(_cb, 0, indices, instances, vertices); });
 
   u8vec4 pixel_data[4 * 4];
   ofs.download(std::span<u8>(&pixel_data[0].x, sizeof(pixel_data)), 4 * 4);
@@ -246,9 +245,7 @@ TEST(offscreen, offscreen_render_offset) {
 
   d.flush_staged();  // staging has to be explicitly flushed in offscreen mode
 
-  ofs.draw([&](VkCommandBuffer _cb) {
-    rgb_pipeline->draw(_cb, 0, indices, instances, vertices);
-  });
+  ofs.draw([&](VkCommandBuffer _cb) { rgb_pipeline->draw(_cb, 0, indices, instances, vertices); });
 
   u8vec4 pixel_data[4 * 4] = {
       // clang-format off

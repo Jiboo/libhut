@@ -51,14 +51,21 @@ using shared_image    = std::shared_ptr<image>;
 using shared_sampler  = std::shared_ptr<sampler>;
 using shared_subimage = std::shared_ptr<subimage>;
 
-template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments> class pipeline;
+template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments>
+class pipeline;
 
-template<typename TContained, typename TParent> class suballoc;
-template<typename TContained, typename TParent> using shared_suballoc = std::shared_ptr<suballoc<TContained, TParent>>;
-template<typename TContained> using buffer_suballoc                   = suballoc<TContained, details::buffer_page_data>;
-template<typename TContained> using shared_buffer_suballoc            = std::shared_ptr<buffer_suballoc<TContained>>;
+template<typename TContained, typename TParent>
+class suballoc;
+template<typename TContained, typename TParent>
+using shared_suballoc = std::shared_ptr<suballoc<TContained, TParent>>;
+template<typename TContained>
+using buffer_suballoc = suballoc<TContained, details::buffer_page_data>;
+template<typename TContained>
+using shared_buffer_suballoc = std::shared_ptr<buffer_suballoc<TContained>>;
 
-template<typename TContained, typename TParent> class updator;
-template<typename TContained> using buffer_updator = updator<TContained, details::buffer_page_data>;
+template<typename TContained, typename TParent>
+class updator;
+template<typename TContained>
+using buffer_updator = updator<TContained, details::buffer_page_data>;
 
 }  // namespace hut

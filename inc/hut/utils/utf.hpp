@@ -40,7 +40,8 @@ inline size_t utf8codepointcount(std::u8string_view s) {
   size_t     len  = 0;
   const auto last = s.data() + s.size();
   for (auto cur = s.data(); cur != last; cur++)
-    if ((*cur & 0xC0) != 0x80) ++len;
+    if ((*cur & 0xC0) != 0x80)
+      ++len;
   return len;
 }
 

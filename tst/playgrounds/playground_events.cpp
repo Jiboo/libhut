@@ -106,9 +106,7 @@ int main(int, char **) {
       avg += sample;
     }
 
-    float average() const {
-      return avg / float(count);
-    }
+    float average() const { return avg / float(count); }
   };
 
   datapoint latencies;
@@ -154,10 +152,13 @@ int main(int, char **) {
     if (ImGui::Begin("Time data")) {
       char header[128];
       snprintf(header, sizeof(header), "min/avg/max: %f/%f/%f", latencies.min, latencies.average(), latencies.max);
-      ImGui::PlotHistogram("latencies", latencies.samples.data(), latencies.samples.size(), 0, header, 0, 1000 / 24.f, ImVec2(latencies.samples.size(), 100));
+      ImGui::PlotHistogram("latencies", latencies.samples.data(), latencies.samples.size(), 0, header, 0, 1000 / 24.f,
+                           ImVec2(latencies.samples.size(), 100));
 
-      snprintf(header, sizeof(header), "min/avg/max: %f/%f/%f", separations.min, separations.average(), separations.max);
-      ImGui::PlotHistogram("separations", separations.samples.data(), separations.samples.size(), 0, header, 0, 1000 / 24.f, ImVec2(separations.samples.size(), 100));
+      snprintf(header, sizeof(header), "min/avg/max: %f/%f/%f", separations.min, separations.average(),
+               separations.max);
+      ImGui::PlotHistogram("separations", separations.samples.data(), separations.samples.size(), 0, header, 0,
+                           1000 / 24.f, ImVec2(separations.samples.size(), 100));
 
       ImGui::Text("Event per second: %f", events_per_seconds / std::chrono::duration<double>(events_period).count());
     }
@@ -169,9 +170,7 @@ int main(int, char **) {
   });
   win.on_frame.connect([&](display::duration _dt) {
     //std::cout << "on_frame " << _dt << std::endl;
-    dsp.post([&](auto) {
-      win.invalidate(true);
-    });
+    dsp.post([&](auto) { win.invalidate(true); });
     return false;
   });
 
@@ -191,8 +190,10 @@ int main(int, char **) {
     return false;
   });
   win.on_key.connect([&](keycode _kcode, keysym _ksym, bool _down) {
-    char kcode_name[128];
-    dsp.keycode_name(kcode_name, _kcode);
+    char  kcode_name[128];
+    char *end = dsp.keycode_name(kcode_name, _kcode);
+    *end      = 0;
+
     std::cout << "on_key " << _kcode << " (" << kcode_name << "), " << _ksym << (_down ? " down" : " up") << std::endl;
 
     if (_ksym == KSYM_ESC && !_down)

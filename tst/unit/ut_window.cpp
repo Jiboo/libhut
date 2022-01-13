@@ -41,9 +41,7 @@ TEST(window, fastkill) {
     display d("hut fastkill test");
     window  w1(d);
     window  w2(d);
-    {
-      window w3(d);
-    }
+    { window w3(d); }
     window w4(d);
   }
 }

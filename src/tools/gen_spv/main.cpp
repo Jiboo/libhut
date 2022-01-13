@@ -24,15 +24,12 @@ inline string_view get_sv(const svsub_match &m) {
   return string_view(m.first, m.length());
 }
 
-inline bool regex_match(string_view                      sv,
-                        svmatch                         &m,
-                        const regex                     &e,
+inline bool regex_match(string_view sv, svmatch &m, const regex &e,
                         regex_constants::match_flag_type flags = regex_constants::match_default) {
   return regex_match(sv.begin(), sv.end(), m, e, flags);
 }
 
-inline bool regex_match(string_view                      sv,
-                        const regex                     &e,
+inline bool regex_match(string_view sv, const regex &e,
                         regex_constants::match_flag_type flags = regex_constants::match_default) {
   return regex_match(sv.begin(), sv.end(), e, flags);
 }
@@ -174,7 +171,8 @@ constexpr string_view vk_formats[] = {
 string_view remove_format_suffix(string_view _input) {
   for (auto &vk_format : vk_formats) {
     if (_input.ends_with(vk_format))
-      return _input.substr(0, _input.size() - vk_format.size() - 1);  // NOTE JBL: extra one for the underscore, '_'<format>
+      return _input.substr(0, _input.size() - vk_format.size()
+                                  - 1);  // NOTE JBL: extra one for the underscore, '_'<format>
   }
   return _input;
 }
@@ -215,9 +213,7 @@ string format_name_vk(SpvReflectInterfaceVariable *_input) {
     case SPV_REFLECT_FORMAT_R64_SFLOAT:
     case SPV_REFLECT_FORMAT_R64G64_SFLOAT:
     case SPV_REFLECT_FORMAT_R64G64B64_SFLOAT:
-    case SPV_REFLECT_FORMAT_R64G64B64A64_SFLOAT:
-      os << "_SFLOAT";
-      break;
+    case SPV_REFLECT_FORMAT_R64G64B64A64_SFLOAT: os << "_SFLOAT"; break;
 
     default:
       if (_input->numeric.scalar.width > 16)
@@ -306,7 +302,8 @@ string format_name_cpp(SpvReflectInterfaceVariable *_input, unsigned _columns = 
   size_t occ32 = std::count(format.begin(), format.end(), '3');
   size_t occ64 = std::count(format.begin(), format.end(), '4');
 
-  if (occ64 > 0) os << "64";
+  if (occ64 > 0)
+    os << "64";
   else if (occ32 > 0)
     os << "32";
   else if (occ16 > 0)
@@ -336,24 +333,26 @@ void reflect_bindings(ostream &_os, const SpvReflectShaderModule &_mod) {
   _os << "  constexpr static std::array<VkDescriptorSetLayoutBinding, " << bindings_count
       << "> descriptor_bindings_ {\n";
   for (auto *binding : bindings) {
-    if (binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER && binding->type_description->op == SpvOpTypeRuntimeArray && binding->count == 1)
-      throw std::runtime_error("missing size on sampler array (specify a dimension size), or 1 specified (if only one is needed don't use an array)");
+    if (binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
+        && binding->type_description->op == SpvOpTypeRuntimeArray && binding->count == 1)
+      throw std::runtime_error("missing size on sampler array (specify a dimension size), or 1 specified (if only one "
+                               "is needed don't use an array)");
     _os << "    VkDescriptorSetLayoutBinding{.binding = " << binding->binding
         << ", .descriptorType = " << descriptor_type_vk(binding->descriptor_type)
-        << ", .descriptorCount = " << binding->count
-        << ", .stageFlags = " << (_mod.shader_stage == SPV_REFLECT_SHADER_STAGE_VERTEX_BIT ? "VK_SHADER_STAGE_VERTEX_BIT" : "VK_SHADER_STAGE_FRAGMENT_BIT")
+        << ", .descriptorCount = " << binding->count << ", .stageFlags = "
+        << (_mod.shader_stage == SPV_REFLECT_SHADER_STAGE_VERTEX_BIT ? "VK_SHADER_STAGE_VERTEX_BIT"
+                                                                     : "VK_SHADER_STAGE_FRAGMENT_BIT")
         << ", .pImmutableSamplers = nullptr},\n";
   }
   _os << "  };" << endl;
 }
 
 // FIXME JBL: string_view for _extra_offset_op when supported by my local and mingw32 STLs
-void reflect_vertex_input(ostream &_os, SpvReflectInterfaceVariable *_input, int _binding, string_view _name, int _location_offset = 0, string _extra_offset_op = "") {
+void reflect_vertex_input(ostream &_os, SpvReflectInterfaceVariable *_input, int _binding, string_view _name,
+                          int _location_offset = 0, string _extra_offset_op = "") {
   _os << "    VkVertexInputAttributeDescription{.location = " << (_input->location + _location_offset)
-      << ", .binding = " << _binding
-      << ", .format = " << format_name_vk(_input)
-      << ", .offset = offsetof(" << (_binding == 0 ? "vertex" : "instance") << ", " << _name << "_)" << _extra_offset_op
-      << "},\n";
+      << ", .binding = " << _binding << ", .format = " << format_name_vk(_input) << ", .offset = offsetof("
+      << (_binding == 0 ? "vertex" : "instance") << ", " << _name << "_)" << _extra_offset_op << "},\n";
 }
 
 void reflect_vertex_inputs(ostream &_os, const SpvReflectShaderModule &_mod) {
@@ -364,9 +363,7 @@ void reflect_vertex_inputs(ostream &_os, const SpvReflectShaderModule &_mod) {
   result = spvReflectEnumerateInputVariables(&_mod, &inputs_count, inputs.data());
   assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
-  std::sort(inputs.begin(), inputs.end(), [](const auto *l, const auto *r) {
-    return l->location < r->location;
-  });
+  std::sort(inputs.begin(), inputs.end(), [](const auto *l, const auto *r) { return l->location < r->location; });
 
   struct vertex_data_member {
     SpvReflectInterfaceVariable *input_;
@@ -415,7 +412,8 @@ void reflect_vertex_inputs(ostream &_os, const SpvReflectShaderModule &_mod) {
         } else {
           for (int i = 0; i < columns; i++) {
             attribute_buffer.str("");
-            reflect_vertex_input(attribute_buffer, input, binding, short_name, i, sstream(" + sizeof(") << format_name_cpp(input, 0) << ") * " << i);
+            reflect_vertex_input(attribute_buffer, input, binding, short_name, i,
+                                 sstream(" + sizeof(") << format_name_cpp(input, 0) << ") * " << i);
             attributes.emplace_back(attribute_buffer.str());
           }
         }
@@ -427,15 +425,13 @@ void reflect_vertex_inputs(ostream &_os, const SpvReflectShaderModule &_mod) {
 
   _os << "\n  struct vertex {\n";
   for (auto &member : vertex_inputs) {
-    _os << "    " << format_name_cpp(member.input_)
-        << " " << member.name_ << "_;\n";
+    _os << "    " << format_name_cpp(member.input_) << " " << member.name_ << "_;\n";
   }
   _os << "  }; // struct vertex\n";
 
   _os << "\n  struct instance {\n";
   for (auto &member : instance_inputs) {
-    _os << "    " << format_name_cpp(member.input_)
-        << " " << member.name_ << "_;\n";
+    _os << "    " << format_name_cpp(member.input_) << " " << member.name_ << "_;\n";
   }
   _os << "  }; // struct instance\n";
 
@@ -487,8 +483,9 @@ int main(int argc, char **argv) {
               "#include <vulkan/vulkan.h>\n"
               "#include \"hut/utils/math.hpp\"\n"
               "#include \""
-           << bundle_namespace << ".hpp\"\n"
-                                  "namespace hut::"
+           << bundle_namespace
+           << ".hpp\"\n"
+              "namespace hut::"
            << bundle_namespace << " {\n";
 
   for (auto i = 3; i < argc; i++) {
@@ -519,8 +516,7 @@ int main(int argc, char **argv) {
       switch (module.shader_stage) {
         case SPV_REFLECT_SHADER_STAGE_VERTEX_BIT: reflect_vertex_shader(output_h, module); break;
         case SPV_REFLECT_SHADER_STAGE_FRAGMENT_BIT: reflect_fragment_shader(output_h, module); break;
-        default:
-          throw runtime_error(sstream("reflecting on unsupported vertex stage ") << module.shader_stage);
+        default: throw runtime_error(sstream("reflecting on unsupported vertex stage ") << module.shader_stage);
       }
     } catch (const exception &_ex) {
       throw runtime_error(sstream("exception while reflecting on ") << input_path << ": " << _ex.what());

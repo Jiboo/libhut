@@ -98,16 +98,18 @@ int main(int, char **) {
       }
       if (ImGui::Button("Paste")) {
         std::cout << "Requesting from clipboard" << std::endl;
-        win.clipboard_receive(clipboard_formats{} | FIMAGE_PNG, [](clipboard_format _mime, clipboard_receiver &_receiver) {
-          std::ofstream ofs("clipboard.png", std::ios::binary);
-          assert(ofs.is_open());
-          u8 buffer[2048];
-          while (auto read = _receiver.read(buffer)) {
-            hexdump(buffer, read);
-            ofs.write((char *)buffer, read);
-          }
-          std::cout << "Read " << ofs.tellp() << " bytes from clipboard in " << _mime << " saved to clipboard.png" << std::endl;
-        });
+        win.clipboard_receive(clipboard_formats{} | FIMAGE_PNG,
+                              [](clipboard_format _mime, clipboard_receiver &_receiver) {
+                                std::ofstream ofs("clipboard.png", std::ios::binary);
+                                assert(ofs.is_open());
+                                u8 buffer[2048];
+                                while (auto read = _receiver.read(buffer)) {
+                                  hexdump(buffer, read);
+                                  ofs.write((char *)buffer, read);
+                                }
+                                std::cout << "Read " << ofs.tellp() << " bytes from clipboard in " << _mime
+                                          << " saved to clipboard.png" << std::endl;
+                              });
       }
     }
     ImGui::End();
