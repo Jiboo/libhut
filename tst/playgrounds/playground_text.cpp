@@ -1151,7 +1151,7 @@ int main(int, char **) {
     ImGui::NewFrame();
 
     if (ImGui::Begin("Hello, world!")) {
-      ImGui::InputTextMultiline("", (char *)text_input, sizeof(text_input));
+      ImGui::InputTextMultiline("##text_input", (char *)text_input, sizeof(text_input));
       if (ImGui::Button("Update")) {
         before_split = clock::now();
         dosplit();

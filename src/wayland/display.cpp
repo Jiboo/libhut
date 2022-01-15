@@ -558,7 +558,7 @@ display::display(const char *_app_name, u32 _app_version, const char *_name)
   std::vector<const char *> extensions = {VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME};
   init_vulkan_instance(_app_name, _app_version, extensions);
 
-  display_ = wl_display_connect(_name);
+  display_ = wl_display_connect(_name != nullptr ? _name : getenv("HUT_DISPLAY"));
   if (!display_)
     throw std::runtime_error("couldn't connect to wayland server");
 
@@ -572,45 +572,43 @@ display::display(const char *_app_name, u32 _app_version, const char *_name)
 
   registry_ = wl_display_get_registry(display_);
   wl_registry_add_listener(registry_, &reg_listeners, this);
+  wl_display_roundtrip(display_);
 
-  {
+  if (seat_) {
+    keyboard_repeat_ctx_.thread_ = std::thread(keyboard_repeat_thread, &keyboard_repeat_ctx_);
     HUT_PROFILE_SCOPE(PDISPLAY, "Waiting keymap");
-    while (keymap_ == nullptr) {
+    while (keymap_ == nullptr)
       wl_display_roundtrip(display_);
-    }
   }
-
-  if (!compositor_)
-    throw std::runtime_error("couldn't retrieve a wl_compositor in the wayland registry");
-  if (!xdg_wm_base_)
-    throw std::runtime_error("couldn't retrieve a xdg_wm_base in the wayland registry");
-  if (!seat_)
-    throw std::runtime_error("couldn't retrieve a wl_seat in the wayland registry");
 
   if (data_device_manager_) {
     data_device_ = wl_data_device_manager_get_data_device(data_device_manager_, seat_);
     wl_data_device_add_listener(data_device_, &data_device_listeners, this);
   }
 
-  auto *dummy = wl_compositor_create_surface(compositor_);
-  if (!dummy)
-    throw std::runtime_error("couldn't create dummy surface");
+  if (compositor_) {
+    auto *dummy = wl_compositor_create_surface(compositor_);
+    if (!dummy)
+      throw std::runtime_error("couldn't create dummy surface");
 
-  VkWaylandSurfaceCreateInfoKHR info = {};
-  info.sType                         = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
-  info.display                       = display_;
-  info.surface                       = dummy;
+    VkWaylandSurfaceCreateInfoKHR info = {};
+    info.sType                         = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
+    info.display                       = display_;
+    info.surface                       = dummy;
 
-  auto        *func = get_proc<PFN_vkCreateWaylandSurfaceKHR>("vkCreateWaylandSurfaceKHR");
-  VkSurfaceKHR dummy_surface;
-  VkResult     vkr;
-  if ((vkr = func(instance_, &info, nullptr, &dummy_surface)) != VK_SUCCESS)
-    throw std::runtime_error(sstream("couldn't create vulkan dummy surface, code: ") << vkr);
+    auto        *func = get_proc<PFN_vkCreateWaylandSurfaceKHR>("vkCreateWaylandSurfaceKHR");
+    VkSurfaceKHR dummy_surface;
+    VkResult     vkr;
+    if ((vkr = func(instance_, &info, nullptr, &dummy_surface)) != VK_SUCCESS)
+      throw std::runtime_error(sstream("couldn't create vulkan dummy surface, code: ") << vkr);
 
-  init_vulkan_device(dummy_surface);
+    init_vulkan_device(dummy_surface);
 
-  HUT_PVK(vkDestroySurfaceKHR, instance_, dummy_surface, nullptr);
-  wl_surface_destroy(dummy);
+    HUT_PVK(vkDestroySurfaceKHR, instance_, dummy_surface, nullptr);
+    wl_surface_destroy(dummy);
+  } else {
+    init_vulkan_device(nullptr);
+  }
 
   if (shm_ != nullptr) {
     char  *env_cursor_theme       = getenv("XCURSOR_THEME");
@@ -627,8 +625,6 @@ display::display(const char *_app_name, u32 _app_version, const char *_name)
     cursor_surface_             = wl_compositor_create_surface(compositor_);
     animate_cursor_ctx_.thread_ = std::thread(animate_cursor_thread, &animate_cursor_ctx_);
   }
-
-  keyboard_repeat_ctx_.thread_ = std::thread(keyboard_repeat_thread, &keyboard_repeat_ctx_);
 }
 
 display::~display() {

@@ -209,6 +209,13 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
   HUT_PVK(vkGetPhysicalDeviceProperties2, _device, &properties2);
   VkPhysicalDeviceProperties &properties = properties2.properties;
 
+#ifdef HUT_PREFER_NONDESCRETE_DEVICES
+  if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+    result.score_ = 0;
+    return result;
+  }
+#endif
+
   VkPhysicalDeviceVulkan12Features features12{};
   features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
   VkPhysicalDeviceFeatures2 features2{};
@@ -224,10 +231,14 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
   if (features2.features.multiDrawIndirect == VK_FALSE)
     result.score_ = 0;
 
-#ifdef HUT_PREFER_NONDESCRETE_DEVICES
-  if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
-    result.score_ = 0;
+#ifdef HUT_ENABLE_VALIDATION_DEBUG
+  std::cout << "[hut] rating device " << properties.deviceName << " using Vulkan "
+            << VK_VERSION_MAJOR(properties.apiVersion) << '.' << VK_VERSION_MINOR(properties.apiVersion) << ", "
+            << (result.score_ == 0 ? "don't" : "do") << " have minimum features." << std::endl;
 #endif
+
+  if (result.score_ == 0)
+    return result;
 
   u32 extension_count;
   HUT_PVK(vkEnumerateDeviceExtensionProperties, _device, nullptr, &extension_count, nullptr);
@@ -239,7 +250,10 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
       has_swapchhain_ext = true;
   }
 
-  if (result.score_ > 0 && has_swapchhain_ext) {
+  if (_dummy && !has_swapchhain_ext)
+    return result;
+
+  if (has_swapchhain_ext) {
     u32 famillies_count;
     HUT_PVK(vkGetPhysicalDeviceQueueFamilyProperties, _device, &famillies_count, nullptr);
     std::vector<VkQueueFamilyProperties> famillies(famillies_count);
@@ -247,8 +261,29 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
 
     for (u32 i = 0; i < famillies_count; i++) {
       const VkQueueFamilyProperties &props = famillies[i];
-      VkBool32                       present;
-      HUT_PVK(vkGetPhysicalDeviceSurfaceSupportKHR, _device, i, _dummy, &present);
+
+      if (_dummy) {
+        VkBool32 present;
+        HUT_PVK(vkGetPhysicalDeviceSurfaceSupportKHR, _device, i, _dummy, &present);
+
+        VkSurfaceCapabilitiesKHR capabilities = {};
+        HUT_PVK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR, _device, _dummy, &capabilities);
+
+        u32 formats_count, modes_count;
+        HUT_PVK(vkGetPhysicalDeviceSurfaceFormatsKHR, _device, _dummy, &formats_count, nullptr);
+        HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, _device, _dummy, &modes_count, nullptr);
+
+        if (props.queueCount > 0) {
+          // prioritise dedicated queues
+          if (result.iqueuep_ == score_t::bad_id && present)
+            result.iqueuep_ = i;
+        }
+
+        if (formats_count == 0)
+          result.score_ = 0;
+        if (modes_count == 0)
+          result.score_ = 0;
+      }
 
       if (props.queueCount > 0) {
         // prioritise dedicated queues
@@ -265,36 +300,21 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
           result.iqueuec_ = i;
         if (result.iqueuet_ == score_t::bad_id && props.queueFlags & VK_QUEUE_TRANSFER_BIT)
           result.iqueuet_ = i;
-        if (result.iqueuep_ == score_t::bad_id && present)
-          result.iqueuep_ = i;
       }
     }
 
-    VkSurfaceCapabilitiesKHR capabilities = {};
-    HUT_PVK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR, _device, _dummy, &capabilities);
-
-    u32 formats_count, modes_count;
-    HUT_PVK(vkGetPhysicalDeviceSurfaceFormatsKHR, _device, _dummy, &formats_count, nullptr);
-    HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, _device, _dummy, &modes_count, nullptr);
-
-    if (formats_count == 0)
-      result.score_ = 0;
-    if (modes_count == 0)
-      result.score_ = 0;
     if (result.iqueueg_ == score_t::bad_id)
       result.score_ = 0;
     if (result.iqueuec_ == score_t::bad_id)
       result.score_ = 0;
     if (result.iqueuet_ == score_t::bad_id)
       result.score_ = 0;
-    if (result.iqueuep_ == score_t::bad_id)
+    if (_dummy && result.iqueuep_ == score_t::bad_id)
       result.score_ = 0;
   }
 
-  if (result.score_) {
-    result.score_ += properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? 1000 : 100;
-    result.score_ += properties.limits.maxImageDimension2D;
-  }
+  result.score_ += properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? 1000 : 100;
+  result.score_ += properties.limits.maxImageDimension2D;
 
 #ifdef HUT_ENABLE_VALIDATION_DEBUG
   std::cout << "[hut] device " << properties.deviceName << " using Vulkan " << VK_VERSION_MAJOR(properties.apiVersion)
@@ -405,7 +425,8 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   unique_indexes.emplace(prefered_rate.iqueueg_);
   unique_indexes.emplace(prefered_rate.iqueuec_);
   unique_indexes.emplace(prefered_rate.iqueuet_);
-  unique_indexes.emplace(prefered_rate.iqueuep_);
+  if (prefered_rate.iqueuep_ != score_t::bad_id)
+    unique_indexes.emplace(prefered_rate.iqueuep_);
 
   std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
   float                                queuePriority     = 1.0f;
@@ -473,7 +494,8 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   HUT_PVK(vkGetDeviceQueue, device_, prefered_rate.iqueueg_, 0, &queueg_);
   HUT_PVK(vkGetDeviceQueue, device_, prefered_rate.iqueuec_, 0, &queuec_);
   HUT_PVK(vkGetDeviceQueue, device_, prefered_rate.iqueuet_, 0, &queuet_);
-  HUT_PVK(vkGetDeviceQueue, device_, prefered_rate.iqueuep_, 0, &queuep_);
+  if (prefered_rate.iqueuep_ != score_t::bad_id)
+    HUT_PVK(vkGetDeviceQueue, device_, prefered_rate.iqueuep_, 0, &queuep_);
 
   VkCommandPoolCreateInfo poolInfo = {};
   poolInfo.sType                   = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -699,7 +721,7 @@ void display::stage_clear(const image_clear &_info, VkImageSubresourceRange _ran
 #ifdef HUT_DEBUG_STAGING
   std::cout << "[staging] image_clear " << _info.destination << std::endl;
 #endif
-  HUT_PVK_NAMED_ALIASED(vkCmdClearColorImage, ("dst", "color"), ((void *)_info.destination, color3_32(_info.color)),
+  HUT_PVK_NAMED_ALIASED(vkCmdClearColorImage, ("dst", "color"), ((void *)_info.destination, color4_32(_info.color)),
                         staging_cb_, _info.destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &_info.color, 1, &_range);
 }
 

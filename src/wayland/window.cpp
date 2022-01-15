@@ -83,6 +83,7 @@ window::window(display &_display, const window_params &_init_params)
   };
   static const xdg_toplevel_listener xdg_toplevel_listeners = {handle_toplevel_configure, handle_toplevel_close};
 
+  assert(_display.compositor_);
   wayland_surface_ = wl_compositor_create_surface(_display.compositor_);
   if (!wayland_surface_)
     throw std::runtime_error("couldn't create wayland surface for new window");
@@ -102,6 +103,7 @@ window::window(display &_display, const window_params &_init_params)
 
   _display.windows_.emplace(wayland_surface_, this);
 
+  assert(_display.xdg_wm_base_);
   window_ = xdg_wm_base_get_xdg_surface(_display.xdg_wm_base_, wayland_surface_);
   xdg_surface_add_listener(window_, &xdg_surface_listeners, this);
 
@@ -403,10 +405,12 @@ void window::dragndrop_start(dragndrop_actions _supported_actions, clipboard_for
 
 void window::interactive_resize(edge _edge) {
   assert(display_.last_mouse_click_serial_ != 0);
+  assert(display_.seat_);
   xdg_toplevel_resize(toplevel_, display_.seat_, display_.last_mouse_click_serial_, _edge.raw());
 }
 
 void window::interactive_move() {
   assert(display_.last_mouse_click_serial_ != 0);
+  assert(display_.seat_);
   xdg_toplevel_move(toplevel_, display_.seat_, display_.last_mouse_click_serial_);
 }

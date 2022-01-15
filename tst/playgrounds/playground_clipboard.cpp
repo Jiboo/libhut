@@ -62,7 +62,7 @@ int main(int, char **) {
     ImGui::NewFrame();
 
     if (ImGui::Begin("Text tests")) {
-      ImGui::InputTextMultiline("", text_input, sizeof(text_input));
+      ImGui::InputTextMultiline("##text_input", text_input, sizeof(text_input));
       ImGui_HutFlag("allowed formats", &formats, format_mime_type);
 
       if (ImGui::Button("Copy")) {

@@ -5,8 +5,8 @@ Upon call to update(..), a staging area is allocated on which you can work durin
 when it is destructed, it will schedule the update from staging to VRAM, and free the staging when the copy is done.
 Updators can be instantiated/destructed from threads safely.
 
-The alternative would be for you to allocate a RAM buffer, work on it, and pass it to hut (like image::update that
-takes a span), which hut will copy again in the staging area, so by using the updator directly we do one less copy.
+The alternative would be for you to allocate a RAM buffer, work on it, and pass it to hut (like image::update that takes
+a span), which hut will copy again in the staging area, so by using the updator directly we do one less copy.
 
 Please note that for image updators, you must respect the pitch (row byte size) of the staging zone, which needs to be
 aligned to a hardware dependent preferred value.

@@ -9,8 +9,9 @@ option(HUT_ENABLE_IMGDEC "Enable the image loading extension" TRUE)
 option(HUT_ENABLE_IMGUI "Enable the imgui extension, which is used for some tests and playgrounds" TRUE)
 option(HUT_ENABLE_KTX2 "Enable the ktx2 io extension library" TRUE)
 option(HUT_ENABLE_RENDER2D "Enable the imgui extension, which is used for some tests and playgrounds" TRUE)
-option(HUT_ENABLE_RENDERDOC "Enable the renderdoc extension allowing to trigger captures from code" TRUE)
+option(HUT_ENABLE_RENDERDOC "Enable the renderdoc extension allowing to trigger captures from code" FALSE)
 option(HUT_ENABLE_TEXT "Enable the text extension allowing to raster glyphs with freetype and layout text with harfbuzz" TRUE)
+option(HUT_ENABLE_UI "Enable the text extension for UI, requires the render2d and text extensions" TRUE)
 
 option(HUT_COMPILE_SAMPLES "Compile all samples/demos, can take some time due to shader/resources pipelines" TRUE)
 option(HUT_COMPILE_PLAYGROUNDS "Compile all test playgrounds" TRUE)
@@ -41,14 +42,12 @@ set(CMAKE_COMPILE_WARNING_MODE HIGH)
 ###########################################################
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/deps/")
 
-add_subdirectory(dep/glslang)
-set(GLSLANG_VALIDATOR_FLAGS "")
-if(CMAKE_BUILD_TYPE MATCHES DEBUG)
-  set(GLSLANG_VALIDATOR_FLAGS "${GLSLANG_VALIDATOR_FLAGS} -g")
-endif()
-
+include(dep/spng.cmake)
 include(dep/imgui.cmake)
 include(dep/spirv_reflect.cmake)
+
+find_program(GLSLANG_VALIDATOR glslangValidator REQUIRED)
+set(GLSLANG_VALIDATOR_FLAGS "")
 
 find_package(Threads REQUIRED)
 set(HUT_LIBS ${HUT_LIBS} ${CMAKE_THREAD_LIBS_INIT})
@@ -150,8 +149,8 @@ function(hut_gen_spv_bundle)
     set(HUT_GEN_SPV_BUNDLE_SHADER_OBJECTS ${HUT_GEN_SPV_BUNDLE_SHADER_OBJECTS};${shader_target})
 
     add_custom_command(OUTPUT ${shader_target}
-            COMMAND $<TARGET_FILE:glslangValidator> ${GLSLANG_VALIDATOR_FLAGS} -V ${shader_source} -o ${shader_target}
-            DEPENDS ${shader_source} glslangValidator
+            COMMAND ${GLSLANG_VALIDATOR} ${GLSLANG_VALIDATOR_FLAGS} -V ${shader_source} -o ${shader_target}
+            DEPENDS ${shader_source} ${GLSLANG_VALIDATOR}
             COMMENT "Generating SPIR-V for ${shader_source}")
   endforeach()
 
@@ -272,12 +271,13 @@ function(hut_add_extension)
   endif()
 endfunction()
 
-hut_add_extension(NAME imgdec DEPENDENCIES SimplePNG)
+hut_add_extension(NAME imgdec DEPENDENCIES ZLIB SimplePNG)
 hut_add_extension(NAME imgui DEPENDENCIES DearImGui)
 hut_add_extension(NAME ktx2)
 hut_add_extension(NAME render2d)
 hut_add_extension(NAME renderdoc DEPENDENCIES Renderdoc EXTRA_LIBS ${CMAKE_DL_LIBS})
 hut_add_extension(NAME text DEPENDENCIES Freetype HarfBuzz)
+hut_add_extension(NAME ui DEPENDENCIES hut_render2d hut_text)
 
 ###########################################################
 # hut test data
@@ -352,6 +352,7 @@ if (HUT_COMPILE_PLAYGROUNDS)
   hut_add_test(NAME hut_playground_clipboard PATH tst/playgrounds/playground_clipboard.cpp DEPENDENCIES hut_imgui hut_tst_data_png)
   hut_add_test(NAME hut_playground_text PATH tst/playgrounds/playground_text.cpp DEPENDENCIES hut_imgui hut_text hut_tst_data_woff2 hut_tst_data_shaders)
   hut_add_test(NAME hut_playground_render2d PATH tst/playgrounds/playground_render2d.cpp DEPENDENCIES hut_render2d hut_imgui hut_imgdec hut_tst_data_png)
+  hut_add_test(NAME hut_playground_ui PATH tst/playgrounds/playground_ui.cpp DEPENDENCIES hut_ui hut_text)
 endif()
 
 if (HUT_COMPILE_UNITTESTS AND GTEST_FOUND)
@@ -365,7 +366,7 @@ if (HUT_COMPILE_UNITTESTS AND GTEST_FOUND)
   endif()
 
   add_executable(hut_unittests ${HUT_UNIT_TESTS} ${HUT_TST_SHADERS})
-  add_test(NAME hut_unittests WORKING_DIRECTORY COMMAND unittests)
+  add_test(NAME hut_unittests WORKING_DIRECTORY COMMAND hut_unittests)
   target_link_libraries(hut_unittests ${HUT_UNIT_TESTS_DEPS} hut_tst_data_shaders)
   target_include_directories(hut_unittests PRIVATE tst/common)
 endif()

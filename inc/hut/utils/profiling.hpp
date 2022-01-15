@@ -143,8 +143,13 @@ struct fixed_string {
 
   constexpr fixed_string(const char *_in, size_t _byte_size) {
     auto min = std::min(str_size, _byte_size);
-    for (size_t i = 0; i != min; ++i)
-      data_[i] = _in[i];
+    for (size_t i = 0; i != min; ++i) {
+      switch (_in[i]) {
+        default: data_[i] = _in[i]; break;
+        case '{': data_[i] = '['; break;
+        case '}': data_[i] = ']'; break;
+      }
+    }
     if (_byte_size > min && TSize > 3) {
       data_[min - 3] = '.';  // NOTE JBL: UTF8 sequence for h ellipsis would be 0xE2 0x80 0xA6, so no gains
       data_[min - 2] = '.';

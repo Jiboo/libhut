@@ -63,17 +63,17 @@ image::image(display &_display, const image_params &_params)
     , params_(_params) {
   mem_reqs_ = create(_display, _params, &image_, &memory_);
 
-  VkImageViewCreateInfo viewInfo = {};
-  viewInfo.sType                 = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-  viewInfo.image                 = image_;
-  viewInfo.viewType
-      = (params_.flags_ & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT) ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
+  const bool            cubemap            = params_.flags_ & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+  VkImageViewCreateInfo viewInfo           = {};
+  viewInfo.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+  viewInfo.image                           = image_;
+  viewInfo.viewType                        = cubemap ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
   viewInfo.format                          = _params.format_;
   viewInfo.subresourceRange.aspectMask     = _params.aspect_;
   viewInfo.subresourceRange.baseMipLevel   = 0;
   viewInfo.subresourceRange.levelCount     = _params.levels_;
   viewInfo.subresourceRange.baseArrayLayer = 0;
-  viewInfo.subresourceRange.layerCount     = _params.layers_;
+  viewInfo.subresourceRange.layerCount     = cubemap ? 6 : 1;
 
   if (vkCreateImageView(_display.device(), &viewInfo, nullptr, &view_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create texture image view!");
