@@ -143,13 +143,8 @@ struct fixed_string {
 
   constexpr fixed_string(const char *_in, size_t _byte_size) {
     auto min = std::min(str_size, _byte_size);
-    for (size_t i = 0; i != min; ++i) {
-      switch (_in[i]) {
-        default: data_[i] = _in[i]; break;
-        case '{': data_[i] = '['; break;
-        case '}': data_[i] = ']'; break;
-      }
-    }
+    for (size_t i = 0; i != min; ++i)
+      data_[i] = _in[i];
     if (_byte_size > min && TSize > 3) {
       data_[min - 3] = '.';  // NOTE JBL: UTF8 sequence for h ellipsis would be 0xE2 0x80 0xA6, so no gains
       data_[min - 2] = '.';
@@ -161,6 +156,19 @@ struct fixed_string {
   constexpr fixed_string(const char (&_in)[TSize])
       : fixed_string(_in, TSize - 1) {}
 };
+
+template<size_t TStringSize>
+constexpr fixed_string<TStringSize> replace_braces(const char (&_in)[TStringSize]) {
+  fixed_string<TStringSize> result{_in, TStringSize};
+  for (size_t i = 0; i != TStringSize; ++i) {
+    switch (_in[i]) {
+      default: result.data_[i] = _in[i]; break;
+      case '{': result.data_[i] = '['; break;
+      case '}': result.data_[i] = ']'; break;
+    }
+  }
+  return result;
+}
 
 template<size_t TMaxSize>
 fixed_string<TMaxSize> make_fixed(std::string_view _view) {

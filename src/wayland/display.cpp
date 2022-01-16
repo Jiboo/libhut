@@ -576,9 +576,6 @@ display::display(const char *_app_name, u32 _app_version, const char *_name)
 
   if (seat_) {
     keyboard_repeat_ctx_.thread_ = std::thread(keyboard_repeat_thread, &keyboard_repeat_ctx_);
-    HUT_PROFILE_SCOPE(PDISPLAY, "Waiting keymap");
-    while (keymap_ == nullptr)
-      wl_display_roundtrip(display_);
   }
 
   if (data_device_manager_) {
@@ -610,18 +607,7 @@ display::display(const char *_app_name, u32 _app_version, const char *_name)
     init_vulkan_device(nullptr);
   }
 
-  if (shm_ != nullptr) {
-    char  *env_cursor_theme       = getenv("XCURSOR_THEME");
-    char  *env_cursor_size        = getenv("XCURSOR_SIZE");
-    size_t env_cursor_size_length = env_cursor_size == nullptr ? 0 : strlen(env_cursor_size);
-    int    cursor_size            = 24;
-    if (env_cursor_size_length > 0)
-      std::from_chars(env_cursor_size, env_cursor_size + env_cursor_size_length, cursor_size);
-
-    {
-      HUT_PROFILE_SCOPE(PDISPLAY, "wl_cursor_theme_load");
-      cursor_theme_ = wl_cursor_theme_load(env_cursor_theme, cursor_size, shm_);
-    }
+  if (shm_) {
     cursor_surface_             = wl_compositor_create_surface(compositor_);
     animate_cursor_ctx_.thread_ = std::thread(animate_cursor_thread, &animate_cursor_ctx_);
   }
@@ -776,7 +762,21 @@ void display::animate_cursor(wl_cursor *_cursor) {
   }
 }
 
+void display::cursor_theme_load(animate_cursor_context *_ctx) {
+  HUT_PROFILE_SCOPE(PDISPLAY, "cursor_theme_load");
+  char  *env_cursor_theme       = getenv("XCURSOR_THEME");
+  char  *env_cursor_size        = getenv("XCURSOR_SIZE");
+  size_t env_cursor_size_length = env_cursor_size == nullptr ? 0 : strlen(env_cursor_size);
+  int    cursor_size            = 24;
+  if (env_cursor_size_length > 0)
+    std::from_chars(env_cursor_size, env_cursor_size + env_cursor_size_length, cursor_size);
+
+  assert(_ctx->display_.shm_);
+  _ctx->display_.cursor_theme_ = wl_cursor_theme_load(env_cursor_theme, cursor_size, _ctx->display_.shm_);
+}
+
 void display::animate_cursor_thread(animate_cursor_context *_ctx) {
+  cursor_theme_load(_ctx);
   std::unique_lock lock(_ctx->mutex_);
   while (!_ctx->stop_request_) {
     if (_ctx->cursor_ == nullptr)

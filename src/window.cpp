@@ -140,37 +140,16 @@ void window::init_vulkan_surface() {
 
   const VkPhysicalDevice &pdevice = display_.pdevice();
 
-  // FIXME JBL: No need to request thus formats every resize, cache them or extract from there
+#ifdef HUT_ENABLE_VALIDATION_DEBUG
+  // NOTE JBL: This should be validated at device selection (we eliminate devices that can't present, if dummy surface is provided)
   VkBool32 present;
   HUT_PVK(vkGetPhysicalDeviceSurfaceSupportKHR, pdevice, display_.iqueuep_, surface_, &present);
   if (!present)
     throw std::runtime_error("can't create a swapchain for the provided surface");
+#endif
 
   VkSurfaceCapabilitiesKHR capabilities = {};
   HUT_PVK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR, pdevice, surface_, &capabilities);
-
-  u32 formats_count;
-  HUT_PVK(vkGetPhysicalDeviceSurfaceFormatsKHR, pdevice, surface_, &formats_count, nullptr);
-  std::vector<VkSurfaceFormatKHR> surface_formats(formats_count);
-  HUT_PVK(vkGetPhysicalDeviceSurfaceFormatsKHR, pdevice, surface_, &formats_count, surface_formats.data());
-  surface_format_ = surface_formats[0];
-  if (surface_formats.size() == 1 && surface_formats[0].format == VK_FORMAT_UNDEFINED) {
-    surface_format_ = {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
-  } else {
-    for (const auto &it : surface_formats) {
-      if (it.format == VK_FORMAT_B8G8R8A8_UNORM && it.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-        surface_format_ = it;
-        break;
-      }
-    }
-  }
-
-  u32 modes_count;
-  HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, pdevice, surface_, &modes_count, nullptr);
-  std::vector<VkPresentModeKHR> modes(modes_count);
-  HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, pdevice, surface_, &modes_count, modes.data());
-  present_mode_ = select_best_mode(modes, params_.flags_.query(window_params::FVSYNC));
-
   if (capabilities.currentExtent.width != std::numeric_limits<u32>::max()) {
     swapchain_extents_ = capabilities.currentExtent;
   } else {
@@ -186,12 +165,20 @@ void window::init_vulkan_surface() {
     images_count = capabilities.maxImageCount;
   }
 
+  if (present_mode_ == VK_PRESENT_MODE_MAX_ENUM_KHR) {
+    u32 modes_count;
+    HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, pdevice, surface_, &modes_count, nullptr);
+    std::vector<VkPresentModeKHR> modes(modes_count);
+    HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, pdevice, surface_, &modes_count, modes.data());
+    present_mode_ = select_best_mode(modes, params_.flags_.query(window_params::FVSYNC));
+  }
+
   VkSwapchainCreateInfoKHR swapchain_infos = {};
   swapchain_infos.sType                    = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
   swapchain_infos.surface                  = surface_;
   swapchain_infos.minImageCount            = images_count;
-  swapchain_infos.imageFormat              = surface_format_.format;
-  swapchain_infos.imageColorSpace          = surface_format_.colorSpace;
+  swapchain_infos.imageFormat              = display_.surface_format_.format;
+  swapchain_infos.imageColorSpace          = display_.surface_format_.colorSpace;
   swapchain_infos.imageExtent              = swapchain_extents_;
   swapchain_infos.imageArrayLayers         = 1;
   swapchain_infos.imageUsage               = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -240,7 +227,7 @@ void window::init_vulkan_surface() {
     imagev_infos.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     imagev_infos.image                           = swapchain_images_[i];
     imagev_infos.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
-    imagev_infos.format                          = surface_format_.format;
+    imagev_infos.format                          = display_.surface_format_.format;
     imagev_infos.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
     imagev_infos.subresourceRange.baseMipLevel   = 0;
     imagev_infos.subresourceRange.levelCount     = 1;
@@ -254,7 +241,7 @@ void window::init_vulkan_surface() {
   pass_params.clear_color_         = render_target_params_.clear_color_;
   pass_params.clear_depth_stencil_ = render_target_params_.clear_depth_stencil_;
   pass_params.box_                 = {0, 0, swapchain_extents_.width, swapchain_extents_.height};
-  pass_params.format_              = surface_format_.format;
+  pass_params.format_              = display_.surface_format_.format;
   if (params_.flags_ & window_params::FMULTISAMPLING)
     pass_params.flags_ |= render_target_params::FMULTISAMPLING;
   if (params_.flags_ & window_params::FDEPTH)
@@ -369,5 +356,12 @@ void window::redraw(display::time_point _tp) {
 #endif
     profiling::threads_data::request_dump();
   }
+#ifdef HUT_PROFILE_BOOT
+  static bool profile_boot_dumped = false;
+  if (!profile_boot_dumped) {
+    profiling::threads_data::request_dump();
+    profile_boot_dumped = true;
+  }
+#endif
   last_frame_ = done;
 }

@@ -146,8 +146,7 @@ class window : public render_target {
 
   VkSurfaceKHR surface_ = VK_NULL_HANDLE;
 
-  VkPresentModeKHR   present_mode_;
-  VkSurfaceFormatKHR surface_format_;
+  VkPresentModeKHR present_mode_ = VK_PRESENT_MODE_MAX_ENUM_KHR;
 
   VkExtent2D                   swapchain_extents_;
   VkSwapchainKHR               swapchain_ = VK_NULL_HANDLE;

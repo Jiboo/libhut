@@ -234,7 +234,7 @@ class pipeline {
   }
 
   void init_pipeline(u16vec4 _default_viewport, VkSampleCountFlagBits _samples, const pipeline_params &_params) {
-    HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
+    HUT_PROFILE_SCOPE(PPIPELINE, "pipeline({},{})::init_pipeline", TVertexRefl::filename_, TFragRefl::filename_);
     auto size   = bbox_size(_default_viewport);
     auto origin = bbox_origin(_default_viewport);
 
@@ -393,7 +393,7 @@ class pipeline {
   explicit pipeline(render_target &_target, const pipeline_params &_params = {})
       : device_ref_(_target.parent().device())
       , render_pass_(_target.renderpass()) {
-    HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
+    HUT_PROFILE_SCOPE(PPIPELINE, "pipeline({},{})::pipeline", TVertexRefl::filename_, TFragRefl::filename_);
     assert(render_pass_ != VK_NULL_HANDLE);
 
     init_bindings();
@@ -680,7 +680,7 @@ class pipeline {
   void draw(VkCommandBuffer _buffer, uint _descriptor_index, const shared_indices &_indices, uint _indices_offset,
             uint _indices_count, const shared_instances &_instances, uint _instances_offset, uint _instances_count,
             const shared_vertices &_vertices, uint _vertex_offset) {
-    HUT_PROFILE_SCOPE(PPIPELINE, __PRETTY_FUNCTION__);
+    HUT_PROFILE_SCOPE(PPIPELINE, "pipeline({},{})::draw", TVertexRefl::filename_, TFragRefl::filename_);
 
     bind_pipeline(_buffer);
     bind_descriptor(_buffer, _descriptor_index);

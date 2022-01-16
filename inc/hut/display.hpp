@@ -271,6 +271,7 @@ class display {
   VkPhysicalDevice                 pdevice_;
   u32                              iqueueg_, iqueuec_, iqueuet_, iqueuep_;
   VkDevice                         device_ = VK_NULL_HANDLE;
+  VkSurfaceFormatKHR               surface_format_;
   VkPhysicalDeviceFeatures         device_features_;
   VkPhysicalDeviceProperties       device_props_;
   VkQueue                          queueg_, queuec_, queuet_, queuep_;
@@ -382,6 +383,7 @@ class display {
   void        cursor_frame(wl_cursor *_cursor, size_t _frame);
   void        animate_cursor(wl_cursor *_cursor);
   static void animate_cursor_thread(animate_cursor_context *_ctx);
+  static void cursor_theme_load(animate_cursor_context *_ctx);
 
   struct keyboard_repeat_context {
     display                &display_;
@@ -426,9 +428,9 @@ class display {
   std::pair<wl_surface *, window *> keyboard_current_{nullptr, nullptr};
   keyboard_repeat_context           keyboard_repeat_ctx_;
 
-  wl_cursor_theme       *cursor_theme_   = nullptr;
-  wl_surface            *cursor_surface_ = nullptr;
-  animate_cursor_context animate_cursor_ctx_;
+  std::atomic<wl_cursor_theme *> cursor_theme_   = nullptr;
+  wl_surface                    *cursor_surface_ = nullptr;
+  animate_cursor_context         animate_cursor_ctx_;
 
   wl_data_device_manager *data_device_manager_ = nullptr;
   wl_data_device         *data_device_         = nullptr;

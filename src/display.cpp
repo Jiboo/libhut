@@ -195,6 +195,7 @@ struct score_t {
   constexpr static u32 bad_id   = std::numeric_limits<u32>::max();
   u32                  iqueueg_ = bad_id, iqueuec_ = bad_id, iqueuet_ = bad_id, iqueuep_ = bad_id;
   uint                 score_ = 0;
+  VkSurfaceFormatKHR   surface_format_{VK_FORMAT_UNDEFINED, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
 };
 
 score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
@@ -266,23 +267,35 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
         VkBool32 present;
         HUT_PVK(vkGetPhysicalDeviceSurfaceSupportKHR, _device, i, _dummy, &present);
 
-        VkSurfaceCapabilitiesKHR capabilities = {};
-        HUT_PVK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR, _device, _dummy, &capabilities);
-
-        u32 formats_count, modes_count;
-        HUT_PVK(vkGetPhysicalDeviceSurfaceFormatsKHR, _device, _dummy, &formats_count, nullptr);
-        HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, _device, _dummy, &modes_count, nullptr);
-
         if (props.queueCount > 0) {
           // prioritise dedicated queues
           if (result.iqueuep_ == score_t::bad_id && present)
             result.iqueuep_ = i;
         }
 
-        if (formats_count == 0)
-          result.score_ = 0;
+        u32 formats_count, modes_count;
+        HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, _device, _dummy, &modes_count, nullptr);
+        HUT_PVK(vkGetPhysicalDeviceSurfaceFormatsKHR, _device, _dummy, &formats_count, nullptr);
+
         if (modes_count == 0)
           result.score_ = 0;
+        if (formats_count == 0)
+          result.score_ = 0;
+        else {
+          std::vector<VkSurfaceFormatKHR> surface_formats(formats_count);
+          HUT_PVK(vkGetPhysicalDeviceSurfaceFormatsKHR, _device, _dummy, &formats_count, surface_formats.data());
+          result.surface_format_ = surface_formats[0];
+          if (surface_formats.size() == 1 && surface_formats[0].format == VK_FORMAT_UNDEFINED) {
+            result.surface_format_ = {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+          } else {
+            for (const auto &it : surface_formats) {
+              if (it.format == VK_FORMAT_B8G8R8A8_UNORM && it.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+                result.surface_format_ = it;
+                break;
+              }
+            }
+          }
+        }
       }
 
       if (props.queueCount > 0) {
@@ -413,11 +426,12 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
             << std::endl;
 #endif
 
-  pdevice_ = prefered_device;
-  iqueueg_ = prefered_rate.iqueueg_;
-  iqueuec_ = prefered_rate.iqueuec_;
-  iqueuet_ = prefered_rate.iqueuet_;
-  iqueuep_ = prefered_rate.iqueuep_;
+  pdevice_        = prefered_device;
+  iqueueg_        = prefered_rate.iqueueg_;
+  iqueuec_        = prefered_rate.iqueuec_;
+  iqueuet_        = prefered_rate.iqueuet_;
+  iqueuep_        = prefered_rate.iqueuep_;
+  surface_format_ = prefered_rate.surface_format_;
 
   HUT_PVK(vkGetPhysicalDeviceMemoryProperties, pdevice_, &mem_props_);
 

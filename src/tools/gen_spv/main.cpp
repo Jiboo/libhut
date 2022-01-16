@@ -495,7 +495,8 @@ int main(int argc, char **argv) {
     if (!input.is_open())
       throw runtime_error(sstream("can't open ") << input_path << ": " << strerror(errno));
 
-    string symbol = input_path.filename().string();
+    string filename = input_path.filename();
+    string symbol   = filename;
     replace(symbol.begin(), symbol.end(), '.', '_');
     replace(symbol.begin(), symbol.end(), '-', '_');
 
@@ -523,6 +524,7 @@ int main(int argc, char **argv) {
     }
 
     output_h << "\n  constexpr static auto &bytecode_ = " << bundle_namespace << "::" << symbol << ";\n";
+    output_h << "\n  constexpr static auto filename_ = \"" << filename << "\";\n";
 
     output_h << "}; // struct " << symbol << "_refl\n";
 
