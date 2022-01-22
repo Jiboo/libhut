@@ -73,20 +73,58 @@ void window::handle_toplevel_close(void *_data, xdg_toplevel *) {
     w->close();
 }
 
+void window::trigger_scale() {
+  constexpr int int_max = std::numeric_limits<int>::max();
+  int           scale   = int_max;
+  auto         &scales  = display_.outputs_scale_;
+  if (scales.empty()) {
+    scale = 1;
+  } else {
+    for (auto output : overlapping_outputs_) {
+      assert(scales.contains(output));
+      scale = std::min(scale, scales[output]);
+    }
+  }
+  if (scale != last_sent_scale_ && scale != int_max) {
+    display_.cursor(current_cursor_type_, scale);
+    if (!HUT_PROFILE_EVENT(this, on_scale, scale))
+      wl_surface_set_buffer_scale(wayland_surface_, scale);
+    last_sent_scale_ = scale;
+  }
+}
+
+void window::surface_enter(void *_data, struct wl_surface *_surface, struct wl_output *_output) {
+#if defined(HUT_ENABLE_VALIDATION_DEBUG) && 0
+  std::cout << "[hut] surface_enter " << _surface << ", " << _output << std::endl;
+#endif
+  auto *w      = static_cast<window *>(_data);
+  auto  result = w->overlapping_outputs_.insert(_output);
+  if (result.second)
+    w->trigger_scale();
+}
+void window::surface_leave(void *_data, struct wl_surface *_surface, struct wl_output *_output) {
+#if defined(HUT_ENABLE_VALIDATION_DEBUG) && 0
+  std::cout << "[hut] surface_leave " << _surface << ", " << _output << std::endl;
+#endif
+  auto *w = static_cast<window *>(_data);
+  if (w->overlapping_outputs_.erase(_output))
+    w->trigger_scale();
+}
+
 window::window(display &_display, const window_params &_init_params)
     : render_target(_display)
     , display_(_display)
     , params_(_init_params)
     , size_(_init_params.size_) {
-  static const xdg_surface_listener xdg_surface_listeners = {
-      handle_xdg_configure,
-  };
+  static const wl_surface_listener   wl_surface_listeners   = {surface_enter, surface_leave};
+  static const xdg_surface_listener  xdg_surface_listeners  = {handle_xdg_configure};
   static const xdg_toplevel_listener xdg_toplevel_listeners = {handle_toplevel_configure, handle_toplevel_close};
 
   assert(_display.compositor_);
   wayland_surface_ = wl_compositor_create_surface(_display.compositor_);
   if (!wayland_surface_)
     throw std::runtime_error("couldn't create wayland surface for new window");
+  wl_surface_add_listener(wayland_surface_, &wl_surface_listeners, this);
 
   VkWaylandSurfaceCreateInfoKHR info = {};
   info.sType                         = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
@@ -178,7 +216,7 @@ void window::invalidate(const uvec4 &, bool _redraw) {
 
 void window::cursor(cursor_type _c) {
   current_cursor_type_ = _c;
-  display_.cursor(_c);
+  display_.cursor(_c, last_sent_scale_);
 }
 
 void window::clipboard_data_source_handle_send(void *_data, wl_data_source *_source, const char *_mime, i32 _fd) {
@@ -396,7 +434,7 @@ void window::dragndrop_start(dragndrop_actions _supported_actions, clipboard_for
     }
   }
   wl_data_source_set_actions(source, wl_actions);
-  display_.cursor(CGRABBING);
+  display_.cursor(CGRABBING, last_sent_scale_);
 
   assert(display_.last_mouse_click_serial_ != 0);
   wl_data_device_start_drag(display_.data_device_, source, wayland_surface_, nullptr,

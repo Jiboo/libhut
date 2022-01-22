@@ -178,7 +178,7 @@ int main(int, char **) {
         pipeleine_tex::instance{make_transform_mat4({300, 100}, {tex1->size() / 2, 1})},
     });
     tex1_ready = true;
-    w.invalidate(true);  // will force to call on_draw on the next frame
+    w.invalidate(true);  // will force a call to on_draw on the next frame
 
     {
       auto update = tex1->update({{100, 100, 200, 200}});
@@ -187,7 +187,7 @@ int main(int, char **) {
         for (int x = 0; x < 100; x++)
           *(row + x) = u8vec4{0x80, 0, 0, 0x80};
       }
-      w.invalidate(true);  // will force to call on_draw on the next frame
+      w.invalidate(true);  // will force a call to on_draw on the next frame
     }
 
     tex2 = imgdec::load_png(d, tst_png::tex2_png);
@@ -199,7 +199,7 @@ int main(int, char **) {
         pipeleine_tex::instance{make_transform_mat4({400, 100}, {tex2->size() / 2, 1})},
     });
     tex2_ready = true;
-    w.invalidate(true);  // will force to call on_draw on the next frame
+    w.invalidate(true);  // will force a call to on_draw on the next frame
   });
 
   w.on_draw.connect([&](VkCommandBuffer _buffer) {
@@ -223,7 +223,7 @@ int main(int, char **) {
 
   w.on_frame.connect([&](display::duration) {
     d.post([&w](auto) {
-      w.invalidate(false);  // asks for another frame without a redraw to continue animations and fps count
+      w.invalidate(false);  // asks for another frame without an on_draw call to continue animations and fps count
     });
 
     static auto startTime = display::clock::now();

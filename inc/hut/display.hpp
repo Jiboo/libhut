@@ -368,6 +368,10 @@ class display {
   static void data_device_handle_motion(void *, wl_data_device *, u32, wl_fixed_t, wl_fixed_t);
   static void data_device_handle_drop(void *, wl_data_device *);
   static void data_device_handle_selection(void *, wl_data_device *, wl_data_offer *);
+  static void output_geometry(void *, wl_output *, int32_t, int32_t, int32_t, int32_t, int32_t, const char *,
+                              const char *, int32_t);
+  static void output_mode(void *, wl_output *, uint32_t, int32_t, int32_t, int32_t);
+  static void output_scale(void *, wl_output *, int32_t);
 
   struct animate_cursor_context {
     display                &display_;
@@ -379,11 +383,11 @@ class display {
     wl_cursor *cursor_ = nullptr;
     size_t     frame_  = 0;
   };
-  void        cursor(cursor_type _c);
+  void        cursor(cursor_type _c, int _scale);
   void        cursor_frame(wl_cursor *_cursor, size_t _frame);
   void        animate_cursor(wl_cursor *_cursor);
   static void animate_cursor_thread(animate_cursor_context *_ctx);
-  static void cursor_theme_load(animate_cursor_context *_ctx);
+  static void cursor_themes_load(animate_cursor_context *_ctx);
 
   struct keyboard_repeat_context {
     display                &display_;
@@ -413,6 +417,7 @@ class display {
   wl_seat       *seat_        = nullptr;
   wl_pointer    *pointer_     = nullptr;
   wl_keyboard   *keyboard_    = nullptr;
+  wl_output     *output_      = nullptr;
   xkb_context   *xkb_context_ = nullptr;
   xkb_state     *xkb_state_ = nullptr, *xkb_state_empty_ = nullptr;
   xkb_keymap    *keymap_ = nullptr;
@@ -424,12 +429,15 @@ class display {
   u32 last_mouse_enter_serial_ = 0;
   u32 last_mouse_click_serial_ = 0;
 
+  std::unordered_map<wl_output *, int> outputs_scale_;
+
   std::pair<wl_surface *, window *> pointer_current_{nullptr, nullptr};
   std::pair<wl_surface *, window *> keyboard_current_{nullptr, nullptr};
   keyboard_repeat_context           keyboard_repeat_ctx_;
 
-  std::atomic<wl_cursor_theme *> cursor_theme_   = nullptr;
-  wl_surface                    *cursor_surface_ = nullptr;
+  std::atomic<wl_cursor_theme *> cursor_theme_       = nullptr;
+  std::atomic<wl_cursor_theme *> cursor_theme_hidpi_ = nullptr;
+  wl_surface                    *cursor_surface_     = nullptr;
   animate_cursor_context         animate_cursor_ctx_;
 
   wl_data_device_manager *data_device_manager_ = nullptr;
@@ -443,8 +451,8 @@ class display {
   std::unordered_map<wl_data_offer *, offer_params> offer_params_;
   wl_data_offer                                    *last_offer_from_clipboard_ = nullptr;
   wl_data_offer                                    *last_offer_from_dropenter_ = nullptr;
-  std::shared_ptr<drop_target_interface>            current_drop_target_interface_;
-  u32                                               drag_enter_serial_ = 0;
+  window                                           *current_drop_target_       = nullptr;
+  u32                                               drag_enter_serial_         = 0;
 
   struct async_reader {
     std::thread        thread_;

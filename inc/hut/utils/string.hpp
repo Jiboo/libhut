@@ -27,11 +27,128 @@
 
 #pragma once
 
+#include <cassert>
+#include <cstring>
+
+#include <iomanip>
+#include <sstream>
 #include <string_view>
 
 namespace hut {
 
 using namespace std::literals::string_view_literals;
+
+template<typename T, T... TValues>
+constexpr T max() {
+  T values[] = {TValues...};
+  T result   = values[0];
+  for (size_t i = 0; i < sizeof...(TValues); i++)
+    result = std::max(result, values[i]);
+  return result;
+}
+
+template<typename T, T... TValues>
+constexpr T sum() {
+  T values[] = {TValues...};
+  T result   = 0;
+  for (size_t i = 0; i < sizeof...(TValues); i++)
+    result += values[i];
+  return result;
+}
+
+template<size_t TSize>
+struct fixed_string {
+  static constexpr size_t size     = TSize;
+  static constexpr size_t str_size = TSize - 1;
+  using data_type                  = char[size];
+
+  data_type data_ = {};
+
+  fixed_string()                         = default;
+  fixed_string(const fixed_string &)     = default;
+  fixed_string(fixed_string &&) noexcept = default;
+
+  constexpr fixed_string(const char *_in, size_t _byte_size) {
+    auto min = std::min(str_size, _byte_size);
+    for (size_t i = 0; i != min; ++i)
+      data_[i] = _in[i];
+    if (_byte_size > min && TSize > 3) {
+      data_[min - 3] = '.';  // NOTE JBL: UTF8 sequence for h ellipsis would be 0xE2 0x80 0xA6, so no gains
+      data_[min - 2] = '.';
+      data_[min - 1] = '.';
+    }
+    data_[min] = 0;
+  }
+
+  constexpr fixed_string(const char (&_in)[TSize])
+      : fixed_string(_in, TSize - 1) {}
+};
+
+template<size_t TStringSize>
+constexpr fixed_string<TStringSize> replace_braces(const char (&_in)[TStringSize]) {
+  fixed_string<TStringSize> result{_in, TStringSize};
+  for (size_t i = 0; i != TStringSize; ++i) {
+    switch (_in[i]) {
+      default: result.data_[i] = _in[i]; break;
+      case '{': result.data_[i] = '['; break;
+      case '}': result.data_[i] = ']'; break;
+    }
+  }
+  return result;
+}
+
+template<size_t TMaxSize>
+fixed_string<TMaxSize> make_fixed(std::string_view _view) {
+  return fixed_string<TMaxSize>{_view.data(), _view.size()};
+}
+
+template<size_t TMaxSize>
+fixed_string<TMaxSize> make_fixed(std::u8string_view _view) {
+  return fixed_string<TMaxSize>{(char *)_view.data(), _view.size()};
+}
+
+template<size_t TMaxSize>
+fixed_string<TMaxSize> make_fixed(const char *_in) {
+  return _in != nullptr ? fixed_string<TMaxSize>{_in, strlen(_in)} : fixed_string<TMaxSize>{nullptr, 0};
+}
+
+template<size_t TSize>
+inline std::ostream &operator<<(std::ostream &_os, const fixed_string<TSize> &_in) {
+  return _os << _in.data_;
+}
+
+template<size_t... TSizes>
+struct fixed_string_array {
+  static constexpr size_t count     = sizeof...(TSizes);
+  static constexpr size_t data_size = sum<size_t, TSizes...>();
+  using data_type                   = char[data_size];
+  using offsets_type                = size_t[count];
+
+  data_type    data_    = {};
+  offsets_type offsets_ = {};
+
+  fixed_string_array(const fixed_string_array &)     = default;
+  fixed_string_array(fixed_string_array &&) noexcept = default;
+
+  constexpr fixed_string_array(const char (&..._in)[TSizes]) { init(0, 0, _in...); }
+
+  template<size_t TFirstSize, size_t... TRestSizes>
+  constexpr void init(size_t _index, size_t _byte_offset, const char (&_first)[TFirstSize],
+                      const char (&..._rest)[TRestSizes]) {
+    offsets_[_index] = _byte_offset;
+    for (size_t i = 0; i != TFirstSize; ++i)
+      data_[i + _byte_offset] = _first[i];
+    if constexpr (sizeof...(TRestSizes) > 0)
+      init(_index + 1, _byte_offset + TFirstSize, _rest...);
+  }
+
+  constexpr void init(size_t, size_t) {}
+
+  [[nodiscard]] constexpr const char *at(size_t _index) const {
+    assert(_index < count);
+    return data_ + offsets_[_index];
+  }
+};
 
 template<typename TInput, typename TCallback>
 inline void split(std::basic_string_view<TInput> _input, std::basic_string_view<TInput> _delimiters,
@@ -64,6 +181,20 @@ inline void hexdump(const void *ptr, size_t buflen) {
     }
     printf("\n");
   }
+}
+
+inline void escape_json(std::ostream &_os, std::string_view _in) {
+  std::stringstream buffer;
+
+  for (char c : _in) {
+    if (c == '"' || c == '\\' || ('\x00' <= c && c <= '\x1f')) {
+      buffer << "\\u" << std::hex << std::setw(4) << std::setfill('0') << (int)c;
+    } else {
+      buffer << c;
+    }
+  }
+
+  _os << buffer.str();
 }
 
 }  // namespace hut

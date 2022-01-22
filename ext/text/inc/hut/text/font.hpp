@@ -28,7 +28,6 @@
 #pragma once
 
 #include <memory>
-#include <unordered_map>
 
 #include "hut/atlas.hpp"
 #include "hut/buffer.hpp"

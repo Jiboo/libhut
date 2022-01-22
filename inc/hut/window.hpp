@@ -29,6 +29,7 @@
 
 #include <chrono>
 #include <string>
+#include <unordered_set>
 
 #include <wayland-client.h>
 
@@ -82,16 +83,22 @@ class window : public render_target {
   friend class display;
 
  public:
-  event<>                  on_pause, on_resume, on_focus, on_blur, on_close;
-  event<uvec4>             on_expose;
-  event<uvec2>             on_resize;
-  event<VkCommandBuffer>   on_draw;
-  event<display::duration> on_frame;
+  event<>                  on_pause;   // sys asked win to stop rendering
+  event<>                  on_resume;  // sys asked win to resume rendering
+  event<>                  on_focus;   // sys gave keyboard focus to win
+  event<>                  on_blur;    // win lost keyboard focus
+  event<>                  on_close;   // overridable, sys requested win to close
+  event<uvec4>             on_expose;  // sys request win to redraw this rect
+  event<uvec2>             on_resize;  // sys changed win size
+  event<VkCommandBuffer>   on_draw;    // win is dirty, needs to rebuild command buffer
+  event<display::duration> on_frame;   // win will soon be drawn (use this to animate values)
+  event<int>               on_scale;   // overridable, sys wants win to use a different DPI scale
+#if defined(HUT_ENABLE_TIME_EVENTS)
+  event<u32> on_time;  // contains timestamps of sys events, to measure hut latency
+#endif
 
   event<u8 /*finger*/, touch_event_type, vec2 /*pos*/> on_touch;
   event<u8 /*button*/, mouse_event_type, vec2 /*pos*/> on_mouse;
-
-  event<u32> on_time;
 
   event<modifiers /*mods*/>             on_kmods;
   event<keycode, keysym, bool /*down*/> on_key;
@@ -170,6 +177,8 @@ class window : public render_target {
   void redraw(display::time_point);
 
  protected:
+  static void surface_enter(void *, wl_surface *, wl_output *);
+  static void surface_leave(void *, wl_surface *, wl_output *);
   static void handle_xdg_configure(void *, xdg_surface *, u32);
   static void handle_toplevel_configure(void *, xdg_toplevel *, i32, i32, wl_array *);
   static void handle_toplevel_close(void *, xdg_toplevel *);
@@ -244,6 +253,10 @@ class window : public render_target {
   };
   clipboard_sender_context         clipboard_sender_context_;
   std::list<display::async_reader> async_readers_;
+
+  std::unordered_set<wl_output *> overlapping_outputs_;
+  int                             last_sent_scale_ = 1;
+  void                            trigger_scale();
 };
 
 }  // namespace hut

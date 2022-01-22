@@ -57,12 +57,14 @@ struct format_info {
     u8 total = 0;
     for (u8 channel = 0; channel < components_; channel++)
       total += component_bits_[channel];
+    assert(total > 0);
     return total;
   }
   [[nodiscard]] constexpr u8 max_component_bits() const {
     u8 max = 0;
     for (u8 channel = 0; channel < components_; channel++)
       max = std::max(max, component_bits_[channel]);
+    assert(max > 0);
     return max;
   }
   [[nodiscard]] constexpr bool packed() const { return pack_ > 0 && components_bits() == pack_; }

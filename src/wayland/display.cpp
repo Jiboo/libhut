@@ -54,7 +54,7 @@ void display::pointer_handle_enter(void *_data, wl_pointer *_pointer, u32 _seria
     w->mouse_lastmove_          = coords;
     d->last_serial_             = _serial;
     d->last_mouse_enter_serial_ = _serial;
-    d->cursor(w->current_cursor_type_);
+    d->cursor(w->current_cursor_type_, w->last_sent_scale_);
     HUT_PROFILE_EVENT_NAMED(w, on_mouse, ("button", "mouse_event_type", "coords"), 0, MMOVE, coords);
   }
 }
@@ -77,7 +77,9 @@ void display::pointer_handle_motion(void *_data, wl_pointer *_pointer, u32 _time
       w->mouse_lastmove_ = coords;
 
       HUT_PROFILE_EVENT_NAMED(w, on_mouse, ("button", "mouse_event_type", "coords"), 0, MMOVE, coords);
+#if defined(HUT_ENABLE_TIME_EVENTS)
       HUT_PROFILE_EVENT(w, on_time, _time);
+#endif
     }
   }
 }
@@ -302,15 +304,43 @@ void handle_xdg_ping(void *, struct xdg_wm_base *_shell, u32 _serial) {
   xdg_wm_base_pong(_shell, _serial);
 }
 
+void display::output_geometry(void *_data, wl_output *_output, int32_t _x, int32_t _y, int32_t _pwidth,
+                              int32_t _pheight, int32_t _subpixel, const char *_maker, const char *_model,
+                              int32_t _transform) {
+#if defined(HUT_ENABLE_VALIDATION_DEBUG) && 0
+  std::cout << "[hut] output_geometry " << _data << ", " << _output << ", x: " << _x << ", y: " << _y
+            << ", _pwidth: " << _pwidth << ", _pheight: " << _pheight << ", _subpixel: " << _subpixel
+            << ", _transform: " << _transform << ", maker: " << _maker << ", model: " << _model << std::endl;
+#endif
+}
+void display::output_mode(void *_data, wl_output *_output, uint32_t _flags, int32_t _width, int32_t _height,
+                          int32_t _refresh) {
+#if defined(HUT_ENABLE_VALIDATION_DEBUG) && 0
+  std::cout << "[hut] output_mode " << _output << ", " << _flags << ", " << _width << ", " << _height << ", "
+            << _refresh << std::endl;
+#endif
+}
+void display::output_scale(void *_data, wl_output *_output, int32_t _scale) {
+#if defined(HUT_ENABLE_VALIDATION_DEBUG) && 0
+  std::cout << "[hut] output_scale " << _scale << std::endl;
+#endif
+  auto *d                    = static_cast<display *>(_data);
+  d->outputs_scale_[_output] = _scale;
+}
+void output_done(void *_data, struct wl_output *_output) {
+#if defined(HUT_ENABLE_VALIDATION_DEBUG) && 0
+  std::cout << "[hut] output_done " << std::endl;
+#endif
+}
+
 void display::registry_handler(void *_data, wl_registry *_registry, u32 _id, const char *_interface, u32 _version) {
 #ifdef HUT_ENABLE_VALIDATION_DEBUG
   std::cout << "[hut] wayland registry item " << _id << ", " << _interface << ", " << _version << std::endl;
 #endif
 
   static const wl_seat_listener     wl_seat_listeners     = {seat_handler, seat_name};
-  static const xdg_wm_base_listener xdg_wm_base_listeners = {
-      handle_xdg_ping,
-  };
+  static const xdg_wm_base_listener xdg_wm_base_listeners = {handle_xdg_ping};
+  static const wl_output_listener   wl_output_listeners   = {output_geometry, output_mode, output_done, output_scale};
 
   auto *d = static_cast<display *>(_data);
   if (strcmp(_interface, wl_compositor_interface.name) == 0) {
@@ -326,6 +356,9 @@ void display::registry_handler(void *_data, wl_registry *_registry, u32 _id, con
   } else if (strcmp(_interface, wl_data_device_manager_interface.name) == 0) {
     d->data_device_manager_
         = static_cast<wl_data_device_manager *>(wl_registry_bind(_registry, _id, &wl_data_device_manager_interface, 3));
+  } else if (strcmp(_interface, wl_output_interface.name) == 0) {
+    d->output_ = static_cast<wl_output *>(wl_registry_bind(_registry, _id, &wl_output_interface, 2));
+    wl_output_add_listener(d->output_, &wl_output_listeners, _data);
   }
 }
 
@@ -446,8 +479,8 @@ void display::data_device_handle_enter(void *_data, wl_data_device *_device, u32
   if (wit != d->windows_.end()) {
     const auto &itf = wit->second->drop_target_interface_;
     if (itf) {
-      d->current_drop_target_interface_ = itf;
-      auto &params                      = d->offer_params_[_offer];
+      d->current_drop_target_ = wit->second;
+      auto &params            = d->offer_params_[_offer];
       itf->on_enter(params.actions_, params.formats_);
     }
   }
@@ -458,8 +491,8 @@ void display::data_device_handle_leave(void *_data, wl_data_device *_device) {
   std::cout << "data_device_handle_leave " << _device << std::endl;
 #endif
   auto *d = static_cast<display *>(_data);
-  if (d->current_drop_target_interface_) {
-    d->current_drop_target_interface_.reset();
+  if (d->current_drop_target_) {
+    d->current_drop_target_ = nullptr;
   }
 }
 
@@ -469,16 +502,19 @@ void display::data_device_handle_motion(void *_data, wl_data_device *_device, u3
 #endif
   auto *d = static_cast<display *>(_data);
 
-  if (d->current_drop_target_interface_) {
+  if (d->current_drop_target_) {
+    auto &itf = d->current_drop_target_->drop_target_interface_;
+    assert(itf);
     auto *offer  = d->last_offer_from_dropenter_;
     auto &params = d->offer_params_[offer];
     vec2  pos{wl_fixed_to_double(_x), wl_fixed_to_double(_y)};
-    auto  move_result = d->current_drop_target_interface_->on_move(pos);
+    int   scale = d->current_drop_target_->last_sent_scale_;
 
+    auto move_result = itf->on_move(pos);
     switch (move_result.preferred_action_) {
-      case DNDCOPY: d->cursor(CCOPY); break;
-      case DNDMOVE: d->cursor(CMOVE); break;
-      case DNDNONE: d->cursor(CNO_DROP); break;
+      case DNDCOPY: d->cursor(CCOPY, scale); break;
+      case DNDMOVE: d->cursor(CMOVE, scale); break;
+      case DNDNONE: d->cursor(CNO_DROP, scale); break;
     }
     if (move_result.preferred_action_ == DNDNONE) {
 #ifdef HUT_DEBUG_WL_DATA_LISTENERS
@@ -511,13 +547,15 @@ void display::data_device_handle_drop(void *_data, wl_data_device *_device) {
 #endif
   auto *d = static_cast<display *>(_data);
 
-  auto &itf = d->current_drop_target_interface_;
-  if (itf) {
+  if (d->current_drop_target_) {
+    auto &itf = d->current_drop_target_->drop_target_interface_;
+    assert(itf);
     auto *offer    = d->last_offer_from_dropenter_;
     auto  itparams = d->offer_params_.find(offer);
     assert(itparams != d->offer_params_.end());
     auto format = itparams->second.drop_format_;
     auto action = itparams->second.drop_action_;
+
     d->offer_params_.erase(offer);
     d->last_offer_from_dropenter_ = nullptr;
 
@@ -660,6 +698,8 @@ display::~display() {
     wl_surface_destroy(cursor_surface_);
   if (cursor_theme_)
     wl_cursor_theme_destroy(cursor_theme_);
+  if (cursor_theme_hidpi_)
+    wl_cursor_theme_destroy(cursor_theme_hidpi_);
   if (shm_)
     wl_shm_destroy(shm_);
   if (keyboard_)
@@ -672,6 +712,8 @@ display::~display() {
     xdg_wm_base_destroy(xdg_wm_base_);
   if (compositor_)
     wl_compositor_destroy(compositor_);
+  if (output_)
+    wl_output_destroy(output_);
   if (registry_)
     wl_registry_destroy(registry_);
   if (display_)
@@ -733,11 +775,13 @@ void display::cursor_frame(wl_cursor *_cursor, size_t _frame) {
   }
 }
 
-void display::cursor(cursor_type _c) {
-  if (cursor_theme_ == nullptr || pointer_ == nullptr)
+void display::cursor(cursor_type _c, int _scale) {
+  auto *theme = _scale == 1 ? cursor_theme_.load() : cursor_theme_hidpi_.load();
+
+  if (theme == nullptr || pointer_ == nullptr)
     return;
 
-  wl_cursor *result = wl_cursor_theme_get_cursor(cursor_theme_, cursor_css_name(_c));
+  wl_cursor *result = wl_cursor_theme_get_cursor(theme, cursor_css_name(_c));
   if (result) {
     if (result->image_count == 1) {
       animate_cursor(nullptr);
@@ -762,7 +806,7 @@ void display::animate_cursor(wl_cursor *_cursor) {
   }
 }
 
-void display::cursor_theme_load(animate_cursor_context *_ctx) {
+void display::cursor_themes_load(animate_cursor_context *_ctx) {
   HUT_PROFILE_SCOPE(PDISPLAY, "cursor_theme_load");
   char  *env_cursor_theme       = getenv("XCURSOR_THEME");
   char  *env_cursor_size        = getenv("XCURSOR_SIZE");
@@ -773,10 +817,14 @@ void display::cursor_theme_load(animate_cursor_context *_ctx) {
 
   assert(_ctx->display_.shm_);
   _ctx->display_.cursor_theme_ = wl_cursor_theme_load(env_cursor_theme, cursor_size, _ctx->display_.shm_);
+  if (env_cursor_size_length > 0)
+    _ctx->display_.cursor_theme_hidpi_ = _ctx->display_.cursor_theme_.load();
+  else
+    _ctx->display_.cursor_theme_hidpi_ = wl_cursor_theme_load(env_cursor_theme, 48, _ctx->display_.shm_);
 }
 
 void display::animate_cursor_thread(animate_cursor_context *_ctx) {
-  cursor_theme_load(_ctx);
+  cursor_themes_load(_ctx);
   std::unique_lock lock(_ctx->mutex_);
   while (!_ctx->stop_request_) {
     if (_ctx->cursor_ == nullptr)

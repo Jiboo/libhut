@@ -10,7 +10,7 @@ include(FindPackageHandleStandardArgs)
 # handle the QUIETLY and REQUIRED arguments and set GLM_FOUND to TRUE
 # if all listed variables are TRUE
 find_package_handle_standard_args(GLM DEFAULT_MSG
-        GLM_INCLUDE_DIR)
+    GLM_INCLUDE_DIR)
 
 mark_as_advanced(GLM_INCLUDE_DIR GLM_LIBRARY)
 

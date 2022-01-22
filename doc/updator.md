@@ -1,7 +1,7 @@
 An updator allows to avoid an allocation when updating an image/buffer by giving direct access to a memory mapped
 staging buffer allocation.
 
-Upon call to update(..), a staging area is allocated on which you can work during the whole life of the updator object,
+Upon call to update(...), a staging area is allocated on which you can work during the whole life of the updator object,
 when it is destructed, it will schedule the update from staging to VRAM, and free the staging when the copy is done.
 Updators can be instantiated/destructed from threads safely.
 
