@@ -36,11 +36,9 @@ struct hb_buffer_t;
 namespace hut::text {
 
 class shaper {
- private:
-  hb_buffer_t *buffer_ = nullptr;
-  shared_font  font_;
-
  public:
+  using render_mode = font::render_mode;
+
   shaper() = delete;
 
   shaper(const shaper &) = delete;
@@ -48,7 +46,8 @@ class shaper {
 
   shaper(shaper &&_other) noexcept
       : buffer_(std::exchange(_other.buffer_, nullptr))
-      , font_(std::move(_other.font_)) {}
+      , font_(std::move(_other.font_))
+      , rmode_(_other.rmode_) {}
   shaper &operator=(shaper &&_other) noexcept {
     if (&_other != this) {
       buffer_ = std::exchange(_other.buffer_, nullptr);
@@ -57,14 +56,16 @@ class shaper {
     return *this;
   }
 
-  explicit shaper(shared_font _font);
+  explicit shaper(shared_font _font, render_mode _rmode = shaper::render_mode::NORMAL);
   ~shaper();
 
   using shape_callback = std::function<void(uint /*index*/, i16vec4 /*quad*/, vec4 /*uv*/, uint /*atlas_page*/)>;
   void shape(const shared_atlas &_atlas, std::u8string_view _view, const shape_callback &_cb);
 
  private:
-  std::unordered_map<uint, font::glyph> cache_;
+  hb_buffer_t *buffer_ = nullptr;
+  shared_font  font_;
+  render_mode  rmode_;
 };
 
 }  // namespace hut::text

@@ -32,14 +32,13 @@
 
 #include "text_refl.hpp"
 
-//#define HUT_TEXT_DEBUG_NO_INDIRECT
-
 namespace hut::text {
 
 class renderer;
 
-using index_t        = uint16;
-using string_hash    = size_t;
+using index_t     = uint16;
+using string_hash = size_t;
+
 using glyph_pipeline = pipeline<index_t, glyph_vert_spv_refl, glyph_frag_spv_refl, const hut::shared_ubo &,
                                 const hut::shared_atlas &, const hut::shared_sampler &>;
 
@@ -67,15 +66,9 @@ struct mesh_store {
 };
 
 struct draw_store {
-  shared_instances instances_;
-#ifndef HUT_TEXT_DEBUG_NO_INDIRECT
+  shared_instances        instances_;
   shared_indexed_commands commands_;
-#else
-  std::vector<VkDrawIndexedIndirectCommand> commands_;
-#endif
   binpack::linear1d<uint> suballocator_;
-
-  std::unordered_map<uint, std::vector<string_hash>> hashes_;
 
   explicit draw_store(renderer *_parent, uint _size);
 };
@@ -112,7 +105,7 @@ struct batch {
 
 class paragraph_holder {
   friend class text::renderer;
-  friend class details::batch;
+  friend struct details::batch;
 
   text_suballoc                  instances_;
   std::unique_ptr<i16vec4[]>     bboxes_;

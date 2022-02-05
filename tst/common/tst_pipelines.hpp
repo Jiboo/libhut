@@ -32,49 +32,27 @@
 namespace hut {
 
 struct proj_ubo {
-  mat4 proj_{1};
+  mat4  proj_{1};
+  float dpi_scale_ = 1;
 
   explicit proj_ubo(u16vec2 _size) { proj_ = ortho<float>(0.f, float(_size.x), 0.f, float(_size.y)); }
 };
 using shared_proj_ubo = shared_buffer_suballoc<proj_ubo>;
 
 struct vp_ubo {
-  mat4 proj_{1};
-  mat4 view_{1};
+  mat4  proj_{1};
+  mat4  view_{1};
+  float dpi_scale_ = 1;
 };
 using shared_vp_ubo = shared_buffer_suballoc<vp_ubo>;
 
-using pipeline_atlas = pipeline<u16, tst_shaders::tex_vert_spv_refl, tst_shaders::atlas_frag_spv_refl,
-                                const shared_proj_ubo &, const shared_atlas &, const shared_sampler &>;
-
-using pipeleine_atlas_mask = pipeline<u16, tst_shaders::tex_mask_vert_spv_refl, tst_shaders::atlas_mask_frag_spv_refl,
-                                      const shared_proj_ubo &, const shared_atlas &, const shared_sampler &>;
-
-using pipeleine_box_rgba
-    = pipeline<u16, tst_shaders::box_rgba_vert_spv_refl, tst_shaders::box_rgba_frag_spv_refl, const shared_proj_ubo &>;
-
-using pipeleine_rgb
+using pipeline_rgb
     = pipeline<u16, tst_shaders::rgb_vert_spv_refl, tst_shaders::rgb_frag_spv_refl, const shared_proj_ubo &>;
 
-using pipeleine_rgb3d
+using pipeline_rgb3d
     = pipeline<u16, tst_shaders::rgb3d_vert_spv_refl, tst_shaders::rgb_frag_spv_refl, const shared_vp_ubo &>;
 
-using pipeleine_rgba
-    = pipeline<u16, tst_shaders::rgba_vert_spv_refl, tst_shaders::rgba_frag_spv_refl, const shared_proj_ubo &>;
-
-using pipeleine_skybox = pipeline<u16, tst_shaders::skybox_vert_spv_refl, tst_shaders::skybox_frag_spv_refl,
-                                  const shared_vp_ubo &, const shared_image &, const shared_sampler &>;
-
-using pipeleine_tex = pipeline<u16, tst_shaders::tex_vert_spv_refl, tst_shaders::tex_frag_spv_refl,
-                               const shared_proj_ubo &, const shared_image &, const shared_sampler &>;
-
-using pipeleine_tex_rgb = pipeline<u16, tst_shaders::tex_rgb_vert_spv_refl, tst_shaders::tex_rgb_frag_spv_refl,
-                                   const shared_proj_ubo &, const shared_image &, const shared_sampler &>;
-
-using pipeleine_tex_rgba = pipeline<u16, tst_shaders::tex_rgba_vert_spv_refl, tst_shaders::tex_rgba_frag_spv_refl,
-                                    const shared_proj_ubo &, const shared_image &, const shared_sampler &>;
-
-using pipeleine_tex_mask = pipeline<u16, tst_shaders::tex_mask_vert_spv_refl, tst_shaders::tex_mask_frag_spv_refl,
-                                    const shared_proj_ubo &, const shared_image &, const shared_sampler &>;
+using pipeline_skybox = pipeline<u16, tst_shaders::skybox_vert_spv_refl, tst_shaders::skybox_frag_spv_refl,
+                                 const shared_vp_ubo &, const shared_image &, const shared_sampler &>;
 
 }  // namespace hut

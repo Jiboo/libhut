@@ -32,7 +32,7 @@
 namespace hut {
 
 namespace details {
-class buffer_page_data;
+struct buffer_page_data;
 }  // namespace details
 
 class atlas;

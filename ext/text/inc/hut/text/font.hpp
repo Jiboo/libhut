@@ -29,6 +29,8 @@
 
 #include <memory>
 
+#include "hut/utils/size.hpp"
+
 #include "hut/atlas.hpp"
 #include "hut/buffer.hpp"
 #include "hut/image.hpp"
@@ -40,7 +42,7 @@ struct hb_font_t;
 
 namespace hut::text {
 
-static constexpr size_t font_scale = 64;
+constexpr size_t FONT_FACTOR = 64;
 
 class font {
   friend class shaper;
@@ -54,7 +56,7 @@ class font {
   font(font &&) noexcept = delete;
   font &operator=(font &&) noexcept = delete;
 
-  font(std::span<const u8> _data, uint _size, bool _hinting = true);
+  font(std::span<const u8> _data, const size_px<uint> &_size, bool _hinting = true);
   ~font();
 
   struct glyph {
@@ -62,15 +64,23 @@ class font {
     i16vec2         bearing_, size_;
   };
 
-  glyph load(const shared_atlas &, uint _char_index);
-  glyph load(const shared_atlas &, char32_t _unichar);
+  enum class render_mode { NORMAL, LCD, LCD_V, SDF };
+
+  uint  char_index(char32_t _unichar);
+  glyph load(const shared_atlas &, uint _char_index, render_mode _rmode = render_mode::NORMAL);
+
+  void reset_to_size(const size_px<uint> &_size);
 
  private:
-  FT_Face    face_;
-  hb_font_t *font_;
-  i32        load_flags_;
-  std::mutex mutex_;
+  FT_Face                         face_ = nullptr;
+  hb_font_t                      *font_ = nullptr;
+  i32                             load_flags_;
+  std::mutex                      mutex_;
+  std::unordered_map<uint, glyph> cache_;
+
+  glyph load_internal(const shared_atlas &, uint _char_index, render_mode _rmode);
 };
+
 using shared_font = std::shared_ptr<font>;
 
 }  // namespace hut::text

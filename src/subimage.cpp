@@ -32,6 +32,7 @@
 using namespace hut;
 
 void subimage::release() {
+  HUT_PROFILE_FUN(PIMAGE)
   if (atlas_)
     atlas_->free(std::move(*this));
   atlas_ = nullptr;
@@ -48,6 +49,7 @@ vec4 subimage::texcoords() const {
 }
 
 image::updator subimage::update(u16vec4 _bounds) {
+  HUT_PROFILE_FUN(PIMAGE)
   auto update_size     = bbox_size(_bounds);
   auto update_origin   = bbox_origin(_bounds);
   auto subimage_origin = bbox_origin(bounds_);

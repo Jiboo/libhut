@@ -61,20 +61,20 @@ const char *window_params_flag_name(window_params::flag _flag) {
 }
 
 int main(int, char **) {
-  display d("hut window playground");
+  display dsp("hut window playground");
 
   window_params wp;
   wp.flags_.set(window_params::FTRANSPARENT);
-  window w(d, wp);
-  w.title(u8"hut window playground");
-  w.clear_color({0, 0, 0, 1});
+  window win(dsp, wp);
+  win.title(u8"hut window playground");
+  win.clear_color({0, 0, 0, 1});
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!ImGui_ImplHut_Init(&d, &w, true))
+  if (!ImGui_ImplHut_Init(&dsp, &win, true))
     return EXIT_FAILURE;
-  install_test_events(d, w);
+  install_test_events(dsp, win);
 
   int     current_corsor = CDEFAULT;
   bool    set_maximize   = true;
@@ -87,7 +87,7 @@ int main(int, char **) {
   vec4                                 create_clear_color{0, 0, 0, 1};
   std::vector<std::shared_ptr<window>> windows;
 
-  w.on_draw.connect([&](VkCommandBuffer _buffer) {
+  win.on_draw.connect([&](VkCommandBuffer _buffer) {
     ImGui_ImplHut_NewFrame();
     ImGui::NewFrame();
 
@@ -97,33 +97,33 @@ int main(int, char **) {
       ImGui::Checkbox("Set##max", &set_maximize);
       ImGui::SameLine();
       if (ImGui::Button("Maximize")) {
-        w.maximize(set_maximize);
+        win.maximize(set_maximize);
         set_maximize = !set_maximize;
       }
 
       ImGui::Checkbox("Set##full", &set_fullscreen);
       ImGui::SameLine();
       if (ImGui::Button("Fullscreen")) {
-        w.fullscreen(set_fullscreen);
+        win.fullscreen(set_fullscreen);
         set_fullscreen = !set_fullscreen;
       }
 
       if (ImGui::Button("Minimize")) {
-        w.pause();
+        win.pause();
       }
 
       if (ImGui::InputText("Title", (char *)title, sizeof(title)))
-        w.title(title);
+        win.title(title);
 
       if (ImGui::ColorEdit4("Clear color", &clear_color.x))
-        w.clear_color(clear_color);
+        win.clear_color(clear_color);
 
       auto item_getter = [](void *, int _cursor, const char **_dst) {
         *_dst = cursor_css_name(static_cast<cursor_type>(_cursor));
         return true;
       };
       if (ImGui::Combo("Cursor", &current_corsor, item_getter, nullptr, CURSOR_TYPE_LAST_VALUE)) {
-        w.cursor(static_cast<cursor_type>(current_corsor));
+        win.cursor(static_cast<cursor_type>(current_corsor));
       }
     }
     ImGui::End();
@@ -137,18 +137,23 @@ int main(int, char **) {
       ImGui::ColorEdit4("Clear color", &create_clear_color.x);
 
       if (ImGui::Button("create"))
-        windows.emplace_back(create_window(d, params, create_title, create_clear_color));
+        windows.emplace_back(create_window(dsp, params, create_title, create_clear_color));
       if (ImGui::Button("close all"))
-        d.post([&](auto) { windows.clear(); });
+        dsp.post([&](auto) { windows.clear(); });
     }
     ImGui::End();
 
     ImGui::Render();
     ImGui_ImplHut_RenderDrawData(_buffer, ImGui::GetDrawData());
+
+    return false;
+  });
+  win.on_frame.connect([&](display::duration _dt) {
+    dsp.post([&](auto) { win.invalidate(true); });
     return false;
   });
 
-  d.dispatch();
+  dsp.dispatch();
 
   ImGui_ImplHut_Shutdown();
   ImGui::DestroyContext();

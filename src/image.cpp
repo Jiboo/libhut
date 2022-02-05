@@ -41,7 +41,7 @@ using namespace hut;
 
 std::shared_ptr<image> image::load_raw(display &_display, std::span<const u8> _data, uint _data_row_pitch,
                                        const image_params &_params) {
-  HUT_PROFILE_SCOPE(PIMAGE, "image::load_raw");
+  HUT_PROFILE_FUN(PIMAGE)
   assert(_params.levels_ == 1);
   assert(_params.layers_ == 1);
 
@@ -52,6 +52,7 @@ std::shared_ptr<image> image::load_raw(display &_display, std::span<const u8> _d
 }
 
 image::~image() {
+  HUT_PROFILE_FUN(PIMAGE)
   const auto device = display_->device();
   HUT_PVK(vkDestroyImageView, device, view_, nullptr);
   HUT_PVK(vkDestroyImage, device, image_, nullptr);
@@ -61,6 +62,7 @@ image::~image() {
 image::image(display &_display, const image_params &_params)
     : display_(&_display)
     , params_(_params) {
+  HUT_PROFILE_FUN(PIMAGE)
   mem_reqs_ = create(_display, _params, &image_, &memory_);
 
   const bool            cubemap            = params_.flags_ & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
@@ -75,7 +77,7 @@ image::image(display &_display, const image_params &_params)
   viewInfo.subresourceRange.baseArrayLayer = 0;
   viewInfo.subresourceRange.layerCount     = cubemap ? 6 : 1;
 
-  if (vkCreateImageView(_display.device(), &viewInfo, nullptr, &view_) != VK_SUCCESS) {
+  if (HUT_PVK(vkCreateImageView, _display.device(), &viewInfo, nullptr, &view_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create texture image view!");
   }
 
@@ -89,16 +91,16 @@ image::image(display &_display, const image_params &_params)
   range.baseArrayLayer           = 0;
   range.layerCount               = _params.layers_;
   display::image_transition pre  = {};
-  pre.destination                = image_;
-  pre.oldLayout                  = VK_IMAGE_LAYOUT_PREINITIALIZED;
-  pre.newLayout                  = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  pre.destination_               = image_;
+  pre.old_layout_                = VK_IMAGE_LAYOUT_PREINITIALIZED;
+  pre.new_layout_                = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
   display::image_transition post = {};
-  post.destination               = image_;
-  post.oldLayout                 = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-  post.newLayout                 = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  post.destination_              = image_;
+  post.old_layout_               = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  post.new_layout_               = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   display::image_clear clear     = {};
-  clear.destination              = image_;
-  clear.color                    = {};
+  clear.destination_             = image_;
+  clear.color_                   = {};
 
   std::lock_guard lk(display_->staging_mutex_);
   display_->staging_jobs_++;
@@ -113,6 +115,7 @@ image::image(display &_display, const image_params &_params)
 
 VkMemoryRequirements image::create(display &_display, const image_params &_params, VkImage *_image,
                                    VkDeviceMemory *_image_memory) {
+  HUT_PROFILE_FUN(PIMAGE)
   VkImageCreateInfo imageInfo = {};
   imageInfo.sType             = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   imageInfo.imageType         = VK_IMAGE_TYPE_2D;
@@ -129,7 +132,7 @@ VkMemoryRequirements image::create(display &_display, const image_params &_param
   imageInfo.sharingMode       = VK_SHARING_MODE_EXCLUSIVE;
   imageInfo.flags             = _params.flags_;
 
-  if (vkCreateImage(_display.device(), &imageInfo, nullptr, _image) != VK_SUCCESS) {
+  if (HUT_PVK(vkCreateImage, _display.device(), &imageInfo, nullptr, _image) != VK_SUCCESS) {
     throw std::runtime_error("failed to create image!");
   }
 
@@ -142,7 +145,7 @@ VkMemoryRequirements image::create(display &_display, const image_params &_param
   auto memtype                   = _display.find_memory_type(memReq.memoryTypeBits, _params.properties_);
   allocInfo.memoryTypeIndex      = memtype.first;
 
-  if (vkAllocateMemory(_display.device(), &allocInfo, nullptr, _image_memory) != VK_SUCCESS) {
+  if (HUT_PVK(vkAllocateMemory, _display.device(), &allocInfo, nullptr, _image_memory) != VK_SUCCESS) {
     throw std::runtime_error("failed to allocate image memory!");
   }
 
@@ -152,6 +155,7 @@ VkMemoryRequirements image::create(display &_display, const image_params &_param
 }
 
 void image::update(subresource _subres, std::span<const u8> _data, uint _src_row_pitch) {
+  HUT_PROFILE_FUN(PIMAGE, _subres.coords_, _subres.level_, _subres.layer_)
   auto updto = update(_subres);
   auto size  = bbox_size(_subres.coords_);
   assert(_data.size_bytes() == (_src_row_pitch * size.y));
@@ -173,6 +177,7 @@ void image::update(subresource _subres, std::span<const u8> _data, uint _src_row
 }
 
 image::updator image::update(subresource _subres) {
+  HUT_PROFILE_FUN(PIMAGE, _subres.coords_, _subres.level_, _subres.layer_)
   auto        size         = bbox_size(_subres.coords_);
   const auto &limits       = display_->limits();
   uint        buffer_align = limits.optimalBufferCopyRowPitchAlignment;
@@ -191,6 +196,7 @@ image::updator image::update(subresource _subres) {
 }
 
 void image::finalize_update(image::updator &_update) {
+  HUT_PROFILE_FUN(PIMAGE, _update.subres_.coords_, _update.subres_.level_, _update.subres_.layer_)
   auto size   = bbox_size(_update.subres_.coords_);
   auto origin = bbox_origin(_update.subres_.coords_);
 
@@ -208,25 +214,25 @@ void image::finalize_update(image::updator &_update) {
   subresRange.layerCount              = 1;
 
   display::image_transition pre = {};
-  pre.destination               = image_;
-  pre.oldLayout                 = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  pre.newLayout                 = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  pre.destination_              = image_;
+  pre.old_layout_               = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  pre.new_layout_               = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 
   display::image_transition post = {};
-  post.destination               = image_;
-  post.oldLayout                 = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-  post.newLayout                 = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  post.destination_              = image_;
+  post.old_layout_               = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  post.new_layout_               = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-  display::buffer2image_copy copy = {};
+  display::buffer_image_copy copy = {};
   copy.imageExtent                = {(uint)size.x, (uint)size.y, 1};
   copy.imageOffset                = {origin.x, origin.y, 0};
   copy.bufferRowLength   = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : ((_update.staging_row_pitch_ * 8) / bpp());
   copy.bufferImageHeight = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : size.y;
   copy.bufferOffset      = _update.staging_.offset_bytes();
   copy.imageSubresource  = subresLayers;
-  copy.source            = _update.staging_.parent()->buffer_;
-  copy.destination       = image_;
-  copy.bytesSize         = _update.size_bytes();
+  copy.source_           = _update.staging_.parent()->buffer_;
+  copy.destination_      = image_;
+  copy.bytes_size_       = _update.size_bytes();
 
   std::lock_guard lk(display_->staging_mutex_);
   display_->staging_jobs_++;

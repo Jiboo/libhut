@@ -118,19 +118,19 @@ TEST(offscreen, offscreen_basic) {
   auto img = std::make_shared<image>(d, iparams);
   auto ofs = offscreen(img);
 
-  auto rgb_pipeline = std::make_shared<pipeleine_rgb>(ofs);
+  auto rgb_pipeline = std::make_shared<pipeline_rgb>(ofs);
   auto indices      = buff->allocate<u16>(6);
   indices->set({0, 1, 2, 2, 1, 3});
-  auto vertices = buff->allocate<pipeleine_rgb::vertex>(4);
+  auto vertices = buff->allocate<pipeline_rgb::vertex>(4);
   vertices->set({
-      pipeleine_rgb::vertex{{0, 0}, {1, 1, 1}},
-      pipeleine_rgb::vertex{{0, 2}, {1, 1, 1}},
-      pipeleine_rgb::vertex{{2, 0}, {1, 1, 1}},
-      pipeleine_rgb::vertex{{2, 2}, {1, 1, 1}},
+      pipeline_rgb::vertex{{0, 0}, {1, 1, 1}},
+      pipeline_rgb::vertex{{0, 2}, {1, 1, 1}},
+      pipeline_rgb::vertex{{2, 0}, {1, 1, 1}},
+      pipeline_rgb::vertex{{2, 2}, {1, 1, 1}},
   });
-  auto instances = buff->allocate<pipeleine_rgb::instance>(2);
-  instances->set({pipeleine_rgb::instance{make_transform_mat4({0, 0}, {1, 1, 1})},
-                  pipeleine_rgb::instance{make_transform_mat4({2, 2}, {1, 1, 1})}});
+  auto instances = buff->allocate<pipeline_rgb::instance>(2);
+  instances->set({pipeline_rgb::instance{make_transform_mat4({0, 0}, {1, 1, 1})},
+                  pipeline_rgb::instance{make_transform_mat4({2, 2}, {1, 1, 1})}});
 
   auto ubo = buff->allocate<proj_ubo>(1, d.ubo_align());
   ubo->set(proj_ubo{iparams.size_});
@@ -143,14 +143,12 @@ TEST(offscreen, offscreen_basic) {
   u8vec4 pixel_data[4 * 4];
   ofs.download(std::span<u8>(&pixel_data[0].x, sizeof(pixel_data)), 4 * 4);
 
-  constexpr u8vec4 B                = {0, 0, 0, 255};
-  constexpr u8vec4 W                = {255, 255, 255, 255};
-  u8vec4           pixel_ref[4 * 4] = {
+  u8vec4 pixel_ref[4 * 4] = {
       // clang-format off
-      W, W, B, B,
-      W, W, B, B,
-      B, B, W, W,
-      B, B, W, W,
+      W, W, C, C,
+      W, W, C, C,
+      C, C, W, W,
+      C, C, W, W,
       // clang-format on
   };
 
@@ -224,19 +222,19 @@ TEST(offscreen, offscreen_render_offset) {
   oparams.subres_.coords_ = make_bbox_with_origin_size(u16vec2{1, 1}, {2, 2});
   auto ofs                = offscreen(img, oparams);
 
-  auto rgb_pipeline = std::make_shared<pipeleine_rgb>(ofs);
+  auto rgb_pipeline = std::make_shared<pipeline_rgb>(ofs);
   auto indices      = buff->allocate<u16>(6);
   indices->set({0, 1, 2, 2, 1, 3});
-  auto vertices = buff->allocate<pipeleine_rgb::vertex>(4);
+  auto vertices = buff->allocate<pipeline_rgb::vertex>(4);
   vertices->set({
-      pipeleine_rgb::vertex{{0, 0}, {1, 1, 1}},
-      pipeleine_rgb::vertex{{0, 1}, {1, 1, 1}},
-      pipeleine_rgb::vertex{{1, 0}, {1, 1, 1}},
-      pipeleine_rgb::vertex{{1, 1}, {1, 1, 1}},
+      pipeline_rgb::vertex{{0, 0}, {1, 1, 1}},
+      pipeline_rgb::vertex{{0, 1}, {1, 1, 1}},
+      pipeline_rgb::vertex{{1, 0}, {1, 1, 1}},
+      pipeline_rgb::vertex{{1, 1}, {1, 1, 1}},
   });
-  auto instances = buff->allocate<pipeleine_rgb::instance>(1);
+  auto instances = buff->allocate<pipeline_rgb::instance>(1);
   instances->set({
-      pipeleine_rgb::instance{make_transform_mat4({1, 1}, {1, 1, 1})},
+      pipeline_rgb::instance{make_transform_mat4({1, 1}, {1, 1, 1})},
   });
 
   auto ubo = buff->allocate<proj_ubo>(1, d.ubo_align());

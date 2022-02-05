@@ -49,7 +49,7 @@ bool prepare_read(image_params *_params, spng_format *_format, spng_ctx &_ctx, s
     case spng_color_type::SPNG_COLOR_TYPE_GRAYSCALE_ALPHA:
       format = (ihdr.bit_depth == 16) ? SPNG_FMT_GA16 : SPNG_FMT_GA8;
       break;
-    case spng_color_type::SPNG_COLOR_TYPE_INDEXED: [[fallthrough]];
+    case spng_color_type::SPNG_COLOR_TYPE_INDEXED:
     case spng_color_type::SPNG_COLOR_TYPE_TRUECOLOR: [[fallthrough]];
     case spng_color_type::SPNG_COLOR_TYPE_TRUECOLOR_ALPHA:
       format = (ihdr.bit_depth == 16) ? SPNG_FMT_RGBA16 : SPNG_FMT_RGBA8;

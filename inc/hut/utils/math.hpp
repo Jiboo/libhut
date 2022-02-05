@@ -40,6 +40,12 @@ namespace hut {
 using namespace glm;
 
 template<typename T>
+inline constexpr T numax_v = std::numeric_limits<T>::max();
+
+template<typename T>
+inline constexpr T numin_v = std::numeric_limits<T>::min();
+
+template<typename T>
 inline T align(T _input, unsigned _align) {
   if (_align == 0)
     return _input;

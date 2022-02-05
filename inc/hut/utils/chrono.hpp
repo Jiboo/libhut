@@ -33,7 +33,23 @@
 
 namespace hut {
 
-using namespace std::chrono_literals;
+using namespace std::literals::chrono_literals;
+
+template<typename TInternalClock, typename TRep>
+class diff_clock_wrapper {
+ public:
+  using internal                  = TInternalClock;
+  using rep                       = TRep;
+  using period                    = std::micro;
+  using duration                  = std::chrono::duration<rep, period>;
+  using time_point                = std::chrono::time_point<diff_clock_wrapper, duration>;
+  static constexpr bool is_steady = TInternalClock::is_steady;
+
+  static time_point now() {
+    static const typename TInternalClock::time_point epoch = TInternalClock::now();
+    return time_point{std::chrono::duration_cast<duration>(TInternalClock::now() - epoch)};
+  }
+};
 
 template<typename TRep, typename TPeriod>
 inline std::ostream &operator<<(std::ostream &_os, const std::chrono::duration<TRep, TPeriod> &_dur) {

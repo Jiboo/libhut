@@ -37,7 +37,7 @@ namespace hut {
 template<typename TUnderlying, fixed_string TUnit>
 struct boxed_number {
   using type                  = TUnderlying;
-  constexpr static char *unit = TUnit.data_;
+  constexpr static char *UNIT = TUnit.data_;
 
   template<typename TOtherUnderlying>
   using common = boxed_number<std::common_type_t<TUnderlying, TOtherUnderlying>, TUnit>;
@@ -46,6 +46,17 @@ struct boxed_number {
 
   TUnderlying value_;
 
+  constexpr boxed_number() = default;
+  constexpr explicit boxed_number(TUnderlying _raw)
+      : value_(_raw) {}
+  constexpr boxed_number(const boxed_number &_other)
+      : value_(_other.value_) {}
+  template<typename TOtherUnderlying>
+  constexpr boxed_number(same<TOtherUnderlying> _o)
+      : value_(_o.value_) {}
+  constexpr ~boxed_number() = default;
+
+  constexpr boxed_number &operator=(const boxed_number &_o) = default;
   template<typename TOtherUnderlying>
   constexpr boxed_number &operator=(same<TOtherUnderlying> _o) {
     value_ = _o.value_;
@@ -101,20 +112,20 @@ struct boxed_number {
   template<typename TOtherUnderlying>
   constexpr common<TOtherUnderlying> operator+(const same<TOtherUnderlying> &_o) const {
     std::common_type_t<TUnderlying, TOtherUnderlying> res = value_ + _o.value_;
-    return {res};
+    return common<TOtherUnderlying>{res};
   }
   template<typename TOtherUnderlying>
   constexpr common<TOtherUnderlying> operator-(const same<TOtherUnderlying> &_o) const {
     std::common_type_t<TUnderlying, TOtherUnderlying> res = value_ + _o.value_;
-    return {res};
+    return common<TOtherUnderlying>{res};
   }
   template<typename TOtherUnderlying>
   constexpr common<TOtherUnderlying> operator*(const TOtherUnderlying &_o) const {
-    return {value_ * _o};
+    return common<TOtherUnderlying>{value_ * _o};
   }
   template<typename TOtherUnderlying>
   constexpr common<TOtherUnderlying> operator/(const TOtherUnderlying &_o) const {
-    return {value_ / _o};
+    return common<TOtherUnderlying>{value_ / _o};
   }
 };
 
@@ -123,6 +134,8 @@ using size_px = boxed_number<TUnderlying, "px">;
 
 template<typename TUnderlying, typename TDpiRati, fixed_string TUnit>
 struct scalable_size : boxed_number<TUnderlying, TUnit> {
+  using boxed_number<TUnderlying, TUnit>::boxed_number;
+
   template<typename TOutput = f32>
   constexpr size_px<TOutput> scale(uint _screen_dpi) {
     constexpr double ratio = static_cast<double>(TDpiRati::num) / TDpiRati::den;
@@ -137,21 +150,17 @@ using size_in = scalable_size<TUnderlying, std::ratio<1, 1>, "in">;
 template<typename TUnderlying>
 using size_mm = scalable_size<TUnderlying, std::ratio<5, 127>, "mm">;  // 127/5 = 25.4, and 1in = 25.4mm
 
-namespace literals {
-
-size_px<long long unsigned> operator"" _px(long long unsigned _in) {
-  return {_in};
+constexpr inline size_px<long long unsigned> operator"" _px(long long unsigned _in) {
+  return size_px<long long unsigned>{_in};
 }
-size_pt<long double> operator"" _pt(long double _in) {
-  return {_in};
+constexpr inline size_pt<long double> operator"" _pt(long double _in) {
+  return size_pt<long double>{_in};
 }
-size_in<long double> operator"" _in(long double _in) {
-  return {_in};
+constexpr inline size_in<long double> operator"" _in(long double _in) {
+  return size_in<long double>{_in};
 }
-size_mm<long double> operator"" _mm(long double _in) {
-  return {_in};
+constexpr inline size_mm<long double> operator"" _mm(long double _in) {
+  return size_mm<long double>{_in};
 }
-
-}  // namespace literals
 
 }  // namespace hut

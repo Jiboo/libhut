@@ -21,7 +21,8 @@ out gl_PerVertex {
 };
 
 void main() {
-  gl_Position = ubo.proj * ubo.view * vec4(in_i_translate_r16g16_uint + in_v_pos_r16g16_sint, 0.0, 1.0);
+  vec2 pos = vec2(in_v_pos_r16g16_sint) + vec2(in_i_translate_r16g16_uint);
+  gl_Position = ubo.proj * ubo.view * vec4(pos, 0.0, 1.0);
   out_col = in_i_col_r8g8b8a8_unorm;
   out_uv = in_v_uv_r16g16_snorm;
 }

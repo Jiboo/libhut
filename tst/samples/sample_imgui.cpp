@@ -29,6 +29,7 @@
 
 #include "hut/display.hpp"
 #include "hut/window.hpp"
+#include "hut/utils/chrono.hpp"
 
 #include "hut/imgui/imgui.hpp"
 
@@ -37,25 +38,25 @@
 using namespace hut;
 
 int main(int, char **) {
-  display d("hut demo");
+  display dsp("hut demo");
 
-  window w(d);
-  w.clear_color({0, 0, 0, 1});
-  w.title(u8"hut imgui demo");
+  window win(dsp);
+  win.clear_color({0, 0, 0, 1});
+  win.title(u8"hut imgui demo");
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!ImGui_ImplHut_Init(&d, &w, true))
+  if (!ImGui_ImplHut_Init(&dsp, &win, true))
     return EXIT_FAILURE;
-  install_test_events(d, w);
+  install_test_events(dsp, win);
 
   vec4 clear_color{0, 0, 0, 1};
 
   bool show_demo_window    = true;
   bool show_another_window = true;
 
-  w.on_draw.connect([&](VkCommandBuffer _buffer) {
+  win.on_draw.connect([&](VkCommandBuffer _buffer) {
     ImGui_ImplHut_NewFrame();
     ImGui::NewFrame();
 
@@ -102,8 +103,22 @@ int main(int, char **) {
 
     return false;
   });
+  win.on_frame.connect([&](display::duration _dt) {
+    dsp.post([&](auto) { win.invalidate(true); });
+    return false;
+  });
 
-  int error_code = d.dispatch();
+  win.on_key.connect([](keycode, keysym _sym, bool _down) {
+#ifdef HUT_ENABLE_PROFILING
+    if (_sym == hut::KSYM_P && _down)
+      hut::profiling::threads_data::request_dump();
+#endif  // HUT_ENABLE_PROFILING
+    if (_sym == hut::KSYM_F && _down)
+      std::this_thread::sleep_for(100ms);
+    return false;
+  });
+
+  int error_code = dsp.dispatch();
 
   ImGui_ImplHut_Shutdown();
   ImGui::DestroyContext();

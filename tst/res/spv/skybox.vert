@@ -4,6 +4,7 @@
 layout(binding = 0) uniform UniformBufferObject {
     mat4 proj;
     mat4 view;
+    float dpi_scale;
 } ubo;
 
 layout(location = 0) in vec3 in_v_pos;

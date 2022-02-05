@@ -129,7 +129,6 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
 
   image_params iparams;
   level_ranges levels[32];
-  u32          type_size;
 
   {
     iparams.tiling_     = _params.tiling_;
@@ -165,10 +164,9 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
       return true;
     };
 
-    constexpr static u8 zero_padding_[4] = {0, 0, 0, 0};
-    constexpr static u8 expected_ktx2_header_[12]
+    constexpr static u8 EXPECTED_KTX2_HEADER[12]
         = {0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A};
-    if (!expect_data(expected_ktx2_header_, 12))
+    if (!expect_data(EXPECTED_KTX2_HEADER, 12))
       return {};
 
     iparams.format_ = static_cast<VkFormat>(read_u32());
@@ -179,7 +177,7 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
     if (iparams.format_ == VK_FORMAT_UNDEFINED)
       return {};  // FIXME http://github.khronos.org/KTX-Specification/#_use_of_vk_format_undefined
 
-    type_size       = read_u32();
+    u32 type_size   = read_u32();
     iparams.size_.x = read_u32();
     iparams.size_.y = read_u32();
     u32 pixel_depth = read_u32();

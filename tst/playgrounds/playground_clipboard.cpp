@@ -118,6 +118,10 @@ int main(int, char **) {
     ImGui_ImplHut_RenderDrawData(_buffer, ImGui::GetDrawData());
     return false;
   });
+  win.on_frame.connect([&](display::duration _dt) {
+    dsp.post([&](auto) { win.invalidate(true); });
+    return false;
+  });
 
   dsp.dispatch();
 

@@ -244,7 +244,7 @@ struct shelve_separator_align {
 
 template<typename T, T TMin>
 struct shelve_separator_pow {
-  u16 select_shelve(u16 _size) { return std::max(std::bit_ceil(_size), u16(16)); }
+  u16 select_shelve(u16 _size) { return std::max(std::bit_ceil(_size), u16(TMin)); }
 };
 
 template<typename T, typename TShelveSelector>

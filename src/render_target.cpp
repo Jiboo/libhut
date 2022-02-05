@@ -40,11 +40,10 @@ using namespace hut;
 
 render_target::render_target(display &_display)
     : display_(&_display) {
-  HUT_PROFILE_SCOPE(PWINDOW, "render_target::render_target");
 }
 
 render_target::~render_target() {
-  HUT_PROFILE_SCOPE(PWINDOW, "render_target::~render_target");
+  HUT_PROFILE_FUN(PRENDERTARGET)
 
   for (auto &fbo : fbos_) {
     if (fbo != VK_NULL_HANDLE)
@@ -56,7 +55,7 @@ render_target::~render_target() {
 }
 
 void render_target::reinit_pass(const render_target_params &_init_params, std::span<VkImageView> _images) {
-  HUT_PROFILE_SCOPE(PWINDOW, "render_target::reinit");
+  HUT_PROFILE_FUN(PRENDERTARGET)
   render_target_params_ = _init_params;
   const auto size       = bbox_size(_init_params.box_);
   const auto offset     = bbox_origin(_init_params.box_);
@@ -231,7 +230,7 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
 }
 
 void render_target::begin_rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
-  HUT_PROFILE_SCOPE(PWINDOW, "window::rebuild_cb");
+  HUT_PROFILE_FUN(PRENDERTARGET)
   auto offset = bbox_origin(render_target_params_.box_);
   auto size   = bbox_size(render_target_params_.box_);
 
@@ -239,7 +238,6 @@ void render_target::begin_rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
   begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   begin_info.flags                    = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
   begin_info.pInheritanceInfo         = nullptr;  // Optional
-
   HUT_PVK(vkBeginCommandBuffer, _cb, &begin_info);
 
   VkRenderPassBeginInfo render_pass_info = {};
@@ -279,6 +277,7 @@ void render_target::begin_rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
 }
 
 void render_target::end_rebuild_cb(VkCommandBuffer _cb) {
+  HUT_PROFILE_FUN(PRENDERTARGET)
   HUT_PVK(vkCmdEndRenderPass, _cb);
   if (HUT_PVK(vkEndCommandBuffer, _cb) != VK_SUCCESS)
     throw std::runtime_error("failed to record command buffer!");

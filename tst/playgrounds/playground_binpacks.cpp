@@ -75,8 +75,8 @@ void ImPacker(const char *_name = "Packer", u16vec2 _bounds = {8 * 1024, 8 * 102
               u16vec2 _max_rect = {100, 100}) {
   ImGui::SetNextWindowContentSize({float(_bounds.x), float(_bounds.y)});
   if (ImGui::Begin(_name, nullptr, ImGuiWindowFlags_HorizontalScrollbar)) {
-    using clock_t = std::chrono::high_resolution_clock;
-    using dur_t   = std::chrono::duration<float, std::milli>;
+    using hrclock_t = std::chrono::high_resolution_clock;
+    using dur_t     = std::chrono::duration<float, std::milli>;
     static TPacker              packer(_bounds);
     static std::vector<u16vec4> packed;
     static std::mt19937         gen;
@@ -111,9 +111,9 @@ void ImPacker(const char *_name = "Packer", u16vec2 _bounds = {8 * 1024, 8 * 102
     };
     auto add_one = [&]() {
       auto rect_size = rand_size();
-      auto before    = clock_t::now();
+      auto before    = hrclock_t::now();
       auto rect      = packer.pack(rect_size + u16vec2(padding));
-      auto after     = clock_t::now();
+      auto after     = hrclock_t::now();
       auto time      = std::chrono::duration_cast<dur_t>(after - before).count();
       total_add_time += time;
       add_timings.emplace_back(time);
@@ -126,9 +126,9 @@ void ImPacker(const char *_name = "Packer", u16vec2 _bounds = {8 * 1024, 8 * 102
     auto remove_rand = [&]() {
       auto index     = rand_int(packed.size());
       auto rect_size = bbox_size(packed[index]);
-      auto before    = clock_t::now();
+      auto before    = hrclock_t::now();
       packer.offer(packed[index]);
-      auto after = clock_t::now();
+      auto after = hrclock_t::now();
       auto time  = std::chrono::duration_cast<dur_t>(after - before).count();
       total_rem_time += time;
       rem_timings.emplace_back(time);
@@ -216,6 +216,10 @@ int main(int, char **) {
     ImGui::Render();
     ImGui_ImplHut_RenderDrawData(_buffer, ImGui::GetDrawData());
 
+    return false;
+  });
+  win.on_frame.connect([&](display::duration _dt) {
+    dsp.post([&](auto) { win.invalidate(true); });
     return false;
   });
 

@@ -58,9 +58,9 @@ constexpr T sum() {
 
 template<size_t TSize>
 struct fixed_string {
-  static constexpr size_t size     = TSize;
-  static constexpr size_t str_size = TSize - 1;
-  using data_type                  = char[size];
+  static constexpr size_t SIZE     = TSize;
+  static constexpr size_t STR_SIZE = TSize - 1;
+  using data_type                  = char[SIZE];
 
   data_type data_ = {};
 
@@ -69,7 +69,7 @@ struct fixed_string {
   fixed_string(fixed_string &&) noexcept = default;
 
   constexpr fixed_string(const char *_in, size_t _byte_size) {
-    auto min = std::min(str_size, _byte_size);
+    auto min = std::min(STR_SIZE, _byte_size);
     for (size_t i = 0; i != min; ++i)
       data_[i] = _in[i];
     if (_byte_size > min && TSize > 3) {
@@ -119,10 +119,10 @@ inline std::ostream &operator<<(std::ostream &_os, const fixed_string<TSize> &_i
 
 template<size_t... TSizes>
 struct fixed_string_array {
-  static constexpr size_t count     = sizeof...(TSizes);
-  static constexpr size_t data_size = sum<size_t, TSizes...>();
-  using data_type                   = char[data_size];
-  using offsets_type                = size_t[count];
+  static constexpr size_t COUNT     = sizeof...(TSizes);
+  static constexpr size_t DATA_SIZE = sum<size_t, TSizes...>();
+  using data_type                   = char[DATA_SIZE];
+  using offsets_type                = size_t[COUNT];
 
   data_type    data_    = {};
   offsets_type offsets_ = {};
@@ -145,7 +145,7 @@ struct fixed_string_array {
   constexpr void init(size_t, size_t) {}
 
   [[nodiscard]] constexpr const char *at(size_t _index) const {
-    assert(_index < count);
+    assert(_index < COUNT);
     return data_ + offsets_[_index];
   }
 };
@@ -162,21 +162,21 @@ inline void split(std::basic_string_view<TInput> _input, std::basic_string_view<
   }
 }
 
-inline void hexdump(const void *ptr, size_t buflen) {
+inline void hexdump(const void *_ptr, size_t _buflen) {
   // https://stackoverflow.com/questions/29242/off-the-shelf-c-hex-dump-code
-  auto  *buf = (unsigned char *)ptr;
+  auto  *buf = (unsigned char *)_ptr;
   size_t i, j;
-  for (i = 0; i < buflen; i += 16) {
+  for (i = 0; i < _buflen; i += 16) {
     printf("%06zx: ", i);
     for (j = 0; j < 16; j++) {
-      if (i + j < buflen)
+      if (i + j < _buflen)
         printf("%02x ", buf[i + j]);
       else
         printf("   ");
     }
     printf(" ");
     for (j = 0; j < 16; j++) {
-      if (i + j < buflen)
+      if (i + j < _buflen)
         printf("%c", isprint(buf[i + j]) ? buf[i + j] : '.');
     }
     printf("\n");

@@ -83,16 +83,16 @@ class window : public render_target {
   friend class display;
 
  public:
-  event<>                  on_pause;   // sys asked win to stop rendering
-  event<>                  on_resume;  // sys asked win to resume rendering
-  event<>                  on_focus;   // sys gave keyboard focus to win
-  event<>                  on_blur;    // win lost keyboard focus
-  event<>                  on_close;   // overridable, sys requested win to close
-  event<uvec4>             on_expose;  // sys request win to redraw this rect
-  event<uvec2>             on_resize;  // sys changed win size
-  event<VkCommandBuffer>   on_draw;    // win is dirty, needs to rebuild command buffer
-  event<display::duration> on_frame;   // win will soon be drawn (use this to animate values)
-  event<int>               on_scale;   // overridable, sys wants win to use a different DPI scale
+  event<>                       on_pause;   // sys asked win to stop rendering
+  event<>                       on_resume;  // sys asked win to resume rendering
+  event<>                       on_focus;   // sys gave keyboard focus to win
+  event<>                       on_blur;    // win lost keyboard focus
+  event<>                       on_close;   // overridable, sys requested win to close
+  event<u16vec4>                on_expose;  // sys request win to redraw this rect
+  event<VkCommandBuffer>        on_draw;    // win is dirty, needs to rebuild command buffer
+  event<display::duration>      on_frame;   // win will soon be drawn (use this to animate values)
+  event<u16vec2, u32 /*scale*/> on_resize;  // sys changed win size or scaling
+
 #if defined(HUT_ENABLE_TIME_EVENTS)
   event<u32> on_time;  // contains timestamps of sys events, to measure hut latency
 #endif
@@ -120,17 +120,19 @@ class window : public render_target {
 
   void invalidate(const uvec4 &, bool _redraw);
   void invalidate(bool _redraw);
+  void maximize(bool _set = true);
+  void fullscreen(bool _set = true);
 
-  void  maximize(bool _set = true);
-  void  fullscreen(bool _set = true);
-  uvec2 size() { return size_; }
-  void  interactive_resize(edge);
-  void  interactive_move();
+  u16vec2 size() const { return size_; }
+  u32     scale() const { return scale_; }
+
+  void interactive_resize(edge);
+  void interactive_move();
 
   void title(std::u8string_view);
   void cursor(cursor_type _c);
   void clear_color(const vec4 &_color) {
-    render_target_params_.clear_color_ = {_color.r, _color.g, _color.b, _color.a};
+    render_target_params_.clear_color_ = {{_color.r, _color.g, _color.b, _color.a}};
     invalidate(true);
   }
 
@@ -166,9 +168,10 @@ class window : public render_target {
   VkSemaphore sem_available_ = VK_NULL_HANDLE;
   VkSemaphore sem_rendered_  = VK_NULL_HANDLE;
 
-  uvec2               size_, pos_;
+  u16vec2             size_, pos_;
   display::time_point last_frame_ = display::clock::now();
   bool                minimized_  = false;
+  u32                 scale_      = 1;
 
   std::shared_ptr<drop_target_interface> drop_target_interface_;
 
@@ -255,7 +258,6 @@ class window : public render_target {
   std::list<display::async_reader> async_readers_;
 
   std::unordered_set<wl_output *> overlapping_outputs_;
-  int                             last_sent_scale_ = 1;
   void                            trigger_scale();
 };
 

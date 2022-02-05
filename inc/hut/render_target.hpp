@@ -43,7 +43,7 @@ struct render_target_params {
 
   u16vec4                  box_;
   VkFormat                 format_;
-  VkClearColorValue        clear_color_         = {0, 0, 0, 1};
+  VkClearColorValue        clear_color_         = {{0, 0, 0, 1}};
   VkClearDepthStencilValue clear_depth_stencil_ = {1, 0};
   VkImageLayout            initial_layout_      = VK_IMAGE_LAYOUT_UNDEFINED;
   VkImageLayout            final_layout_        = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;

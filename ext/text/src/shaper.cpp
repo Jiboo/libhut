@@ -34,9 +34,10 @@
 
 using namespace hut::text;
 
-shaper::shaper(shared_font _font)
+shaper::shaper(shared_font _font, render_mode _rmode)
     : buffer_(hb_buffer_create())
-    , font_(std::move(_font)) {
+    , font_(std::move(_font))
+    , rmode_(_rmode) {
 }
 
 shaper::~shaper() {
@@ -45,7 +46,7 @@ shaper::~shaper() {
 }
 
 void shaper::shape(const shared_atlas &_atlas, std::u8string_view _text, const shape_callback &_cb) {
-  HUT_PROFILE_SCOPE_NAMED(PFONT, "shaper::bake {}", ("text"), make_fixed<40>(_text));
+  HUT_PROFILE_SCOPE_NAMED(PFONT, "shaper::bake {}", ("text"), make_fixed<40>(_text))
 
   hb_buffer_reset(buffer_);
   hb_buffer_add_utf8(buffer_, (char *)_text.data(), (int)_text.size(), 0, -1);
@@ -62,24 +63,18 @@ void shaper::shape(const shared_atlas &_atlas, std::u8string_view _text, const s
   for (uint i = 0; i < codepoints; i++) {
     uint cindex = info[i].codepoint;  // FIXME: Isn't "codepoint" for UTF codes? This seems to be a char index..
 
-    auto it = cache_.find(cindex);
-    if (it == cache_.end()) {
-      auto result = cache_.emplace(cindex, font_->load(_atlas, cindex));
-      assert(result.second);
-      it = result.first;
-    }
-    auto &glyph = it->second;
-
+    auto glyph = font_->load(_atlas, cindex, rmode_);
     if (glyph.subimage_) {
-      using i16limits = std::numeric_limits<i16>;
-      assert((pos[i].x_offset / font_scale) <= i16limits::max());
-      i16vec2 glyph_offset = i16vec2{pos[i].x_offset, pos[i].y_offset} / font_scale;
+      assert((pos[i].x_offset / FONT_FACTOR) <= numax_v<i32>);
+      auto    bearing      = glyph.bearing_;
+      auto    size         = glyph.size_;
+      i16vec2 glyph_offset = i16vec2{pos[i].x_offset, pos[i].y_offset} / FONT_FACTOR;
       i16vec2 offset       = cur_offset + glyph_offset;
-      i16vec2 begin{offset.x + glyph.bearing_.x, offset.y - glyph.bearing_.y};
-      i16vec2 end = begin + glyph.size_;
+      i16vec2 begin{offset.x + bearing.x, offset.y - bearing.y};
+      i16vec2 end = begin + size;
 
       _cb(i, i16vec4{begin, end}, glyph.subimage_->texcoords(), glyph.subimage_->page());
     }
-    cur_offset += i16vec2{pos[i].x_advance, pos[i].y_advance} / font_scale;
+    cur_offset += i16vec2{pos[i].x_advance, pos[i].y_advance} / FONT_FACTOR;
   }
 }

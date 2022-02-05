@@ -88,15 +88,9 @@ int main(int, char **) {
   });
 
   bool handle_on_resize_events = false;
-  win.on_resize.connect([&](uvec2 _size) {
-    std::cout << "on_resize " << _size << std::endl;
+  win.on_resize.connect([&](u16vec2 _size, u32 _scale) {
+    std::cout << "on_resize " << _size << ", " << _scale << std::endl;
     return handle_on_resize_events;
-  });
-
-  bool handle_on_scale_events = false;
-  win.on_scale.connect([&](int _scale) {
-    std::cout << "on_scale " << _scale << std::endl;
-    return handle_on_scale_events;
   });
 
   struct datapoint {
@@ -221,7 +215,6 @@ int main(int, char **) {
       ImGui::Checkbox("on_close", &handle_on_close_events);
       ImGui::Checkbox("on_expose", &handle_on_expose_events);
       ImGui::Checkbox("on_resize", &handle_on_resize_events);
-      ImGui::Checkbox("on_scale", &handle_on_scale_events);
       ImGui::Separator();
 
       ImGui::Checkbox("on_touch", &handle_on_touch_events);
@@ -262,7 +255,6 @@ int main(int, char **) {
   });
 
   install_resizable_movable(win);
-  install_continuous_redraw(dsp, win);
 
   dsp.dispatch();
   ImGui_ImplHut_Shutdown();

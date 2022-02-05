@@ -100,7 +100,7 @@ struct buffer_params {
 };
 
 class buffer {
-  friend class details::buffer_page_data;
+  friend struct details::buffer_page_data;
 
  public:
   buffer(display &_display, uint _size, const buffer_params &_params = {});
@@ -123,7 +123,7 @@ class buffer {
 
   std::list<details::buffer_page_data> pages_;
 
-  details::buffer_page_data &grow(uint new_size) { return pages_.emplace_back(*this, new_size); }
+  details::buffer_page_data &grow(uint _new_size) { return pages_.emplace_back(*this, _new_size); }
 };
 
 }  // namespace hut

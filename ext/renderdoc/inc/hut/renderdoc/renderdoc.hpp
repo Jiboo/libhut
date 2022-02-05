@@ -37,6 +37,6 @@ void frame_end(const char *_comment = nullptr);
 namespace details {
 RENDERDOC_API_1_4_1 *init();
 void                 configure(RENDERDOC_API_1_4_1 *);
-};  // namespace details
+}  // namespace details
 
 }  // namespace hut::renderdoc

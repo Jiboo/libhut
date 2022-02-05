@@ -76,8 +76,8 @@ struct format_info {
   auto operator<=>(const format_info &) const = default;
 };
 
-constexpr format_info invalid_format_info{{0, 0, 0, 0}, 0, format_suffix::UNORM, format_target::COLOR, 0};
-static_assert(!invalid_format_info.valid());
+constexpr format_info INVALID_FORMAT_INFO{{0, 0, 0, 0}, 0, format_suffix::UNORM, format_target::COLOR, 0};
+static_assert(!INVALID_FORMAT_INFO.valid());
 
 constexpr format_info format_info::from(VkFormat _input) {
   switch (_input) {
@@ -88,7 +88,7 @@ constexpr format_info format_info::from(VkFormat _input) {
     case VK_FORMAT_R5G6B5_UNORM_PACK16: [[fallthrough]];
     case VK_FORMAT_B5G6R5_UNORM_PACK16:
       return format_info{{5, 6, 5, 0}, 3, format_suffix::UNORM, format_target::COLOR, 16};
-    case VK_FORMAT_R5G5B5A1_UNORM_PACK16: [[fallthrough]];
+    case VK_FORMAT_R5G5B5A1_UNORM_PACK16:
     case VK_FORMAT_B5G5R5A1_UNORM_PACK16: [[fallthrough]];
     case VK_FORMAT_A1R5G5B5_UNORM_PACK16:
       return format_info{{5, 5, 5, 1}, 4, format_suffix::UNORM, format_target::COLOR, 16};
@@ -299,7 +299,7 @@ constexpr format_info format_info::from(VkFormat _input) {
     case VK_FORMAT_BC7_UNORM_BLOCK: return format_info{{8, 8, 8, 8}, 4, format_suffix::UNORM, format_target::COLOR, 8};
     case VK_FORMAT_BC7_SRGB_BLOCK: return format_info{{8, 8, 8, 8}, 4, format_suffix::SRGB, format_target::COLOR, 8};
 
-    default: return invalid_format_info;
+    default: return INVALID_FORMAT_INFO;
   }
 }
 

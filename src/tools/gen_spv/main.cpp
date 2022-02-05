@@ -20,18 +20,18 @@ using namespace hut;
 using svmatch     = match_results<string_view::const_iterator>;
 using svsub_match = sub_match<string_view::const_iterator>;
 
-inline string_view get_sv(const svsub_match &m) {
-  return string_view(m.first, m.length());
+inline string_view get_sv(const svsub_match &_m) {
+  return {_m.first, static_cast<string_view::size_type>(_m.length())};
 }
 
-inline bool regex_match(string_view sv, svmatch &m, const regex &e,
-                        regex_constants::match_flag_type flags = regex_constants::match_default) {
-  return regex_match(sv.begin(), sv.end(), m, e, flags);
+inline bool regex_match(string_view _sv, svmatch &_m, const regex &_e,
+                        regex_constants::match_flag_type _flags = regex_constants::match_default) {
+  return regex_match(_sv.begin(), _sv.end(), _m, _e, _flags);
 }
 
-inline bool regex_match(string_view sv, const regex &e,
-                        regex_constants::match_flag_type flags = regex_constants::match_default) {
-  return regex_match(sv.begin(), sv.end(), e, flags);
+inline bool regex_match(string_view _sv, const regex &_e,
+                        regex_constants::match_flag_type _flags = regex_constants::match_default) {
+  return regex_match(_sv.begin(), _sv.end(), _e, _flags);
 }
 
 string_view descriptor_type_vk(SpvReflectDescriptorType _type) {
@@ -42,7 +42,7 @@ string_view descriptor_type_vk(SpvReflectDescriptorType _type) {
   }
 }
 
-constexpr string_view vk_formats[] = {
+constexpr string_view VK_FORMATS[] = {
     "r4g4_unorm_pack8",
     "r4g4b4a4_unorm_pack16",
     "b4g4r4a4_unorm_pack16",
@@ -169,7 +169,7 @@ constexpr string_view vk_formats[] = {
 };
 
 string_view remove_format_suffix(string_view _input) {
-  for (auto &vk_format : vk_formats) {
+  for (auto &vk_format : VK_FORMATS) {
     if (_input.ends_with(vk_format))
       return _input.substr(0, _input.size() - vk_format.size()
                                   - 1);  // NOTE JBL: extra one for the underscore, '_'<format>
@@ -189,7 +189,7 @@ string format_name_vk(SpvReflectInterfaceVariable *_input) {
   os << "VK_FORMAT_";
 
   const string_view name = _input->name;
-  for (auto &vk_format : vk_formats) {
+  for (auto &vk_format : VK_FORMATS) {
     if (name.ends_with(vk_format)) {
       for (auto c : vk_format)
         os << (char)std::toupper(c);
@@ -226,12 +226,12 @@ string format_name_vk(SpvReflectInterfaceVariable *_input) {
   return os.str();
 }
 
-string format_name_cpp(SpvReflectInterfaceVariable *_input, unsigned _columns = -1) {
-  _columns = (_columns == -1 ? _input->numeric.matrix.column_count : _columns);
+string format_name_cpp(SpvReflectInterfaceVariable *_input, uint _columns = numax_v<uint>) {
+  _columns = (_columns == numax_v<uint> ? _input->numeric.matrix.column_count : _columns);
 
   const string_view name = _input->name;
   string            format;
-  for (auto &vk_format : vk_formats) {
+  for (auto &vk_format : VK_FORMATS) {
     if (name.ends_with(vk_format)) {
       format = vk_format;
       break;
@@ -331,7 +331,7 @@ void reflect_bindings(ostream &_os, const SpvReflectShaderModule &_mod) {
   assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
   _os << "  constexpr static std::array<VkDescriptorSetLayoutBinding, " << bindings_count
-      << "> descriptor_bindings_ {\n";
+      << "> DESCRIPTOR_BINDINGS {\n";
   for (auto *binding : bindings) {
     if (binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
         && binding->type_description->op == SpvOpTypeRuntimeArray && binding->count == 1)
@@ -348,8 +348,8 @@ void reflect_bindings(ostream &_os, const SpvReflectShaderModule &_mod) {
 }
 
 // FIXME JBL: string_view for _extra_offset_op when supported by my local and mingw32 STLs
-void reflect_vertex_input(ostream &_os, SpvReflectInterfaceVariable *_input, int _binding, string_view _name,
-                          int _location_offset = 0, string _extra_offset_op = "") {
+void reflect_vertex_input(ostream &_os, SpvReflectInterfaceVariable *_input, uint _binding, string_view _name,
+                          uint _location_offset = 0, const string &_extra_offset_op = "") {
   _os << "    VkVertexInputAttributeDescription{.location = " << (_input->location + _location_offset)
       << ", .binding = " << _binding << ", .format = " << format_name_vk(_input) << ", .offset = offsetof("
       << (_binding == 0 ? "vertex" : "instance") << ", " << _name << "_)" << _extra_offset_op << "},\n";
@@ -363,7 +363,7 @@ void reflect_vertex_inputs(ostream &_os, const SpvReflectShaderModule &_mod) {
   result = spvReflectEnumerateInputVariables(&_mod, &inputs_count, inputs.data());
   assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
-  std::sort(inputs.begin(), inputs.end(), [](const auto *l, const auto *r) { return l->location < r->location; });
+  std::sort(inputs.begin(), inputs.end(), [](const auto *_l, const auto *_r) { return _l->location < _r->location; });
 
   struct vertex_data_member {
     SpvReflectInterfaceVariable *input_;
@@ -379,8 +379,8 @@ void reflect_vertex_inputs(ostream &_os, const SpvReflectShaderModule &_mod) {
    * "binding" decoration is forbidden, and apparently can't use SPIRV-Reflect for custom decorations
    * or pragmas for cpp-like "attributes"..*/
 
-  constexpr string_view input_regex_source = "in_(v|i)_([a-z0-9_]*)";
-  static regex          input_regex(input_regex_source.data(), input_regex_source.size());
+  constexpr string_view INPUT_REGEXP_SOURCE = "in_(v|i)_([a-z0-9_]*)";
+  static regex          input_regex(INPUT_REGEXP_SOURCE.data(), INPUT_REGEXP_SOURCE.size());
   static svmatch        input_match;
 
   std::vector<std::string> attributes;
@@ -393,7 +393,7 @@ void reflect_vertex_inputs(ostream &_os, const SpvReflectShaderModule &_mod) {
 
       int binding = 0;
       if (!regex_match(string_view{input->name}, input_match, input_regex)) {
-        throw runtime_error(hut::sstream("did not match regexp ") << input_regex_source);
+        throw runtime_error(hut::sstream("did not match regexp ") << INPUT_REGEXP_SOURCE);
       } else {
         auto name_without_prefix = string_view{input_match[2].first, input_match[2].second};
         auto short_name          = remove_format_suffix(name_without_prefix);
@@ -410,7 +410,7 @@ void reflect_vertex_inputs(ostream &_os, const SpvReflectShaderModule &_mod) {
           reflect_vertex_input(attribute_buffer, input, binding, short_name);
           attributes.emplace_back(attribute_buffer.str());
         } else {
-          for (int i = 0; i < columns; i++) {
+          for (uint i = 0; i < columns; i++) {
             attribute_buffer.str("");
             reflect_vertex_input(attribute_buffer, input, binding, short_name, i,
                                  sstream(" + sizeof(") << format_name_cpp(input, 0) << ") * " << i);
@@ -436,7 +436,7 @@ void reflect_vertex_inputs(ostream &_os, const SpvReflectShaderModule &_mod) {
   _os << "  }; // struct instance\n";
 
   _os << "\n  constexpr static std::array<VkVertexInputAttributeDescription, " << attributes.size()
-      << "> vertices_description_ {\n";
+      << "> VERTICES_DESCRIPTION {\n";
   for (auto &attribute : attributes)
     _os << attribute;
   _os << "  };" << endl;
@@ -451,21 +451,21 @@ void reflect_vertex_shader(ostream &_os, const SpvReflectShaderModule &_mod) {
   reflect_vertex_inputs(_os, _mod);
 }
 
-int main(int argc, char **argv) {
+int main(int _argc, char **_argv) {
   auto start = steady_clock::now();
 
-  for (auto i = 0; i < argc; i++)
-    cout << argv[i] << " ";
+  for (auto i = 0; i < _argc; i++)
+    cout << _argv[i] << " ";
   cout << endl;
 
-  if (argc <= 3)
-    throw runtime_error(sstream("usage: ") << argv[0] << " <namespace> <output> <list of input...>");
+  if (_argc <= 3)
+    throw runtime_error(sstream("usage: ") << _argv[0] << " <namespace> <output> <list of input...>");
 
-  path output_path = argv[2];
+  path output_path = _argv[2];
   if (output_path.has_parent_path() && !exists(output_path.parent_path()))
     create_directories(output_path.parent_path());
 
-  path output_base_path = output_path / argv[1];
+  path output_base_path = output_path / _argv[1];
   path output_h_path    = output_base_path;
   output_h_path += ".hpp";
 
@@ -473,7 +473,7 @@ int main(int argc, char **argv) {
   if (!output_h.is_open())
     throw runtime_error(sstream("can't open ") << output_h_path << ": " << strerror(errno));
 
-  auto bundle_namespace = string(argv[1]);
+  auto bundle_namespace = string(_argv[1]);
   assert(bundle_namespace.ends_with("_refl"));
   bundle_namespace.resize(bundle_namespace.size() - strlen("_refl"));
 
@@ -488,8 +488,8 @@ int main(int argc, char **argv) {
               "namespace hut::"
            << bundle_namespace << " {\n";
 
-  for (auto i = 3; i < argc; i++) {
-    path input_path = argv[i];
+  for (auto i = 3; i < _argc; i++) {
+    path input_path = _argv[i];
 
     ifstream input(input_path, ios::ate | ios::binary);
     if (!input.is_open())
@@ -501,12 +501,11 @@ int main(int argc, char **argv) {
     replace(symbol.begin(), symbol.end(), '-', '_');
 
     auto found_size = input.tellg();
-    auto written    = 0;
 
     input.seekg(0);
     string spirv_data;
     spirv_data.resize(found_size);
-    input.read(spirv_data.data(), spirv_data.size());
+    input.read(spirv_data.data(), static_cast<streamsize>(spirv_data.size()));
     SpvReflectShaderModule module;
     SpvReflectResult       result = spvReflectCreateShaderModule(spirv_data.size(), spirv_data.data(), &module);
     assert(result == SPV_REFLECT_RESULT_SUCCESS);
@@ -523,18 +522,18 @@ int main(int argc, char **argv) {
       throw runtime_error(sstream("exception while reflecting on ") << input_path << ": " << _ex.what());
     }
 
-    output_h << "\n  constexpr static auto &bytecode_ = " << bundle_namespace << "::" << symbol << ";\n";
-    output_h << "\n  constexpr static auto filename_ = \"" << filename << "\";\n";
+    output_h << "\n  constexpr static auto &BYTECODE = " << bundle_namespace << "::" << symbol << ";\n";
+    output_h << "\n  constexpr static auto FILENAME = \"" << filename << "\";\n";
 
     output_h << "}; // struct " << symbol << "_refl\n";
 
     spvReflectDestroyShaderModule(&module);
   }
 
-  output_h << "}  // namespace hut::" << argv[1] << '\n';
+  output_h << "}  // namespace hut::" << _argv[1] << '\n';
 
   output_h.flush();
 
-  cout << "Generated " << argv[1] << " at " << output_path << " in "
+  cout << "Generated " << _argv[1] << " at " << output_path << " in "
        << duration<double, milli>(steady_clock::now() - start).count() << "ms." << endl;
 }

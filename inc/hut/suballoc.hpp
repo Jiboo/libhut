@@ -35,7 +35,7 @@ namespace hut {
 
 template<typename TContained, typename TParent>
 class suballoc {
-  friend class details::buffer_page_data;
+  friend struct details::buffer_page_data;
 
  public:
   using contained_t   = TContained;
@@ -125,7 +125,7 @@ class suballoc {
 template<typename TContained, typename TParent>
 class updator {
  public:
-  friend class details::buffer_page_data;
+  friend struct details::buffer_page_data;
   using staging_alloc_t = buffer_suballoc<TContained>;
 
  protected:

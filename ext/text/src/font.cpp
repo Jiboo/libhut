@@ -43,56 +43,68 @@
 using namespace hut;
 using namespace hut::text;
 
-struct FTLibraryHolder {
+struct ft_library_holder {
   FT_Library library_ = nullptr;
-  FTLibraryHolder() {
-    HUT_PROFILE_SCOPE(PFONT, "FT_Init_FreeType");
+  ft_library_holder() {
+    HUT_PROFILE_SCOPE(PFONT, "FT_Init_FreeType")
     FT_Init_FreeType(&library_);
   }
-  ~FTLibraryHolder() {
+  ~ft_library_holder() {
     if (library_)
       FT_Done_FreeType(library_);
   }
 };
 
-font::font(std::span<const u8> _data, uint _size, bool _hinting) {
-  static FTLibraryHolder lib_holder;
+font::font(std::span<const u8> _data, const size_px<uint> &_size, bool _hinting) {
+  static ft_library_holder lib_holder;
 
   load_flags_ = FT_LOAD_COLOR | (_hinting ? FT_LOAD_FORCE_AUTOHINT : FT_LOAD_NO_HINTING);
 
-  {
-    HUT_PROFILE_SCOPE(PFONT, "font::font::ft");
-    auto result = FT_New_Memory_Face(lib_holder.library_, _data.data(), FT_Long(_data.size_bytes()), 0, &face_);
-    if (result != 0)
-      throw std::runtime_error(sstream("couldn't load face: ") << result);
-    FT_Set_Char_Size(face_, FT_F26Dot6(_size * font_scale), FT_F26Dot6(_size * font_scale), 0, 0);
-  }
-  {
-    HUT_PROFILE_SCOPE(PFONT, "font::font::hb");
-    font_ = hb_ft_font_create(face_, nullptr);
-    hb_ft_font_set_funcs(font_);
-    hb_ft_font_set_load_flags(font_, load_flags_);
-  }
+  HUT_PROFILE_SCOPE(PFONT, "font::font")
+  auto result = FT_New_Memory_Face(lib_holder.library_, _data.data(), FT_Long(_data.size_bytes()), 0, &face_);
+  if (result != 0)
+    throw std::runtime_error(sstream("couldn't load face: ") << result);
+  reset_to_size(_size);
 }
 
 font::~font() {
-  hb_font_destroy(font_);
-  FT_Done_Face(face_);
+  if (font_)
+    hb_font_destroy(font_);
+  if (face_)
+    FT_Done_Face(face_);
 }
 
-font::glyph font::load(const shared_atlas &_atlas, uint _char_index) {
-  if (FT_HAS_COLOR(face_))
-    assert(_atlas->format() == VK_FORMAT_B8G8R8A8_UNORM);
+font::glyph font::load_internal(const shared_atlas &_atlas, uint _char_index, render_mode _rmode) {
+  HUT_PROFILE_SCOPE(PFONT, "font::load_internal")
 
-  HUT_PROFILE_SCOPE(PFONT, "font::load_glyph");
-
-  std::unique_lock lk{mutex_};
+  FT_Render_Mode ftmode;
+  switch (_rmode) {
+    case render_mode::NORMAL:
+      if (FT_HAS_COLOR(face_))
+        assert(_atlas->format() == VK_FORMAT_B8G8R8A8_UNORM);
+      else
+        assert(_atlas->format() == VK_FORMAT_R8_UNORM);
+      ftmode = FT_RENDER_MODE_NORMAL;
+      break;
+    case render_mode::LCD:
+      assert(_atlas->format() == VK_FORMAT_B8G8R8A8_UNORM);
+      ftmode = FT_RENDER_MODE_LCD;
+      break;
+    case render_mode::LCD_V:
+      assert(_atlas->format() == VK_FORMAT_B8G8R8A8_UNORM);
+      ftmode = FT_RENDER_MODE_LCD_V;
+      break;
+    case render_mode::SDF:
+      assert(_atlas->format() == VK_FORMAT_R8_UNORM);
+      ftmode = FT_RENDER_MODE_SDF;
+      break;
+  }
 
   if (FT_Load_Glyph(face_, _char_index, load_flags_))
     throw std::runtime_error("couldn't load char");
 
   FT_GlyphSlot &ftg = face_->glyph;
-  if (FT_Render_Glyph(ftg, FT_RENDER_MODE_NORMAL))
+  if (FT_Render_Glyph(ftg, ftmode))
     throw std::runtime_error("couldn't render char");
 
   FT_Bitmap render = ftg->bitmap;
@@ -131,7 +143,31 @@ font::glyph font::load(const shared_atlas &_atlas, uint _char_index) {
   return result;
 }
 
-font::glyph font::load(const shared_atlas &_atlas, char32_t _unichar) {
-  uint index = FT_Get_Char_Index(face_, _unichar);
-  return load(_atlas, index);
+uint font::char_index(char32_t _unichar) {
+  std::unique_lock lk{mutex_};
+  return FT_Get_Char_Index(face_, _unichar);
+}
+
+font::glyph font::load(const shared_atlas &_atlas, uint _char_index, render_mode _rmode) {
+  std::unique_lock lk{mutex_};
+  auto             it = cache_.find(_char_index);
+  if (it == cache_.end()) {
+    auto result = cache_.emplace(_char_index, load_internal(_atlas, _char_index, _rmode));
+    assert(result.second);
+    it = result.first;
+  }
+  return it->second;
+}
+
+void font::reset_to_size(const size_px<uint> &_size) {
+  HUT_PROFILE_SCOPE(PFONT, "font::font::reset_to_size")
+  std::unique_lock lk{mutex_};
+  cache_.clear();
+  FT_Set_Pixel_Sizes(face_, 0, _size.value_);
+
+  if (font_)
+    hb_font_destroy(font_);
+  font_ = hb_ft_font_create(face_, nullptr);
+  hb_ft_font_set_funcs(font_);
+  hb_ft_font_set_load_flags(font_, load_flags_);
 }

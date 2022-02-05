@@ -202,14 +202,13 @@ class display {
   friend class offscreen;
   friend class window;
   friend class image;
-  friend class details::buffer_page_data;
+  friend struct details::buffer_page_data;
 
  public:
-  using clock          = std::chrono::steady_clock;
-  using time_point     = clock::time_point;
-  using duration       = clock::duration;
-  using callback       = std::function<void(time_point)>;
-  using scheduled_item = std::tuple<callback, duration>;
+  using clock      = std::chrono::steady_clock;
+  using time_point = clock::time_point;
+  using duration   = clock::duration;
+  using callback   = std::function<void(time_point)>;
 
   display() = delete;
 
@@ -294,47 +293,47 @@ class display {
   void        postflush_collect(buffer_suballoc<u8> &&_callback);
 
   struct buffer_copy : public VkBufferCopy {
-    VkBuffer source;
-    VkBuffer destination;
+    VkBuffer source_;
+    VkBuffer destination_;
   };
 
   struct buffer_zero {
-    VkBuffer     destination;
-    VkDeviceSize size;
-    VkDeviceSize offset;
+    VkBuffer     destination_;
+    VkDeviceSize size_;
+    VkDeviceSize offset_;
   };
 
-  struct buffer2image_copy : public VkBufferImageCopy {
-    VkBuffer source;
-    VkImage  destination;
-    uint     bytesSize;
+  struct buffer_image_copy : public VkBufferImageCopy {
+    VkBuffer source_;
+    VkImage  destination_;
+    uint     bytes_size_;
   };
 
   struct image_copy : public VkImageCopy {
-    VkImage source;
-    VkImage destination;
+    VkImage source_;
+    VkImage destination_;
   };
 
   struct image_clear {
-    VkImage           destination;
-    VkClearColorValue color;
+    VkImage           destination_;
+    VkClearColorValue color_;
   };
 
   struct image_transition {
-    VkImage       destination;
-    VkImageLayout oldLayout, newLayout;
+    VkImage       destination_;
+    VkImageLayout old_layout_, new_layout_;
   };
 
   void stage_copy(const buffer_copy &_info);
   void stage_zero(const buffer_zero &_info);
 
   void stage_copy(const image_copy &_info);
-  void stage_copy(const buffer2image_copy &_info);
+  void stage_copy(const buffer_image_copy &_info);
   void stage_transition(const image_transition &_info, VkImageSubresourceRange _range);
   void stage_clear(const image_clear &_info, VkImageSubresourceRange _range);
 
   static void transition_image(VkCommandBuffer _cb, VkImage _image, VkImageSubresourceRange _range,
-                               VkImageLayout _oldLayout, VkImageLayout _newLayout);
+                               VkImageLayout _old_layout, VkImageLayout _new_layout);
 
   std::list<callback> posted_jobs_;
   std::mutex          posted_mutex_;
@@ -382,12 +381,15 @@ class display {
 
     wl_cursor *cursor_ = nullptr;
     size_t     frame_  = 0;
+
+    explicit animate_cursor_context(display &_parent)
+        : display_(_parent) {}
   };
-  void        cursor(cursor_type _c, int _scale);
-  void        cursor_frame(wl_cursor *_cursor, size_t _frame);
-  void        animate_cursor(wl_cursor *_cursor);
-  static void animate_cursor_thread(animate_cursor_context *_ctx);
-  static void cursor_themes_load(animate_cursor_context *_ctx);
+  void             cursor(cursor_type _c, u32 _scale);
+  void             cursor_frame(wl_cursor *_cursor, size_t _frame);
+  void             animate_cursor(wl_cursor *_cursor);
+  wl_cursor_theme *cursor_theme_load(u32 _scale);
+  static void      animate_cursor_thread(animate_cursor_context *_ctx);
 
   struct keyboard_repeat_context {
     display                &display_;
@@ -396,13 +398,16 @@ class display {
     std::condition_variable cv_;
     bool                    stop_request_ = false;
 
-    duration   delay_;
-    duration   sleep_;
-    char32_t   key_ = 0;
+    duration   delay_ = duration::zero();
+    duration   sleep_ = duration::zero();
+    char32_t   key_   = 0;
     time_point start_;
+
+    explicit keyboard_repeat_context(display &_parent)
+        : display_(_parent) {}
   };
   void        keyboard_repeat(char32_t _c);
-  static void keyboard_repeat_thread(keyboard_repeat_context *_ctx);
+  static void keyboard_repeat_thread(keyboard_repeat_context *_tp);
 
   static keysym map_xkb_keysym(xkb_keysym_t);
 
@@ -429,16 +434,16 @@ class display {
   u32 last_mouse_enter_serial_ = 0;
   u32 last_mouse_click_serial_ = 0;
 
-  std::unordered_map<wl_output *, int> outputs_scale_;
+  std::unordered_map<wl_output *, u32> outputs_scale_;
 
   std::pair<wl_surface *, window *> pointer_current_{nullptr, nullptr};
   std::pair<wl_surface *, window *> keyboard_current_{nullptr, nullptr};
   keyboard_repeat_context           keyboard_repeat_ctx_;
 
-  std::atomic<wl_cursor_theme *> cursor_theme_       = nullptr;
-  std::atomic<wl_cursor_theme *> cursor_theme_hidpi_ = nullptr;
-  wl_surface                    *cursor_surface_     = nullptr;
-  animate_cursor_context         animate_cursor_ctx_;
+  std::mutex                                  cursor_themes_mutex_;
+  std::unordered_map<uint, wl_cursor_theme *> cursor_themes_;
+  wl_surface                                 *cursor_surface_ = nullptr;
+  animate_cursor_context                      animate_cursor_ctx_;
 
   wl_data_device_manager *data_device_manager_ = nullptr;
   wl_data_device         *data_device_         = nullptr;

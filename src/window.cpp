@@ -78,6 +78,7 @@ void window::invalidate(bool _redraw) {
 }
 
 void window::destroy_vulkan() {
+  HUT_PROFILE_FUN(PWINDOW)
   if (surface_ == VK_NULL_HANDLE)
     return;
 
@@ -106,24 +107,24 @@ void window::destroy_vulkan() {
 }
 
 VkPresentModeKHR select_best_mode(const std::span<VkPresentModeKHR> &_modes, bool _vsync_only) {
-  constexpr VkPresentModeKHR preferred_tearing_modes[] = {
+  constexpr VkPresentModeKHR PREFERRED_TEARING_MODES[] = {
       VK_PRESENT_MODE_IMMEDIATE_KHR,
       VK_PRESENT_MODE_MAILBOX_KHR,
   };
-  constexpr VkPresentModeKHR preferred_vsync_modes[] = {
+  constexpr VkPresentModeKHR PREFERRED_VSYNC_MODES[] = {
       VK_PRESENT_MODE_FIFO_RELAXED_KHR,
       VK_PRESENT_MODE_FIFO_KHR,
   };
 
   if (!_vsync_only) {
-    for (const auto &preferred_mode : preferred_tearing_modes) {
+    for (const auto &preferred_mode : PREFERRED_TEARING_MODES) {
       for (const auto &mode : _modes) {
         if (mode == preferred_mode)
           return preferred_mode;
       }
     }
   }
-  for (const auto &preferred_mode : preferred_vsync_modes) {
+  for (const auto &preferred_mode : PREFERRED_VSYNC_MODES) {
     for (const auto &mode : _modes) {
       if (mode == preferred_mode)
         return preferred_mode;
@@ -134,7 +135,7 @@ VkPresentModeKHR select_best_mode(const std::span<VkPresentModeKHR> &_modes, boo
 }
 
 void window::init_vulkan_surface() {
-  HUT_PROFILE_SCOPE(PWINDOW, "window::init_vulkan_surface");
+  HUT_PROFILE_FUN(PWINDOW)
   if (surface_ == VK_NULL_HANDLE)
     return;
 
@@ -150,10 +151,10 @@ void window::init_vulkan_surface() {
 
   VkSurfaceCapabilitiesKHR capabilities = {};
   HUT_PVK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR, pdevice, surface_, &capabilities);
-  if (capabilities.currentExtent.width != std::numeric_limits<u32>::max()) {
+  if (capabilities.currentExtent.width != numax_v<u32>) {
     swapchain_extents_ = capabilities.currentExtent;
   } else {
-    swapchain_extents_ = {size_.x, size_.y};
+    swapchain_extents_ = {u32(size_.x * scale_), u32(size_.y * scale_)};
   }
   swapchain_extents_.width  = std::max(capabilities.minImageExtent.width,
                                        std::min(capabilities.maxImageExtent.width, swapchain_extents_.width));
@@ -278,13 +279,13 @@ void window::init_vulkan_surface() {
 }
 
 void window::redraw(display::time_point _tp) {
-  HUT_PROFILE_SCOPE(PWINDOW, "window::redraw");
+  HUT_PROFILE_FUN(PWINDOW)
   if (swapchain_ == VK_NULL_HANDLE)
     return;
 
   u32      imageIndex;
-  VkResult result = HUT_PVK(vkAcquireNextImageKHR, display_.device_, swapchain_, std::numeric_limits<u64>::max(),
-                            sem_available_, VK_NULL_HANDLE, &imageIndex);
+  VkResult result = HUT_PVK(vkAcquireNextImageKHR, display_.device_, swapchain_, numax_v<u64>, sem_available_,
+                            VK_NULL_HANDLE, &imageIndex);
 
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
     init_vulkan_surface();
@@ -346,15 +347,17 @@ void window::redraw(display::time_point _tp) {
 
   cbs_.clear();
 
-  constexpr auto min_frame_time = 1000ms / 144.f;
-  constexpr auto max_frame_time = 1000ms / 10.f;
+  constexpr auto MIN_FRAME_TIME = 1000ms / 144.f;
+  constexpr auto MAX_FRAME_TIME = 1000ms / 10.f;
   auto           done           = display::clock::now();
   auto           diff_frame     = done - last_frame_;
-  if (diff_frame > max_frame_time) {
+  if (diff_frame > MAX_FRAME_TIME) {
 #ifdef HUT_ENABLE_VALIDATION_DEBUG
-    std::cout << "Frame overbudget " << diff_frame << " > " << max_frame_time << std::endl;
+    std::cout << "Frame overbudget " << diff_frame << " > " << MAX_FRAME_TIME << std::endl;
 #endif
+#ifdef HUT_ENABLE_PROFILING
     profiling::threads_data::request_dump();
+#endif  // HUT_ENABLE_PROFILING
   }
 #ifdef HUT_PROFILE_BOOT
   static bool profile_boot_dumped = false;

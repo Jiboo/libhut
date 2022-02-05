@@ -123,8 +123,8 @@ int main(int, char **) {
       }
       ImGui::SliderScalar("Corner radius", ImGuiDataType_U16, &custom_radius, &extra_min, &extra_max);
       ImGui::SliderScalar("Corner softness", ImGuiDataType_U16, &custom_softness, &extra_min, &extra_max);
-      constexpr const char *gradients[] = {"T2B", "L2R", "TL2BT", "TR2BL"};
-      ImGui::Combo("Gradient", &custom_gradient, gradients, 4);
+      constexpr const char *GRADIENTS[] = {"T2B", "L2R", "TL2BT", "TR2BL"};
+      ImGui::Combo("Gradient", &custom_gradient, GRADIENTS, 4);
       ImGui::Checkbox("Use texture", &custom_use_tex);
 
       ImGui::Separator();
@@ -146,17 +146,18 @@ int main(int, char **) {
       ImGui::Checkbox("Grid no feather/corner", &grid_no_params);
 
       auto iupdator = quads.update();
-      for (int i = 0; i < quads.size() - 1; i++) {
-        auto line = i / 15;
-        auto col  = i % 15;
-        auto bbox = make_bbox_with_origin_size(u16vec2{8} + u16vec2{col * (grid_size.x + 8), line * (grid_size.y + 8)},
-                                               grid_size);
-        render2d::set(iupdator[i], bbox, grid_fixed_colors ? custom_col_from : rand_color(),
+      u16  scale    = win.scale();
+      for (unsigned i = 0; i < quads.size() - 1; i++) {
+        auto    line = i / 15;
+        auto    col  = i % 15;
+        u16vec4 bbox = make_bbox_with_origin_size(
+            u16vec2{8} + u16vec2{col * (grid_size.x + 8), line * (grid_size.y + 8)}, grid_size);
+        render2d::set(iupdator[i], bbox * scale, grid_fixed_colors ? custom_col_from : rand_color(),
                       grid_fixed_colors ? custom_col_to : rand_color(),
                       grid_fixed_gradient ? render2d::gradient(custom_gradient) : render2d::gradient(i % 4),
                       grid_no_params ? 0 : col, grid_no_params ? 0 : line, grid_use_tex ? tex : shared_subimage{});
       }
-      render2d::set(iupdator[quads.size() - 1], custom_bbox, custom_col_from, custom_col_to,
+      render2d::set(iupdator[quads.size() - 1], custom_bbox * scale, custom_col_from, custom_col_to,
                     render2d::gradient(custom_gradient), custom_radius, custom_softness,
                     custom_use_tex ? tex : shared_subimage{});
 
@@ -176,6 +177,10 @@ int main(int, char **) {
 
     ImGui::Render();
     ImGui_ImplHut_RenderDrawData(_buffer, ImGui::GetDrawData());
+    return false;
+  });
+  win.on_frame.connect([&](display::duration _dt) {
+    dsp.post([&](auto) { win.invalidate(true); });
     return false;
   });
 

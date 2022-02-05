@@ -1,3 +1,18 @@
+Storage
+-------
+
+Most GPU data will be stored in `buffer`.
+This class manages a collection of VkBuffer, aka "pages", you create the buffer with an initial size and then you may
+sub-allocate it with a couple of `buffer::allocate()` calls. If your alloc doesn't fit in current pages another one
+will be allocated, so in theory you could have enough with one buffer instance, although all pages share the same
+vulkan memory usage and type flags.
+
+Similarly to the `buffer` the `atlas` class manages a collection of sub-allocatable texture atlas, when your next
+allocation does not fit, another page/`image` (wrapper for `VkImage`) is added to the atlas.
+
+Updators
+--------
+
 An updator allows to avoid an allocation when updating an image/buffer by giving direct access to a memory mapped
 staging buffer allocation.
 

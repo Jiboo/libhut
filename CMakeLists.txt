@@ -20,14 +20,15 @@ option(HUT_COMPILE_UNITTESTS "Compile all unit tests" TRUE)
 ###########################################################
 # Debug
 ###########################################################
-#set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_TIME_EVENTS)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_PROFILING)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_VALIDATION_DEBUG)
+#set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_ENABLE_TIME_EVENTS)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_PROFILE_BOOT)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_DEBUG_STAGING)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_DEBUG_WL_DATA_LISTENERS)
 #set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DHUT_PREFER_NONDESCRETE_DEVICES)
+#set(GLSLANG_VALIDATOR_FLAGS "-g")
 
 ###########################################################
 # Compile/link flags
@@ -38,6 +39,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_COMPILE_WARNING_MODE HIGH)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -v")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
 ###########################################################
 # Checking for required dependencies...
@@ -49,7 +51,6 @@ include(dep/imgui.cmake)
 include(dep/spirv_reflect.cmake)
 
 find_program(GLSLANG_VALIDATOR glslangValidator REQUIRED)
-set(GLSLANG_VALIDATOR_FLAGS "")
 
 find_package(Threads REQUIRED)
 set(HUT_LIBS ${HUT_LIBS} ${CMAKE_THREAD_LIBS_INIT})
@@ -343,7 +344,6 @@ endfunction()
 if (HUT_COMPILE_SAMPLES)
   hut_add_test(NAME hut_sample_3d PATH tst/samples/sample_3d.cpp DEPENDENCIES hut_tst_data_shaders)
   hut_add_test(NAME hut_sample_imgui PATH tst/samples/sample_imgui.cpp DEPENDENCIES hut_imgui)
-  hut_add_test(NAME hut_sample_pipelines PATH tst/samples/sample_pipelines.cpp DEPENDENCIES hut_imgdec hut_tst_data_shaders hut_tst_data_png)
 endif ()
 
 if (HUT_COMPILE_PLAYGROUNDS)

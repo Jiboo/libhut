@@ -57,16 +57,16 @@ void renderer::draw(VkCommandBuffer _buffer) {
   }
 }
 
-suballoc<instance, batch> renderer::allocate(uint _count, uint _align) {
+suballoc<instance, batch> renderer::allocate(uint _count) {
   uint size_bytes = sizeof(instance) * _count;
   for (auto &batch : batches_) {
-    auto fit = batch.suballocator_.pack(size_bytes, _align);
+    auto fit = batch.suballocator_.pack(_count);
     if (fit)
       return {&batch, *fit, size_bytes};
   }
 
-  auto &new_batch = grow(std::max<uint>(size_bytes, batches_.back().size() * 2));
-  auto  fit       = new_batch.suballocator_.pack(size_bytes, _align);
+  auto &new_batch = grow(std::max<uint>(_count, batches_.back().size() * 2));
+  auto  fit       = new_batch.suballocator_.pack(_count);
   assert(fit);
 
   return {&new_batch, *fit, size_bytes};

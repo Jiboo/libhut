@@ -47,11 +47,9 @@ IMGUI_IMPL_API void        ImGui_ImplHut_RemImage(ImTextureID);
 
 // Callbacks (installed by default if you enable 'install_callbacks' during initialization)
 // You can also handle inputs yourself and use those as a reference.
-IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnResize(hut::uvec2 _size);
+IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnResize(hut::u16vec2 _size, hut::u32 _scale);
 IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnMouse(hut::u8 _button, hut::mouse_event_type _type, hut::vec2 _pos);
 IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnKey(hut::keycode _kcode, hut::keysym _ksym, bool _down);
-IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnKMods(hut::modifiers _mods);
-IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnChar(char32_t _utf32_char);
 IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnChar(char32_t _utf32_char);
 IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnBlur();
 IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnFocus();
@@ -79,7 +77,7 @@ bool ImGui_HutFlagSelect(const char *_label, typename TFlagged::enum_type *_valu
   bool changed = false;
   int  val     = *_value;
   ImGui::Text("%s: ", _label);
-  for (typename TFlagged::underlying_type i = 0; i <= TFlagged::enum_end; i++) {
+  for (typename TFlagged::underlying_type i = 0; i <= TFlagged::ENUM_END; i++) {
     ImGui::SameLine();
     changed |= ImGui::RadioButton(_name_cb(static_cast<typename TFlagged::enum_type>(i)), &val, i);
   }
@@ -91,14 +89,13 @@ template<typename TFlagged>
 bool ImGui_HutFlagReorder(const char *_label, typename TFlagged::enum_type *_values,
                           const char *(*_name_cb)(typename TFlagged::enum_type)) {
   ImGui::Text("%s: ", _label);
-  for (typename TFlagged::underlying_type i = 0; i <= TFlagged::enum_end; i++) {
+  for (typename TFlagged::underlying_type i = 0; i <= TFlagged::ENUM_END; i++) {
     ImGui::Selectable(_name_cb(_values[i]));
     if (ImGui::IsItemActive() && !ImGui::IsItemHovered()) {
-      int next = i + (ImGui::GetMouseDragDelta(0).y < 0.f ? -1 : 1);
-      if (next >= 0 && next <= TFlagged::enum_end) {
+      hut::i64 next = i + (ImGui::GetMouseDragDelta(0).y < 0.f ? -1 : 1);
+      if (next >= 0 && next <= hut::i64(TFlagged::ENUM_END)) {
         std::swap(_values[i], _values[next]);
         ImGui::ResetMouseDragDelta();
-        //return true;
       }
     }
   }

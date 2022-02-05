@@ -40,6 +40,7 @@ using namespace hut::details;
 buffer_page_data::buffer_page_data(buffer &_parent, uint _size)
     : parent_(&_parent)
     , suballocator_(_size) {
+  HUT_PROFILE_FUN(PBUFFER, _size)
   VkBufferCreateInfo create_info = {};
   create_info.sType              = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   create_info.size               = _size;
@@ -47,7 +48,7 @@ buffer_page_data::buffer_page_data(buffer &_parent, uint _size)
   create_info.sharingMode        = VK_SHARING_MODE_EXCLUSIVE;
 
   auto device = _parent.display_.device();
-  if (vkCreateBuffer(device, &create_info, nullptr, &buffer_) != VK_SUCCESS) {
+  if (HUT_PVK(vkCreateBuffer, device, &create_info, nullptr, &buffer_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create buffer!");
   }
 
@@ -78,6 +79,7 @@ buffer_page_data::buffer_page_data(buffer &_parent, uint _size)
 
 buffer_page_data::~buffer_page_data() {
   if (parent_) {
+    HUT_PROFILE_FUN(PBUFFER)
     auto device = parent_->display_.device();
 
     if (permanent_map_)
@@ -96,6 +98,7 @@ buffer::buffer(display &_display, uint _size, const buffer_params &_params)
 }
 
 buffer_suballoc<u8> buffer::allocate_raw(uint _size_bytes, uint _align) {
+  HUT_PROFILE_FUN(PBUFFER, _size_bytes, _align)
   for (auto &page : pages_) {
     auto fit = page.suballocator_.pack(_size_bytes, _align);
     if (fit)
@@ -110,12 +113,14 @@ buffer_suballoc<u8> buffer::allocate_raw(uint _size_bytes, uint _align) {
 }
 
 void buffer_page_data::release_impl(buffer_suballoc<u8> *_suballoc) {
+  HUT_PROFILE_FUN(PBUFFER)
   assert(parent_);
   assert(_suballoc->parent_ == this);
   suballocator_.offer(_suballoc->offset_bytes());
 }
 
 buffer_updator<u8> buffer_page_data::update_raw_impl(uint _offset_bytes, uint _size_bytes) {
+  HUT_PROFILE_FUN(PBUFFER, _offset_bytes, _size_bytes)
   assert(parent_);
   auto         &display = parent_->display_;
   auto          lk      = std::lock_guard{display.staging_mutex_};
@@ -125,16 +130,17 @@ buffer_updator<u8> buffer_page_data::update_raw_impl(uint _offset_bytes, uint _s
 }
 
 void buffer_page_data::finalize_impl(buffer_updator<u8> *_updator) {
+  HUT_PROFILE_FUN_NAMED(PBUFFER, ("offset", "size"), _updator->offset_bytes(), _updator->size_bytes())
   assert(parent_);
   assert(_updator->parent_ == this);
   auto &display = parent_->display_;
 
-  auto copy        = display::buffer_copy{};
-  copy.size        = _updator->size_bytes();
-  copy.srcOffset   = _updator->staging_alloc_.offset_bytes();
-  copy.source      = _updator->staging_alloc_.parent_->buffer_;
-  copy.dstOffset   = _updator->offset_bytes();
-  copy.destination = buffer_;
+  auto copy         = display::buffer_copy{};
+  copy.size         = _updator->size_bytes();
+  copy.srcOffset    = _updator->staging_alloc_.offset_bytes();
+  copy.source_      = _updator->staging_alloc_.parent_->buffer_;
+  copy.dstOffset    = _updator->offset_bytes();
+  copy.destination_ = buffer_;
 
   std::lock_guard lk(display.staging_mutex_);
   display.staging_jobs_++;
@@ -146,11 +152,12 @@ void buffer_page_data::finalize_impl(buffer_updator<u8> *_updator) {
 }
 
 void buffer_page_data::zero_raw(uint _offset_bytes, uint _size_bytes) {
+  HUT_PROFILE_FUN(PBUFFER, _offset_bytes, _size_bytes)
   assert(parent_);
   display::buffer_zero zero = {};
-  zero.size                 = _size_bytes;
-  zero.offset               = _offset_bytes;
-  zero.destination          = buffer_;
+  zero.size_                = _size_bytes;
+  zero.offset_              = _offset_bytes;
+  zero.destination_         = buffer_;
 
   auto &dsp = parent_->display_;
   dsp.staging_jobs_++;

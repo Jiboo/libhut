@@ -47,11 +47,11 @@ void window::handle_xdg_configure(void *_data, xdg_surface *, u32 _serial) {
 void window::handle_toplevel_configure(void *_data, xdg_toplevel *, i32 _width, i32 _height, wl_array *_states) {
   auto *w = static_cast<window *>(_data);
   if (_width > 0 && _height > 0) {
-    uvec2 new_size{_width, _height};
+    u16vec2 new_size{_width, _height};
     if (new_size != w->size_) {
       w->size_ = new_size;
       w->init_vulkan_surface();
-      HUT_PROFILE_EVENT(w, on_resize, new_size);
+      HUT_PROFILE_EVENT(w, on_resize, new_size, w->scale_);
     }
   }
   std::span<xdg_toplevel_state> states{reinterpret_cast<xdg_toplevel_state *>(_states->data),
@@ -74,9 +74,8 @@ void window::handle_toplevel_close(void *_data, xdg_toplevel *) {
 }
 
 void window::trigger_scale() {
-  constexpr int int_max = std::numeric_limits<int>::max();
-  int           scale   = int_max;
-  auto         &scales  = display_.outputs_scale_;
+  u32   scale  = numax_v<u32>;
+  auto &scales = display_.outputs_scale_;
   if (scales.empty()) {
     scale = 1;
   } else {
@@ -85,11 +84,12 @@ void window::trigger_scale() {
       scale = std::min(scale, scales[output]);
     }
   }
-  if (scale != last_sent_scale_ && scale != int_max) {
+  if (scale != scale_ && scale != numax_v<u32>) {
+    scale_ = scale;
     display_.cursor(current_cursor_type_, scale);
-    if (!HUT_PROFILE_EVENT(this, on_scale, scale))
-      wl_surface_set_buffer_scale(wayland_surface_, scale);
-    last_sent_scale_ = scale;
+    wl_surface_set_buffer_scale(wayland_surface_, int(scale));
+    init_vulkan_surface();
+    HUT_PROFILE_EVENT(this, on_resize, size_, scale);
   }
 }
 
@@ -116,6 +116,7 @@ window::window(display &_display, const window_params &_init_params)
     , display_(_display)
     , params_(_init_params)
     , size_(_init_params.size_) {
+  HUT_PROFILE_FUN(PWAYLAND)
   static const wl_surface_listener   wl_surface_listeners   = {surface_enter, surface_leave};
   static const xdg_surface_listener  xdg_surface_listeners  = {handle_xdg_configure};
   static const xdg_toplevel_listener xdg_toplevel_listeners = {handle_toplevel_configure, handle_toplevel_close};
@@ -158,11 +159,13 @@ window::window(display &_display, const window_params &_init_params)
 }
 
 window::~window() {
+  HUT_PROFILE_FUN(PWAYLAND)
   close();
 }
 
 void window::close() {
   if (window_ != nullptr) {
+    HUT_PROFILE_FUN(PWAYLAND)
     display_.windows_.erase(wayland_surface_);
     display_.pointer_current_ = {nullptr, nullptr};
 
@@ -177,6 +180,7 @@ void window::close() {
 }
 
 void window::title(std::u8string_view _title) {
+  HUT_PROFILE_FUN(PWAYLAND)
   assert(_title.size() < 1024);
   char buffer[1024];
   auto min = std::min(_title.size(), sizeof(buffer) - 1);
@@ -216,7 +220,7 @@ void window::invalidate(const uvec4 &, bool _redraw) {
 
 void window::cursor(cursor_type _c) {
   current_cursor_type_ = _c;
-  display_.cursor(_c, last_sent_scale_);
+  display_.cursor(_c, scale_);
 }
 
 void window::clipboard_data_source_handle_send(void *_data, wl_data_source *_source, const char *_mime, i32 _fd) {
@@ -277,6 +281,7 @@ void window::clipboard_offer(clipboard_formats _supported_formats, send_clipboar
          clipboard_data_source_handle_cancelled,    clipboard_data_source_handle_dnd_drop_performed,
          clipboard_data_source_handle_dnd_finished, clipboard_data_source_handle_action};
 
+  HUT_PROFILE_FUN(PWAYLAND)
   if (!display_.data_device_manager_ || !display_.data_device_)
     return;
 
@@ -303,6 +308,7 @@ bool window::clipboard_receive(clipboard_formats _supported_formats, receive_cli
   std::cout << "window::clipboard_receive" << std::endl;
 #endif
 
+  HUT_PROFILE_FUN(PWAYLAND)
   if (display_.last_offer_from_clipboard_ == nullptr)
     return false;
 
@@ -334,6 +340,7 @@ void window::drag_data_source_handle_send(void *_data, wl_data_source *_source, 
 #ifdef HUT_DEBUG_WL_DATA_LISTENERS
   std::cout << "drag_data_source_handle_send " << _source << ", " << _mime << std::endl;
 #endif
+
   auto *w      = (window *)_data;
   auto  format = mime_type_format(_mime);
   if (format) {
@@ -352,6 +359,7 @@ void window::drag_data_source_handle_target(void *_data, wl_data_source *_source
 #ifdef HUT_DEBUG_WL_DATA_LISTENERS
   //std::cout << "drag_data_source_handle_target " << _source << ", " << (_mime ? _mime : "<nullptr>") << std::endl;
 #endif
+
   auto *w = (window *)_data;
   if (_mime == nullptr) {
     auto it = w->dragndrop_async_writers_.find(_source);
@@ -378,6 +386,7 @@ void window::drag_data_source_handle_cancelled(void *_data, wl_data_source *_sou
 #ifdef HUT_DEBUG_WL_DATA_LISTENERS
   std::cout << "drag_data_source_handle_cancelled " << _source << std::endl;
 #endif
+
   auto *w  = (window *)_data;
   auto  it = w->dragndrop_async_writers_.find(_source);
   assert(it != w->dragndrop_async_writers_.end());
@@ -395,6 +404,7 @@ void window::drag_data_source_handle_dnd_finished(void *_data, wl_data_source *_
 #ifdef HUT_DEBUG_WL_DATA_LISTENERS
   std::cout << "drag_data_source_handle_dnd_finished " << _source << std::endl;
 #endif
+
   auto *w  = (window *)_data;
   auto  it = w->dragndrop_async_writers_.find(_source);
   assert(it != w->dragndrop_async_writers_.end());
@@ -409,6 +419,7 @@ void window::dragndrop_start(dragndrop_actions _supported_actions, clipboard_for
          drag_data_source_handle_cancelled,    drag_data_source_handle_dnd_drop_performed,
          drag_data_source_handle_dnd_finished, drag_data_source_handle_action};
 
+  HUT_PROFILE_FUN(PWAYLAND)
   if (!display_.data_device_manager_ || !display_.data_device_)
     return;
   if (!_supported_formats)
@@ -434,7 +445,7 @@ void window::dragndrop_start(dragndrop_actions _supported_actions, clipboard_for
     }
   }
   wl_data_source_set_actions(source, wl_actions);
-  display_.cursor(CGRABBING, last_sent_scale_);
+  display_.cursor(CGRABBING, scale_);
 
   assert(display_.last_mouse_click_serial_ != 0);
   wl_data_device_start_drag(display_.data_device_, source, wayland_surface_, nullptr,

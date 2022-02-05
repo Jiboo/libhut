@@ -39,34 +39,36 @@
 using namespace hut;
 
 sampler::sampler(display &_display, const sampler_params &_params)
-    : device_(_display.device())
-    , sampler_(VK_NULL_HANDLE) {
-  VkSamplerCreateInfo samplerInfo     = {};
-  samplerInfo.sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-  samplerInfo.magFilter               = _params.filter_;
-  samplerInfo.minFilter               = _params.filter_;
-  samplerInfo.addressModeU            = _params.addressMode_;
-  samplerInfo.addressModeV            = _params.addressMode_;
-  samplerInfo.addressModeW            = _params.addressMode_;
-  bool enable_filtering               = _params.anisotropy_ && _display.features().samplerAnisotropy;
-  samplerInfo.anisotropyEnable        = enable_filtering ? VK_TRUE : VK_FALSE;
-  samplerInfo.maxAnisotropy           = enable_filtering ? _display.properties().limits.maxSamplerAnisotropy : 0;
-  samplerInfo.borderColor             = VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
-  samplerInfo.unnormalizedCoordinates = VK_FALSE;
-  samplerInfo.compareEnable           = VK_FALSE;
-  samplerInfo.compareOp               = VK_COMPARE_OP_NEVER;
-  samplerInfo.mipmapMode
+    : sampler_(VK_NULL_HANDLE)
+    , device_(_display.device()) {
+  HUT_PROFILE_FUN(PSAMPLER)
+  VkSamplerCreateInfo sampler_info     = {};
+  sampler_info.sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+  sampler_info.magFilter               = _params.filter_;
+  sampler_info.minFilter               = _params.filter_;
+  sampler_info.addressModeU            = _params.addressMode_;
+  sampler_info.addressModeV            = _params.addressMode_;
+  sampler_info.addressModeW            = _params.addressMode_;
+  bool enable_filtering                = _params.anisotropy_ && _display.features().samplerAnisotropy;
+  sampler_info.anisotropyEnable        = enable_filtering ? VK_TRUE : VK_FALSE;
+  sampler_info.maxAnisotropy           = enable_filtering ? _display.properties().limits.maxSamplerAnisotropy : 0;
+  sampler_info.borderColor             = VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
+  sampler_info.unnormalizedCoordinates = VK_FALSE;
+  sampler_info.compareEnable           = VK_FALSE;
+  sampler_info.compareOp               = VK_COMPARE_OP_NEVER;
+  sampler_info.mipmapMode
       = _params.filter_ == VK_FILTER_NEAREST ? VK_SAMPLER_MIPMAP_MODE_NEAREST : VK_SAMPLER_MIPMAP_MODE_LINEAR;
-  samplerInfo.mipLodBias = _params.lodBias_;
-  samplerInfo.minLod     = _params.lodRange_.x;
-  samplerInfo.maxLod     = _params.lodRange_.y;
-  if (vkCreateSampler(device_, &samplerInfo, nullptr, &sampler_) != VK_SUCCESS) {
+  sampler_info.mipLodBias = _params.lodBias_;
+  sampler_info.minLod     = _params.lodRange_.x;
+  sampler_info.maxLod     = _params.lodRange_.y;
+  if (vkCreateSampler(device_, &sampler_info, nullptr, &sampler_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create texture sampler!");
   }
 }
 
 sampler::~sampler() {
   if (sampler_) {
+    HUT_PROFILE_FUN(PSAMPLER)
     HUT_PVK(vkDeviceWaitIdle, device_);
     HUT_PVK(vkDestroySampler, device_, sampler_, nullptr);
   }

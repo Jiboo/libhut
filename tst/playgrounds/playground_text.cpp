@@ -25,7 +25,7 @@
  * SOFTWARE.
  */
 
-#define HUT_TEXT_SAMPLE_ENABLE_IMGUI
+//#define HUT_TEXT_SAMPLE_ENABLE_IMGUI
 
 #include <random>
 
@@ -62,8 +62,9 @@ int main(int, char **) {
   ubo->set(common_ubo{win.size()});
   auto fontatlas
       = std::make_shared<atlas>(dsp, image_params{.size_ = dsp.max_tex_size(), .format_ = VK_FORMAT_R8_UNORM});
-  auto samp = std::make_shared<sampler>(dsp);
-  auto font = std::make_shared<text::font>(tst_woff2::Roboto_Regular_woff2, 15);
+  auto           samp      = std::make_shared<sampler>(dsp);
+  constexpr auto FONT_SIZE = 16_px;
+  auto           font      = std::make_shared<text::font>(tst_woff2::Roboto_Regular_woff2, FONT_SIZE);
 
 #ifdef HUT_TEXT_SAMPLE_ENABLE_IMGUI
   IMGUI_CHECKVERSION();
@@ -80,8 +81,9 @@ int main(int, char **) {
   text::renderer r(win, buf, font, ubo, fontatlas, samp, params);
 
   char8_t text_input[1024 * 1024]
-      = u8"\n"
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur semper auctor blandit. Donec ut est quis "
+      = u8"Lorem"
+        " ipsum"
+        " dolor sit amet, consectetur adipiscing elit. Curabitur semper auctor blandit. Donec ut est quis "
         "augue dapibus malesuada. Proin ac nulla in lectus placerat efficitur. Phasellus eget erat dolor. Maecenas "
         "viverra ultrices arcu, interdum tincidunt nulla vehicula non. Sed ac justo eu tortor facilisis semper in a "
         "metus. Pellentesque nec purus nulla.\n"
@@ -1099,7 +1101,8 @@ int main(int, char **) {
         "arcu, in sollicitudin libero aliquam ac. Donec a justo sit amet risus maximus bibendum a id ex. Aliquam ac "
         "mauris blandit, consectetur libero faucibus, hendrerit turpis. Vestibulum sed nulla cursus, dictum nisi vel, "
         "commodo tellus. Nam placerat orci a nisl porta mollis. Nam sed tempor arcu. Morbi vehicula quam quis arcu "
-        "elementum, sit amet laoreet tortor commodo. Ut eu vehicula leo. Nam imperdiet, nibh nec pretium nulla.";
+        "elementum, sit amet laoreet tortor commodo. Ut eu vehicula leo. Nam imperdiet, nibh nec pretium nulla."
+      ;
 
   std::vector<std::u8string_view> words{16000};
 
@@ -1119,13 +1122,20 @@ int main(int, char **) {
   auto before_alloc   = clock::now();
   auto paragraph      = r.allocate(words);
   auto after_alloc    = clock::now();
+  u32  current_scale  = win.scale();
 
-  auto relayout = [&paragraph](uvec2 _size) {
-    const auto     win_width   = _size.x;
-    constexpr uint line_height = 16;
-    constexpr uint space_width = 6;
-    uvec2          offset      = {0, line_height - 3};
-    auto           staging     = paragraph.instances().update();
+  auto relayout = [&](u16vec2 _size, u32 _scale) {
+    if (_scale != current_scale) {
+      current_scale = _scale;
+      font->reset_to_size(FONT_SIZE * _scale);
+      paragraph.release();
+      paragraph = r.allocate(words);
+    }
+    const auto win_width   = _size.x * _scale;
+    uint       line_height = FONT_SIZE.value_ * _scale;
+    uint       space_width = line_height / 4;
+    uvec2      offset      = {0, line_height};
+    auto       staging     = paragraph.instances().update();
     for (uint i = 0; i < paragraph.size(); i++) {
       const auto bbox       = paragraph.bbox(i);
       const auto line_break = (offset.x + bbox.z) > win_width;
@@ -1133,14 +1143,14 @@ int main(int, char **) {
         offset.x = 0;
         offset.y += line_height;
       }
-      staging[i] = {offset, colors::white};
+      staging[i] = {offset, colors::WHITE};
       offset.x += bbox.z + space_width;
     }
     return false;
   };
 
   auto before_update = clock::now();
-  relayout(win.size());
+  relayout(win.size(), win.scale());
   auto after_update = clock::now();
 
   win.on_draw.connect([&](VkCommandBuffer _buffer) {
@@ -1162,11 +1172,11 @@ int main(int, char **) {
         after_release = clock::now();
 
         before_alloc = clock::now();
-        paragraph    = r.allocate(words);
+        paragraph    = r->allocate(words);
         after_alloc  = clock::now();
 
         before_update = clock::now();
-        relayout(win.size());
+        relayout(win.size(), win.scale());
         after_update = clock::now();
       }
 
@@ -1193,6 +1203,13 @@ int main(int, char **) {
 
     return false;
   });
+
+#ifdef HUT_TEXT_SAMPLE_ENABLE_IMGUI
+  win.on_frame.connect([&](display::duration _dt) {
+    dsp.post([&](auto) { win.invalidate(true); });
+    return false;
+  });
+#endif
 
   win.on_resize.connect(relayout);
 

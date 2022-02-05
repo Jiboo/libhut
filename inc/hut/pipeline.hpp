@@ -70,15 +70,15 @@ struct pipeline_params {
 namespace details {
 template<typename TIndex>
 struct vulkan_index_type {
-  constexpr static VkIndexType type_ = VK_INDEX_TYPE_MAX_ENUM;
+  constexpr static VkIndexType TYPE = VK_INDEX_TYPE_MAX_ENUM;
 };
 template<>
 struct vulkan_index_type<u16> {
-  constexpr static VkIndexType type_ = VK_INDEX_TYPE_UINT16;
+  constexpr static VkIndexType TYPE = VK_INDEX_TYPE_UINT16;
 };
 template<>
 struct vulkan_index_type<u32> {
-  constexpr static VkIndexType type_ = VK_INDEX_TYPE_UINT32;
+  constexpr static VkIndexType TYPE = VK_INDEX_TYPE_UINT32;
 };
 }  // namespace details
 
@@ -124,22 +124,22 @@ class pipeline {
   std::unordered_map<shared_atlas, per_atlas_info> atlas_infos_;
 
   void init_bindings() {
-    const auto &vert_bindings = TVertexRefl::descriptor_bindings_;
+    constexpr auto &VBINDINGS = TVertexRefl::DESCRIPTOR_BINDINGS;
 
-    for (auto vert_binding : vert_bindings) {
-      bindings_.emplace_back(vert_binding);
+    for (auto &VBINDING : VBINDINGS) {
+      bindings_.emplace_back(VBINDING);
     }
 
-    for (auto frag_binding : TFragRefl::descriptor_bindings_) {
+    for (auto &FBINDING : TFragRefl::DESCRIPTOR_BINDINGS) {
       bool in_vert_stage = false;
-      for (int i = 0; i < vert_bindings.size(); i++) {
-        if (frag_binding.binding == vert_bindings[i].binding) {
-          bindings_[i].stageFlags |= frag_binding.stageFlags;
+      for (u32 i = 0; i < VBINDINGS.size(); i++) {
+        if (FBINDING.binding == VBINDINGS[i].binding) {
+          bindings_[i].stageFlags |= FBINDING.stageFlags;
           in_vert_stage = true;
         }
       }
       if (!in_vert_stage)
-        bindings_.emplace_back(frag_binding);
+        bindings_.emplace_back(FBINDING);
     }
   }
 
@@ -205,16 +205,16 @@ class pipeline {
   void init_shaders() {
     VkShaderModuleCreateInfo vert_create_info = {};
     vert_create_info.sType                    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    vert_create_info.codeSize                 = TVertexRefl::bytecode_.size();
-    vert_create_info.pCode                    = (u32 *)TVertexRefl::bytecode_.data();
+    vert_create_info.codeSize                 = TVertexRefl::BYTECODE.size();
+    vert_create_info.pCode                    = (u32 *)TVertexRefl::BYTECODE.data();
 
     if (HUT_PVK(vkCreateShaderModule, device_ref_, &vert_create_info, nullptr, &vert_) != VK_SUCCESS)
       throw std::runtime_error("failed to create vertex module!");
 
     VkShaderModuleCreateInfo frag_create_info = {};
     frag_create_info.sType                    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    frag_create_info.codeSize                 = TFragRefl::bytecode_.size();
-    frag_create_info.pCode                    = (u32 *)TFragRefl::bytecode_.data();
+    frag_create_info.codeSize                 = TFragRefl::BYTECODE.size();
+    frag_create_info.pCode                    = (u32 *)TFragRefl::BYTECODE.data();
 
     if (HUT_PVK(vkCreateShaderModule, device_ref_, &frag_create_info, nullptr, &frag_) != VK_SUCCESS)
       throw std::runtime_error("failed to create fragment module!");
@@ -234,7 +234,7 @@ class pipeline {
   }
 
   void init_pipeline(u16vec4 _default_viewport, VkSampleCountFlagBits _samples, const pipeline_params &_params) {
-    HUT_PROFILE_SCOPE(PPIPELINE, "pipeline({},{})::init_pipeline", TVertexRefl::filename_, TFragRefl::filename_);
+    HUT_PROFILE_SCOPE(PPIPELINE, "pipeline({},{})::init_pipeline", TVertexRefl::FILENAME, TFragRefl::FILENAME)
     auto size   = bbox_size(_default_viewport);
     auto origin = bbox_origin(_default_viewport);
 
@@ -264,8 +264,8 @@ class pipeline {
     vertex_create_info.sType                                = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertex_create_info.vertexBindingDescriptionCount        = vertices_bindings.size();
     vertex_create_info.pVertexBindingDescriptions           = vertices_bindings.data();
-    vertex_create_info.vertexAttributeDescriptionCount      = (u32)TVertexRefl::vertices_description_.size();
-    vertex_create_info.pVertexAttributeDescriptions         = TVertexRefl::vertices_description_.data();
+    vertex_create_info.vertexAttributeDescriptionCount      = (u32)TVertexRefl::VERTICES_DESCRIPTION.size();
+    vertex_create_info.pVertexAttributeDescriptions         = TVertexRefl::VERTICES_DESCRIPTION.data();
 
     VkPipelineInputAssemblyStateCreateInfo assembly_create_info = {};
     assembly_create_info.sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -313,10 +313,10 @@ class pipeline {
     msaa_create_info.alphaToCoverageEnable                = VK_FALSE;
     msaa_create_info.alphaToOneEnable                     = VK_FALSE;
 
-    constexpr uint component_mask
+    constexpr uint COMPONENT_MASK
         = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     VkPipelineColorBlendAttachmentState blend_attachment = {};
-    blend_attachment.colorWriteMask                      = component_mask;
+    blend_attachment.colorWriteMask                      = COMPONENT_MASK;
     blend_attachment.blendEnable                         = _params.enable_blending_;
     blend_attachment.srcColorBlendFactor                 = VK_BLEND_FACTOR_SRC_ALPHA;
     blend_attachment.dstColorBlendFactor                 = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
@@ -393,7 +393,7 @@ class pipeline {
   explicit pipeline(render_target &_target, const pipeline_params &_params = {})
       : device_ref_(_target.parent().device())
       , render_pass_(_target.renderpass()) {
-    HUT_PROFILE_SCOPE(PPIPELINE, "pipeline({},{})::pipeline", TVertexRefl::filename_, TFragRefl::filename_);
+    HUT_PROFILE_SCOPE(PPIPELINE, "pipeline({},{})::pipeline", TVertexRefl::FILENAME, TFragRefl::FILENAME)
     assert(render_pass_ != VK_NULL_HANDLE);
 
     init_bindings();
@@ -650,9 +650,9 @@ class pipeline {
 
   void bind_indices(VkCommandBuffer _buffer, const shared_indices &_indices) {
     assert(_indices);
-    constexpr auto vulkan_index_type = details::vulkan_index_type<index_t>::type_;
-    static_assert(vulkan_index_type != VK_INDEX_TYPE_MAX_ENUM, "Unsupported index type");
-    HUT_PVK(vkCmdBindIndexBuffer, _buffer, _indices->parent()->buffer_, _indices->offset_bytes(), vulkan_index_type);
+    constexpr auto VULKAN_INDEX_TYPE = details::vulkan_index_type<index_t>::TYPE;
+    static_assert(VULKAN_INDEX_TYPE != VK_INDEX_TYPE_MAX_ENUM, "Unsupported index type");
+    HUT_PVK(vkCmdBindIndexBuffer, _buffer, _indices->parent()->buffer_, _indices->offset_bytes(), VULKAN_INDEX_TYPE);
   }
 
   void draw(VkCommandBuffer _buffer, uint _vertex_count, uint _instances_count, uint _vertex_offset,
@@ -680,7 +680,7 @@ class pipeline {
   void draw(VkCommandBuffer _buffer, uint _descriptor_index, const shared_indices &_indices, uint _indices_offset,
             uint _indices_count, const shared_instances &_instances, uint _instances_offset, uint _instances_count,
             const shared_vertices &_vertices, uint _vertex_offset) {
-    HUT_PROFILE_SCOPE(PPIPELINE, "pipeline({},{})::draw", TVertexRefl::filename_, TFragRefl::filename_);
+    HUT_PROFILE_SCOPE(PPIPELINE, "pipeline({},{})::draw", TVertexRefl::FILENAME, TFragRefl::FILENAME)
 
     bind_pipeline(_buffer);
     bind_descriptor(_buffer, _descriptor_index);

@@ -30,26 +30,18 @@
 
 namespace hut {
 
-void install_esc_close(window &_win) {
-  _win.on_key.connect([&](keycode _kcode, keysym _ksym, bool _down) {
-    if (_ksym == KSYM_ESC && !_down)
-      _win.close();
-    return false;
-  });
-}
-
 void install_resizable_movable(window &_win) {
   _win.on_mouse.connect([&](u8 _button, mouse_event_type _type, vec2 _coords) {
-    constexpr float resize_border_threshold = 20;
+    constexpr float RESIZE_BORDER_THRESHOLD = 20;
 
     edge coords_edge;
-    if (_coords.x < resize_border_threshold)
+    if (_coords.x < RESIZE_BORDER_THRESHOLD)
       coords_edge |= LEFT;
-    if (_coords.y < resize_border_threshold)
+    if (_coords.y < RESIZE_BORDER_THRESHOLD)
       coords_edge |= TOP;
-    if (float(_win.size().x) - _coords.x < resize_border_threshold)
+    if (float(_win.size().x) - _coords.x < RESIZE_BORDER_THRESHOLD)
       coords_edge |= RIGHT;
-    if (float(_win.size().y) - _coords.y < resize_border_threshold)
+    if (float(_win.size().y) - _coords.y < RESIZE_BORDER_THRESHOLD)
       coords_edge |= BOTTOM;
     _win.cursor(edge_cursor(coords_edge));
 
@@ -71,24 +63,18 @@ void install_resizable_movable(window &_win) {
 
 template<typename TUBO>
 void install_resizable_ubo(window &_win, shared_buffer_suballoc<TUBO> _ubo) {
-  _win.on_resize.connect([_ubo](const uvec2 &_size) {
-    mat4 proj = ortho<float>(0.f, float(_size.x), 0.f, float(_size.y));
+  _win.on_resize.connect([_ubo](const u16vec2 &_size, u32 _scale) {
+    mat4 proj = ortho<float>(0.f, float(_size.x * _scale), 0.f, float(_size.y * _scale));
     _ubo->set_subone(0, offsetof(TUBO, proj_), sizeof(mat4), &proj);
-    return false;
-  });
-}
 
-void install_continuous_redraw(display &_display, window &_win) {
-  _win.on_frame.connect([&](display::duration _dt) {
-    _display.post([&](auto) { _win.invalidate(true); });
+    float dpi_scale{static_cast<float>(_scale)};
+    _ubo->set_subone(0, offsetof(TUBO, dpi_scale_), sizeof(dpi_scale), &dpi_scale);
     return false;
   });
 }
 
 void install_test_events(display &_display, window &_win) {
-  //install_esc_close(_win);
   install_resizable_movable(_win);
-  install_continuous_redraw(_display, _win);
 }
 
 template<typename TUBO>

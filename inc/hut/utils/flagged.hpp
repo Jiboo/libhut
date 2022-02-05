@@ -45,15 +45,16 @@ class flagged {
       : active_(_init) {}
 
  public:
-  static constexpr size_t      underlying_bits = sizeof(TUnderlying) * 8;
+  static constexpr size_t      UNDERLYING_BITS = sizeof(TUnderlying) * 8;
   static constexpr TUnderlying mask(TEnum _flag) { return 1U << _flag; }
-  static_assert(std::bit_width(mask(TEnd)) <= underlying_bits, "underlying type too small to hold values to end");
+  static_assert(std::bit_width(mask(TEnd)) <= UNDERLYING_BITS, "underlying type too small to hold values to end");
 
   using enum_type                       = TEnum;
   using underlying_type                 = TUnderlying;
-  static constexpr TUnderlying enum_end = TEnd;
+  static constexpr TUnderlying ENUM_END = TEnd;
 
-  constexpr flagged() = default;
+  constexpr flagged()                      = default;
+  constexpr flagged(const flagged &_other) = default;
   constexpr explicit flagged(TEnum _init) { set(_init); }
   constexpr flagged(std::initializer_list<TEnum> _inits) {
     for (auto flag : _inits)
@@ -116,8 +117,8 @@ class flagged {
       shifted_ = shifted_ >> 1U;
       current_++;
       auto to_skip = std::countr_zero(shifted_);
-      shifted_     = to_skip == underlying_bits ? 0 : shifted_ >> to_skip;
-      current_     = std::min(TUnderlying(underlying_bits), TUnderlying(current_ + to_skip));
+      shifted_     = to_skip == UNDERLYING_BITS ? 0 : shifted_ >> to_skip;
+      current_     = std::min(TUnderlying(UNDERLYING_BITS), TUnderlying(current_ + to_skip));
       return *this;
     }
     constexpr bool  operator!=(const const_iterator &_other) const { return current_ != _other.current_; }
@@ -129,7 +130,7 @@ class flagged {
     return const_iterator{active_ >> to_skip, to_skip};
   }
   constexpr const_iterator begin() const { return cbegin(); }
-  constexpr const_iterator cend() const { return const_iterator{0, underlying_bits}; }
+  constexpr const_iterator cend() const { return const_iterator{0, UNDERLYING_BITS}; }
   constexpr const_iterator end() const { return cend(); }
 };
 

@@ -40,9 +40,9 @@ using namespace hut;
 
 offscreen::offscreen(const shared_image &_target, offscreen_params _init_params)
     : render_target(*_target->display_)
-    , target_(_target)
-    , params_(std::move(_init_params)) {
-  HUT_PROFILE_SCOPE(PWINDOW, "offscreen::offscreen");
+    , params_(std::move(_init_params))
+    , target_(_target) {
+  HUT_PROFILE_FUN(POFFSCREEN)
 
   if (params_.subres_.coords_ == u16vec4{0, 0, 0, 0})
     params_.subres_.coords_ = make_bbox_with_origin_size(u16vec2{0, 0}, target_->size());
@@ -76,8 +76,7 @@ offscreen::offscreen(const shared_image &_target, offscreen_params _init_params)
 }
 
 offscreen::~offscreen() {
-  HUT_PROFILE_SCOPE(PWINDOW, "offscreen::~offscreen");
-
+  HUT_PROFILE_FUN(POFFSCREEN)
   if (cb_ != VK_NULL_HANDLE)
     HUT_PVK(vkFreeCommandBuffers, display_->device_, display_->commandg_pool_, 1, &cb_);
   if (fence_ != VK_NULL_HANDLE)
@@ -85,6 +84,7 @@ offscreen::~offscreen() {
 }
 
 void offscreen::flush_cb() {
+  HUT_PROFILE_FUN(POFFSCREEN)
   VkSubmitInfo submit_info       = {};
   submit_info.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submit_info.commandBufferCount = 1;
@@ -101,13 +101,7 @@ void offscreen::flush_cb() {
 }
 
 void offscreen::draw(const draw_callback &_callback) {
-  VkImageSubresourceRange subres_range;
-  subres_range.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-  subres_range.baseMipLevel   = params_.subres_.level_;
-  subres_range.levelCount     = 1;
-  subres_range.baseArrayLayer = params_.subres_.layer_;
-  subres_range.layerCount     = 1;
-
+  HUT_PROFILE_FUN(POFFSCREEN)
   begin_rebuild_cb(fbos_[0], cb_);
   _callback(cb_);
   end_rebuild_cb(cb_);
@@ -115,6 +109,7 @@ void offscreen::draw(const draw_callback &_callback) {
 }
 
 void offscreen::download(std::span<u8> _dst, uint _data_row_pitch, image::subresource _src) {
+  HUT_PROFILE_FUN(POFFSCREEN, _src.coords_, _src.level_, _src.layer_)
   // Downloading whole image seems more suitable
   if (_src.coords_ == u16vec4{0, 0, 0, 0})
     _src.coords_ = make_bbox_with_origin_size({0, 0}, target_->size());
@@ -167,8 +162,8 @@ void offscreen::download(std::span<u8> _dst, uint _data_row_pitch, image::subres
 
   display::transition_image(cb_, target_->image_, subres_range, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  vkCmdCopyImageToBuffer(cb_, target_->image_, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging_alloc.parent()->buffer_, 1,
-                         &region);
+  HUT_PVK(vkCmdCopyImageToBuffer, cb_, target_->image_, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+          staging_alloc.parent()->buffer_, 1, &region);
   display::transition_image(cb_, target_->image_, subres_range, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 

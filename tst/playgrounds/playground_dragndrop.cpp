@@ -70,8 +70,8 @@ struct my_drop_target_interface : drop_target_interface {
 
   move_result on_move(vec2 _pos) override {
     //std::cout << "my_drop_target_interface::on_move " << _pos << std::endl;
-    constexpr move_result default_result = {dragndrop_actions{DNDNONE}, DNDNONE, FTEXT_PLAIN};
-    move_result           result         = default_result;
+    constexpr move_result DEFAULT_RESULT = {dragndrop_actions{DNDNONE}, DNDNONE, FTEXT_PLAIN};
+    move_result           result         = DEFAULT_RESULT;
 
     for (auto &target : targets_) {
       if (bbox_contains(target.bbox_, _pos) && (target.allowed_formats_ & current_formats_)) {
@@ -89,7 +89,7 @@ struct my_drop_target_interface : drop_target_interface {
       }
     }
 
-    if (result == default_result) {
+    if (result == DEFAULT_RESULT) {
       target_ = nullptr;
     }
 
@@ -179,9 +179,9 @@ int main(int, char **) {
     ImGui::End();
 
     for (auto &target : targets) {
-      constexpr auto buff_size = sizeof("Target ") + sizeof(void *) * 2;
-      char           title_buff[buff_size];
-      snprintf(title_buff, buff_size, "Target %p", &target);
+      constexpr auto BUFF_SIZE = sizeof("Target ") + sizeof(void *) * 2;
+      char           title_buff[BUFF_SIZE];
+      snprintf(title_buff, BUFF_SIZE, "Target %p", &target);
       if (ImGui::Begin(title_buff)) {
         ImVec2 size{ImGui::GetContentRegionAvail().x, 100};
         ImGui::Button("Drop here", size);
@@ -199,6 +199,10 @@ int main(int, char **) {
 
     ImGui::Render();
     ImGui_ImplHut_RenderDrawData(_buffer, ImGui::GetDrawData());
+    return false;
+  });
+  win.on_frame.connect([&](display::duration _dt) {
+    dsp.post([&](auto) { win.invalidate(true); });
     return false;
   });
 

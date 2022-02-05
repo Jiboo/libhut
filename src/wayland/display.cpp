@@ -54,7 +54,7 @@ void display::pointer_handle_enter(void *_data, wl_pointer *_pointer, u32 _seria
     w->mouse_lastmove_          = coords;
     d->last_serial_             = _serial;
     d->last_mouse_enter_serial_ = _serial;
-    d->cursor(w->current_cursor_type_, w->last_sent_scale_);
+    d->cursor(w->current_cursor_type_, w->scale_);
     HUT_PROFILE_EVENT_NAMED(w, on_mouse, ("button", "mouse_event_type", "coords"), 0, MMOVE, coords);
   }
 }
@@ -227,9 +227,9 @@ void display::keyboard_handle_key(void *_data, wl_keyboard *_keyboard, u32 _seri
     d->last_serial_ = _serial;
     HUT_PROFILE_EVENT_NAMED(w, on_key, ("kcode", "ksym", "down"), kcode, hut_ksym, _state != 0);
     if (_state != 0) {
-      const auto utf32     = xkb_keysym_to_utf32(ksym);
-      const auto valid     = utf32 != 0;
-      const auto printable = utf32 > 0x7f || isprint(utf32);
+      const char32_t utf32     = xkb_keysym_to_utf32(ksym);
+      const auto     valid     = utf32 != 0;
+      const auto     printable = utf32 > 0x7f || isprint(int(utf32));
       if (valid && printable) {
         d->keyboard_repeat(utf32);
         HUT_PROFILE_EVENT(w, on_char, (u32)utf32);
@@ -506,9 +506,9 @@ void display::data_device_handle_motion(void *_data, wl_data_device *_device, u3
     auto &itf = d->current_drop_target_->drop_target_interface_;
     assert(itf);
     auto *offer  = d->last_offer_from_dropenter_;
+    u32   scale  = d->current_drop_target_->scale_;
     auto &params = d->offer_params_[offer];
     vec2  pos{wl_fixed_to_double(_x), wl_fixed_to_double(_y)};
-    int   scale = d->current_drop_target_->last_sent_scale_;
 
     auto move_result = itf->on_move(pos);
     switch (move_result.preferred_action_) {
@@ -590,9 +590,9 @@ void display::data_device_handle_selection(void *_data, wl_data_device *_device,
 }
 
 display::display(const char *_app_name, u32 _app_version, const char *_name)
-    : animate_cursor_ctx_{*this}
-    , keyboard_repeat_ctx_{*this} {
-  HUT_PROFILE_SCOPE(PDISPLAY, "display::display");
+    : keyboard_repeat_ctx_{*this}
+    , animate_cursor_ctx_{*this} {
+  HUT_PROFILE_FUN(PWAYLAND)
   std::vector<const char *> extensions = {VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME};
   init_vulkan_instance(_app_name, _app_version, extensions);
 
@@ -652,6 +652,7 @@ display::display(const char *_app_name, u32 _app_version, const char *_name)
 }
 
 display::~display() {
+  HUT_PROFILE_FUN(PWAYLAND)
   preflush_jobs_.clear();
   postflush_garbage_.clear();
   posted_jobs_.clear();
@@ -696,10 +697,8 @@ display::~display() {
     wl_data_device_manager_destroy(data_device_manager_);
   if (cursor_surface_)
     wl_surface_destroy(cursor_surface_);
-  if (cursor_theme_)
-    wl_cursor_theme_destroy(cursor_theme_);
-  if (cursor_theme_hidpi_)
-    wl_cursor_theme_destroy(cursor_theme_hidpi_);
+  for (auto theme : cursor_themes_)
+    wl_cursor_theme_destroy(theme.second);
   if (shm_)
     wl_shm_destroy(shm_);
   if (keyboard_)
@@ -721,40 +720,41 @@ display::~display() {
 }
 
 void display::flush() {
+  HUT_PROFILE_FUN(PWAYLAND)
   wl_display_flush(display_);
 }
 
 void display::post_empty_event() {
+  HUT_PROFILE_FUN(PWAYLAND)
   wl_callback_destroy(wl_display_sync(display_));
 }
 
 void display::roundtrip() {
+  HUT_PROFILE_FUN(PWAYLAND)
   wl_display_dispatch(display_);
 }
 
 int display::dispatch() {
+  HUT_PROFILE_FUN(PWAYLAND)
   if (windows_.empty())
     throw std::runtime_error("dispatch called without any window");
 
   while (loop_) {
-    {
-      HUT_PROFILE_SCOPE(PDISPLAY, "Main loop");
-      {
-        HUT_PROFILE_SCOPE(PDISPLAY, "Wayland dispatch");
-        wl_display_dispatch(display_);
-      }
-      process_posts(display::clock::now());
-      if (windows_.empty())
-        loop_ = false;
-      for (auto wpair : windows_) {
-        window *w = wpair.second;
-        if (w->invalidated_) {
-          w->redraw(display::clock::now());
-          w->invalidated_ = false;
-        }
+    HUT_PROFILE_SCOPE(PWAYLAND, "Main loop")
+    roundtrip();
+    process_posts(display::clock::now());
+    if (windows_.empty())
+      loop_ = false;
+    for (auto wpair : windows_) {
+      window *w = wpair.second;
+      if (w->invalidated_) {
+        w->redraw(display::clock::now());
+        w->invalidated_ = false;
       }
     }
+#ifdef HUT_ENABLE_PROFILING
     profiling::threads_data::next_frame();
+#endif  // HUT_ENABLE_PROFILING
   }
 
   return EXIT_SUCCESS;
@@ -775,11 +775,22 @@ void display::cursor_frame(wl_cursor *_cursor, size_t _frame) {
   }
 }
 
-void display::cursor(cursor_type _c, int _scale) {
-  auto *theme = _scale == 1 ? cursor_theme_.load() : cursor_theme_hidpi_.load();
-
-  if (theme == nullptr || pointer_ == nullptr)
+void display::cursor(cursor_type _c, u32 _scale) {
+  if (pointer_ == nullptr)
     return;
+
+  wl_cursor_theme *theme = nullptr;
+  {
+    std::scoped_lock sl(cursor_themes_mutex_);
+    auto             themeit = cursor_themes_.find(_scale);
+    if (themeit == cursor_themes_.end()) {
+      theme                  = cursor_theme_load(_scale);
+      cursor_themes_[_scale] = theme;
+    } else {
+      theme = themeit->second;
+    }
+  }
+  assert(theme != nullptr);
 
   wl_cursor *result = wl_cursor_theme_get_cursor(theme, cursor_css_name(_c));
   if (result) {
@@ -806,8 +817,8 @@ void display::animate_cursor(wl_cursor *_cursor) {
   }
 }
 
-void display::cursor_themes_load(animate_cursor_context *_ctx) {
-  HUT_PROFILE_SCOPE(PDISPLAY, "cursor_theme_load");
+wl_cursor_theme *display::cursor_theme_load(u32 _scale) {
+  HUT_PROFILE_FUN(PWAYLAND, _scale)
   char  *env_cursor_theme       = getenv("XCURSOR_THEME");
   char  *env_cursor_size        = getenv("XCURSOR_SIZE");
   size_t env_cursor_size_length = env_cursor_size == nullptr ? 0 : strlen(env_cursor_size);
@@ -815,16 +826,11 @@ void display::cursor_themes_load(animate_cursor_context *_ctx) {
   if (env_cursor_size_length > 0)
     std::from_chars(env_cursor_size, env_cursor_size + env_cursor_size_length, cursor_size);
 
-  assert(_ctx->display_.shm_);
-  _ctx->display_.cursor_theme_ = wl_cursor_theme_load(env_cursor_theme, cursor_size, _ctx->display_.shm_);
-  if (env_cursor_size_length > 0)
-    _ctx->display_.cursor_theme_hidpi_ = _ctx->display_.cursor_theme_.load();
-  else
-    _ctx->display_.cursor_theme_hidpi_ = wl_cursor_theme_load(env_cursor_theme, 48, _ctx->display_.shm_);
+  assert(shm_);
+  return wl_cursor_theme_load(env_cursor_theme, cursor_size * i16(_scale), shm_);
 }
 
 void display::animate_cursor_thread(animate_cursor_context *_ctx) {
-  cursor_themes_load(_ctx);
   std::unique_lock lock(_ctx->mutex_);
   while (!_ctx->stop_request_) {
     if (_ctx->cursor_ == nullptr)
@@ -865,7 +871,7 @@ void display::keyboard_repeat_thread(keyboard_repeat_context *_ctx) {
         auto initial_delay_remaining = _ctx->delay_ - elapsed;
         _ctx->cv_.wait_for(lock, initial_delay_remaining);
       } else {
-        _ctx->display_.post([w, k = _ctx->key_](auto tp) { HUT_PROFILE_EVENT(w, on_char, (u32)k); });
+        _ctx->display_.post([w, k = _ctx->key_](auto _tp) { HUT_PROFILE_EVENT(w, on_char, (u32)k); });
         _ctx->cv_.wait_for(lock, _ctx->sleep_);
       }
     }

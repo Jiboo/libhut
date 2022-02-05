@@ -36,7 +36,7 @@ class atlas {
   template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments>
   friend class pipeline;
 
-  constexpr static u16vec2 padding = {1, 1};
+  constexpr static u16vec2 PADDING = {1, 1};
 
  public:
   atlas(display &_display, const image_params &_params);

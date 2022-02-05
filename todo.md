@@ -2,14 +2,13 @@ fix:
 
 - we probably want a resize event at window creation, before any draw event?
 - xdg_toplevel_resize seems to ignore xdg_toplevel_set_min/max_size (repro on mutter and weston)
-- text renderer is making renderdoc crash, I'm probably doing something wrong
 - gnome rescales my window during overlap between screens with different scales, unsure how to detect it and trigger
   on_scale at that time, as we get a wl_surface.enter as soon as there is overlap but the gnome scaling happens when
   like more than 50% of the window is on a different scale.
 
 refactor:
 
-- (nothing yet)
+- refactor buffer into two separate concepts, to have symmetry with atlas vs image classes.
 
 features:
 

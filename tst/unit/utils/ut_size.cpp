@@ -7,6 +7,13 @@ using namespace hut;
 template<typename T>
 using box_tst = boxed_number<T, "tst">;
 
+TEST(size, cast) {
+  box_tst<u32> t{0};
+  box_tst<u64> t1 = t;
+  box_tst<f64> t2 = t;
+  box_tst<u16> t3 = t;
+}
+
 TEST(size, comparaisons) {
   EXPECT_EQ(box_tst<u32>{0}, box_tst<u64>{0});
   EXPECT_NE(box_tst<u32>{0}, box_tst<u64>{1});
@@ -21,8 +28,8 @@ TEST(size, comparaisons) {
 TEST(size, arithmetics) {
   EXPECT_EQ(box_tst<u32>{8}, box_tst<u16>{0} + box_tst<u32>{8});
   EXPECT_EQ(box_tst<u32>{8}, box_tst<u16>{8} - box_tst<u32>{0});
-  EXPECT_EQ(box_tst<u32>{8}, box_tst<u16>{4} * 2);
-  EXPECT_EQ(box_tst<u32>{4}, box_tst<u16>{8} / 2);
+  EXPECT_EQ(box_tst<u32>{8}, box_tst<u16>{4} * 2u);
+  EXPECT_EQ(box_tst<u32>{4}, box_tst<u16>{8} / 2u);
 }
 
 TEST(size, modifiers) {
@@ -58,7 +65,6 @@ TEST(size, mm) {
 }
 
 TEST(size, literals) {
-  using namespace hut::literals;
   EXPECT_EQ(size_px<u32>{10}, 10_px);
   EXPECT_EQ(size_pt<f32>{10}, 10._pt);
   EXPECT_EQ(size_in<f32>{10}, 10._in);

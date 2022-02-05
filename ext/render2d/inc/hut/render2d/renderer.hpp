@@ -40,7 +40,6 @@
 namespace hut::render2d {
 
 class renderer;
-class quads_set;
 
 using index = u32;
 
@@ -119,7 +118,7 @@ class renderer {
 
   void draw(VkCommandBuffer);
 
-  suballoc<instance, details::batch> allocate(uint _count, uint _align = 4);
+  suballoc<instance, details::batch> allocate(uint _count);
 
  private:
   std::list<details::batch> batches_;

@@ -47,4 +47,13 @@ inline void hash_combine(std::size_t &_seed, const T &_v, Rest &&..._rest) {
   hash_combine(_seed, std::forward<Rest>(_rest)...);
 }
 
+template<typename TOut, typename TIn>
+static TOut rehash(const TIn &_in) {
+  const TOut *ptr    = reinterpret_cast<const TOut *>(&_in);
+  TOut        result = *ptr;
+  for (size_t i = 1; i < sizeof(TIn) / sizeof(TOut); i++)
+    result ^= ptr[i];
+  return result;
+}
+
 }  // namespace hut

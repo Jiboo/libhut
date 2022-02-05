@@ -35,7 +35,7 @@ using namespace hut;
 atlas::atlas(display &_display, const image_params &_params)
     : display_(_display)
     , params_(_params) {
-  HUT_PROFILE_SCOPE(PIMAGE, "atlas::atlas");
+  HUT_PROFILE_FUN(PIMAGE)
   if (params_.size_ == u16vec2{0, 0}) {
     params_.size_ = {_display.limits().maxImageDimension2D, _display.limits().maxImageDimension2D};
   }
@@ -43,13 +43,15 @@ atlas::atlas(display &_display, const image_params &_params)
 }
 
 void atlas::add_page() {
+  HUT_PROFILE_FUN(PIMAGE)
   pages_.emplace_back(std::make_shared<image>(display_, params_));
 }
 
 shared_subimage atlas::alloc(const u16vec2 &_bounds) {
+  HUT_PROFILE_FUN(PIMAGE, _bounds)
   assert(_bounds.x > 0);
   assert(_bounds.y > 0);
-  auto padded = _bounds + padding;
+  auto padded = _bounds + PADDING;
   assert(padded.x < params_.size_.x);
   assert(padded.y < params_.size_.y);
   for (uint i = 0; i < pages_.size(); i++) {
@@ -64,17 +66,20 @@ shared_subimage atlas::alloc(const u16vec2 &_bounds) {
 }
 
 shared_subimage atlas::pack(const u16vec2 &_bounds, std::span<const u8> _data, uint _src_row_pitch) {
+  HUT_PROFILE_FUN(PIMAGE, _bounds)
   shared_subimage result = alloc(_bounds);
   pages_[result->page()].image_->update({result->bounds()}, _data, _src_row_pitch);
   return result;
 }
 
 image::updator atlas::update(const subimage &_sub, const u16vec4 &_bounds) {
+  HUT_PROFILE_FUN(PIMAGE, _sub.page(), _sub.bounds(), _bounds)
   assert(_sub.from(this));
   return pages_[_sub.page()].image_->update({_bounds});
 }
 
 void atlas::free(subimage &&_sub) {
+  HUT_PROFILE_FUN(PIMAGE, _sub.bounds())
   assert(_sub.from(this));
   auto &l = pages_[_sub.page()];
   l.packer_.offer(_sub.bounds());

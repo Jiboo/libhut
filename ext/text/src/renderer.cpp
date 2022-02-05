@@ -30,7 +30,6 @@
 #include <string_view>
 #include <utility>
 
-#include "hut/utils/profiling.hpp"
 #include "hut/utils/utf.hpp"
 
 #include "hut/display.hpp"
@@ -69,8 +68,8 @@ renderer::renderer(render_target &_target, shared_buffer _buffer, const shared_f
     , buffer_(std::move(_buffer))
     , atlas_(std::move(_atlas))
     , shaper_(_font) {
-  constexpr u16 max_atlas_bounds = 32 * 1024;
-  assert(atlas_->size().x <= max_atlas_bounds && atlas_->size().y <= max_atlas_bounds);
+  constexpr u16 MAX_ATLAS_BOUNDS = 32 * 1024;
+  assert(atlas_->size().x <= MAX_ATLAS_BOUNDS && atlas_->size().y <= MAX_ATLAS_BOUNDS);
   if (_params.initial_mesh_store_size_ > 0 && _params.initial_draw_store_size_ > 0)
     grow(_params.initial_mesh_store_size_, _params.initial_draw_store_size_);
   pipeline_.write(0, _ubo, atlas_, _sampler);
@@ -84,11 +83,7 @@ mesh_store::mesh_store(renderer *_parent, uint _size)
 
 draw_store::draw_store(renderer *_parent, uint _size)
     : instances_(_parent->buffer_->allocate<instance>(_size))
-#ifndef HUT_TEXT_DEBUG_NO_INDIRECT
     , commands_(_parent->buffer_->allocate<VkDrawIndexedIndirectCommand>(_size))
-#else
-    , commands_(_size)
-#endif
     , suballocator_(_size) {
 }
 
@@ -100,18 +95,16 @@ renderer::words_info::words_info(std::span<const std::u8string_view> _words)
   total_codepoints_ = 0;
   for (uint i = 0; i < count; i++) {
     hashes_[i]            = std::hash<std::u8string_view>{}(_words[i]);
-    const auto codepoints = utf8codepointcount(_words[i]);
+    const auto codepoints = utf8_codepoint_count(_words[i]);
     codepoints_[i]        = codepoints;
     total_codepoints_ += codepoints;
   }
 }
 
-using flimits = std::numeric_limits<float>;
-
 word::word(renderer *_parent, batch &_batch, uint _alloc, uint _codepoints, std::u8string_view _text)
     : alloc_(_alloc)
     , glyphs_(0)
-    , bbox_(flimits::max(), flimits::max(), flimits::min(), flimits::min()) {
+    , bbox_(numax_v<f32>, numax_v<f32>, numin_v<f32>, numin_v<f32>) {
   const auto vertices_offset = sizeof(vertex) * 4 * _alloc;
   const auto indices_offset  = sizeof(index_t) * 6 * _alloc;
   const auto vertices_size   = sizeof(vertex) * 4 * _codepoints;
@@ -152,16 +145,8 @@ void renderer::draw(VkCommandBuffer _buff) {
     pipeline_.bind_indices(_buff, batch.mstore_.indices_);
     pipeline_.bind_vertices(_buff, batch.mstore_.vertices_);
     pipeline_.bind_instances(_buff, batch.dstore_.instances_);
-#ifndef HUT_TEXT_DEBUG_NO_INDIRECT
     pipeline_.draw_indexed(_buff, batch.dstore_.commands_, batch.dstore_.suballocator_.upper_bound(),
                            sizeof(VkDrawIndexedIndirectCommand));
-#else
-    for (uint i = 0; i < batch.dstore_.suballocator_.upper_bound(); i++) {
-      auto &command = batch.dstore_.commands_[i];
-      pipeline_.draw_indexed(_buff, command.indexCount, command.instanceCount, command.firstIndex, command.vertexOffset,
-                             command.firstInstance);
-    }
-#endif
   }
 }
 
@@ -182,10 +167,8 @@ renderer::paragraph_holder renderer::allocate(std::span<const std::u8string_view
   paragraph_holder result{&best_batch, *draw_alloc, uint(_words.size() * sizeof(instance))};
   result.bboxes_ = std::make_unique<i16vec4[]>(_words.size());
 
-#ifndef HUT_TEXT_DEBUG_NO_INDIRECT
   auto cupdator = best_batch.dstore_.commands_->update_raw(sizeof(VkDrawIndexedIndirectCommand) * *draw_alloc,
                                                            sizeof(VkDrawIndexedIndirectCommand) * _words.size());
-#endif
 
   for (uint i = 0; i < winfo.size(); i++) {
     const auto hash       = winfo.hashes_[i];
@@ -201,12 +184,8 @@ renderer::paragraph_holder renderer::allocate(std::span<const std::u8string_view
     it->second.ref_count_++;
     result.bboxes_[i] = it->second.bbox_;
 
-#ifndef HUT_TEXT_DEBUG_NO_INDIRECT
     VkDrawIndexedIndirectCommand *cptr
         = reinterpret_cast<VkDrawIndexedIndirectCommand *>(cupdator.staging().data()) + i;
-#else
-    VkDrawIndexedIndirectCommand *cptr = best_batch.dstore_.commands_.data() + *draw_alloc + i;
-#endif
 
     cptr->firstInstance = *draw_alloc + i;
     cptr->instanceCount = 1;
@@ -247,14 +226,7 @@ batch &renderer::find_best_fit(const words_info &_winfo) {
 }
 
 void batch::release(text_suballoc *_suballoc) {
-#ifndef HUT_TEXT_DEBUG_NO_INDIRECT
   dstore_.commands_->zero_raw(_suballoc->offset_bytes(), _suballoc->size_bytes());
-#else
-  auto offset_elements = offset_bytes() / sizeof(instance);
-  auto size_elements   = size_bytes() / sizeof(instance);
-  std::fill(dstore.commands_.data() + offset_elements, dstore.commands_.data() + offset_elements + size_elements,
-            VkDrawIndexedIndirectCommand{0});
-#endif
   dstore_.suballocator_.offer(_suballoc->offset_bytes());
 }
 
