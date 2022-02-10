@@ -39,20 +39,20 @@
 #include "hut/buffer.hpp"
 #include "hut/window.hpp"
 
-using namespace hut;
+namespace hut {
 
 #ifdef HUT_ENABLE_VALIDATION
-static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT flags,
-                                                     VkDebugReportObjectTypeEXT /*objType*/, u64 /*obj*/,
-                                                     size_t /*location*/, i32 /*code*/, const char *layerPrefix,
-                                                     const char *msg, void * /*userData*/) {
-  if (strcmp(layerPrefix, "Loader Message") == 0)
+static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT _flags,
+                                                     VkDebugReportObjectTypeEXT /*_obj_type*/, u64 /*_obj*/,
+                                                     size_t /*_location*/, i32 /*_code*/, const char *_prefix,
+                                                     const char *_msg, void * /*_data*/) {
+  if (strcmp(_prefix, "Loader Message") == 0)
     return VK_FALSE;
-  if (strcmp(layerPrefix, "radv") == 0)
+  if (strcmp(_prefix, "radv") == 0)
     return VK_FALSE;
 
   char level;
-  switch (flags) {
+  switch (_flags) {
     case VK_DEBUG_REPORT_INFORMATION_BIT_EXT: level = 'I'; break;
     case VK_DEBUG_REPORT_WARNING_BIT_EXT: level = 'W'; break;
     case VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT: level = 'P'; break;
@@ -60,12 +60,12 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT flags
     default: level = 'D'; break;
   }
 
-  std::cout << '[' << level << ' ' << layerPrefix << "] " << msg << std::endl;
+  std::cout << '[' << level << ' ' << _prefix << "] " << _msg << std::endl;
 #  if defined(HUT_ENABLE_VALIDATION_DEBUG) && defined(HUT_ENABLE_PROFILING)
   boost::stacktrace::stacktrace st;
   if (st) {
     for (const auto &frame : st.as_vector()) {
-      std::cout << "\t[" << layerPrefix << "] callstack: " << frame << std::endl;
+      std::cout << "\t[" << _prefix << "] callstack: " << frame << std::endl;
     }
   }
 #  endif  //HUT_ENABLE_VALIDATION_DEBUG
@@ -73,7 +73,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT flags
 }
 #endif  //HUT_ENABLE_VALIDATION
 
-const char *hut::keysym_name(keysym _keysym) {
+const char *keysym_name(keysym _keysym) {
   switch (_keysym) {
 #define HUT_MAP_KEYSYM(FORMAT_LINUX, FORMAT_X11, FORMAT_IMGUI)                                                         \
   case KSYM_##FORMAT_LINUX:                                                                                            \
@@ -84,8 +84,7 @@ const char *hut::keysym_name(keysym _keysym) {
   }
 }
 
-const char *hut::cursor_css_name(cursor_type _c) {
-  using namespace hut;
+const char *cursor_css_name(cursor_type _c) {
   switch (_c) {
     case CNONE: return "none";
     default: [[fallthrough]];
@@ -125,7 +124,7 @@ const char *hut::cursor_css_name(cursor_type _c) {
   }
 }
 
-const char *hut::format_mime_type(clipboard_format _f) {
+const char *format_mime_type(clipboard_format _f) {
   switch (_f) {
     case FTEXT_PLAIN: return "text/plain;charset=utf-8";
     case FTEXT_HTML: return "text/html";
@@ -137,7 +136,7 @@ const char *hut::format_mime_type(clipboard_format _f) {
   return nullptr;
 }
 
-std::optional<clipboard_format> hut::mime_type_format(const char *_mime_type) {
+std::optional<clipboard_format> mime_type_format(const char *_mime_type) {
   if (strcmp(_mime_type, "text/plain;charset=utf-8") == 0)
     return FTEXT_PLAIN;
   else if (strcmp(_mime_type, "text/html") == 0)
@@ -153,7 +152,7 @@ std::optional<clipboard_format> hut::mime_type_format(const char *_mime_type) {
   return {};
 }
 
-const char *hut::action_name(dragndrop_action _a) {
+const char *action_name(dragndrop_action _a) {
   switch (_a) {
     case DNDNONE: return "None";
     case DNDMOVE: return "Move";
@@ -162,7 +161,7 @@ const char *hut::action_name(dragndrop_action _a) {
   return nullptr;
 }
 
-const char *hut::modifier_name(modifier _m) {
+const char *modifier_name(modifier _m) {
   switch (_m) {
     case KMOD_CTRL: return "Ctrl";
     case KMOD_ALT: return "Alt";
@@ -191,8 +190,23 @@ void display::process_posts(time_point _now) {
     job(_now);
 }
 
+void *display::get_proc_impl(const std::string &_name) {
+  static std::unordered_map<std::string, void *> s_cache;
+
+  auto it = s_cache.find(_name);
+  if (it == s_cache.end()) {
+    auto func = vkGetInstanceProcAddr(instance_, _name.data());
+    if (func == nullptr)
+      throw std::runtime_error(sstream("can't find address of ") << _name);
+    s_cache.emplace(_name, (void *)func);
+    return (void *)func;
+  } else {
+    return it->second;
+  }
+}
+
 struct score_t {
-  constexpr static u32 BAD_ID   = numax_v<u32>;
+  constexpr static u32 BAD_ID   = NUMAX<u32>;
   u32                  iqueueg_ = BAD_ID, iqueuec_ = BAD_ID, iqueuet_ = BAD_ID, iqueuep_ = BAD_ID;
   uint                 score_ = 0;
   VkSurfaceFormatKHR   surface_format_{VK_FORMAT_UNDEFINED, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
@@ -252,7 +266,7 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
       has_swapchhain_ext = true;
   }
 
-  if (_dummy && !has_swapchhain_ext)
+  if ((_dummy != nullptr) && !has_swapchhain_ext)
     return result;
 
   if (has_swapchhain_ext) {
@@ -264,17 +278,18 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
     for (u32 i = 0; i < famillies_count; i++) {
       const VkQueueFamilyProperties &props = famillies[i];
 
-      if (_dummy) {
+      if (_dummy != nullptr) {
         VkBool32 present;
         HUT_PVK(vkGetPhysicalDeviceSurfaceSupportKHR, _device, i, _dummy, &present);
 
         if (props.queueCount > 0) {
           // prioritise dedicated queues
-          if (result.iqueuep_ == score_t::BAD_ID && present)
+          if (result.iqueuep_ == score_t::BAD_ID && (present != 0u))
             result.iqueuep_ = i;
         }
 
-        u32 formats_count, modes_count;
+        u32 formats_count;
+        u32 modes_count;
         HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, _device, _dummy, &modes_count, nullptr);
         HUT_PVK(vkGetPhysicalDeviceSurfaceFormatsKHR, _device, _dummy, &formats_count, nullptr);
 
@@ -301,18 +316,21 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
 
       if (props.queueCount > 0) {
         // prioritise dedicated queues
-        if (props.queueFlags & VK_QUEUE_GRAPHICS_BIT && (props.queueFlags & (uint)~VK_QUEUE_GRAPHICS_BIT) == 0)
+        if (((props.queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0u)
+            && (props.queueFlags & (uint)~VK_QUEUE_GRAPHICS_BIT) == 0)
           result.iqueueg_ = i;
-        else if (props.queueFlags & VK_QUEUE_COMPUTE_BIT && (props.queueFlags & (uint)~VK_QUEUE_COMPUTE_BIT) == 0)
+        else if (((props.queueFlags & VK_QUEUE_COMPUTE_BIT) != 0u)
+                 && (props.queueFlags & (uint)~VK_QUEUE_COMPUTE_BIT) == 0)
           result.iqueuec_ = i;
-        else if (props.queueFlags & VK_QUEUE_TRANSFER_BIT && (props.queueFlags & (uint)~VK_QUEUE_TRANSFER_BIT) == 0)
+        else if (((props.queueFlags & VK_QUEUE_TRANSFER_BIT) != 0u)
+                 && (props.queueFlags & (uint)~VK_QUEUE_TRANSFER_BIT) == 0)
           result.iqueuet_ = i;
 
-        if (result.iqueueg_ == score_t::BAD_ID && props.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+        if (result.iqueueg_ == score_t::BAD_ID && ((props.queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0u))
           result.iqueueg_ = i;
-        if (result.iqueuec_ == score_t::BAD_ID && props.queueFlags & VK_QUEUE_COMPUTE_BIT)
+        if (result.iqueuec_ == score_t::BAD_ID && ((props.queueFlags & VK_QUEUE_COMPUTE_BIT) != 0u))
           result.iqueuec_ = i;
-        if (result.iqueuet_ == score_t::BAD_ID && props.queueFlags & VK_QUEUE_TRANSFER_BIT)
+        if (result.iqueuet_ == score_t::BAD_ID && ((props.queueFlags & VK_QUEUE_TRANSFER_BIT) != 0u))
           result.iqueuet_ = i;
       }
     }
@@ -323,7 +341,7 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
       result.score_ = 0;
     if (result.iqueuet_ == score_t::BAD_ID)
       result.score_ = 0;
-    if (_dummy && result.iqueuep_ == score_t::BAD_ID)
+    if ((_dummy != nullptr) && result.iqueuep_ == score_t::BAD_ID)
       result.score_ = 0;
   }
 
@@ -338,15 +356,15 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
   return result;
 }
 
-const std::vector<const char *> layers = {
+const std::vector<const char *> G_ENABLED_LAYERS = {
 #ifdef HUT_ENABLE_VALIDATION
     "VK_LAYER_KHRONOS_validation",
 #endif
 };
 
-void display::init_vulkan_instance(const char *_app_name, u32 _app_version, std::vector<const char *> &extensions) {
+void display::init_vulkan_instance(const char *_app_name, u32 _app_version, std::vector<const char *> &_extensions) {
   HUT_PROFILE_FUN(PDISPLAY)
-  extensions.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);
+  _extensions.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);
 
   u32 extension_count;
   HUT_PVK(vkEnumerateInstanceExtensionProperties, nullptr, &extension_count, nullptr);
@@ -356,32 +374,32 @@ void display::init_vulkan_instance(const char *_app_name, u32 _app_version, std:
   for (const auto &extension : available_extensions) {
 #ifdef HUT_ENABLE_VALIDATION
     if (strcmp(extension.extensionName, VK_EXT_DEBUG_REPORT_EXTENSION_NAME) == 0)
-      extensions.emplace_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+      _extensions.emplace_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 #endif
   }
 
-  VkApplicationInfo appInfo  = {};
-  appInfo.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-  appInfo.apiVersion         = VK_API_VERSION_1_2;
-  appInfo.pEngineName        = "hut";
-  appInfo.engineVersion      = VK_MAKE_VERSION(0, 1, 0);
-  appInfo.pApplicationName   = _app_name;
-  appInfo.applicationVersion = _app_version;
+  VkApplicationInfo app_info  = {};
+  app_info.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+  app_info.apiVersion         = VK_API_VERSION_1_2;
+  app_info.pEngineName        = "hut";
+  app_info.engineVersion      = VK_MAKE_VERSION(0, 1, 0);
+  app_info.pApplicationName   = _app_name;
+  app_info.applicationVersion = _app_version;
 
   VkInstanceCreateInfo info    = {};
   info.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-  info.enabledExtensionCount   = (u32)extensions.size();
-  info.ppEnabledExtensionNames = extensions.data();
-  info.enabledLayerCount       = (u32)layers.size();
-  info.ppEnabledLayerNames     = layers.data();
-  info.pApplicationInfo        = &appInfo;
+  info.enabledExtensionCount   = (u32)_extensions.size();
+  info.ppEnabledExtensionNames = _extensions.data();
+  info.enabledLayerCount       = (u32)G_ENABLED_LAYERS.size();
+  info.ppEnabledLayerNames     = G_ENABLED_LAYERS.data();
+  info.pApplicationInfo        = &app_info;
 
   VkResult result = HUT_PVK(vkCreateInstance, &info, nullptr, &instance_);
   if (result != VK_SUCCESS)
     throw std::runtime_error(sstream("Couldn't create a vulkan instance, code: ") << result);
 
 #ifdef HUT_ENABLE_VALIDATION
-  if (std::find(extensions.cbegin(), extensions.cend(), VK_EXT_DEBUG_REPORT_EXTENSION_NAME) != extensions.cend()) {
+  if (std::find(_extensions.cbegin(), _extensions.cend(), VK_EXT_DEBUG_REPORT_EXTENSION_NAME) != _extensions.cend()) {
     VkDebugReportCallbackCreateInfoEXT dinfo = {};
     dinfo.sType                              = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
     dinfo.flags = VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT
@@ -444,11 +462,11 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
     unique_indexes.emplace(prefered_rate.iqueuep_);
 
   std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
-  float                                queuePriority     = 1.0f;
+  float                                queue_priority    = 1.0f;
   VkDeviceQueueCreateInfo              queue_create_info = {};
   queue_create_info.sType                                = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
   queue_create_info.queueCount                           = 1;
-  queue_create_info.pQueuePriorities                     = &queuePriority;
+  queue_create_info.pQueuePriorities                     = &queue_priority;
   for (u32 index : unique_indexes) {
     queue_create_info.queueFamilyIndex = index;
     queue_create_infos.emplace_back(queue_create_info);
@@ -499,8 +517,8 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   device_info.pNext                   = &device_features;
   device_info.enabledExtensionCount   = (u32)extensions.size();
   device_info.ppEnabledExtensionNames = extensions.data();
-  device_info.enabledLayerCount       = (u32)layers.size();
-  device_info.ppEnabledLayerNames     = layers.data();
+  device_info.enabledLayerCount       = (u32)G_ENABLED_LAYERS.size();
+  device_info.ppEnabledLayerNames     = G_ENABLED_LAYERS.data();
 
   VkResult result = HUT_PVK(vkCreateDevice, pdevice_, &device_info, nullptr, &device_);
   if (result != VK_SUCCESS)
@@ -512,12 +530,12 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   if (prefered_rate.iqueuep_ != score_t::BAD_ID)
     HUT_PVK(vkGetDeviceQueue, device_, prefered_rate.iqueuep_, 0, &queuep_);
 
-  VkCommandPoolCreateInfo poolInfo = {};
-  poolInfo.sType                   = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-  poolInfo.queueFamilyIndex        = prefered_rate.iqueueg_;
-  poolInfo.flags                   = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+  VkCommandPoolCreateInfo pool_info = {};
+  pool_info.sType                   = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  pool_info.queueFamilyIndex        = prefered_rate.iqueueg_;
+  pool_info.flags                   = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-  if (HUT_PVK(vkCreateCommandPool, device_, &poolInfo, nullptr, &commandg_pool_) != VK_SUCCESS) {
+  if (HUT_PVK(vkCreateCommandPool, device_, &pool_info, nullptr, &commandg_pool_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create command pool!");
   }
 
@@ -527,19 +545,19 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   staging_params.usage_ = VkBufferUsageFlagBits(VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
   staging_              = std::make_shared<buffer>(*this, 1024 * 1024, staging_params);
 
-  VkCommandBufferAllocateInfo allocInfo = {};
-  allocInfo.sType                       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  allocInfo.level                       = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  allocInfo.commandPool                 = commandg_pool_;
-  allocInfo.commandBufferCount          = 1;
+  VkCommandBufferAllocateInfo alloc_info = {};
+  alloc_info.sType                       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  alloc_info.level                       = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  alloc_info.commandPool                 = commandg_pool_;
+  alloc_info.commandBufferCount          = 1;
 
-  HUT_PVK(vkAllocateCommandBuffers, device_, &allocInfo, &staging_cb_);
+  HUT_PVK(vkAllocateCommandBuffers, device_, &alloc_info, &staging_cb_);
 
-  VkCommandBufferBeginInfo beginInfo = {};
-  beginInfo.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  beginInfo.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  VkCommandBufferBeginInfo begin_info = {};
+  begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  begin_info.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-  HUT_PVK(vkBeginCommandBuffer, staging_cb_, &beginInfo);
+  HUT_PVK(vkBeginCommandBuffer, staging_cb_, &begin_info);
 }
 
 void display::destroy_vulkan() {
@@ -565,9 +583,9 @@ void display::destroy_vulkan() {
     HUT_PVK(vkDestroyInstance, instance_, nullptr);
 }
 
-std::pair<u32, VkMemoryPropertyFlags> display::find_memory_type(u32 typeFilter, VkMemoryPropertyFlags properties) {
+std::pair<u32, VkMemoryPropertyFlags> display::find_memory_type(u32 _type_filter, VkMemoryPropertyFlags _properties) {
   for (u32 i = 0; i < mem_props_.memoryTypeCount; i++) {
-    if ((typeFilter & (1 << i)) && (mem_props_.memoryTypes[i].propertyFlags & properties) == properties) {
+    if (((_type_filter & (1 << i)) != 0u) && (mem_props_.memoryTypes[i].propertyFlags & _properties) == _properties) {
       return {i, mem_props_.memoryTypes[i].propertyFlags};
     }
   }
@@ -604,69 +622,70 @@ void display::transition_image(VkCommandBuffer _cb, VkImage _image, VkImageSubre
   barrier.image                = _image;
   barrier.subresourceRange     = _range;
 
-  VkPipelineStageFlagBits srcStage, dstStage;
+  VkPipelineStageFlagBits src_stage;
+  VkPipelineStageFlagBits dst_stage;
 
   if (_old_layout == VK_IMAGE_LAYOUT_PREINITIALIZED && _new_layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-    srcStage              = VK_PIPELINE_STAGE_HOST_BIT;
-    dstStage              = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    src_stage             = VK_PIPELINE_STAGE_HOST_BIT;
+    dst_stage             = VK_PIPELINE_STAGE_TRANSFER_BIT;
   } else if (_old_layout == VK_IMAGE_LAYOUT_PREINITIALIZED && _new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    srcStage              = VK_PIPELINE_STAGE_HOST_BIT;
-    dstStage              = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    src_stage             = VK_PIPELINE_STAGE_HOST_BIT;
+    dst_stage             = VK_PIPELINE_STAGE_TRANSFER_BIT;
   } else if (_old_layout == VK_IMAGE_LAYOUT_PREINITIALIZED && _new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    srcStage              = VK_PIPELINE_STAGE_HOST_BIT;
-    dstStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    src_stage             = VK_PIPELINE_STAGE_HOST_BIT;
+    dst_stage             = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
   } else if (_old_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
              && _new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
     barrier.dstAccessMask = VK_ACCESS_HOST_WRITE_BIT;
-    srcStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    dstStage              = VK_PIPELINE_STAGE_HOST_BIT;
+    src_stage             = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    dst_stage             = VK_PIPELINE_STAGE_HOST_BIT;
   } else if (_old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
              && _new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    srcStage              = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    dstStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    src_stage             = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    dst_stage             = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
   } else if (_old_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
              && _new_layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-    srcStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    dstStage              = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    src_stage             = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    dst_stage             = VK_PIPELINE_STAGE_TRANSFER_BIT;
   } else if (_old_layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
              && _new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    srcStage              = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    dstStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    src_stage             = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    dst_stage             = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
   } else if (_old_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
              && _new_layout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    srcStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    dstStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    src_stage             = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    dst_stage             = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
   } else if (_old_layout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
              && _new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
     barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    srcStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    dstStage              = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    src_stage             = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    dst_stage             = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
   } else {
     throw std::invalid_argument("unsupported layout transition!");
   }
 
   HUT_PVK_NAMED_ALIASED(vkCmdPipelineBarrier, ("dest", "from", "to"), ((void *)_image, _old_layout, _new_layout), _cb,
-                        srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+                        src_stage, dst_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
 void display::postflush_collect(buffer_suballoc<u8> &&_callback) {
@@ -762,22 +781,22 @@ void display::flush_staged() {
 
   HUT_PVK(vkEndCommandBuffer, staging_cb_);
 
-  VkSubmitInfo submitInfo       = {};
-  submitInfo.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers    = &staging_cb_;
+  VkSubmitInfo submit_info       = {};
+  submit_info.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submit_info.commandBufferCount = 1;
+  submit_info.pCommandBuffers    = &staging_cb_;
 
 #ifdef HUT_DEBUG_STAGING
   std::cout << "[staging] submitting!" << std::endl;
 #endif
-  HUT_PVK(vkQueueSubmit, queueg_, 1, &submitInfo, VK_NULL_HANDLE);
+  HUT_PVK(vkQueueSubmit, queueg_, 1, &submit_info, VK_NULL_HANDLE);
   HUT_PVK(vkQueueWaitIdle, queueg_);
 
-  VkCommandBufferBeginInfo beginInfo = {};
-  beginInfo.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  beginInfo.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  VkCommandBufferBeginInfo begin_info = {};
+  begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  begin_info.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-  HUT_PVK(vkBeginCommandBuffer, staging_cb_, &beginInfo);
+  HUT_PVK(vkBeginCommandBuffer, staging_cb_, &begin_info);
 
   postflush_garbage_.clear();
 
@@ -786,3 +805,5 @@ void display::flush_staged() {
   staging_->debug();
 #endif
 }
+
+}  // namespace hut

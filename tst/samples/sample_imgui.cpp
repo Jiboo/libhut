@@ -27,9 +27,10 @@
 
 #include <random>
 
+#include "hut/utils/chrono.hpp"
+
 #include "hut/display.hpp"
 #include "hut/window.hpp"
-#include "hut/utils/chrono.hpp"
 
 #include "hut/imgui/imgui.hpp"
 
@@ -37,7 +38,7 @@
 
 using namespace hut;
 
-int main(int, char **) {
+int main(int /*unused*/, char ** /*unused*/) {
   display dsp("hut demo");
 
   window win(dsp);
@@ -47,7 +48,7 @@ int main(int, char **) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!ImGui_ImplHut_Init(&dsp, &win, true))
+  if (!imgui::init(&dsp, &win, true))
     return EXIT_FAILURE;
   install_test_events(dsp, win);
 
@@ -56,8 +57,8 @@ int main(int, char **) {
   bool show_demo_window    = true;
   bool show_another_window = true;
 
-  win.on_draw.connect([&](VkCommandBuffer _buffer) {
-    ImGui_ImplHut_NewFrame();
+  win.on_draw_.connect([&](VkCommandBuffer _buffer) {
+    imgui::new_frame();
     ImGui::NewFrame();
 
     // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
@@ -65,21 +66,21 @@ int main(int, char **) {
       ImGui::ShowDemoWindow(&show_demo_window);
 
     // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
-    static float f       = 0.0f;
-    static int   counter = 0;
+    static float s_f       = 0.0f;
+    static int   s_counter = 0;
 
     if (ImGui::Begin("Hello, world!")) {                  // Create a window called "Hello, world!" and append into it.
       ImGui::Text("This is some useful text.");           // Display some text (you can use a format strings too)
       ImGui::Checkbox("Demo Window", &show_demo_window);  // Edit bools storing our window open/close state
       ImGui::Checkbox("Another Window", &show_another_window);
 
-      ImGui::SliderFloat("float", &f, 0.0f, 1.0f);              // Edit 1 float using a slider from 0.0f to 1.0f
+      ImGui::SliderFloat("float", &s_f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
       ImGui::ColorEdit4("clear color", (float *)&clear_color);  // Edit 3 floats representing a color
 
       if (ImGui::Button("Button"))  // Buttons return true when clicked (most widgets return true when edited/activated)
-        counter++;
+        s_counter++;
       ImGui::SameLine();
-      ImGui::Text("counter = %d", counter);
+      ImGui::Text("counter = %d", s_counter);
 
       ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                   ImGui::GetIO().Framerate);
@@ -99,28 +100,28 @@ int main(int, char **) {
     }
 
     ImGui::Render();
-    ImGui_ImplHut_RenderDrawData(_buffer, ImGui::GetDrawData());
+    imgui::render(_buffer, ImGui::GetDrawData());
 
     return false;
   });
-  win.on_frame.connect([&](display::duration _dt) {
+  win.on_frame_.connect([&](display::duration _dt) {
     dsp.post([&](auto) { win.invalidate(true); });
     return false;
   });
 
-  win.on_key.connect([](keycode, keysym _sym, bool _down) {
+  win.on_key_.connect([](keycode, keysym _sym, bool _down) {
 #ifdef HUT_ENABLE_PROFILING
-    if (_sym == hut::KSYM_P && _down)
-      hut::profiling::threads_data::request_dump();
+    if (_sym == KSYM_P && _down)
+      profiling::threads_data::request_dump();
 #endif  // HUT_ENABLE_PROFILING
-    if (_sym == hut::KSYM_F && _down)
+    if (_sym == KSYM_F && _down)
       std::this_thread::sleep_for(100ms);
     return false;
   });
 
   int error_code = dsp.dispatch();
 
-  ImGui_ImplHut_Shutdown();
+  imgui::shutdown();
   ImGui::DestroyContext();
 
   return error_code;

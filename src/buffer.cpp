@@ -34,8 +34,30 @@
 #include "hut/buffer.hpp"
 #include "hut/display.hpp"
 
-using namespace hut;
-using namespace hut::details;
+namespace hut {
+
+buffer::buffer(display &_display, uint _size, const buffer_params &_params)
+    : display_(_display)
+    , params_(_params) {
+  grow(_size);
+}
+
+buffer_suballoc<u8> buffer::allocate_raw(uint _size_bytes, uint _align) {
+  HUT_PROFILE_FUN(PBUFFER, _size_bytes, _align)
+  for (auto &page : pages_) {
+    auto fit = page.suballocator_.pack(_size_bytes, _align);
+    if (fit)
+      return {&page, *fit, _size_bytes};
+  }
+
+  auto &new_buffer = grow(std::max<uint>(_size_bytes, pages_.back().size() * 2));
+  auto  fit        = new_buffer.suballocator_.pack(_size_bytes, _align);
+  assert(fit);
+
+  return {&new_buffer, *fit, _size_bytes};
+}
+
+namespace details {
 
 buffer_page_data::buffer_page_data(buffer &_parent, uint _size)
     : parent_(&_parent)
@@ -47,7 +69,7 @@ buffer_page_data::buffer_page_data(buffer &_parent, uint _size)
   create_info.usage              = _parent.params_.usage_;
   create_info.sharingMode        = VK_SHARING_MODE_EXCLUSIVE;
 
-  auto device = _parent.display_.device();
+  auto *device = _parent.display_.device();
   if (HUT_PVK(vkCreateBuffer, device, &create_info, nullptr, &buffer_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create buffer!");
   }
@@ -78,38 +100,17 @@ buffer_page_data::buffer_page_data(buffer &_parent, uint _size)
 }
 
 buffer_page_data::~buffer_page_data() {
-  if (parent_) {
+  if (parent_ != nullptr) {
     HUT_PROFILE_FUN(PBUFFER)
-    auto device = parent_->display_.device();
+    auto *device = parent_->display_.device();
 
-    if (permanent_map_)
+    if (permanent_map_ != nullptr)
       HUT_PVK(vkUnmapMemory, device, memory_);
-    if (buffer_)
+    if (buffer_ != nullptr)
       HUT_PVK(vkDestroyBuffer, device, buffer_, nullptr);
-    if (memory_)
+    if (memory_ != nullptr)
       HUT_PVK(vkFreeMemory, device, memory_, nullptr);
   }
-}
-
-buffer::buffer(display &_display, uint _size, const buffer_params &_params)
-    : display_(_display)
-    , params_(_params) {
-  grow(_size);
-}
-
-buffer_suballoc<u8> buffer::allocate_raw(uint _size_bytes, uint _align) {
-  HUT_PROFILE_FUN(PBUFFER, _size_bytes, _align)
-  for (auto &page : pages_) {
-    auto fit = page.suballocator_.pack(_size_bytes, _align);
-    if (fit)
-      return {&page, *fit, _size_bytes};
-  }
-
-  auto &new_buffer = grow(std::max<uint>(_size_bytes, pages_.back().size() * 2));
-  auto  fit        = new_buffer.suballocator_.pack(_size_bytes, _align);
-  assert(fit);
-
-  return {&new_buffer, *fit, _size_bytes};
 }
 
 void buffer_page_data::release_impl(buffer_suballoc<u8> *_suballoc) {
@@ -151,7 +152,7 @@ void buffer_page_data::finalize_impl(buffer_updator<u8> *_updator) {
   display.postflush_collect(std::move(_updator->staging_alloc_));
 }
 
-void buffer_page_data::zero_raw(uint _offset_bytes, uint _size_bytes) {
+void buffer_page_data::zero_raw(uint _offset_bytes, uint _size_bytes) const {
   HUT_PROFILE_FUN(PBUFFER, _offset_bytes, _size_bytes)
   assert(parent_);
   display::buffer_zero zero = {};
@@ -167,17 +168,21 @@ void buffer_page_data::zero_raw(uint _offset_bytes, uint _size_bytes) {
   });
 }
 
+}  // namespace details
+
 #ifdef HUT_DEBUG_STAGING
 void buffer::debug() {
   std::cout << "[buffer] " << this << " contents:" << std::endl;
   for (const auto &page : pages_) {
     std::cout << "\tVkBuffer " << page.buffer_ << " size:" << page.size() << std::endl;
 
-    page.suballocator_.visit_blocks([](const auto &block) {
-      std::cout << "\t\trange " << block.offset_ << " - " << (block.offset_ + block.size_) << ": " << block.used_
+    page.suballocator_.visit_blocks([](const auto &_block) {
+      std::cout << "\t\trange " << _block.offset_ << " - " << (_block.offset_ + _block.size_) << ": " << _block.used_
                 << std::endl;
       return true;
     });
   }
 }
 #endif
+
+}  // namespace hut

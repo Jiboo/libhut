@@ -48,8 +48,8 @@ class sstream {
   sstream(sstream &&_base) noexcept   = default;
   sstream &operator=(sstream &&) noexcept = default;
 
-  template<typename T>
-  sstream &operator<<(const T &_rhs) {
+  template<typename TType>
+  sstream &operator<<(const TType &_rhs) {
     stream_ << _rhs;
     return *this;
   }

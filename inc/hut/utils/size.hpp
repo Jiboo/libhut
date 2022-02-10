@@ -138,8 +138,8 @@ struct scalable_size : boxed_number<TUnderlying, TUnit> {
 
   template<typename TOutput = f32>
   constexpr size_px<TOutput> scale(uint _screen_dpi) {
-    constexpr double ratio = static_cast<double>(TDpiRati::num) / TDpiRati::den;
-    return size_px<TOutput>{static_cast<TOutput>(this->value_ * (ratio * _screen_dpi))};
+    constexpr double RATIO = static_cast<double>(TDpiRati::num) / TDpiRati::den;
+    return size_px<TOutput>{static_cast<TOutput>(this->value_ * (RATIO * _screen_dpi))};
   }
 };
 

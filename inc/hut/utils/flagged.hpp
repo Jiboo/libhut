@@ -45,13 +45,13 @@ class flagged {
       : active_(_init) {}
 
  public:
-  static constexpr size_t      UNDERLYING_BITS = sizeof(TUnderlying) * 8;
-  static constexpr TUnderlying mask(TEnum _flag) { return 1U << _flag; }
+  constexpr static size_t      UNDERLYING_BITS = sizeof(TUnderlying) * 8;
+  constexpr static TUnderlying mask(TEnum _flag) { return 1U << _flag; }
   static_assert(std::bit_width(mask(TEnd)) <= UNDERLYING_BITS, "underlying type too small to hold values to end");
 
   using enum_type                       = TEnum;
   using underlying_type                 = TUnderlying;
-  static constexpr TUnderlying ENUM_END = TEnd;
+  constexpr static TUnderlying ENUM_END = TEnd;
 
   constexpr flagged()                      = default;
   constexpr flagged(const flagged &_other) = default;

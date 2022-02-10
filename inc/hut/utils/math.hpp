@@ -39,45 +39,64 @@ namespace hut {
 
 using namespace glm;
 
-template<typename T>
-inline constexpr T numax_v = std::numeric_limits<T>::max();
+template<typename TType>
+constexpr inline TType NUMAX = std::numeric_limits<TType>::max();
 
-template<typename T>
-inline constexpr T numin_v = std::numeric_limits<T>::min();
+template<typename TType>
+constexpr inline TType NUMIN = std::numeric_limits<TType>::min();
 
-template<typename T>
-inline T align(T _input, unsigned _align) {
+template<typename TType, TType... TValues>
+constexpr TType max() {
+  TType values[] = {TValues...};
+  TType result   = values[0];
+  for (size_t i = 0; i < sizeof...(TValues); i++)
+    result = std::max(result, values[i]);
+  return result;
+}
+
+template<typename TType, TType... TValues>
+constexpr TType sum() {
+  TType values[] = {TValues...};
+  TType result   = 0;
+  for (size_t i = 0; i < sizeof...(TValues); i++)
+    result += values[i];
+  return result;
+}
+
+template<typename TType>
+constexpr TType align(TType _input, unsigned _align) {
   if (_align == 0)
     return _input;
 
-  T rest = _input % _align;
+  TType rest = _input % _align;
   return _input + (rest ? (_align - rest) : 0);
 }
 
-template<typename T, qualifier Q = defaultp>
-inline vec<2, T, Q> bbox_origin(const vec<4, T, Q> &_input) {
-  return vec<2, T, Q>{_input[0], _input[1]};
+template<typename TType, qualifier TQualifier = defaultp>
+inline vec<2, TType, TQualifier> bbox_origin(const vec<4, TType, TQualifier> &_input) {
+  return vec<2, TType, TQualifier>{_input[0], _input[1]};
 }
 
-template<typename T, qualifier Q = defaultp>
-inline vec<2, T, Q> bbox_size(const vec<4, T, Q> &_input) {
-  return vec<2, T, Q>{_input[2] - _input[0], _input[3] - _input[1]};
+template<typename TType, qualifier TQualifier = defaultp>
+inline vec<2, TType, TQualifier> bbox_size(const vec<4, TType, TQualifier> &_input) {
+  return vec<2, TType, TQualifier>{_input[2] - _input[0], _input[3] - _input[1]};
 }
 
-template<typename T, qualifier Q = defaultp>
-inline vec<2, T, Q> bbox_center(const vec<4, T, Q> &_input) {
+template<typename TType, qualifier TQualifier = defaultp>
+inline vec<2, TType, TQualifier> bbox_center(const vec<4, TType, TQualifier> &_input) {
   const auto size = bbox_size(_input);
-  return vec<2, T, Q>{_input[0] + size.x / 2, _input[1] + size.y / 2};
+  return vec<2, TType, TQualifier>{_input[0] + size.x / 2, _input[1] + size.y / 2};
 }
 
-template<typename TBox, typename TPoint, qualifier Q = defaultp>
-bool bbox_contains(const vec<4, TBox, Q> &_box, const vec<2, TPoint, Q> &_point) {
+template<typename TBox, typename TPoint, qualifier TQualifier = defaultp>
+bool bbox_contains(const vec<4, TBox, TQualifier> &_box, const vec<2, TPoint, TQualifier> &_point) {
   return _point.x >= _box.x && _point.x <= _box.z && _point.y >= _box.y && _point.y <= _box.w;
 }
 
-template<typename T, qualifier Q = defaultp>
-inline vec<4, T, Q> make_bbox_with_origin_size(const vec<2, T, Q> &_offset, const vec<2, T, Q> &_size) {
-  return vec<4, T, Q>{_offset.x, _offset.y, _offset.x + _size.x, _offset.y + _size.y};
+template<typename TType, qualifier TQualifier = defaultp>
+inline vec<4, TType, TQualifier> make_bbox_with_origin_size(const vec<2, TType, TQualifier> &_offset,
+                                                            const vec<2, TType, TQualifier> &_size) {
+  return vec<4, TType, TQualifier>{_offset.x, _offset.y, _offset.x + _size.x, _offset.y + _size.y};
 }
 
 inline mat4 make_transform_mat4(vec2 _translate) {

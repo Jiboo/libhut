@@ -40,8 +40,7 @@
 
 #include "imgui_refl.hpp"
 
-using namespace hut;
-using namespace imgui;
+namespace hut::imgui {
 
 using imgui_pipeline = pipeline<ImDrawIdx, imgui_vert_spv_refl, imgui_frag_spv_refl, const shared_ubo &,
                                 const shared_image &, const shared_sampler &>;
@@ -84,7 +83,7 @@ struct hut_imgui_impl_ctx {
   }
 };
 
-const char *get_clipboard_text(void *) {
+const char *get_clipboard_text(void *_user_data) {
   hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(ImGui::GetIO().BackendRendererUserData);
 
   auto &target = ctx.clipboard_buffer_;
@@ -95,7 +94,7 @@ const char *get_clipboard_text(void *) {
                                  [&](clipboard_format _mime, clipboard_receiver &_receiver) {
                                    u8     buffer[2048];
                                    size_t read_bytes;
-                                   while ((read_bytes = _receiver.read(buffer))) {
+                                   while ((read_bytes = _receiver.read(buffer)) != 0u) {
                                      target += std::string_view{(char *)buffer, read_bytes};
                                    }
                                    done = true;
@@ -109,17 +108,17 @@ const char *get_clipboard_text(void *) {
   return target.data();
 }
 
-void set_clipboard_text(void *, const char *text) {
+void set_clipboard_text(void *_user_data, const char *_text) {
   hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(ImGui::GetIO().BackendRendererUserData);
   ctx.window_->clipboard_offer(clipboard_formats{FTEXT_PLAIN},
-                               [buffer{std::string(text)}](clipboard_format _mime, clipboard_sender &_sender) {
+                               [buffer{std::string(_text)}](clipboard_format _mime, clipboard_sender &_sender) {
                                  if (_mime == FTEXT_PLAIN) {
                                    _sender.write({(u8 *)buffer.data(), buffer.size()});
                                  }
                                });
 }
 
-bool ImGui_ImplHut_Init(display *_d, window *_w, bool _install_callbacks) {
+bool init(display *_d, window *_w, bool _install_callbacks) {
   ImGuiIO &io                = ImGui::GetIO();
   io.BackendRendererUserData = new hut_imgui_impl_ctx;
   hut_imgui_impl_ctx &ctx    = *static_cast<hut_imgui_impl_ctx *>(io.BackendRendererUserData);
@@ -136,33 +135,32 @@ bool ImGui_ImplHut_Init(display *_d, window *_w, bool _install_callbacks) {
   ctx.last_frame_ = display::clock::now();
 
   if (_install_callbacks) {
-    _w->on_resize.connect(ImGui_ImplHut_HandleOnResize);
-    _w->on_mouse.connect(ImGui_ImplHut_HandleOnMouse);
-    _w->on_key.connect(ImGui_ImplHut_HandleOnKey);
-    _w->on_char.connect(ImGui_ImplHut_HandleOnChar);
-    _w->on_blur.connect(ImGui_ImplHut_HandleOnBlur);
-    _w->on_focus.connect(ImGui_ImplHut_HandleOnFocus);
+    _w->on_resize_.connect(handle_resize);
+    _w->on_mouse_.connect(handle_mouse);
+    _w->on_key_.connect(handle_key);
+    _w->on_char_.connect(handle_char);
+    _w->on_focus_.connect(handle_focus);
   }
 
-  ImGui_ImplHut_HandleOnResize(_w->size(), _w->scale());
+  handle_resize(_w->size(), _w->scale());
 
   return true;
 }
 
-void ImGui_ImplHut_Shutdown() {
-  ImGui_ImplHut_InvalidateDeviceObjects();
+void shutdown() {
+  invalidate_device_objects();
   ImGuiIO &io = ImGui::GetIO();
-  if (io.BackendRendererUserData) {
+  if (io.BackendRendererUserData != nullptr) {
     delete static_cast<hut_imgui_impl_ctx *>(io.BackendRendererUserData);
     io.BackendRendererUserData = nullptr;
   }
 }
 
-void ImGui_ImplHut_NewFrame() {
+void new_frame() {
   ImGuiIO            &io  = ImGui::GetIO();
   hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(io.BackendRendererUserData);
   if (!ctx.buffer_)
-    ImGui_ImplHut_CreateDeviceObjects();
+    create_device_objects();
 
   const auto now   = display::clock::now();
   const auto delta = std::chrono::duration<float>(now - ctx.last_frame_);
@@ -170,7 +168,7 @@ void ImGui_ImplHut_NewFrame() {
   io.DeltaTime     = std::max(delta.count(), std::numeric_limits<float>::min());
 }
 
-void ImGui_ImplHut_RenderDrawData(VkCommandBuffer _cmd_buffer, ImDrawData *_draw_data) {
+void render(VkCommandBuffer _cmd_buffer, ImDrawData *_draw_data) {
   if (_draw_data->DisplaySize.x <= 0.0f || _draw_data->DisplaySize.y <= 0.0f)
     return;
 
@@ -187,7 +185,7 @@ void ImGui_ImplHut_RenderDrawData(VkCommandBuffer _cmd_buffer, ImDrawData *_draw
   ctx.meshes_.clear();
 
   ctx.pipeline_->bind_pipeline(_cmd_buffer);
-  auto last_bound_set = numax_v<size_t>;
+  auto last_bound_set = NUMAX<size_t>;
   for (int n = 0; n < _draw_data->CmdListsCount; n++) {
     const ImDrawList *cmd_list = _draw_data->CmdLists[n];
 
@@ -237,13 +235,14 @@ void ImGui_ImplHut_RenderDrawData(VkCommandBuffer _cmd_buffer, ImDrawData *_draw
   HUT_PVK(vkCmdSetScissor, _cmd_buffer, 0, 1, &scissor);
 }
 
-bool ImGui_ImplHut_CreateDeviceObjects() {
+bool create_device_objects() {
   // Build texture atlas
   ImGuiIO            &io  = ImGui::GetIO();
   hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(io.BackendRendererUserData);
 
   unsigned char *data;
-  int            width, height;
+  int            width;
+  int            height;
   io.Fonts->GetTexDataAsRGBA32(&data, &width, &height);
 
   ctx.buffer_ = std::make_shared<buffer>(*ctx.display_, 4 * 1024 * 1024);
@@ -258,7 +257,7 @@ bool ImGui_ImplHut_CreateDeviceObjects() {
   atlas_params.format_ = VK_FORMAT_R8G8B8A8_UNORM;
   auto image           = image::load_raw(*ctx.display_, pixels, width * 4, atlas_params);
   auto samp            = std::make_shared<sampler>(*ctx.display_);
-  io.Fonts->TexID      = ImGui_ImplHut_AddImage(image, samp);
+  io.Fonts->TexID      = add_image(image, samp);
 
   pipeline_params pparams;
   pparams.max_sets_ = HUT_IMGUI_MAX_DESCRIPTORS;
@@ -274,12 +273,12 @@ bool ImGui_ImplHut_CreateDeviceObjects() {
   return true;
 }
 
-void ImGui_ImplHut_InvalidateDeviceObjects() {
+void invalidate_device_objects() {
   hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(ImGui::GetIO().BackendRendererUserData);
   ctx.reset();
 }
 
-ImTextureID ImGui_ImplHut_AddImage(const shared_image &_image, const shared_sampler &_sampler) {
+ImTextureID add_image(const shared_image &_image, const shared_sampler &_sampler) {
   hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(ImGui::GetIO().BackendRendererUserData);
 
   size_t index;
@@ -298,12 +297,12 @@ ImTextureID ImGui_ImplHut_AddImage(const shared_image &_image, const shared_samp
   return reinterpret_cast<ImTextureID>(index);
 }
 
-void ImGui_ImplHut_RemImage(ImTextureID _id) {
+void rem_image(ImTextureID _id) {
   hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(ImGui::GetIO().BackendRendererUserData);
   ctx.reusable_bindings_ids_.emplace_back(reinterpret_cast<size_t>(_id));
 }
 
-bool ImGui_ImplHut_HandleOnResize(u16vec2 _size, u32 _scale) {
+bool handle_resize(u16vec2 _size, u32 _scale) {
   ImGuiIO            &io  = ImGui::GetIO();
   hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(io.BackendRendererUserData);
 
@@ -337,7 +336,7 @@ cursor_type hut_cursor_type(ImGuiMouseCursor _input) {
   return result;
 }
 
-bool ImGui_ImplHut_HandleOnMouse(u8 _button, mouse_event_type _type, vec2 _pos) {
+bool handle_mouse(u8 _button, mouse_event_type _type, vec2 _pos) {
   ImGuiIO            &io  = ImGui::GetIO();
   hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(io.BackendRendererUserData);
 
@@ -358,7 +357,7 @@ bool ImGui_ImplHut_HandleOnMouse(u8 _button, mouse_event_type _type, vec2 _pos) 
   return ImGui::GetIO().WantCaptureMouse;
 }
 
-ImGuiKey imgui_keysym(hut::keysym _ksym) {
+ImGuiKey imgui_keysym(keysym _ksym) {
   ImGuiKey ImGuiKey_Linefeed = ImGuiKey_None;
   ImGuiKey ImGuiKey_SysReq   = ImGuiKey_None;
 
@@ -374,7 +373,7 @@ ImGuiKey imgui_keysym(hut::keysym _ksym) {
   return ImGuiKey_None;
 }
 
-bool ImGui_ImplHut_HandleOnKey(keycode _kcode, keysym _ksym, bool _down) {
+bool handle_key(keycode _kcode, keysym _ksym, bool _down) {
   ImGuiIO            &io  = ImGui::GetIO();
   hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(io.BackendRendererUserData);
 
@@ -399,7 +398,7 @@ bool ImGui_ImplHut_HandleOnKey(keycode _kcode, keysym _ksym, bool _down) {
   return io.WantCaptureKeyboard;
 }
 
-bool ImGui_ImplHut_HandleOnChar(char32_t _utf32) {
+bool handle_char(char32_t _utf32) {
   ImGuiIO &io = ImGui::GetIO();
 
 #if !defined(NDEBUG) && 0
@@ -412,7 +411,7 @@ bool ImGui_ImplHut_HandleOnChar(char32_t _utf32) {
   return true;
 }
 
-bool ImGui_ImplHut_HandleOnBlur() {
+bool handle_blur() {
   ImGuiIO &io = ImGui::GetIO();
 
 #if !defined(NDEBUG) && 0
@@ -423,13 +422,15 @@ bool ImGui_ImplHut_HandleOnBlur() {
   return false;
 }
 
-bool ImGui_ImplHut_HandleOnFocus() {
+bool handle_focus(bool _focused) {
   ImGuiIO &io = ImGui::GetIO();
 
 #if !defined(NDEBUG) && 0
   std::cout << "OnFocus" << std::endl;
 #endif
 
-  io.AddFocusEvent(true);
+  io.AddFocusEvent(_focused);
   return false;
 }
+
+}  // namespace hut::imgui

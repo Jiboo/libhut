@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include <span>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -37,22 +39,26 @@
 
 namespace hut {
 
-inline void hash_combine(std::size_t &) {
+inline void hash_combine(std::size_t &_seed) {
 }
 
-template<typename T, typename... Rest>
-inline void hash_combine(std::size_t &_seed, const T &_v, Rest &&..._rest) {
-  std::hash<T> hasher;
+template<typename TType, typename... TRest>
+inline void hash_combine(std::size_t &_seed, const TType &_v, TRest &&..._rest) {
+  std::hash<TType> hasher;
   _seed ^= hasher(_v) + 0x9e3779b9 + (_seed << 6U) + (_seed >> 2U);
-  hash_combine(_seed, std::forward<Rest>(_rest)...);
+  hash_combine(_seed, std::forward<TRest>(_rest)...);
 }
 
 template<typename TOut, typename TIn>
 static TOut rehash(const TIn &_in) {
-  const TOut *ptr    = reinterpret_cast<const TOut *>(&_in);
-  TOut        result = *ptr;
-  for (size_t i = 1; i < sizeof(TIn) / sizeof(TOut); i++)
-    result ^= ptr[i];
+  static_assert(sizeof(TIn) > sizeof(TOut));
+  static_assert(sizeof(TIn) % sizeof(TOut) == 0);
+  constexpr auto RATIO = sizeof(TIn) / sizeof(TOut);
+
+  std::span<const TOut, RATIO> in(reinterpret_cast<const TOut *>(&_in), RATIO);
+  TOut                         result{};
+  for (size_t i = 0; i < RATIO; i++)
+    result ^= in[i];
   return result;
 }
 

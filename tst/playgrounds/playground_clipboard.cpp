@@ -40,7 +40,7 @@
 
 using namespace hut;
 
-int main(int, char **) {
+int main(int /*unused*/, char ** /*unused*/) {
   display dsp("hut clipboard playground");
 
   window win(dsp);
@@ -50,20 +50,20 @@ int main(int, char **) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!ImGui_ImplHut_Init(&dsp, &win, true))
+  if (!imgui::init(&dsp, &win, true))
     return EXIT_FAILURE;
   install_test_events(dsp, win);
 
   char text_input[4096];
   auto formats = clipboard_formats{} | FTEXT_PLAIN | FTEXT_HTML;
 
-  win.on_draw.connect([&](VkCommandBuffer _buffer) {
-    ImGui_ImplHut_NewFrame();
+  win.on_draw_.connect([&](VkCommandBuffer _buffer) {
+    imgui::new_frame();
     ImGui::NewFrame();
 
     if (ImGui::Begin("Text tests")) {
       ImGui::InputTextMultiline("##text_input", text_input, sizeof(text_input));
-      ImGui_HutFlag("allowed formats", &formats, format_mime_type);
+      imgui::flagged_multi("allowed formats", &formats, format_mime_type);
 
       if (ImGui::Button("Copy")) {
         std::cout << "Offering to clipboard" << std::endl;
@@ -81,7 +81,7 @@ int main(int, char **) {
           std::cout << "Read " << read << " bytes from clipboard in " << _mime << std::endl;
           hexdump(text_input, read);
           u8 sink[1024];
-          while (_receiver.read(sink))
+          while (_receiver.read(sink) != 0)
             ;
         });
       }
@@ -115,17 +115,17 @@ int main(int, char **) {
     ImGui::End();
 
     ImGui::Render();
-    ImGui_ImplHut_RenderDrawData(_buffer, ImGui::GetDrawData());
+    imgui::render(_buffer, ImGui::GetDrawData());
     return false;
   });
-  win.on_frame.connect([&](display::duration _dt) {
+  win.on_frame_.connect([&](display::duration _dt) {
     dsp.post([&](auto) { win.invalidate(true); });
     return false;
   });
 
   dsp.dispatch();
 
-  ImGui_ImplHut_Shutdown();
+  imgui::shutdown();
   ImGui::DestroyContext();
 
   return EXIT_SUCCESS;

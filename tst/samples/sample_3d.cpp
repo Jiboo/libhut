@@ -35,7 +35,7 @@
 
 using namespace hut;
 
-int main(int, char **) {
+int main(int /*unused*/, char ** /*unused*/) {
   display d("hut demo3d");
   auto    b = std::make_shared<buffer>(d, 1024 * 1024);
 
@@ -120,20 +120,20 @@ int main(int, char **) {
   });
   skybox_pipeline->write(0, ubo, skybox_image, skybox_sampler);
 
-  w.on_draw.connect([&](VkCommandBuffer _buffer) {
+  w.on_draw_.connect([&](VkCommandBuffer _buffer) {
     rgb3d_pipeline->draw(_buffer, 0, indices, rgb3d_instances, rgb3d_vertices);
     skybox_pipeline->draw(_buffer, 0, indices, pipeline_skybox::shared_instances{}, skybox_vertices);
     return false;
   });
 
-  w.on_resize.connect([&](const u16vec2 &_size, u32 _scale) {
+  w.on_resize_.connect([&](const u16vec2 &_size, u32 _scale) {
     mat4 new_proj = perspective(radians(45.0f), _size.x / (float)_size.y, 0.001f, 1000.0f);
     ubo->set_subone(0, offsetof(vp_ubo, proj_), sizeof(mat4), &new_proj);
     return false;
   });
 
-  w.on_key.connect([&](keycode, keysym c, bool _press) {
-    if (c == KSYM_ESC && !_press)
+  w.on_key_.connect([&](keycode, keysym _c, bool _press) {
+    if (_c == KSYM_ESC && !_press)
       w.close();
     return true;
   });
@@ -142,11 +142,12 @@ int main(int, char **) {
   vec2 down_pos        = {0, 0};
   bool button_clicked  = false;
   bool dragging_window = false;
-  w.on_mouse.connect([&](u8 _button, mouse_event_type _type, vec2 _pos) {
+  w.on_mouse_.connect([&](u8 _button, mouse_event_type _type, vec2 _pos) {
     if (_type == MUP) {
       button_clicked = false;
       return true;
-    } else if (_type == MDOWN) {
+    }
+    if (_type == MDOWN) {
       button_clicked  = true;
       down_pos        = _pos;
       dragging_window = _pos.x < 20;

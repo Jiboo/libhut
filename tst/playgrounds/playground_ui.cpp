@@ -34,7 +34,7 @@
 
 using namespace hut;
 
-int main(int, char **) {
+int main(int /*unused*/, char ** /*unused*/) {
   display d("hut ui playground");
 
   window_params wp;

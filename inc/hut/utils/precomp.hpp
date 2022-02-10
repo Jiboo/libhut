@@ -38,6 +38,7 @@
 #include "hash.hpp"
 #include "math.hpp"
 #include "profiling.hpp"
+#include "size.hpp"
 #include "sstream.hpp"
 #include "string.hpp"
 #include "utf.hpp"

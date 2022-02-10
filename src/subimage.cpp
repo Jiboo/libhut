@@ -29,11 +29,11 @@
 
 #include "hut/atlas.hpp"
 
-using namespace hut;
+namespace hut {
 
 void subimage::release() {
   HUT_PROFILE_FUN(PIMAGE)
-  if (atlas_)
+  if (atlas_ != nullptr)
     atlas_->free(std::move(*this));
   atlas_ = nullptr;
 }
@@ -56,3 +56,5 @@ image::updator subimage::update(u16vec4 _bounds) {
   auto image_bounds    = make_bbox_with_origin_size(subimage_origin + update_origin, update_size);
   return atlas_->update(*this, image_bounds);
 }
+
+}  // namespace hut

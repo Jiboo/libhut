@@ -246,18 +246,18 @@ void dispatcher_impl(void *_thiz, dispatch_op _op, void *_data) {
 
 template<typename TKeyType>
 struct dispatcher_repository {
-  static inline std::array<dispatcher, numax_v<TKeyType>> repository_;
+  static inline std::array<dispatcher, NUMAX<TKeyType>> g_repository;
 
   static TKeyType slot(dispatcher _dispatcher) {
-    static std::atomic_uint16_t counter = 0;
-    assert(counter < numax_v<TKeyType>);
-    TKeyType result     = counter++;
-    repository_[result] = _dispatcher;
+    static std::atomic_uint16_t s_counter = 0;
+    assert(s_counter < NUMAX<TKeyType>);
+    TKeyType result      = s_counter++;
+    g_repository[result] = _dispatcher;
     return result;
   }
 
   static void dispatch(TKeyType _key, void *_thiz, dispatch_op _op, void *_data) {
-    repository_[_key](_thiz, _op, _data);
+    g_repository[_key](_thiz, _op, _data);
   }
 };
 
@@ -276,11 +276,10 @@ struct dispatcher_component : TNextParent {
 template<typename TDispatcherKeyType, size_t TTotalByteSize, typename TFirstParent>
 class basic_event : public TFirstParent {
  public:
-  static constexpr size_t TOTAL_SIZE  = TTotalByteSize;
-  static constexpr size_t HEADER_SIZE = sizeof(TFirstParent);
-  static constexpr size_t DATA_SIZE   = TOTAL_SIZE - HEADER_SIZE;
+  constexpr static size_t TOTAL_SIZE  = TTotalByteSize;
+  constexpr static size_t HEADER_SIZE = sizeof(TFirstParent);
+  constexpr static size_t DATA_SIZE   = TOTAL_SIZE - HEADER_SIZE;
 
- public:
   static_assert(TOTAL_SIZE > HEADER_SIZE, "Total size is too small");
 
   using args_storage_container = std::array<u8, DATA_SIZE>;
@@ -350,7 +349,6 @@ class basic_event : public TFirstParent {
     _os << "}";
   }
 
- public:
   template<typename... TEventArgs, typename... TParentsCtorArgs>
   basic_event(std::tuple<TEventArgs...> &&_event_args, TParentsCtorArgs &&..._parent_args)
       : TFirstParent{std::forward<TParentsCtorArgs>(_parent_args)...} {
@@ -411,47 +409,46 @@ struct thread_data {
   std::unordered_map<u32, stacktrace> stacktrace_cache_;
 };
 
-thread_local inline thread_data *tls_data_ = nullptr;
-
 struct threads_data {
   using thread_data_mapping = std::unordered_map<std::thread::id, std::unique_ptr<thread_data>>;
-  static inline std::mutex          mapping_mutex_;
-  static inline thread_data_mapping threads_mapping_;
-  static inline std::atomic_uint    frame_index_;
+  static inline std::mutex          g_mapping_mutex;
+  static inline thread_data_mapping g_threads_mapping;
+  static inline std::atomic_uint    g_frame_index;
 
-  static inline bool             dump_requested_   = false;
-  static inline std::atomic_bool dump_in_progress_ = false;
+  static inline bool             g_dump_requested   = false;
+  static inline std::atomic_bool g_dump_in_progress = false;
 
-  static thread_data &get(std::thread::id _id = std::this_thread::get_id()) {
-    if (tls_data_ != nullptr)
-      return *tls_data_;
-
-    std::scoped_lock lock{mapping_mutex_};
-    auto             inserted = threads_mapping_.emplace(_id, std::make_unique<thread_data>());
+  static thread_data *make_tls(std::thread::id _id = std::this_thread::get_id()) {
+    std::scoped_lock lock{g_mapping_mutex};
+    auto             inserted = g_threads_mapping.emplace(_id, std::make_unique<thread_data>());
     assert(inserted.second);
-    tls_data_ = inserted.first->second.get();
-    return *tls_data_;
+    return inserted.first->second.get();
   }
 
-  static std::vector<complete_event> &my_queue() { return get().completed_[frame_index_]; }
+  static thread_data &get() {
+    thread_local thread_data *s_tls_data = make_tls(std::this_thread::get_id());
+    return *s_tls_data;
+  }
+
+  static std::vector<complete_event> &my_queue() { return get().completed_[g_frame_index]; }
 
   static void next_frame() {
-    std::scoped_lock lock{mapping_mutex_};
-    if (dump_requested_ && !dump_in_progress_.load()) {
-      dump_in_progress_.store(true);
+    std::scoped_lock lock{g_mapping_mutex};
+    if (g_dump_requested && !g_dump_in_progress.load()) {
+      g_dump_in_progress.store(true);
       std::thread{background_dump, collect_frames()}.detach();
     }
-    dump_requested_ = false;
+    g_dump_requested = false;
 
-    auto prev = frame_index_.load();
+    auto prev = g_frame_index.load();
     auto next = (prev + 1) % FRAME_HISTORY;
-    for (auto &thread : threads_mapping_) {
+    for (auto &thread : g_threads_mapping) {
       thread.second->completed_[next].clear();
     }
-    frame_index_.store(next);
+    g_frame_index.store(next);
   }
 
-  static void request_dump() { dump_requested_ = true; }
+  static void request_dump() { g_dump_requested = true; }
 
   struct frame_cache {
     std::string name_, source_file_;
@@ -461,41 +458,41 @@ struct threads_data {
   static void dump_stackframes(std::ostream &_os) {
     using frames_cache_map = std::unordered_map<const void *, frame_cache>;
 
-    static frames_cache_map           frames_cache;
-    static std::unordered_set<size_t> done;
-    static std::stringstream          json_cache;
+    static frames_cache_map           s_frames_cache;
+    static std::unordered_set<size_t> s_done;
+    static std::stringstream          s_json_cache;
 
-    for (auto &thread_data : threads_mapping_) {
+    for (auto &thread_data : g_threads_mapping) {
       for (const auto &entry : thread_data.second->stacktrace_cache_) {
-        if (!done.emplace(entry.first).second)
+        if (!s_done.emplace(entry.first).second)
           continue;
         const auto &vec  = entry.second.as_vector();
         const auto  size = (int)vec.size();
         for (int i = size - 1; i >= 0; --i) {
-          json_cache << ",\n\"" << entry.first;
+          s_json_cache << ",\n\"" << entry.first;
           if (i != 0)
-            json_cache << '_' << i;
+            s_json_cache << '_' << i;
 
           auto frame   = vec[i];
-          auto itcache = frames_cache.find(frame.address());
-          if (itcache == frames_cache.end()) {
-            auto result = frames_cache.emplace(frame.address(),
-                                               frame_cache{frame.name(), frame.source_file(), frame.source_line()});
+          auto itcache = s_frames_cache.find(frame.address());
+          if (itcache == s_frames_cache.end()) {
+            auto result = s_frames_cache.emplace(frame.address(),
+                                                 frame_cache{frame.name(), frame.source_file(), frame.source_line()});
             itcache     = result.first;
           }
 
-          json_cache << "\":{\"name\":\"";
-          escape_json(json_cache, itcache->second.name_);
-          json_cache << " at ";
-          escape_json(json_cache, itcache->second.source_file_);
-          json_cache << ':' << itcache->second.line_;
+          s_json_cache << "\":{\"name\":\"";
+          escape_json(s_json_cache, itcache->second.name_);
+          s_json_cache << " at ";
+          escape_json(s_json_cache, itcache->second.source_file_);
+          s_json_cache << ':' << itcache->second.line_;
           if (i != (size - 1))
-            json_cache << "\",\"parent\":\"" << entry.first << '_' << (i + 1);
-          json_cache << "\"}";
+            s_json_cache << "\",\"parent\":\"" << entry.first << '_' << (i + 1);
+          s_json_cache << "\"}";
         }
       }
     }
-    _os << json_cache.view();
+    _os << s_json_cache.view();
   }
 
   struct frames {
@@ -503,10 +500,10 @@ struct threads_data {
   };
 
   static frames collect_frames() {
-    assert(mapping_mutex_.try_lock() == false);
+    assert(g_mapping_mutex.try_lock() == false);
 
     frames result;
-    for (auto &thread : threads_mapping_) {
+    for (auto &thread : g_threads_mapping) {
       for (auto &frame : thread.second->completed_) {
         result.cpu_frames_.emplace_back(std::move(frame));
       }
@@ -517,21 +514,21 @@ struct threads_data {
   static std::filesystem::path unique_profiline_path() {
     constexpr std::string_view PREFIX = "profiling-";
 
-    static bool cleaned = false;
-    if (!cleaned) {
-      for (auto &entry : std::filesystem::directory_iterator(".")) {
+    static bool s_cleaned = false;
+    if (!s_cleaned) {
+      for (const auto &entry : std::filesystem::directory_iterator(".")) {
         auto             stem_str = entry.path().stem().string();
         std::string_view stem     = stem_str;
         if (stem.starts_with(PREFIX)) {
           std::filesystem::remove(entry);
         }
       }
-      cleaned = true;
+      s_cleaned = true;
     }
 
-    static unsigned   last_index = 0;
+    static unsigned   s_last_index = 0;
     std::stringstream filename;
-    filename << PREFIX << (last_index++ % 10) << ".json";
+    filename << PREFIX << (s_last_index++ % 10) << ".json";
     return filename.str();
   }
 
@@ -552,7 +549,7 @@ struct threads_data {
     os << "}}" << std::defaultfloat << std::endl;
 
     std::cout << "[hut] Wrote profiling to: " << filename << std::endl;
-    dump_in_progress_.store(false);
+    g_dump_in_progress.store(false);
   }
 };
 
@@ -593,14 +590,14 @@ struct complete_event_scope {
 template<fixed_string TFormat, fixed_string_array TArgNames, profiling_category TProfileCat, typename TEventType,
          typename... TEventArgs>
 auto make_complete_event_scope(std::vector<TEventType> &_buffer, std::tuple<TEventArgs...> &&_event_args) {
-  static auto slot = dispatcher_repository<dispatcher_u16>::slot(
-      dispatcher_impl<TFormat, TArgNames, ::hut::profiling::type::COMPLETE, TProfileCat, TEventType, TEventArgs...>);
+  static auto s_slot = dispatcher_repository<dispatcher_u16>::slot(
+      dispatcher_impl<TFormat, TArgNames, type::COMPLETE, TProfileCat, TEventType, TEventArgs...>);
   return complete_event_scope<TEventType, TEventArgs...>{_buffer,
                                                          std::move(_event_args),
                                                          profile_clock_f32::now(),
-                                                         hash_stacktrace(::hut::profiling::stacktrace{1, 8}),
+                                                         hash_stacktrace(stacktrace{1, 8}),
                                                          this_thread<threadid_u16>(),
-                                                         slot};
+                                                         s_slot};
 }
 
 #  define HUT_PROFILE_TRANSFORM_STRINGIFY(MR, MData, MElement) BOOST_PP_STRINGIZE(MElement)

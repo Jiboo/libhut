@@ -50,7 +50,7 @@ struct format_info {
   format_target target_;
   u8            pack_;
 
-  static constexpr format_info from(VkFormat);
+  constexpr static format_info from(VkFormat _input);
 
   [[nodiscard]] constexpr bool valid() const { return components_ > 0; }
   [[nodiscard]] constexpr u8   components_bits() const {
@@ -71,7 +71,7 @@ struct format_info {
   [[nodiscard]] constexpr bool compressed() const { return pack_ > 0 && components_bits() > pack_; }
   [[nodiscard]] constexpr u8   bpp() const { return compressed() ? pack_ : components_bits(); }
   [[nodiscard]] constexpr bool srgb() const { return suffix_ == format_suffix::SRGB; }
-  [[nodiscard]] constexpr bool channels() const { return components_; }
+  [[nodiscard]] constexpr bool channels() const { return components_ != 0u; }
 
   auto operator<=>(const format_info &) const = default;
 };

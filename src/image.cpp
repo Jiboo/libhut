@@ -27,6 +27,7 @@
 
 #include "hut/image.hpp"
 
+#include <cstddef>
 #include <cstring>
 
 #include <iostream>
@@ -37,7 +38,7 @@
 #include "hut/buffer.hpp"
 #include "hut/display.hpp"
 
-using namespace hut;
+namespace hut {
 
 std::shared_ptr<image> image::load_raw(display &_display, std::span<const u8> _data, uint _data_row_pitch,
                                        const image_params &_params) {
@@ -53,7 +54,7 @@ std::shared_ptr<image> image::load_raw(display &_display, std::span<const u8> _d
 
 image::~image() {
   HUT_PROFILE_FUN(PIMAGE)
-  const auto device = display_->device();
+  auto *const device = display_->device();
   HUT_PVK(vkDestroyImageView, device, view_, nullptr);
   HUT_PVK(vkDestroyImage, device, image_, nullptr);
   HUT_PVK(vkFreeMemory, device, memory_, nullptr);
@@ -65,19 +66,19 @@ image::image(display &_display, const image_params &_params)
   HUT_PROFILE_FUN(PIMAGE)
   mem_reqs_ = create(_display, _params, &image_, &memory_);
 
-  const bool            cubemap            = params_.flags_ & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-  VkImageViewCreateInfo viewInfo           = {};
-  viewInfo.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-  viewInfo.image                           = image_;
-  viewInfo.viewType                        = cubemap ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
-  viewInfo.format                          = _params.format_;
-  viewInfo.subresourceRange.aspectMask     = _params.aspect_;
-  viewInfo.subresourceRange.baseMipLevel   = 0;
-  viewInfo.subresourceRange.levelCount     = _params.levels_;
-  viewInfo.subresourceRange.baseArrayLayer = 0;
-  viewInfo.subresourceRange.layerCount     = cubemap ? 6 : 1;
+  const bool            cubemap             = (params_.flags_ & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT) != 0u;
+  VkImageViewCreateInfo view_info           = {};
+  view_info.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+  view_info.image                           = image_;
+  view_info.viewType                        = cubemap ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
+  view_info.format                          = _params.format_;
+  view_info.subresourceRange.aspectMask     = _params.aspect_;
+  view_info.subresourceRange.baseMipLevel   = 0;
+  view_info.subresourceRange.levelCount     = _params.levels_;
+  view_info.subresourceRange.baseArrayLayer = 0;
+  view_info.subresourceRange.layerCount     = cubemap ? 6 : 1;
 
-  if (HUT_PVK(vkCreateImageView, _display.device(), &viewInfo, nullptr, &view_) != VK_SUCCESS) {
+  if (HUT_PVK(vkCreateImageView, _display.device(), &view_info, nullptr, &view_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create texture image view!");
   }
 
@@ -106,7 +107,7 @@ image::image(display &_display, const image_params &_params)
   display_->staging_jobs_++;
   display_->preflush([this, pre, post, clear, range]() {
     display_->stage_transition(pre, range);
-    if (params_.tiling_ & VK_IMAGE_TILING_LINEAR)  // FIXME
+    if ((params_.tiling_ & VK_IMAGE_TILING_LINEAR) != 0)  // FIXME
       display_->stage_clear(clear, range);
     display_->stage_transition(post, range);
     display_->staging_jobs_--;
@@ -116,49 +117,49 @@ image::image(display &_display, const image_params &_params)
 VkMemoryRequirements image::create(display &_display, const image_params &_params, VkImage *_image,
                                    VkDeviceMemory *_image_memory) {
   HUT_PROFILE_FUN(PIMAGE)
-  VkImageCreateInfo imageInfo = {};
-  imageInfo.sType             = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-  imageInfo.imageType         = VK_IMAGE_TYPE_2D;
-  imageInfo.extent.width      = _params.size_.x;
-  imageInfo.extent.height     = _params.size_.y;
-  imageInfo.extent.depth      = 1;
-  imageInfo.mipLevels         = _params.levels_;
-  imageInfo.arrayLayers       = _params.layers_;
-  imageInfo.format            = _params.format_;
-  imageInfo.tiling            = _params.tiling_;
-  imageInfo.initialLayout     = VK_IMAGE_LAYOUT_PREINITIALIZED;
-  imageInfo.usage             = _params.usage_;
-  imageInfo.samples           = _params.samples_;
-  imageInfo.sharingMode       = VK_SHARING_MODE_EXCLUSIVE;
-  imageInfo.flags             = _params.flags_;
+  VkImageCreateInfo image_info = {};
+  image_info.sType             = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+  image_info.imageType         = VK_IMAGE_TYPE_2D;
+  image_info.extent.width      = _params.size_.x;
+  image_info.extent.height     = _params.size_.y;
+  image_info.extent.depth      = 1;
+  image_info.mipLevels         = _params.levels_;
+  image_info.arrayLayers       = _params.layers_;
+  image_info.format            = _params.format_;
+  image_info.tiling            = _params.tiling_;
+  image_info.initialLayout     = VK_IMAGE_LAYOUT_PREINITIALIZED;
+  image_info.usage             = _params.usage_;
+  image_info.samples           = _params.samples_;
+  image_info.sharingMode       = VK_SHARING_MODE_EXCLUSIVE;
+  image_info.flags             = _params.flags_;
 
-  if (HUT_PVK(vkCreateImage, _display.device(), &imageInfo, nullptr, _image) != VK_SUCCESS) {
+  if (HUT_PVK(vkCreateImage, _display.device(), &image_info, nullptr, _image) != VK_SUCCESS) {
     throw std::runtime_error("failed to create image!");
   }
 
-  VkMemoryRequirements memReq;
-  HUT_PVK(vkGetImageMemoryRequirements, _display.device(), *_image, &memReq);
+  VkMemoryRequirements mem_req;
+  HUT_PVK(vkGetImageMemoryRequirements, _display.device(), *_image, &mem_req);
 
-  VkMemoryAllocateInfo allocInfo = {};
-  allocInfo.sType                = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  allocInfo.allocationSize       = memReq.size;
-  auto memtype                   = _display.find_memory_type(memReq.memoryTypeBits, _params.properties_);
-  allocInfo.memoryTypeIndex      = memtype.first;
+  VkMemoryAllocateInfo alloc_info = {};
+  alloc_info.sType                = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  alloc_info.allocationSize       = mem_req.size;
+  auto memtype                    = _display.find_memory_type(mem_req.memoryTypeBits, _params.properties_);
+  alloc_info.memoryTypeIndex      = memtype.first;
 
-  if (HUT_PVK(vkAllocateMemory, _display.device(), &allocInfo, nullptr, _image_memory) != VK_SUCCESS) {
+  if (HUT_PVK(vkAllocateMemory, _display.device(), &alloc_info, nullptr, _image_memory) != VK_SUCCESS) {
     throw std::runtime_error("failed to allocate image memory!");
   }
 
   HUT_PVK(vkBindImageMemory, _display.device(), *_image, *_image_memory, 0);
 
-  return memReq;
+  return mem_req;
 }
 
 void image::update(subresource _subres, std::span<const u8> _data, uint _src_row_pitch) {
   HUT_PROFILE_FUN(PIMAGE, _subres.coords_, _subres.level_, _subres.layer_)
   auto updto = update(_subres);
   auto size  = bbox_size(_subres.coords_);
-  assert(_data.size_bytes() == (_src_row_pitch * size.y));
+  assert(_data.size_bytes() == static_cast<size_t>(_src_row_pitch * size.y));
   auto mip_size = params_.size_ >> _subres.level_;
   assert(mip_size.x >= size.x && mip_size.y >= size.y);
 
@@ -169,8 +170,8 @@ void image::update(subresource _subres, std::span<const u8> _data, uint _src_row
     assert(row_bit_size >= 8);
     uint row_byte_size = row_bit_size / 8;
     for (uint y = 0; y < size.y; y++) {
-      auto *dst_row = updto.data() + y * updto.staging_row_pitch();
-      auto *src_row = _data.data() + y * _src_row_pitch;
+      auto       *dst_row = updto.data() + static_cast<size_t>(y * updto.staging_row_pitch());
+      const auto *src_row = _data.data() + static_cast<size_t>(y * _src_row_pitch);
       memcpy(dst_row, src_row, row_byte_size);
     }
   }
@@ -200,18 +201,18 @@ void image::finalize_update(image::updator &_update) {
   auto size   = bbox_size(_update.subres_.coords_);
   auto origin = bbox_origin(_update.subres_.coords_);
 
-  VkImageSubresourceLayers subresLayers = {};
-  subresLayers.aspectMask               = VK_IMAGE_ASPECT_COLOR_BIT;
-  subresLayers.mipLevel                 = _update.subres_.level_;
-  subresLayers.baseArrayLayer           = _update.subres_.layer_;
-  subresLayers.layerCount               = 1;
+  VkImageSubresourceLayers subres_layers = {};
+  subres_layers.aspectMask               = VK_IMAGE_ASPECT_COLOR_BIT;
+  subres_layers.mipLevel                 = _update.subres_.level_;
+  subres_layers.baseArrayLayer           = _update.subres_.layer_;
+  subres_layers.layerCount               = 1;
 
-  VkImageSubresourceRange subresRange = {};
-  subresRange.aspectMask              = VK_IMAGE_ASPECT_COLOR_BIT;
-  subresRange.baseMipLevel            = _update.subres_.level_;
-  subresRange.levelCount              = 1;
-  subresRange.baseArrayLayer          = _update.subres_.layer_;
-  subresRange.layerCount              = 1;
+  VkImageSubresourceRange subres_range = {};
+  subres_range.aspectMask              = VK_IMAGE_ASPECT_COLOR_BIT;
+  subres_range.baseMipLevel            = _update.subres_.level_;
+  subres_range.levelCount              = 1;
+  subres_range.baseArrayLayer          = _update.subres_.layer_;
+  subres_range.layerCount              = 1;
 
   display::image_transition pre = {};
   pre.destination_              = image_;
@@ -229,18 +230,20 @@ void image::finalize_update(image::updator &_update) {
   copy.bufferRowLength   = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : ((_update.staging_row_pitch_ * 8) / bpp());
   copy.bufferImageHeight = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : size.y;
   copy.bufferOffset      = _update.staging_.offset_bytes();
-  copy.imageSubresource  = subresLayers;
+  copy.imageSubresource  = subres_layers;
   copy.source_           = _update.staging_.parent()->buffer_;
   copy.destination_      = image_;
   copy.bytes_size_       = _update.size_bytes();
 
   std::lock_guard lk(display_->staging_mutex_);
   display_->staging_jobs_++;
-  display_->preflush([this, pre, post, copy, subresRange]() {
-    display_->stage_transition(pre, subresRange);
+  display_->preflush([this, pre, post, copy, subres_range]() {
+    display_->stage_transition(pre, subres_range);
     display_->stage_copy(copy);
-    display_->stage_transition(post, subresRange);
+    display_->stage_transition(post, subres_range);
     display_->staging_jobs_--;
   });
   display_->postflush_collect(std::move(_update.staging_));
 }
+
+}  // namespace hut

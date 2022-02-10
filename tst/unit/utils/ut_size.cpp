@@ -4,8 +4,8 @@
 
 using namespace hut;
 
-template<typename T>
-using box_tst = boxed_number<T, "tst">;
+template<typename TUnderlying>
+using box_tst = boxed_number<TUnderlying, "tst">;
 
 TEST(size, cast) {
   box_tst<u32> t{0};

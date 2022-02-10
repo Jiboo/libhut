@@ -53,13 +53,13 @@ class offscreen : public render_target {
   offscreen(offscreen &&) noexcept = delete;
   offscreen &operator=(offscreen &&) noexcept = delete;
 
-  explicit offscreen(const shared_image &_dest, offscreen_params _init_params = {});
+  explicit offscreen(const shared_image &_target, offscreen_params _init_params = {});
   ~offscreen();
 
   using draw_callback = std::function<void(VkCommandBuffer)>;
   void draw(const draw_callback &_callback);
 
-  void download(std::span<u8> _dst, uint _dst_row_pitch, image::subresource _src = {});
+  void download(std::span<u8> _dst, uint _data_row_pitch, image::subresource _src = {});
 
  protected:
   offscreen_params params_;

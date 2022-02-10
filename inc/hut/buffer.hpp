@@ -67,10 +67,10 @@ struct buffer_page_data {
 
   buffer_page_data(buffer &_parent, uint _size);
 
-  void                             release_impl(buffer_suballoc<u8> *);
+  void                             release_impl(buffer_suballoc<u8> *_suballoc);
   [[nodiscard]] buffer_updator<u8> update_raw_impl(uint _offset_bytes, uint _size_bytes);
-  void                             finalize_impl(buffer_updator<u8> *);
-  void                             zero_raw(uint _offset_bytes, uint _size_bytes);
+  void                             finalize_impl(buffer_updator<u8> *_updator);
+  void                             zero_raw(uint _offset_bytes, uint _size_bytes) const;
 
   template<typename TContained>
   void release(buffer_suballoc<TContained> *_suballoc) {
@@ -107,10 +107,10 @@ class buffer {
 
   buffer_suballoc<u8> allocate_raw(uint _size_bytes, uint _align = 4);
 
-  template<typename T>
-  shared_buffer_suballoc<T> allocate(uint _count, uint _align = 4) {
-    auto raw_alloc = allocate_raw(_count * sizeof(T), _align);
-    return std::make_shared<buffer_suballoc<T>>(std::move(*raw_alloc.template reinterpret_as<T>()));
+  template<typename TSubType>
+  shared_buffer_suballoc<TSubType> allocate(uint _count, uint _align = 4) {
+    auto raw_alloc = allocate_raw(_count * sizeof(TSubType), _align);
+    return std::make_shared<buffer_suballoc<TSubType>>(std::move(*raw_alloc.template reinterpret_as<TSubType>()));
   }
 
 #ifdef HUT_DEBUG_STAGING

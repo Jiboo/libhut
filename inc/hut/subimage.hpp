@@ -60,7 +60,7 @@ class subimage {
       , page_(_page)
       , bounds_(_bounds) {}
   ~subimage() {
-    if (atlas_)
+    if (atlas_ != nullptr)
       release();
   }
 

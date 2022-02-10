@@ -36,9 +36,9 @@
 #include "hut/display.hpp"
 #include "hut/image.hpp"
 
-using namespace hut;
+namespace hut {
 
-const char *hut::touch_event_name(touch_event_type _type) {
+const char *touch_event_name(touch_event_type _type) {
   switch (_type) {
     case TDOWN: return "TDOWN";
     case TUP: return "TUP";
@@ -47,7 +47,7 @@ const char *hut::touch_event_name(touch_event_type _type) {
   }
 }
 
-const char *hut::mouse_event_name(mouse_event_type _type) {
+const char *mouse_event_name(mouse_event_type _type) {
   switch (_type) {
     case MDOWN: return "MDOWN";
     case MUP: return "MUP";
@@ -58,7 +58,7 @@ const char *hut::mouse_event_name(mouse_event_type _type) {
   }
 }
 
-cursor_type hut::edge_cursor(edge _edge) {
+cursor_type edge_cursor(edge _edge) {
   switch (_edge.raw()) {
     case edge{TOP}.raw(): return CRESIZE_N;
     case edge{RIGHT}.raw(): return CRESIZE_E;
@@ -145,13 +145,13 @@ void window::init_vulkan_surface() {
   // NOTE JBL: This should be validated at device selection (we eliminate devices that can't present, if dummy surface is provided)
   VkBool32 present;
   HUT_PVK(vkGetPhysicalDeviceSurfaceSupportKHR, pdevice, display_.iqueuep_, surface_, &present);
-  if (!present)
+  if (present == 0u)
     throw std::runtime_error("can't create a swapchain for the provided surface");
 #endif
 
   VkSurfaceCapabilitiesKHR capabilities = {};
   HUT_PVK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR, pdevice, surface_, &capabilities);
-  if (capabilities.currentExtent.width != numax_v<u32>) {
+  if (capabilities.currentExtent.width != NUMAX<u32>) {
     swapchain_extents_ = capabilities.currentExtent;
   } else {
     swapchain_extents_ = {u32(size_.x * scale_), u32(size_.y * scale_)};
@@ -253,13 +253,13 @@ void window::init_vulkan_surface() {
     HUT_PVK(vkFreeCommandBuffers, display_.device_, display_.commandg_pool_, primary_cbs_.size(), primary_cbs_.data());
 
   primary_cbs_.resize(images_count);
-  VkCommandBufferAllocateInfo allocInfo = {};
-  allocInfo.sType                       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  allocInfo.level                       = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  allocInfo.commandBufferCount          = images_count;
-  allocInfo.commandPool                 = display_.commandg_pool_;
+  VkCommandBufferAllocateInfo alloc_info = {};
+  alloc_info.sType                       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  alloc_info.level                       = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  alloc_info.commandBufferCount          = images_count;
+  alloc_info.commandPool                 = display_.commandg_pool_;
 
-  if (HUT_PVK(vkAllocateCommandBuffers, display_.device_, &allocInfo, primary_cbs_.data()) != VK_SUCCESS)
+  if (HUT_PVK(vkAllocateCommandBuffers, display_.device_, &alloc_info, primary_cbs_.data()) != VK_SUCCESS)
     throw std::runtime_error("failed to allocate command buffers!");
 
   if (sem_available_ != VK_NULL_HANDLE)
@@ -267,15 +267,15 @@ void window::init_vulkan_surface() {
   if (sem_rendered_ != VK_NULL_HANDLE)
     HUT_PVK(vkDestroySemaphore, display_.device_, sem_rendered_, nullptr);
 
-  VkSemaphoreCreateInfo semaphoreInfo = {};
-  semaphoreInfo.sType                 = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  if (HUT_PVK(vkCreateSemaphore, display_.device_, &semaphoreInfo, nullptr, &sem_available_) != VK_SUCCESS
-      || HUT_PVK(vkCreateSemaphore, display_.device_, &semaphoreInfo, nullptr, &sem_rendered_) != VK_SUCCESS) {
+  VkSemaphoreCreateInfo semaphore_info = {};
+  semaphore_info.sType                 = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+  if (HUT_PVK(vkCreateSemaphore, display_.device_, &semaphore_info, nullptr, &sem_available_) != VK_SUCCESS
+      || HUT_PVK(vkCreateSemaphore, display_.device_, &semaphore_info, nullptr, &sem_rendered_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create semaphores!");
   }
 
   invalidate(true);
-  dirty_.resize(images_count, true);
+  dirty_.resize(images_count, 1u);
 }
 
 void window::redraw(display::time_point _tp) {
@@ -283,62 +283,63 @@ void window::redraw(display::time_point _tp) {
   if (swapchain_ == VK_NULL_HANDLE)
     return;
 
-  u32      imageIndex;
-  VkResult result = HUT_PVK(vkAcquireNextImageKHR, display_.device_, swapchain_, numax_v<u64>, sem_available_,
-                            VK_NULL_HANDLE, &imageIndex);
+  u32      image_index;
+  VkResult result = HUT_PVK(vkAcquireNextImageKHR, display_.device_, swapchain_, NUMAX<u64>, sem_available_,
+                            VK_NULL_HANDLE, &image_index);
 
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
     init_vulkan_surface();
     invalidate(false);
     return;
-  } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+  }
+  if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
     throw std::runtime_error("failed to acquire swap chain image!");
   }
 
-  if (dirty_[imageIndex]) {
+  if (dirty_[image_index] != 0u) {
     HUT_PVK(vkDeviceWaitIdle, display_.device_);
-    dirty_[imageIndex] = false;
-    begin_rebuild_cb(fbos_[imageIndex], primary_cbs_[imageIndex]);
-    HUT_PROFILE_EVENT_NAMED_ALIASED(this, on_draw, (), (), primary_cbs_[imageIndex]);
-    end_rebuild_cb(primary_cbs_[imageIndex]);
+    dirty_[image_index] = 0u;
+    begin_rebuild_cb(fbos_[image_index], primary_cbs_[image_index]);
+    HUT_PROFILE_EVENT_NAMED_ALIASED(this, on_draw_, (), (), primary_cbs_[image_index]);
+    end_rebuild_cb(primary_cbs_[image_index]);
   }
 
-  HUT_PROFILE_EVENT(this, on_frame, _tp - last_frame_);
+  HUT_PROFILE_EVENT(this, on_frame_, _tp - last_frame_);
   display_.flush_staged();
-  cbs_.emplace_back(primary_cbs_[imageIndex]);
+  cbs_.emplace_back(primary_cbs_[image_index]);
 
-  VkSubmitInfo submitInfo = {};
-  submitInfo.sType        = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  VkSubmitInfo submit_info = {};
+  submit_info.sType        = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-  VkSemaphore          waitSemaphores[] = {sem_available_};
-  VkPipelineStageFlags waitStages[]     = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-  submitInfo.waitSemaphoreCount         = 1;
-  submitInfo.pWaitSemaphores            = waitSemaphores;
-  submitInfo.pWaitDstStageMask          = waitStages;
+  VkSemaphore          wait_semaphores[] = {sem_available_};
+  VkPipelineStageFlags wait_stages[]     = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+  submit_info.waitSemaphoreCount         = 1;
+  submit_info.pWaitSemaphores            = wait_semaphores;
+  submit_info.pWaitDstStageMask          = wait_stages;
 
-  submitInfo.commandBufferCount = (u32)cbs_.size();
-  submitInfo.pCommandBuffers    = cbs_.data();
+  submit_info.commandBufferCount = (u32)cbs_.size();
+  submit_info.pCommandBuffers    = cbs_.data();
 
-  VkSemaphore signalSemaphores[]  = {sem_rendered_};
-  submitInfo.signalSemaphoreCount = 1;
-  submitInfo.pSignalSemaphores    = signalSemaphores;
+  VkSemaphore signal_semaphores[]  = {sem_rendered_};
+  submit_info.signalSemaphoreCount = 1;
+  submit_info.pSignalSemaphores    = signal_semaphores;
 
-  if (HUT_PVK(vkQueueSubmit, display_.queueg_, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
+  if (HUT_PVK(vkQueueSubmit, display_.queueg_, 1, &submit_info, VK_NULL_HANDLE) != VK_SUCCESS)
     throw std::runtime_error("failed to submit draw command buffer!");
 
-  VkPresentInfoKHR presentInfo = {};
-  presentInfo.sType            = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+  VkPresentInfoKHR present_info = {};
+  present_info.sType            = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
-  presentInfo.waitSemaphoreCount = 1;
-  presentInfo.pWaitSemaphores    = signalSemaphores;
+  present_info.waitSemaphoreCount = 1;
+  present_info.pWaitSemaphores    = signal_semaphores;
 
-  VkSwapchainKHR swapChains[] = {swapchain_};
-  presentInfo.swapchainCount  = 1;
-  presentInfo.pSwapchains     = swapChains;
-  presentInfo.pImageIndices   = &imageIndex;
-  presentInfo.pResults        = nullptr;  // Optional
+  VkSwapchainKHR swap_chains[] = {swapchain_};
+  present_info.swapchainCount  = 1;
+  present_info.pSwapchains     = swap_chains;
+  present_info.pImageIndices   = &image_index;
+  present_info.pResults        = nullptr;  // Optional
 
-  result = HUT_PVK(vkQueuePresentKHR, display_.queuep_, &presentInfo);
+  result = HUT_PVK(vkQueuePresentKHR, display_.queuep_, &present_info);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
     init_vulkan_surface();
   } else if (result != VK_SUCCESS) {
@@ -360,11 +361,13 @@ void window::redraw(display::time_point _tp) {
 #endif  // HUT_ENABLE_PROFILING
   }
 #ifdef HUT_PROFILE_BOOT
-  static bool profile_boot_dumped = false;
-  if (!profile_boot_dumped) {
+  static bool s_profile_boot_dumped = false;
+  if (!s_profile_boot_dumped) {
     profiling::threads_data::request_dump();
-    profile_boot_dumped = true;
+    s_profile_boot_dumped = true;
   }
 #endif
   last_frame_ = done;
 }
+
+}  // namespace hut

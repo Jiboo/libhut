@@ -103,7 +103,7 @@ class image {
     }
 
     ~updator() {
-      if (data_.size_bytes())
+      if (data_.size_bytes() != 0u)
         target_->finalize_update(*this);
     }
 
@@ -114,7 +114,7 @@ class image {
     [[nodiscard]] uint      image_row_pitch() const { return target_->bpp() * bbox_size(subres_.coords_).x / 8; }
   };
 
-  static std::shared_ptr<image> load_raw(display &, std::span<const u8> _data, uint _data_row_pitch,
+  static std::shared_ptr<image> load_raw(display &_display, std::span<const u8> _data, uint _data_row_pitch,
                                          const image_params &_params);
 
   image() = delete;
@@ -128,7 +128,7 @@ class image {
   image(display &_display, const image_params &_params);
   ~image();
 
-  void    update(subresource _subres, std::span<const u8>, uint _src_row_pitch);
+  void    update(subresource _subres, std::span<const u8> _data, uint _src_row_pitch);
   updator update(subresource _subres);
   updator update() { return update({make_bbox_with_origin_size({0, 0}, params_.size_)}); }
 

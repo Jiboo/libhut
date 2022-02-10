@@ -31,7 +31,7 @@
 namespace hut {
 
 void install_resizable_movable(window &_win) {
-  _win.on_mouse.connect([&](u8 _button, mouse_event_type _type, vec2 _coords) {
+  _win.on_mouse_.connect([&](u8 _button, mouse_event_type _type, vec2 _coords) {
     constexpr float RESIZE_BORDER_THRESHOLD = 20;
 
     edge coords_edge;
@@ -45,12 +45,12 @@ void install_resizable_movable(window &_win) {
       coords_edge |= BOTTOM;
     _win.cursor(edge_cursor(coords_edge));
 
-    static bool clicked = false;
+    static bool s_clicked = false;
     if (_type == MDOWN && _button == 1)
-      clicked = true;
+      s_clicked = true;
     else if (_type == MUP && _button == 1)
-      clicked = false;
-    else if (_type == MMOVE && clicked) {
+      s_clicked = false;
+    else if (_type == MMOVE && s_clicked) {
       if (!coords_edge)
         _win.interactive_move();
       else
@@ -63,7 +63,7 @@ void install_resizable_movable(window &_win) {
 
 template<typename TUBO>
 void install_resizable_ubo(window &_win, shared_buffer_suballoc<TUBO> _ubo) {
-  _win.on_resize.connect([_ubo](const u16vec2 &_size, u32 _scale) {
+  _win.on_resize_.connect([_ubo](const u16vec2 &_size, u32 _scale) {
     mat4 proj = ortho<float>(0.f, float(_size.x * _scale), 0.f, float(_size.y * _scale));
     _ubo->set_subone(0, offsetof(TUBO, proj_), sizeof(mat4), &proj);
 

@@ -27,6 +27,8 @@
 
 #include "hut/offscreen.hpp"
 
+#include <cstddef>
+
 #include <algorithm>
 #include <utility>
 
@@ -36,7 +38,7 @@
 #include "hut/display.hpp"
 #include "hut/image.hpp"
 
-using namespace hut;
+namespace hut {
 
 offscreen::offscreen(const shared_image &_target, offscreen_params _init_params)
     : render_target(*_target->display_)
@@ -175,11 +177,13 @@ void offscreen::download(std::span<u8> _dst, uint _data_row_pitch, image::subres
     assert(_dst.size_bytes() >= staging_data.size_bytes());
     memcpy(_dst.data(), staging_data.data(), staging_data.size());
   } else {
-    assert(_dst.size_bytes() >= (size.y * _data_row_pitch));
+    assert(_dst.size_bytes() >= static_cast<size_t>(size.y * _data_row_pitch));
     for (uint y = 0; y < size.y; y++) {
-      auto *src_row = staging_data.data() + y * buffer_row_pitch;
-      auto *dst_row = _dst.data() + y * _data_row_pitch;
+      auto *src_row = staging_data.data() + static_cast<size_t>(y * buffer_row_pitch);
+      auto *dst_row = _dst.data() + static_cast<size_t>(y * _data_row_pitch);
       memcpy(dst_row, src_row, row_byte_size);
     }
   }
 }
+
+}  // namespace hut

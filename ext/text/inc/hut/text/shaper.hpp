@@ -60,7 +60,7 @@ class shaper {
   ~shaper();
 
   using shape_callback = std::function<void(uint /*index*/, i16vec4 /*quad*/, vec4 /*uv*/, uint /*atlas_page*/)>;
-  void shape(const shared_atlas &_atlas, std::u8string_view _view, const shape_callback &_cb);
+  void shape(const shared_atlas &_atlas, std::u8string_view _text, const shape_callback &_cb);
 
  private:
   hb_buffer_t *buffer_ = nullptr;

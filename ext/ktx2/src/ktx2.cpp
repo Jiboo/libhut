@@ -27,6 +27,7 @@
 
 #include "hut/ktx2/ktx2.hpp"
 
+#include <cstddef>
 #include <cstring>
 
 #include <bit>
@@ -183,7 +184,7 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
     u32 pixel_depth = read_u32();
     if (pixel_depth > 1)
       return {};  // FIXME Support 3D texture
-    iparams.layers_ = max(read_u32(), u32{1});
+    iparams.layers_ = std::max(read_u32(), u32{1});
     u32 face_count  = read_u32();
     if (face_count != 1 && face_count != 6)
       return {};
@@ -221,11 +222,12 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
     assert(bit_stride > 8);
     u32  byte_stride       = bit_stride / 8;
     auto layer_byte_length = byte_stride * level_size.y;
-    assert(level_range.uncompressed_byte_length_ == layer_byte_length * iparams.layers_);
+    assert(level_range.uncompressed_byte_length_ == static_cast<size_t>(layer_byte_length * iparams.layers_));
 
     for (u16 layer = 0; layer < iparams.layers_; layer++) {
-      auto layer_byte_offset = _input.data() + level_range.byte_offset_ + layer_byte_length * layer;
-      auto subres            = image::subresource{u16vec4{0, 0, level_size}, level, layer};
+      const auto *layer_byte_offset
+          = _input.data() + level_range.byte_offset_ + static_cast<size_t>(layer_byte_length * layer);
+      auto subres = image::subresource{u16vec4{0, 0, level_size}, level, layer};
       img->update(subres, std::span<const u8>(layer_byte_offset, layer_byte_length), byte_stride);
     }
   }

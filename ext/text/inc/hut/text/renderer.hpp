@@ -39,8 +39,8 @@ class renderer;
 using index_t     = uint16;
 using string_hash = size_t;
 
-using glyph_pipeline = pipeline<index_t, glyph_vert_spv_refl, glyph_frag_spv_refl, const hut::shared_ubo &,
-                                const hut::shared_atlas &, const hut::shared_sampler &>;
+using glyph_pipeline = pipeline<index_t, glyph_vert_spv_refl, glyph_frag_spv_refl, const shared_ubo &,
+                                const shared_atlas &, const shared_sampler &>;
 
 using vertex   = glyph_pipeline::vertex;
 using instance = glyph_pipeline::instance;
@@ -79,7 +79,7 @@ struct word {
   uint    ref_count_ = 0;
   i16vec4 bbox_;
 
-  word(renderer *_parent, batch &_batch, uint _alloc, uint _atlas_page, std::u8string_view _text);
+  word(renderer *_parent, batch &_batch, uint _alloc, uint _codepoints, std::u8string_view _text);
 };
 
 struct batch {
@@ -135,7 +135,7 @@ class paragraph_holder {
       : instances_(_parent, _offset_bytes, _size_bytes) {}
 
   void release() {
-    if (instances_.parent()) {
+    if (instances_.parent() != nullptr) {
       instances_.parent()->release_words(std::span{hashes_.get(), size()});
       instances_.release();
     }
@@ -166,7 +166,7 @@ class renderer {
 
   paragraph_holder allocate(std::span<const std::u8string_view> _words);
 
-  void draw(VkCommandBuffer);
+  void draw(VkCommandBuffer _buff);
 
  private:
   glyph_pipeline pipeline_;
@@ -188,7 +188,7 @@ class renderer {
 
     [[nodiscard]] uint size() const { return texts_.size(); }
   };
-  details::batch &find_best_fit(const words_info &_info);
+  details::batch &find_best_fit(const words_info &_winfo);
 };
 
 }  // namespace hut::text

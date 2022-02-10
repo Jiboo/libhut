@@ -34,9 +34,7 @@
 
 #include "hut/display.hpp"
 
-using namespace hut;
-using namespace hut::text;
-using namespace hut::text::details;
+namespace hut::text {
 
 ivec2 encode_atlas_page_xy(vec2 _in, uint _atlas_page) {
   assert(_atlas_page < 4);
@@ -75,18 +73,6 @@ renderer::renderer(render_target &_target, shared_buffer _buffer, const shared_f
   pipeline_.write(0, _ubo, atlas_, _sampler);
 }
 
-mesh_store::mesh_store(renderer *_parent, uint _size)
-    : vertices_(_parent->buffer_->allocate<vertex>(_size * 4))
-    , indices_(_parent->buffer_->allocate<index_t>(_size * 6))
-    , suballocator_(_size) {
-}
-
-draw_store::draw_store(renderer *_parent, uint _size)
-    : instances_(_parent->buffer_->allocate<instance>(_size))
-    , commands_(_parent->buffer_->allocate<VkDrawIndexedIndirectCommand>(_size))
-    , suballocator_(_size) {
-}
-
 renderer::words_info::words_info(std::span<const std::u8string_view> _words)
     : texts_(_words) {
   auto count        = _words.size();
@@ -101,10 +87,113 @@ renderer::words_info::words_info(std::span<const std::u8string_view> _words)
   }
 }
 
+void renderer::draw(VkCommandBuffer _buff) {
+  pipeline_.bind_pipeline(_buff);
+  pipeline_.bind_descriptor(_buff, 0);
+  for (const auto &batch : batches_) {
+    pipeline_.bind_indices(_buff, batch.mstore_.indices_);
+    pipeline_.bind_vertices(_buff, batch.mstore_.vertices_);
+    pipeline_.bind_instances(_buff, batch.dstore_.instances_);
+    pipeline_.draw_indexed(_buff, batch.dstore_.commands_, batch.dstore_.suballocator_.upper_bound(),
+                           sizeof(VkDrawIndexedIndirectCommand));
+  }
+}
+
+details::batch &renderer::grow(uint _mesh_store_size, uint _draw_store_size) {
+  auto mesh_back_size  = batches_.empty() ? 0 : batches_.back().mstore_.suballocator_.capacity();
+  auto draw_back_size  = batches_.empty() ? 0 : batches_.back().dstore_.suballocator_.capacity();
+  auto mesh_store_size = std::max(_mesh_store_size, mesh_back_size * 2);
+  auto draw_store_size = std::max(_draw_store_size, draw_back_size * 2);
+  assert(mesh_store_size > 0 && draw_store_size > 0);
+  return batches_.emplace_back(details::batch{this, mesh_store_size, draw_store_size});
+}
+
+renderer::paragraph_holder renderer::allocate(std::span<const std::u8string_view> _words) {
+  words_info winfo{_words};
+  auto      &best_batch = find_best_fit(winfo);
+
+  auto draw_alloc = best_batch.dstore_.suballocator_.pack(_words.size());
+  assert(draw_alloc);
+  paragraph_holder result{&best_batch, *draw_alloc, uint(_words.size() * sizeof(instance))};
+  result.bboxes_ = std::make_unique<i16vec4[]>(_words.size());
+
+  auto cupdator = best_batch.dstore_.commands_->update_raw(sizeof(VkDrawIndexedIndirectCommand) * *draw_alloc,
+                                                           sizeof(VkDrawIndexedIndirectCommand) * _words.size());
+
+  for (uint i = 0; i < winfo.size(); i++) {
+    const auto hash       = winfo.hashes_[i];
+    const auto codepoints = winfo.codepoints_[i];
+    auto       it         = best_batch.cache_.find(hash);
+    if (it == best_batch.cache_.end()) {
+      auto word_alloc = best_batch.mstore_.suballocator_.pack(codepoints);
+      assert(word_alloc);
+      auto emplaced
+          = best_batch.cache_.emplace(hash, details::word{this, best_batch, *word_alloc, codepoints, winfo.texts_[i]});
+      assert(emplaced.second);
+      it = emplaced.first;
+    }
+    it->second.ref_count_++;
+    result.bboxes_[i] = it->second.bbox_;
+
+    VkDrawIndexedIndirectCommand *cptr
+        = reinterpret_cast<VkDrawIndexedIndirectCommand *>(cupdator.staging().data()) + i;
+
+    cptr->firstInstance = *draw_alloc + i;
+    cptr->instanceCount = 1;
+    cptr->firstIndex    = it->second.alloc_ * 6;
+    cptr->indexCount    = 6 * it->second.glyphs_;
+    cptr->vertexOffset  = (int)it->second.alloc_ * 4;
+  }
+
+  result.hashes_ = std::move(winfo.hashes_);
+  return result;
+}
+
+details::batch &renderer::find_best_fit(const words_info &_winfo) {
+  details::batch *best_batch = nullptr;
+  uint            best_score = 0;
+  for (auto &b : batches_) {
+    uint score = 0;
+    if (!b.dstore_.suballocator_.try_fit(_winfo.size()))
+      continue;
+    for (uint iw = 0; iw < _winfo.size(); iw++) {
+      auto it = b.cache_.find(_winfo.hashes_[iw]);
+      if (it != b.cache_.end())
+        score += it->second.glyphs_;
+    }
+    const uint needed_codepoints = _winfo.total_codepoints_ - score;
+    if (!b.mstore_.suballocator_.try_fit(needed_codepoints))
+      continue;
+    score += b.dstore_.suballocator_.free() * 8 + b.mstore_.suballocator_.free();
+    if (score > best_score) {
+      best_batch = &b;
+      best_score = score;
+    }
+  }
+
+  if (best_batch != nullptr)
+    return *best_batch;
+  return grow(_winfo.total_codepoints_, _winfo.size());
+}
+
+namespace details {
+
+mesh_store::mesh_store(renderer *_parent, uint _size)
+    : vertices_(_parent->buffer_->allocate<vertex>(_size * 4))
+    , indices_(_parent->buffer_->allocate<index_t>(_size * 6))
+    , suballocator_(_size) {
+}
+
+draw_store::draw_store(renderer *_parent, uint _size)
+    : instances_(_parent->buffer_->allocate<instance>(_size))
+    , commands_(_parent->buffer_->allocate<VkDrawIndexedIndirectCommand>(_size))
+    , suballocator_(_size) {
+}
+
 word::word(renderer *_parent, batch &_batch, uint _alloc, uint _codepoints, std::u8string_view _text)
     : alloc_(_alloc)
     , glyphs_(0)
-    , bbox_(numax_v<f32>, numax_v<f32>, numin_v<f32>, numin_v<f32>) {
+    , bbox_(NUMAX<f32>, NUMAX<f32>, NUMIN<f32>, NUMIN<f32>) {
   const auto vertices_offset = sizeof(vertex) * 4 * _alloc;
   const auto indices_offset  = sizeof(index_t) * 6 * _alloc;
   const auto vertices_size   = sizeof(vertex) * 4 * _codepoints;
@@ -138,93 +227,6 @@ word::word(renderer *_parent, batch &_batch, uint _alloc, uint _codepoints, std:
   _parent->shaper_.shape(_parent->atlas_, _text, callback);
 }
 
-void renderer::draw(VkCommandBuffer _buff) {
-  pipeline_.bind_pipeline(_buff);
-  pipeline_.bind_descriptor(_buff, 0);
-  for (const auto &batch : batches_) {
-    pipeline_.bind_indices(_buff, batch.mstore_.indices_);
-    pipeline_.bind_vertices(_buff, batch.mstore_.vertices_);
-    pipeline_.bind_instances(_buff, batch.dstore_.instances_);
-    pipeline_.draw_indexed(_buff, batch.dstore_.commands_, batch.dstore_.suballocator_.upper_bound(),
-                           sizeof(VkDrawIndexedIndirectCommand));
-  }
-}
-
-batch &renderer::grow(uint _mesh_store_size, uint _draw_store_size) {
-  auto mesh_back_size  = batches_.empty() ? 0 : batches_.back().mstore_.suballocator_.capacity();
-  auto draw_back_size  = batches_.empty() ? 0 : batches_.back().dstore_.suballocator_.capacity();
-  auto mesh_store_size = std::max(_mesh_store_size, mesh_back_size * 2);
-  auto draw_store_size = std::max(_draw_store_size, draw_back_size * 2);
-  assert(mesh_store_size > 0 && draw_store_size > 0);
-  return batches_.emplace_back(batch{this, mesh_store_size, draw_store_size});
-}
-renderer::paragraph_holder renderer::allocate(std::span<const std::u8string_view> _words) {
-  words_info winfo{_words};
-  auto      &best_batch = find_best_fit(winfo);
-
-  auto draw_alloc = best_batch.dstore_.suballocator_.pack(_words.size());
-  assert(draw_alloc);
-  paragraph_holder result{&best_batch, *draw_alloc, uint(_words.size() * sizeof(instance))};
-  result.bboxes_ = std::make_unique<i16vec4[]>(_words.size());
-
-  auto cupdator = best_batch.dstore_.commands_->update_raw(sizeof(VkDrawIndexedIndirectCommand) * *draw_alloc,
-                                                           sizeof(VkDrawIndexedIndirectCommand) * _words.size());
-
-  for (uint i = 0; i < winfo.size(); i++) {
-    const auto hash       = winfo.hashes_[i];
-    const auto codepoints = winfo.codepoints_[i];
-    auto       it         = best_batch.cache_.find(hash);
-    if (it == best_batch.cache_.end()) {
-      auto word_alloc = best_batch.mstore_.suballocator_.pack(codepoints);
-      assert(word_alloc);
-      auto emplaced = best_batch.cache_.emplace(hash, word{this, best_batch, *word_alloc, codepoints, winfo.texts_[i]});
-      assert(emplaced.second);
-      it = emplaced.first;
-    }
-    it->second.ref_count_++;
-    result.bboxes_[i] = it->second.bbox_;
-
-    VkDrawIndexedIndirectCommand *cptr
-        = reinterpret_cast<VkDrawIndexedIndirectCommand *>(cupdator.staging().data()) + i;
-
-    cptr->firstInstance = *draw_alloc + i;
-    cptr->instanceCount = 1;
-    cptr->firstIndex    = it->second.alloc_ * 6;
-    cptr->indexCount    = 6 * it->second.glyphs_;
-    cptr->vertexOffset  = (int)it->second.alloc_ * 4;
-  }
-
-  result.hashes_ = std::move(winfo.hashes_);
-  return result;
-}
-
-batch &renderer::find_best_fit(const words_info &_winfo) {
-  details::batch *best_batch = nullptr;
-  uint            best_score = 0;
-  for (auto &b : batches_) {
-    uint score = 0;
-    if (!b.dstore_.suballocator_.try_fit(_winfo.size()))
-      continue;
-    for (uint iw = 0; iw < _winfo.size(); iw++) {
-      auto it = b.cache_.find(_winfo.hashes_[iw]);
-      if (it != b.cache_.end())
-        score += it->second.glyphs_;
-    }
-    const uint needed_codepoints = _winfo.total_codepoints_ - score;
-    if (!b.mstore_.suballocator_.try_fit(needed_codepoints))
-      continue;
-    score += b.dstore_.suballocator_.free() * 8 + b.mstore_.suballocator_.free();
-    if (score > best_score) {
-      best_batch = &b;
-      best_score = score;
-    }
-  }
-
-  if (best_batch != nullptr)
-    return *best_batch;
-  return grow(_winfo.total_codepoints_, _winfo.size());
-}
-
 void batch::release(text_suballoc *_suballoc) {
   dstore_.commands_->zero_raw(_suballoc->offset_bytes(), _suballoc->size_bytes());
   dstore_.suballocator_.offer(_suballoc->offset_bytes());
@@ -255,3 +257,7 @@ text_updator batch::update_raw_impl(uint _offset_bytes, uint _size_bytes) {
 void batch::zero_raw(uint _offset_bytes, uint _size_bytes) {
   dstore_.instances_->zero_raw(_offset_bytes, _size_bytes);
 }
+
+}  // namespace details
+
+}  // namespace hut::text

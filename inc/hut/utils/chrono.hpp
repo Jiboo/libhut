@@ -43,11 +43,11 @@ class diff_clock_wrapper {
   using period                    = std::micro;
   using duration                  = std::chrono::duration<rep, period>;
   using time_point                = std::chrono::time_point<diff_clock_wrapper, duration>;
-  static constexpr bool is_steady = TInternalClock::is_steady;
+  constexpr static bool is_steady = TInternalClock::is_steady;  // NOLINT(readability-identifier-naming)
 
   static time_point now() {
-    static const typename TInternalClock::time_point epoch = TInternalClock::now();
-    return time_point{std::chrono::duration_cast<duration>(TInternalClock::now() - epoch)};
+    const static typename TInternalClock::time_point S_EPOCH = TInternalClock::now();
+    return time_point{std::chrono::duration_cast<duration>(TInternalClock::now() - S_EPOCH)};
   }
 };
 

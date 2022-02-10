@@ -65,7 +65,7 @@ enum keysym {
 #undef HUT_MAP_KEYSYM
   KSYM_LAST_VALUE = KSYM_RIGHTMETA,
 };
-const char          *keysym_name(keysym);
+const char          *keysym_name(keysym _keysym);
 inline std::ostream &operator<<(std::ostream &_os, keysym _k) {
   return _os << keysym_name(_k);
 }
@@ -112,7 +112,7 @@ enum cursor_type {
   CZOOM_OUT,
   CURSOR_TYPE_LAST_VALUE = CZOOM_OUT,
 };
-const char          *cursor_css_name(cursor_type);
+const char          *cursor_css_name(cursor_type _c);
 inline std::ostream &operator<<(std::ostream &_os, cursor_type _c) {
   return _os << cursor_css_name(_c);
 }
@@ -167,7 +167,7 @@ class clipboard_sender {
 
  public:
   void    close();
-  ssize_t write(std::span<const u8>);
+  ssize_t write(std::span<const u8> _data) const;
 };
 
 class clipboard_receiver {
@@ -180,7 +180,7 @@ class clipboard_receiver {
 
  public:
   void    close();
-  ssize_t read(std::span<u8>);
+  ssize_t read(std::span<u8> _data) const;
 };
 
 struct drop_target_interface {
@@ -239,20 +239,9 @@ class display {
   char32_t keycode_idle_char(keycode _in) const;
   char    *keycode_name(std::span<char> _out, keycode _in) const;
 
-  template<typename T>
-  T get_proc(const std::string &_name) {
-    static std::unordered_map<std::string, void *> cache;
-
-    auto it = cache.find(_name);
-    if (it == cache.end()) {
-      auto func = (T)vkGetInstanceProcAddr(instance_, _name.data());
-      if (func == nullptr)
-        throw std::runtime_error(sstream("can't find address of ") << _name);
-      cache.emplace(_name, (void *)func);
-      return func;
-    } else {
-      return (T)it->second;
-    }
+  template<typename TSignature>
+  TSignature get_proc(const std::string &_name) {
+    return (TSignature)get_proc_impl(_name);
   }
 
   [[nodiscard]] u16vec2 max_tex_size() const {
@@ -280,6 +269,8 @@ class display {
   void init_vulkan_instance(const char *_app_name, u32 _app_version, std::vector<const char *> &_extensions);
   void init_vulkan_device(VkSurfaceKHR _dummy);
   void destroy_vulkan();
+
+  void *get_proc_impl(const std::string &_name);
 
   shared_buffer   staging_;
   VkCommandBuffer staging_cb_;
@@ -340,37 +331,42 @@ class display {
   void                process_posts(time_point _now);
   void                post_empty_event();
 
-  static void registry_handler(void *, wl_registry *, u32, const char *, u32);
-  static void seat_handler(void *, wl_seat *, u32);
-  static void pointer_handle_enter(void *, wl_pointer *, u32, wl_surface *, wl_fixed_t, wl_fixed_t);
-  static void pointer_handle_leave(void *, wl_pointer *, u32, wl_surface *);
-  static void pointer_handle_motion(void *, wl_pointer *, u32, wl_fixed_t, wl_fixed_t);
-  static void pointer_handle_button(void *, wl_pointer *, u32, u32, u32, u32);
-  static void pointer_handle_axis(void *, wl_pointer *, u32, u32, wl_fixed_t);
-  static void pointer_handle_frame(void *, wl_pointer *);
-  static void pointer_handle_axis_source(void *, wl_pointer *, u32);
-  static void pointer_handle_axis_stop(void *, wl_pointer *, u32, u32);
-  static void pointer_handle_axis_discrete(void *, wl_pointer *, u32, i32);
-  static void keyboard_handle_keymap(void *, wl_keyboard *, u32, int, u32);
-  static void keyboard_handle_enter(void *, wl_keyboard *, u32, wl_surface *, wl_array *);
-  static void keyboard_handle_leave(void *, wl_keyboard *, u32, wl_surface *);
-  static void keyboard_handle_key(void *, wl_keyboard *, u32, u32, u32, u32);
-  static void keyboard_handle_modifiers(void *, wl_keyboard *, u32, u32, u32, u32, u32);
-  static void keyboard_handle_repeat_info(void *, wl_keyboard *, i32, i32);
-  static void data_offer_handle_offer(void *, wl_data_offer *, const char *);
-  static void data_offer_handle_source_actions(void *, wl_data_offer *, u32);
-  static void data_offer_handle_action(void *, wl_data_offer *, u32);
-  static void data_device_handle_data_offer(void *, wl_data_device *, wl_data_offer *);
-  static void data_device_handle_enter(void *, wl_data_device *, u32, wl_surface *, wl_fixed_t, wl_fixed_t,
-                                       wl_data_offer *);
-  static void data_device_handle_leave(void *, wl_data_device *);
-  static void data_device_handle_motion(void *, wl_data_device *, u32, wl_fixed_t, wl_fixed_t);
-  static void data_device_handle_drop(void *, wl_data_device *);
-  static void data_device_handle_selection(void *, wl_data_device *, wl_data_offer *);
-  static void output_geometry(void *, wl_output *, int32_t, int32_t, int32_t, int32_t, int32_t, const char *,
-                              const char *, int32_t);
-  static void output_mode(void *, wl_output *, uint32_t, int32_t, int32_t, int32_t);
-  static void output_scale(void *, wl_output *, int32_t);
+  static void registry_handler(void *_data, wl_registry *_registry, u32 _id, const char *_interface, u32 _version);
+  static void seat_handler(void *_data, wl_seat *_seat, u32 _caps);
+  static void pointer_handle_enter(void *_data, wl_pointer *_pointer, u32 _serial, wl_surface *_surface, wl_fixed_t _sx,
+                                   wl_fixed_t _sy);
+  static void pointer_handle_leave(void *_data, wl_pointer *_pointer, u32 _serial, wl_surface *_surface);
+  static void pointer_handle_motion(void *_data, wl_pointer *_pointer, u32 _time, wl_fixed_t _sx, wl_fixed_t _sy);
+  static void pointer_handle_button(void *_data, wl_pointer *_pointer, u32 _serial, u32 _time, u32 _button, u32 _state);
+  static void pointer_handle_axis(void *_data, wl_pointer *_pointer, u32 _time, u32 _axis, wl_fixed_t _value);
+  static void pointer_handle_frame(void *_data, wl_pointer *_pointer);
+  static void pointer_handle_axis_source(void *_data, wl_pointer *_pointer, u32 _source);
+  static void pointer_handle_axis_stop(void *_data, wl_pointer *_pointer, u32 _time, u32 _axis);
+  static void pointer_handle_axis_discrete(void *_data, wl_pointer *_pointer, u32 _axis, i32 _discrete);
+  static void keyboard_handle_keymap(void *_data, wl_keyboard *_keyboard, u32 _format, int _fd, u32 _size);
+  static void keyboard_handle_enter(void *_data, wl_keyboard *_keyboard, u32 _serial, wl_surface *_surface,
+                                    wl_array *_unused);
+  static void keyboard_handle_leave(void *_data, wl_keyboard *_keyboard, u32 _serial, wl_surface *_surface);
+  static void keyboard_handle_key(void *_data, wl_keyboard *_keyboard, u32 _serial, u32 _time, u32 _key, u32 _state);
+  static void keyboard_handle_modifiers(void *_data, wl_keyboard *_keyboard, u32 _serial, u32 _mods_depressed,
+                                        u32 _mods_latched, u32 _mods_locked, u32 _group);
+  static void keyboard_handle_repeat_info(void *_data, wl_keyboard *_keyboard, i32 _rate, i32 _delay);
+  static void data_offer_handle_offer(void *_data, wl_data_offer *_offer, const char *_mime);
+  static void data_offer_handle_source_actions(void *_data, wl_data_offer *_offer, u32 _actions);
+  static void data_offer_handle_action(void *_data, wl_data_offer *_offer, u32 _action);
+  static void data_device_handle_data_offer(void *_data, wl_data_device *_unused, wl_data_offer *_offer);
+  static void data_device_handle_enter(void *_data, wl_data_device *_device, u32 _serial, wl_surface *_surface,
+                                       wl_fixed_t _x, wl_fixed_t _y, wl_data_offer *_offer);
+  static void data_device_handle_leave(void *_data, wl_data_device *_device);
+  static void data_device_handle_motion(void *_data, wl_data_device *_device, u32 _time, wl_fixed_t _x, wl_fixed_t _y);
+  static void data_device_handle_drop(void *_data, wl_data_device *_device);
+  static void data_device_handle_selection(void *_data, wl_data_device *_device, wl_data_offer *_offer);
+  static void output_geometry(void *_data, wl_output *_output, int32_t _x, int32_t _y, int32_t _pwidth,
+                              int32_t _pheight, int32_t _subpixel, const char *_maker, const char *_model,
+                              int32_t _transform);
+  static void output_mode(void *_data, wl_output *_output, uint32_t _flags, int32_t _width, int32_t _height,
+                          int32_t _refresh);
+  static void output_scale(void *_data, wl_output *_output, int32_t _scale);
 
   struct animate_cursor_context {
     display                &display_;
@@ -407,9 +403,9 @@ class display {
         : display_(_parent) {}
   };
   void        keyboard_repeat(char32_t _c);
-  static void keyboard_repeat_thread(keyboard_repeat_context *_tp);
+  static void keyboard_repeat_thread(keyboard_repeat_context *_ctx);
 
-  static keysym map_xkb_keysym(xkb_keysym_t);
+  static keysym map_xkb_keysym(xkb_keysym_t _in);
 
   std::unordered_map<wl_surface *, window *> windows_;
   bool                                       loop_ = true;

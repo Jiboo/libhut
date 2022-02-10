@@ -32,7 +32,7 @@
 
 #include "hut/utils/profiling.hpp"
 
-using namespace hut::text;
+namespace hut::text {
 
 shaper::shaper(shared_font _font, render_mode _rmode)
     : buffer_(hb_buffer_create())
@@ -65,7 +65,7 @@ void shaper::shape(const shared_atlas &_atlas, std::u8string_view _text, const s
 
     auto glyph = font_->load(_atlas, cindex, rmode_);
     if (glyph.subimage_) {
-      assert((pos[i].x_offset / FONT_FACTOR) <= numax_v<i32>);
+      assert((pos[i].x_offset / FONT_FACTOR) <= NUMAX<i32>);
       auto    bearing      = glyph.bearing_;
       auto    size         = glyph.size_;
       i16vec2 glyph_offset = i16vec2{pos[i].x_offset, pos[i].y_offset} / FONT_FACTOR;
@@ -78,3 +78,5 @@ void shaper::shape(const shared_atlas &_atlas, std::u8string_view _text, const s
     cur_offset += i16vec2{pos[i].x_advance, pos[i].y_advance} / FONT_FACTOR;
   }
 }
+
+}  // namespace hut::text

@@ -67,7 +67,7 @@ class font {
   enum class render_mode { NORMAL, LCD, LCD_V, SDF };
 
   uint  char_index(char32_t _unichar);
-  glyph load(const shared_atlas &, uint _char_index, render_mode _rmode = render_mode::NORMAL);
+  glyph load(const shared_atlas &_atlas, uint _char_index, render_mode _rmode = render_mode::NORMAL);
 
   void reset_to_size(const size_px<uint> &_size);
 
@@ -78,7 +78,7 @@ class font {
   std::mutex                      mutex_;
   std::unordered_map<uint, glyph> cache_;
 
-  glyph load_internal(const shared_atlas &, uint _char_index, render_mode _rmode);
+  glyph load_internal(const shared_atlas &_atlas, uint _char_index, render_mode _rmode);
 };
 
 using shared_font = std::shared_ptr<font>;

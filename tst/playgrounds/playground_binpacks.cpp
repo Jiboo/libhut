@@ -38,13 +38,13 @@
 
 using namespace hut;
 
-template<typename T>
-void debug(const binpack::linear1d<T> &_packer) {
+template<typename TSizeType>
+void debug(const binpack::linear1d<TSizeType> &_packer) {
   ImDrawList *draw_list = ImGui::GetWindowDrawList();
   ImVec2      p         = ImGui::GetCursorScreenPos();
-  _packer.visit_blocks([p, draw_list](const auto &block) {
-    if (!block.used_) {
-      u16vec4 rect{block.offset_, 0, block.offset_ + block.size_, 100};
+  _packer.visit_blocks([p, draw_list](const auto &_block) {
+    if (!_block.used_) {
+      u16vec4 rect{_block.offset_, 0, _block.offset_ + _block.size_, 100};
       draw_list->AddRectFilled(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w),
                                IM_COL32(0, 255, 0, 63));
       draw_list->AddRect(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w),
@@ -54,13 +54,13 @@ void debug(const binpack::linear1d<T> &_packer) {
   });
 }
 
-template<typename T, typename TUnderlying>
-void debug(const binpack::adaptor1d_dummy2d<T, TUnderlying> &_packer) {
+template<typename TSizeType, typename TUnderlying>
+void debug(const binpack::adaptor1d_dummy2d<TSizeType, TUnderlying> &_packer) {
   debug(_packer.underlying_);
 }
 
-template<typename T, typename TShelveSelector>
-void debug(const binpack::shelve<T, TShelveSelector> &_packer) {
+template<typename TSizeType, typename TShelveSelector>
+void debug(const binpack::shelve<TSizeType, TShelveSelector> &_packer) {
   ImDrawList *draw_list = ImGui::GetWindowDrawList();
   ImVec2      p         = ImGui::GetCursorScreenPos();
 
@@ -71,69 +71,69 @@ void debug(const binpack::shelve<T, TShelveSelector> &_packer) {
 }
 
 template<typename TPacker>
-void ImPacker(const char *_name = "Packer", u16vec2 _bounds = {8 * 1024, 8 * 1024}, u16vec2 _min_rect = {5, 5},
-              u16vec2 _max_rect = {100, 100}) {
+void packer(const char *_name = "Packer", u16vec2 _bounds = {8 * 1024, 8 * 1024}, u16vec2 _min_rect = {5, 5},
+            u16vec2 _max_rect = {100, 100}) {
   ImGui::SetNextWindowContentSize({float(_bounds.x), float(_bounds.y)});
   if (ImGui::Begin(_name, nullptr, ImGuiWindowFlags_HorizontalScrollbar)) {
     using hrclock_t = std::chrono::high_resolution_clock;
     using dur_t     = std::chrono::duration<float, std::milli>;
-    static TPacker              packer(_bounds);
-    static std::vector<u16vec4> packed;
-    static std::mt19937         gen;
-    static float                surface = 0;
-    static std::vector<float>   add_timings;
-    static float                total_add_time = 0;
-    static std::vector<float>   rem_timings;
-    static float                total_rem_time = 0;
-    static auto                 padding        = ivec2{0, 0};
+    static TPacker              s_packer(_bounds);
+    static std::vector<u16vec4> s_packed;
+    static std::mt19937         s_gen;
+    static float                s_surface = 0;
+    static std::vector<float>   s_add_timings;
+    static float                s_total_add_time = 0;
+    static std::vector<float>   s_rem_timings;
+    static float                s_total_rem_time = 0;
+    static auto                 s_padding        = ivec2{0, 0};
 
     auto rand_norm = [&]() {
       std::uniform_real_distribution<> dis(0.0, 1.0);
-      return dis(gen);
+      return dis(s_gen);
     };
     auto rand_int = [&](int _end) {
       std::uniform_int_distribution dis(0, _end - 1);
-      return dis(gen);
+      return dis(s_gen);
     };
     auto rand_size = [&]() {
       return u16vec2{(_max_rect.x - _min_rect.x) * rand_norm() + _min_rect.x,
                      (_max_rect.y - _min_rect.y) * rand_norm() + _min_rect.y};
     };
     auto reset = [&]() {
-      gen.seed(std::mt19937::default_seed);
-      packed.clear();
-      add_timings.clear();
-      rem_timings.clear();
-      packer.reset();
-      surface        = 0;
-      total_add_time = 0;
-      total_rem_time = 0;
+      s_gen.seed(std::mt19937::default_seed);
+      s_packed.clear();
+      s_add_timings.clear();
+      s_rem_timings.clear();
+      s_packer.reset();
+      s_surface        = 0;
+      s_total_add_time = 0;
+      s_total_rem_time = 0;
     };
     auto add_one = [&]() {
       auto rect_size = rand_size();
       auto before    = hrclock_t::now();
-      auto rect      = packer.pack(rect_size + u16vec2(padding));
+      auto rect      = s_packer.pack(rect_size + u16vec2(s_padding));
       auto after     = hrclock_t::now();
       auto time      = std::chrono::duration_cast<dur_t>(after - before).count();
-      total_add_time += time;
-      add_timings.emplace_back(time);
+      s_total_add_time += time;
+      s_add_timings.emplace_back(time);
       if (rect) {
-        surface += rect_size.x * rect_size.y;
-        packed.emplace_back(make_bbox_with_origin_size(rect.value(), rect_size - u16vec2(padding)));
+        s_surface += rect_size.x * rect_size.y;
+        s_packed.emplace_back(make_bbox_with_origin_size(rect.value(), rect_size - u16vec2(s_padding)));
       }
       return rect.has_value();
     };
     auto remove_rand = [&]() {
-      auto index     = rand_int(packed.size());
-      auto rect_size = bbox_size(packed[index]);
+      auto index     = rand_int(s_packed.size());
+      auto rect_size = bbox_size(s_packed[index]);
       auto before    = hrclock_t::now();
-      packer.offer(packed[index]);
+      s_packer.offer(s_packed[index]);
       auto after = hrclock_t::now();
       auto time  = std::chrono::duration_cast<dur_t>(after - before).count();
-      total_rem_time += time;
-      rem_timings.emplace_back(time);
-      surface -= rect_size.x * rect_size.y;
-      packed.erase(packed.begin() + index);
+      s_total_rem_time += time;
+      s_rem_timings.emplace_back(time);
+      s_surface -= rect_size.x * rect_size.y;
+      s_packed.erase(s_packed.begin() + index);
     };
 
     if (ImGui::Button("Reset")) {
@@ -160,38 +160,40 @@ void ImPacker(const char *_name = "Packer", u16vec2 _bounds = {8 * 1024, 8 * 102
     }
     ImGui::SameLine();
     if (ImGui::Button("Stress")) {
-      while (!packed.empty())
+      while (!s_packed.empty())
         remove_rand();
       while (add_one())
         ;
     }
     ImGui::SameLine();
-    ImGui::InputInt2("Padding", &padding.x);
+    ImGui::InputInt2("Padding", &s_padding.x);
     ImGui::Text("Packed %zu/%zu (with %zu rem), %f%% surface, %fms total add (%fms/op), %fms total rem (%fms/op)",
-                packed.size(), add_timings.size(), rem_timings.size(), surface / float(_bounds.x * _bounds.y) * 100,
-                total_add_time, total_add_time / add_timings.size(), total_rem_time,
-                total_rem_time / rem_timings.size());
-    ImGui::PlotHistogram("Add", add_timings.data(), add_timings.size(), 0, nullptr, FLT_MAX, FLT_MAX, ImVec2(0, 200));
-    ImGui::PlotHistogram("Rem", rem_timings.data(), rem_timings.size(), 0, nullptr, FLT_MAX, FLT_MAX, ImVec2(0, 200));
+                s_packed.size(), s_add_timings.size(), s_rem_timings.size(),
+                s_surface / float(_bounds.x * _bounds.y) * 100, s_total_add_time,
+                s_total_add_time / s_add_timings.size(), s_total_rem_time, s_total_rem_time / s_rem_timings.size());
+    ImGui::PlotHistogram("Add", s_add_timings.data(), s_add_timings.size(), 0, nullptr, FLT_MAX, FLT_MAX,
+                         ImVec2(0, 200));
+    ImGui::PlotHistogram("Rem", s_rem_timings.data(), s_rem_timings.size(), 0, nullptr, FLT_MAX, FLT_MAX,
+                         ImVec2(0, 200));
 
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     ImVec2      p         = ImGui::GetCursorScreenPos();
 
     draw_list->AddRect(ImVec2(p.x, p.y), ImVec2(p.x + _bounds.x, p.y + _bounds.y), IM_COL32(255, 0, 0, 255));
-    for (auto &rect : packed) {
+    for (auto &rect : s_packed) {
       draw_list->AddRectFilled(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w),
                                IM_COL32(255, 255, 0, 127));
       draw_list->AddRect(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w),
                          IM_COL32(255, 255, 0, 255));
     }
-    debug(packer);
+    debug(s_packer);
 
     ImGui::Dummy(ImVec2(_bounds.x, _bounds.y));
   }
   ImGui::End();
 }
 
-int main(int, char **) {
+int main(int /*unused*/, char ** /*unused*/) {
   display dsp("hut binpack playground");
 
   window win(dsp);
@@ -201,31 +203,31 @@ int main(int, char **) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!ImGui_ImplHut_Init(&dsp, &win, true))
+  if (!imgui::init(&dsp, &win, true))
     return EXIT_FAILURE;
   install_test_events(dsp, win);
 
-  win.on_draw.connect([&](VkCommandBuffer _buffer) {
-    ImGui_ImplHut_NewFrame();
+  win.on_draw_.connect([&](VkCommandBuffer _buffer) {
+    imgui::new_frame();
     ImGui::NewFrame();
 
-    ImPacker<binpack::adaptor1d_dummy2d<u16, binpack::linear1d<u16>>>("linear1d", {32 * 1024, 100}, {5, 100});
-    ImPacker<binpack::shelve<u16, binpack::shelve_separator_align<u16, 16>>>("shelves<align<16>>");
-    ImPacker<binpack::shelve<u16, binpack::shelve_separator_pow<u16, 16>>>("shelves<pow<16>>");
+    packer<binpack::adaptor1d_dummy2d<u16, binpack::linear1d<u16>>>("linear1d", {32 * 1024, 100}, {5, 100});
+    packer<binpack::shelve<u16, binpack::shelve_separator_align<u16, 16>>>("shelves<align<16>>");
+    packer<binpack::shelve<u16, binpack::shelve_separator_pow<u16, 16>>>("shelves<pow<16>>");
 
     ImGui::Render();
-    ImGui_ImplHut_RenderDrawData(_buffer, ImGui::GetDrawData());
+    imgui::render(_buffer, ImGui::GetDrawData());
 
     return false;
   });
-  win.on_frame.connect([&](display::duration _dt) {
+  win.on_frame_.connect([&](display::duration _dt) {
     dsp.post([&](auto) { win.invalidate(true); });
     return false;
   });
 
   dsp.dispatch();
 
-  ImGui_ImplHut_Shutdown();
+  imgui::shutdown();
   ImGui::DestroyContext();
 
   return EXIT_SUCCESS;

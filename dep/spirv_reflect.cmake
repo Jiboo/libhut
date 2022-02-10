@@ -11,3 +11,4 @@ add_library(spirv_reflect STATIC ${SPIRV_REFLECT_HEADERS} ${SPIRV_REFLECT_SOURCE
 target_compile_definitions(spirv_reflect PUBLIC ${SPIRV_REFLECT_DEFINITIONS})
 target_include_directories(spirv_reflect PUBLIC ${SPIRV_REFLECT_INCLUDES})
 target_precompile_headers(spirv_reflect PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_SOURCE_DIR}/dep/SPIRV-Reflect/spirv_reflect.h>")
+set_property(TARGET spirv_reflect PROPERTY EXPORT_COMPILE_COMMANDS OFF)

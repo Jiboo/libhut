@@ -36,7 +36,7 @@
 #include "hut/display.hpp"
 #include "hut/image.hpp"
 
-using namespace hut;
+namespace hut {
 
 render_target::render_target(display &_display)
     : display_(&_display) {
@@ -65,11 +65,11 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
   if (render_target_params_.flags_ & render_target_params::FMULTISAMPLING) {
     const auto        &limits = display_->limits();
     VkSampleCountFlags counts = limits.framebufferColorSampleCounts & limits.framebufferDepthSampleCounts;
-    if (counts & VK_SAMPLE_COUNT_8_BIT)
+    if ((counts & VK_SAMPLE_COUNT_8_BIT) != 0u)
       sample_count_ = VK_SAMPLE_COUNT_8_BIT;
-    else if (counts & VK_SAMPLE_COUNT_4_BIT)
+    else if ((counts & VK_SAMPLE_COUNT_4_BIT) != 0u)
       sample_count_ = VK_SAMPLE_COUNT_4_BIT;
-    else if (counts & VK_SAMPLE_COUNT_2_BIT)
+    else if ((counts & VK_SAMPLE_COUNT_2_BIT) != 0u)
       sample_count_ = VK_SAMPLE_COUNT_2_BIT;
 
     if (sample_count_ != VK_SAMPLE_COUNT_1_BIT) {
@@ -92,7 +92,7 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
       VkFormatProperties props;
       HUT_PVK(vkGetPhysicalDeviceFormatProperties, pdevice, format, &props);
 
-      if (props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+      if ((props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0u) {
         depth_format = format;
         break;
       }
@@ -187,7 +187,7 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
   render_pass_info.dependencyCount        = 1;
   render_pass_info.pDependencies          = &dependency;
 
-  const auto device = display_->device();
+  auto *const device = display_->device();
   if (renderpass_ != VK_NULL_HANDLE)
     HUT_PVK(vkDestroyRenderPass, device, renderpass_, nullptr);
   if (HUT_PVK(vkCreateRenderPass, device, &render_pass_info, nullptr, &renderpass_) != VK_SUCCESS)
@@ -282,3 +282,5 @@ void render_target::end_rebuild_cb(VkCommandBuffer _cb) {
   if (HUT_PVK(vkEndCommandBuffer, _cb) != VK_SUCCESS)
     throw std::runtime_error("failed to record command buffer!");
 }
+
+}  // namespace hut

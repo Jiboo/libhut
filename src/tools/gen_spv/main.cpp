@@ -169,7 +169,7 @@ constexpr string_view VK_FORMATS[] = {
 };
 
 string_view remove_format_suffix(string_view _input) {
-  for (auto &vk_format : VK_FORMATS) {
+  for (const auto &vk_format : VK_FORMATS) {
     if (_input.ends_with(vk_format))
       return _input.substr(0, _input.size() - vk_format.size()
                                   - 1);  // NOTE JBL: extra one for the underscore, '_'<format>
@@ -189,7 +189,7 @@ string format_name_vk(SpvReflectInterfaceVariable *_input) {
   os << "VK_FORMAT_";
 
   const string_view name = _input->name;
-  for (auto &vk_format : VK_FORMATS) {
+  for (const auto &vk_format : VK_FORMATS) {
     if (name.ends_with(vk_format)) {
       for (auto c : vk_format)
         os << (char)std::toupper(c);
@@ -217,7 +217,7 @@ string format_name_vk(SpvReflectInterfaceVariable *_input) {
 
     default:
       if (_input->numeric.scalar.width > 16)
-        os << (_input->numeric.scalar.signedness ? "_SINT" : "_UINT");
+        os << (_input->numeric.scalar.signedness != 0u ? "_SINT" : "_UINT");
       else
         os << "_UNORM";
       break;
@@ -226,12 +226,12 @@ string format_name_vk(SpvReflectInterfaceVariable *_input) {
   return os.str();
 }
 
-string format_name_cpp(SpvReflectInterfaceVariable *_input, uint _columns = numax_v<uint>) {
-  _columns = (_columns == numax_v<uint> ? _input->numeric.matrix.column_count : _columns);
+string format_name_cpp(SpvReflectInterfaceVariable *_input, uint _columns = NUMAX<uint>) {
+  _columns = (_columns == NUMAX<uint> ? _input->numeric.matrix.column_count : _columns);
 
   const string_view name = _input->name;
   string            format;
-  for (auto &vk_format : VK_FORMATS) {
+  for (const auto &vk_format : VK_FORMATS) {
     if (name.ends_with(vk_format)) {
       format = vk_format;
       break;
@@ -273,7 +273,7 @@ string format_name_cpp(SpvReflectInterfaceVariable *_input, uint _columns = numa
     if (fp)
       os << "_sfloat";
     else if (_input->numeric.scalar.width > 16)
-      os << (_input->numeric.scalar.signedness ? "_sint" : "_uint");
+      os << (_input->numeric.scalar.signedness != 0u ? "_sint" : "_uint");
     else
       os << "_unorm";
 
@@ -282,7 +282,7 @@ string format_name_cpp(SpvReflectInterfaceVariable *_input, uint _columns = numa
 
   if (format.ends_with("pack8"))
     return "u8";
-  else if (format.ends_with("pack16"))
+  if (format.ends_with("pack16"))
     return "u16";
   else if (format.ends_with("pack32"))
     return "u32";
@@ -373,53 +373,54 @@ void reflect_vertex_inputs(ostream &_os, const SpvReflectShaderModule &_mod) {
         : input_(_input)
         , name_(_name) {}
   };
-  vector<vertex_data_member> vertex_inputs, instance_inputs;
+  vector<vertex_data_member> vertex_inputs;
+  vector<vertex_data_member> instance_inputs;
 
   /* FIXME JBL: Can't found something better to do than to use naming convention for vertex/instance split
    * "binding" decoration is forbidden, and apparently can't use SPIRV-Reflect for custom decorations
    * or pragmas for cpp-like "attributes"..*/
 
   constexpr string_view INPUT_REGEXP_SOURCE = "in_(v|i)_([a-z0-9_]*)";
-  static regex          input_regex(INPUT_REGEXP_SOURCE.data(), INPUT_REGEXP_SOURCE.size());
-  static svmatch        input_match;
+  static regex          s_input_regex(INPUT_REGEXP_SOURCE.data(), INPUT_REGEXP_SOURCE.size());
+  static svmatch        s_input_match;
 
   std::vector<std::string> attributes;
   ostringstream            attribute_buffer;
 
   for (auto *input : inputs) {
     try {
-      if (input->decoration_flags & SPV_REFLECT_DECORATION_BUILT_IN)
+      if ((input->decoration_flags & SPV_REFLECT_DECORATION_BUILT_IN) != 0u)
         continue;
 
       int binding = 0;
-      if (!regex_match(string_view{input->name}, input_match, input_regex)) {
-        throw runtime_error(hut::sstream("did not match regexp ") << INPUT_REGEXP_SOURCE);
+      if (!regex_match(string_view{input->name}, s_input_match, s_input_regex)) {
+        throw runtime_error(sstream("did not match regexp ") << INPUT_REGEXP_SOURCE);
+      }
+      auto name_without_prefix = string_view{s_input_match[2].first, s_input_match[2].second};
+      auto short_name          = remove_format_suffix(name_without_prefix);
+      if (s_input_match[1] == "i") {
+        instance_inputs.emplace_back(input, short_name);
+        binding = 1;
       } else {
-        auto name_without_prefix = string_view{input_match[2].first, input_match[2].second};
-        auto short_name          = remove_format_suffix(name_without_prefix);
-        if (input_match[1] == "i") {
-          instance_inputs.emplace_back(input, short_name);
-          binding = 1;
-        } else {
-          vertex_inputs.emplace_back(input, short_name);
-        }
+        vertex_inputs.emplace_back(input, short_name);
+      }
 
-        auto columns = input->numeric.matrix.column_count;
-        if (columns == 0) {
+      auto columns = input->numeric.matrix.column_count;
+      if (columns == 0) {
+        attribute_buffer.str("");
+        reflect_vertex_input(attribute_buffer, input, binding, short_name);
+        attributes.emplace_back(attribute_buffer.str());
+      } else {
+        for (uint i = 0; i < columns; i++) {
           attribute_buffer.str("");
-          reflect_vertex_input(attribute_buffer, input, binding, short_name);
+          reflect_vertex_input(attribute_buffer, input, binding, short_name, i,
+                               sstream(" + sizeof(") << format_name_cpp(input, 0) << ") * " << i);
           attributes.emplace_back(attribute_buffer.str());
-        } else {
-          for (uint i = 0; i < columns; i++) {
-            attribute_buffer.str("");
-            reflect_vertex_input(attribute_buffer, input, binding, short_name, i,
-                                 sstream(" + sizeof(") << format_name_cpp(input, 0) << ") * " << i);
-            attributes.emplace_back(attribute_buffer.str());
-          }
         }
       }
-    } catch (const exception &_ex) {
-      throw runtime_error(sstream("while reflecting on field ") << input->name << ": " << _ex.what());
+
+    } catch (const exception &ex) {
+      throw runtime_error(sstream("while reflecting on field ") << input->name << ": " << ex.what());
     }
   }
 
@@ -518,8 +519,8 @@ int main(int _argc, char **_argv) {
         case SPV_REFLECT_SHADER_STAGE_FRAGMENT_BIT: reflect_fragment_shader(output_h, module); break;
         default: throw runtime_error(sstream("reflecting on unsupported vertex stage ") << module.shader_stage);
       }
-    } catch (const exception &_ex) {
-      throw runtime_error(sstream("exception while reflecting on ") << input_path << ": " << _ex.what());
+    } catch (const exception &ex) {
+      throw runtime_error(sstream("exception while reflecting on ") << input_path << ": " << ex.what());
     }
 
     output_h << "\n  constexpr static auto &BYTECODE = " << bundle_namespace << "::" << symbol << ";\n";

@@ -48,16 +48,16 @@ enum side {
   LAST_SIDE = RIGHT,
 };
 using edge = flagged<side, LAST_SIDE>;
-cursor_type edge_cursor(edge);
+cursor_type edge_cursor(edge _edge);
 
 enum touch_event_type { TDOWN, TUP, TMOVE };
-const char          *touch_event_name(touch_event_type);
+const char          *touch_event_name(touch_event_type _type);
 inline std::ostream &operator<<(std::ostream &_os, touch_event_type _c) {
   return _os << touch_event_name(_c);
 }
 
 enum mouse_event_type { MDOWN, MUP, MMOVE, MWHEEL_UP, MWHEEL_DOWN };
-const char          *mouse_event_name(mouse_event_type);
+const char          *mouse_event_name(mouse_event_type _type);
 inline std::ostream &operator<<(std::ostream &_os, mouse_event_type _c) {
   return _os << mouse_event_name(_c);
 }
@@ -83,26 +83,25 @@ class window : public render_target {
   friend class display;
 
  public:
-  event<>                       on_pause;   // sys asked win to stop rendering
-  event<>                       on_resume;  // sys asked win to resume rendering
-  event<>                       on_focus;   // sys gave keyboard focus to win
-  event<>                       on_blur;    // win lost keyboard focus
-  event<>                       on_close;   // overridable, sys requested win to close
-  event<u16vec4>                on_expose;  // sys request win to redraw this rect
-  event<VkCommandBuffer>        on_draw;    // win is dirty, needs to rebuild command buffer
-  event<display::duration>      on_frame;   // win will soon be drawn (use this to animate values)
-  event<u16vec2, u32 /*scale*/> on_resize;  // sys changed win size or scaling
+  event<>                       on_pause_;   // sys asked win to stop rendering
+  event<>                       on_resume_;  // sys asked win to resume rendering
+  event<bool>                   on_focus_;   // sys gave keyboard focus to win
+  event<>                       on_close_;   // overridable, sys requested win to close
+  event<u16vec4>                on_expose_;  // sys request win to redraw this rect
+  event<VkCommandBuffer>        on_draw_;    // win is dirty, needs to rebuild command buffer
+  event<display::duration>      on_frame_;   // win will soon be drawn (use this to animate values)
+  event<u16vec2, u32 /*scale*/> on_resize_;  // sys changed win size or scaling
 
 #if defined(HUT_ENABLE_TIME_EVENTS)
-  event<u32> on_time;  // contains timestamps of sys events, to measure hut latency
+  event<u32> on_time_;  // contains timestamps of sys events, to measure hut latency
 #endif
 
-  event<u8 /*finger*/, touch_event_type, vec2 /*pos*/> on_touch;
-  event<u8 /*button*/, mouse_event_type, vec2 /*pos*/> on_mouse;
+  event<u8 /*finger*/, touch_event_type, vec2 /*pos*/> on_touch_;
+  event<u8 /*button*/, mouse_event_type, vec2 /*pos*/> on_mouse_;
 
-  event<modifiers /*mods*/>             on_kmods;
-  event<keycode, keysym, bool /*down*/> on_key;
-  event<char32_t /*utf32_char*/>        on_char;
+  event<modifiers /*mods*/>             on_kmods_;
+  event<keycode, keysym, bool /*down*/> on_key_;
+  event<char32_t /*utf32_char*/>        on_char_;
 
   window() = delete;
 
@@ -118,7 +117,7 @@ class window : public render_target {
   void close();
   void pause();
 
-  void invalidate(const uvec4 &, bool _redraw);
+  void invalidate(const uvec4 &_rect, bool _redraw);
   void invalidate(bool _redraw);
   void maximize(bool _set = true);
   void fullscreen(bool _set = true);
@@ -126,10 +125,10 @@ class window : public render_target {
   u16vec2 size() const { return size_; }
   u32     scale() const { return scale_; }
 
-  void interactive_resize(edge);
+  void interactive_resize(edge _edge);
   void interactive_move();
 
-  void title(std::u8string_view);
+  void title(std::u8string_view _title);
   void cursor(cursor_type _c);
   void clear_color(const vec4 &_color) {
     render_target_params_.clear_color_ = {{_color.r, _color.g, _color.b, _color.a}};
@@ -177,26 +176,25 @@ class window : public render_target {
 
   void init_vulkan_surface();
   void destroy_vulkan();
-  void redraw(display::time_point);
+  void redraw(display::time_point _tp);
 
- protected:
-  static void surface_enter(void *, wl_surface *, wl_output *);
-  static void surface_leave(void *, wl_surface *, wl_output *);
-  static void handle_xdg_configure(void *, xdg_surface *, u32);
-  static void handle_toplevel_configure(void *, xdg_toplevel *, i32, i32, wl_array *);
-  static void handle_toplevel_close(void *, xdg_toplevel *);
-  static void clipboard_data_source_handle_target(void *, wl_data_source *, const char *);
-  static void clipboard_data_source_handle_send(void *, wl_data_source *, const char *, i32);
-  static void clipboard_data_source_handle_cancelled(void *, wl_data_source *);
-  static void clipboard_data_source_handle_dnd_drop_performed(void *, wl_data_source *);
-  static void clipboard_data_source_handle_dnd_finished(void *, wl_data_source *);
-  static void clipboard_data_source_handle_action(void *, wl_data_source *, u32);
-  static void drag_data_source_handle_target(void *, wl_data_source *, const char *);
-  static void drag_data_source_handle_send(void *, wl_data_source *, const char *, i32);
-  static void drag_data_source_handle_cancelled(void *, wl_data_source *);
-  static void drag_data_source_handle_dnd_drop_performed(void *, wl_data_source *);
-  static void drag_data_source_handle_dnd_finished(void *, wl_data_source *);
-  static void drag_data_source_handle_action(void *, wl_data_source *, u32);
+  static void surface_enter(void *_data, wl_surface *_surface, wl_output *_output);
+  static void surface_leave(void *_data, wl_surface *_surface, wl_output *_output);
+  static void handle_xdg_configure(void *_data, xdg_surface *_unused, u32 _serial);
+  static void handle_toplevel_configure(void *_data, xdg_toplevel *_unused, i32 _width, i32 _height, wl_array *_states);
+  static void handle_toplevel_close(void *_data, xdg_toplevel *_unused);
+  static void clipboard_data_source_handle_target(void *_data, wl_data_source *_source, const char *_mime);
+  static void clipboard_data_source_handle_send(void *_data, wl_data_source *_source, const char *_mime, i32 _fd);
+  static void clipboard_data_source_handle_cancelled(void *_data, wl_data_source *_source);
+  static void clipboard_data_source_handle_dnd_drop_performed(void *_data, wl_data_source *_source);
+  static void clipboard_data_source_handle_dnd_finished(void *_data, wl_data_source *_source);
+  static void clipboard_data_source_handle_action(void *_data, wl_data_source *_source, u32 _action);
+  static void drag_data_source_handle_target(void *_data, wl_data_source *_source, const char *_mime);
+  static void drag_data_source_handle_send(void *_data, wl_data_source *_source, const char *_mime, i32 _fd);
+  static void drag_data_source_handle_cancelled(void *_data, wl_data_source *_source);
+  static void drag_data_source_handle_dnd_drop_performed(void *_data, wl_data_source *_source);
+  static void drag_data_source_handle_dnd_finished(void *_data, wl_data_source *_source);
+  static void drag_data_source_handle_action(void *_data, wl_data_source *_source, u32 _action);
 
   wl_surface   *wayland_surface_;
   xdg_surface  *window_;
@@ -243,7 +241,7 @@ class window : public render_target {
         if (writer.thread_.joinable())
           writer.thread_.join();
       }
-      if (selection_) {
+      if (selection_ != nullptr) {
         wl_data_source_destroy(selection_);
       }
       selection_ = nullptr;

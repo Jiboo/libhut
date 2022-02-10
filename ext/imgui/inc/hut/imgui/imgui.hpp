@@ -34,28 +34,29 @@
 #include "hut/display.hpp"
 #include "hut/window.hpp"
 
-IMGUI_IMPL_API bool ImGui_ImplHut_Init(hut::display *_d, hut::window *_w, bool _install_callbacks);
-IMGUI_IMPL_API void ImGui_ImplHut_Shutdown();
-IMGUI_IMPL_API void ImGui_ImplHut_NewFrame();
-IMGUI_IMPL_API void ImGui_ImplHut_RenderDrawData(VkCommandBuffer _buffer, ImDrawData *_draw_data);
+namespace hut::imgui {
+
+IMGUI_IMPL_API bool init(display *_d, window *_w, bool _install_callbacks);
+IMGUI_IMPL_API void shutdown();
+IMGUI_IMPL_API void new_frame();
+IMGUI_IMPL_API void render(VkCommandBuffer _buffer, ImDrawData *_draw_data);
 
 // Use if you want to reset your rendering device without losing Dear ImGui state.
-IMGUI_IMPL_API bool        ImGui_ImplHut_CreateDeviceObjects();
-IMGUI_IMPL_API void        ImGui_ImplHut_InvalidateDeviceObjects();
-IMGUI_IMPL_API ImTextureID ImGui_ImplHut_AddImage(const hut::shared_image &_image, const hut::shared_sampler &_sampler);
-IMGUI_IMPL_API void        ImGui_ImplHut_RemImage(ImTextureID);
+IMGUI_IMPL_API bool        create_device_objects();
+IMGUI_IMPL_API void        invalidate_device_objects();
+IMGUI_IMPL_API ImTextureID add_image(const shared_image &_image, const shared_sampler &_sampler);
+IMGUI_IMPL_API void        rem_image(ImTextureID _id);
 
 // Callbacks (installed by default if you enable 'install_callbacks' during initialization)
 // You can also handle inputs yourself and use those as a reference.
-IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnResize(hut::u16vec2 _size, hut::u32 _scale);
-IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnMouse(hut::u8 _button, hut::mouse_event_type _type, hut::vec2 _pos);
-IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnKey(hut::keycode _kcode, hut::keysym _ksym, bool _down);
-IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnChar(char32_t _utf32_char);
-IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnBlur();
-IMGUI_IMPL_API bool ImGui_ImplHut_HandleOnFocus();
+IMGUI_IMPL_API bool handle_resize(u16vec2 _size, u32 _scale);
+IMGUI_IMPL_API bool handle_mouse(u8 _button, mouse_event_type _type, vec2 _pos);
+IMGUI_IMPL_API bool handle_key(keycode _kcode, keysym _ksym, bool _down);
+IMGUI_IMPL_API bool handle_char(char32_t _utf32_char);
+IMGUI_IMPL_API bool handle_focus(bool _focused);
 
-template<typename TEnum, TEnum TEnd, typename TUnderlying = hut::u32>
-bool ImGui_HutFlag(const char *_label, hut::flagged<TEnum, TEnd, TUnderlying> *_flags, const char *(*_name_cb)(TEnum)) {
+template<typename TEnum, TEnum TEnd, typename TUnderlying = u32>
+bool flagged_multi(const char *_label, flagged<TEnum, TEnd, TUnderlying> *_flags, const char *(*_name_cb)(TEnum)) {
   bool changed = false;
   ImGui::Text("%s: ", _label);
   for (TUnderlying i = 0; i <= static_cast<TUnderlying>(TEnd); i++) {
@@ -72,8 +73,8 @@ bool ImGui_HutFlag(const char *_label, hut::flagged<TEnum, TEnd, TUnderlying> *_
 }
 
 template<typename TFlagged>
-bool ImGui_HutFlagSelect(const char *_label, typename TFlagged::enum_type *_value,
-                         const char *(*_name_cb)(typename TFlagged::enum_type)) {
+bool flagged_single(const char *_label, typename TFlagged::enum_type *_value,
+                    const char *(*_name_cb)(typename TFlagged::enum_type)) {
   bool changed = false;
   int  val     = *_value;
   ImGui::Text("%s: ", _label);
@@ -86,14 +87,14 @@ bool ImGui_HutFlagSelect(const char *_label, typename TFlagged::enum_type *_valu
 }
 
 template<typename TFlagged>
-bool ImGui_HutFlagReorder(const char *_label, typename TFlagged::enum_type *_values,
-                          const char *(*_name_cb)(typename TFlagged::enum_type)) {
+bool flagged_reorder(const char *_label, typename TFlagged::enum_type *_values,
+                     const char *(*_name_cb)(typename TFlagged::enum_type)) {
   ImGui::Text("%s: ", _label);
   for (typename TFlagged::underlying_type i = 0; i <= TFlagged::ENUM_END; i++) {
     ImGui::Selectable(_name_cb(_values[i]));
     if (ImGui::IsItemActive() && !ImGui::IsItemHovered()) {
-      hut::i64 next = i + (ImGui::GetMouseDragDelta(0).y < 0.f ? -1 : 1);
-      if (next >= 0 && next <= hut::i64(TFlagged::ENUM_END)) {
+      i64 next = i + (ImGui::GetMouseDragDelta(0).y < 0.f ? -1 : 1);
+      if (next >= 0 && next <= i64(TFlagged::ENUM_END)) {
         std::swap(_values[i], _values[next]);
         ImGui::ResetMouseDragDelta();
       }
@@ -101,3 +102,5 @@ bool ImGui_HutFlagReorder(const char *_label, typename TFlagged::enum_type *_val
   }
   return false;
 }
+
+}  // namespace hut::imgui

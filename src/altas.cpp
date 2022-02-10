@@ -30,7 +30,7 @@
 
 #include "hut/atlas.hpp"
 
-using namespace hut;
+namespace hut {
 
 atlas::atlas(display &_display, const image_params &_params)
     : display_(_display)
@@ -84,3 +84,5 @@ void atlas::free(subimage &&_sub) {
   auto &l = pages_[_sub.page()];
   l.packer_.offer(_sub.bounds());
 }
+
+}  // namespace hut

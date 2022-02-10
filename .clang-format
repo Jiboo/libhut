@@ -75,8 +75,13 @@ NamespaceIndentation: None
 PackConstructorInitializers: Never
 PointerAlignment: Right
 
+QualifierAlignment: Custom
+QualifierOrder: ['constexpr', 'const', 'static', 'inline', 'type']
+
 ReferenceAlignment: Right
 ReflowComments: false
+
+#SeparateDefinitionBlocks: Always
 
 ShortNamespaceLines: 0
 SortUsingDeclarations: true

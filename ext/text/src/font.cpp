@@ -27,6 +27,8 @@
 
 #include "hut/text/font.hpp"
 
+#include <cstddef>
+
 #include <iostream>
 
 #include <ft2build.h>
@@ -40,8 +42,7 @@
 
 #include "hut/atlas.hpp"
 
-using namespace hut;
-using namespace hut::text;
+namespace hut::text {
 
 struct ft_library_holder {
   FT_Library library_ = nullptr;
@@ -50,27 +51,27 @@ struct ft_library_holder {
     FT_Init_FreeType(&library_);
   }
   ~ft_library_holder() {
-    if (library_)
+    if (library_ != nullptr)
       FT_Done_FreeType(library_);
   }
 };
 
 font::font(std::span<const u8> _data, const size_px<uint> &_size, bool _hinting) {
-  static ft_library_holder lib_holder;
+  static ft_library_holder s_lib_holder;
 
   load_flags_ = FT_LOAD_COLOR | (_hinting ? FT_LOAD_FORCE_AUTOHINT : FT_LOAD_NO_HINTING);
 
   HUT_PROFILE_SCOPE(PFONT, "font::font")
-  auto result = FT_New_Memory_Face(lib_holder.library_, _data.data(), FT_Long(_data.size_bytes()), 0, &face_);
+  auto result = FT_New_Memory_Face(s_lib_holder.library_, _data.data(), FT_Long(_data.size_bytes()), 0, &face_);
   if (result != 0)
     throw std::runtime_error(sstream("couldn't load face: ") << result);
   reset_to_size(_size);
 }
 
 font::~font() {
-  if (font_)
+  if (font_ != nullptr)
     hb_font_destroy(font_);
-  if (face_)
+  if (face_ != nullptr)
     FT_Done_Face(face_);
 }
 
@@ -100,11 +101,11 @@ font::glyph font::load_internal(const shared_atlas &_atlas, uint _char_index, re
       break;
   }
 
-  if (FT_Load_Glyph(face_, _char_index, load_flags_))
+  if (FT_Load_Glyph(face_, _char_index, load_flags_) != 0)
     throw std::runtime_error("couldn't load char");
 
   FT_GlyphSlot &ftg = face_->glyph;
-  if (FT_Render_Glyph(ftg, ftmode))
+  if (FT_Render_Glyph(ftg, ftmode) != 0)
     throw std::runtime_error("couldn't render char");
 
   FT_Bitmap render = ftg->bitmap;
@@ -119,7 +120,7 @@ font::glyph font::load_internal(const shared_atlas &_atlas, uint _char_index, re
   if ((render.pixel_mode == FT_PIXEL_MODE_BGRA && atlas_format == VK_FORMAT_B8G8R8A8_UNORM)
       || (render.pixel_mode == FT_PIXEL_MODE_GRAY && atlas_format == VK_FORMAT_R8_UNORM)) {
     // same format as atlas, nothing to do
-    auto span        = std::span<const u8>{render.buffer, render.pitch * render.rows};
+    auto span        = std::span<const u8>{render.buffer, static_cast<size_t>(render.pitch * render.rows)};
     result.subimage_ = _atlas->pack(result.size_, span, render.pitch);
   } else if (render.pixel_mode == FT_PIXEL_MODE_GRAY && atlas_format == VK_FORMAT_B8G8R8A8_UNORM) {
     result.subimage_ = _atlas->alloc(result.size_);
@@ -127,8 +128,8 @@ font::glyph font::load_internal(const shared_atlas &_atlas, uint _char_index, re
     auto *src        = render.buffer;
     auto *dst        = update.data();
     for (uint y = 0; y < render.rows; y++) {
-      auto *src_row = src + render.width * y;
-      auto *dst_row = (u8vec4 *)(dst + update.staging_row_pitch() * y);
+      auto *src_row = src + static_cast<size_t>(render.width * y);
+      auto *dst_row = (u8vec4 *)(dst + static_cast<size_t>(update.staging_row_pitch() * y));
       for (uint x = 0; x < render.width; x++) {
         auto  src_pixel = *(src_row + x);
         auto &dst_pixel = *(dst_row + x);
@@ -165,9 +166,11 @@ void font::reset_to_size(const size_px<uint> &_size) {
   cache_.clear();
   FT_Set_Pixel_Sizes(face_, 0, _size.value_);
 
-  if (font_)
+  if (font_ != nullptr)
     hb_font_destroy(font_);
   font_ = hb_ft_font_create(face_, nullptr);
   hb_ft_font_set_funcs(font_);
   hb_ft_font_set_load_flags(font_, load_flags_);
 }
+
+}  //namespace hut::text

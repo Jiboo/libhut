@@ -37,9 +37,9 @@ namespace hut {
 
 inline size_t utf8_codepoint_count(std::u8string_view _s) {
   // https://stackoverflow.com/a/7298458
-  size_t     len  = 0;
-  const auto last = _s.data() + _s.size();
-  for (auto cur = _s.data(); cur != last; cur++)
+  size_t            len  = 0;
+  const auto *const last = _s.data() + _s.size();
+  for (const auto *cur = _s.data(); cur != last; cur++)
     if ((*cur & 0xC0) != 0x80)
       ++len;
   return len;

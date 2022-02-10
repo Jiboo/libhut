@@ -48,8 +48,8 @@ class atlas {
 
   shared_subimage alloc(const u16vec2 &_bounds);
   shared_subimage pack(const u16vec2 &_bounds, std::span<const u8> _data, uint _src_row_pitch);
-  image::updator  update(const subimage &, const u16vec4 &_bounds);
-  void            free(subimage &&);
+  image::updator  update(const subimage &_sub, const u16vec4 &_bounds);
+  void            free(subimage &&_sub);
 
  private:
   void add_page();

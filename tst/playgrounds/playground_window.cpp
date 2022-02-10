@@ -60,7 +60,7 @@ const char *window_params_flag_name(window_params::flag _flag) {
   return "invalid";
 }
 
-int main(int, char **) {
+int main(int /*unused*/, char ** /*unused*/) {
   display dsp("hut window playground");
 
   window_params wp;
@@ -72,7 +72,7 @@ int main(int, char **) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!ImGui_ImplHut_Init(&dsp, &win, true))
+  if (!imgui::init(&dsp, &win, true))
     return EXIT_FAILURE;
   install_test_events(dsp, win);
 
@@ -87,8 +87,8 @@ int main(int, char **) {
   vec4                                 create_clear_color{0, 0, 0, 1};
   std::vector<std::shared_ptr<window>> windows;
 
-  win.on_draw.connect([&](VkCommandBuffer _buffer) {
-    ImGui_ImplHut_NewFrame();
+  win.on_draw_.connect([&](VkCommandBuffer _buffer) {
+    imgui::new_frame();
     ImGui::NewFrame();
 
     if (ImGui::Begin("Window playground")) {
@@ -129,7 +129,7 @@ int main(int, char **) {
     ImGui::End();
 
     if (ImGui::Begin("Create window")) {
-      ImGui_HutFlag("flags", &params.flags_, window_params_flag_name);
+      imgui::flagged_multi("flags", &params.flags_, window_params_flag_name);
       ImGui::InputScalarN("position", ImGuiDataType_U32, &params.size_, 2);
       ImGui::InputScalarN("min_size", ImGuiDataType_U32, &params.min_size_, 2);
       ImGui::InputScalarN("max_size", ImGuiDataType_U32, &params.max_size_, 2);
@@ -144,18 +144,18 @@ int main(int, char **) {
     ImGui::End();
 
     ImGui::Render();
-    ImGui_ImplHut_RenderDrawData(_buffer, ImGui::GetDrawData());
+    imgui::render(_buffer, ImGui::GetDrawData());
 
     return false;
   });
-  win.on_frame.connect([&](display::duration _dt) {
+  win.on_frame_.connect([&](display::duration _dt) {
     dsp.post([&](auto) { win.invalidate(true); });
     return false;
   });
 
   dsp.dispatch();
 
-  ImGui_ImplHut_Shutdown();
+  imgui::shutdown();
   ImGui::DestroyContext();
 
   return EXIT_SUCCESS;

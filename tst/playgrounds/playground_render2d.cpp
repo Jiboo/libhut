@@ -42,7 +42,7 @@
 
 using namespace hut;
 
-int main(int, char **) {
+int main(int /*unused*/, char ** /*unused*/) {
   display dsp("hut render2d playground");
   auto    buf = std::make_shared<buffer>(dsp, 256 * 1024 * 1024);
 
@@ -62,7 +62,7 @@ int main(int, char **) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!ImGui_ImplHut_Init(&dsp, &win, true))
+  if (!imgui::init(&dsp, &win, true))
     return EXIT_FAILURE;
   install_test_events<common_ubo>(dsp, win, ubo);
 
@@ -80,11 +80,15 @@ int main(int, char **) {
 
   auto quads = box_renderer.allocate(15 * 15 + 1);
 
-  u16     bbox_min = 0, bbox_max = 1000;
+  u16     bbox_min        = 0;
+  u16     bbox_max        = 1000;
   u16vec4 custom_bbox     = {0, 0, 0, 0};
-  u8vec4  custom_col_from = {255, 0, 0, 255}, custom_col_to = {0, 0, 255, 255};
-  u16     custom_radius = 8, custom_softness = 1;
-  u16     extra_min = 0, extra_max = 15;
+  u8vec4  custom_col_from = {255, 0, 0, 255};
+  u8vec4  custom_col_to   = {0, 0, 255, 255};
+  u16     custom_radius   = 8;
+  u16     custom_softness = 1;
+  u16     extra_min       = 0;
+  u16     extra_max       = 15;
   int     custom_gradient = 0;
   bool    custom_use_tex  = false;
 
@@ -94,18 +98,21 @@ int main(int, char **) {
   bool    grid_release_before_realloc = false;
   bool    grid_no_params              = false;
   u16vec2 grid_size                   = {75, 75};
-  u16     grid_min = 10, grid_max = 200;
-  float   scroll_min = -800, scroll_max = 800;
-  vec2    scroll = {0, 0};
+  u16     grid_min                    = 10;
+  u16     grid_max                    = 200;
+  float   scroll_min                  = -800;
+  float   scroll_max                  = 800;
+  vec2    scroll                      = {0, 0};
 
-  win.on_draw.connect([&](VkCommandBuffer _buffer) {
-    ImGui_ImplHut_NewFrame();
+  win.on_draw_.connect([&](VkCommandBuffer _buffer) {
+    imgui::new_frame();
     ImGui::NewFrame();
 
     if (ImGui::Begin("renderer2d")) {
       gen.seed(std::mt19937::default_seed);
 
-      u16vec2 origin = bbox_origin(custom_bbox), size = bbox_size(custom_bbox);
+      u16vec2 origin = bbox_origin(custom_bbox);
+      u16vec2 size   = bbox_size(custom_bbox);
       ImGui::SliderScalarN("Origin", ImGuiDataType_U16, &origin, 2, &bbox_min, &bbox_max);
       ImGui::SliderScalarN("Size", ImGuiDataType_U16, &size, 2, &bbox_min, &bbox_max);
       custom_bbox = make_bbox_with_origin_size(origin, size);
@@ -165,7 +172,7 @@ int main(int, char **) {
 
       if (ImGui::SliderScalarN("Scroll", ImGuiDataType_Float, &scroll, 2, &scroll_min, &scroll_max)) {
         mat4 translate = make_transform_mat4(scroll);
-        ubo->set_subone(0, offsetof(common_ubo, view_), sizeof(hut::mat4), &translate);
+        ubo->set_subone(0, offsetof(common_ubo, view_), sizeof(mat4), &translate);
       }
 
       ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
@@ -176,17 +183,17 @@ int main(int, char **) {
     box_renderer.draw(_buffer);
 
     ImGui::Render();
-    ImGui_ImplHut_RenderDrawData(_buffer, ImGui::GetDrawData());
+    imgui::render(_buffer, ImGui::GetDrawData());
     return false;
   });
-  win.on_frame.connect([&](display::duration _dt) {
+  win.on_frame_.connect([&](display::duration _dt) {
     dsp.post([&](auto) { win.invalidate(true); });
     return false;
   });
 
   dsp.dispatch();
 
-  ImGui_ImplHut_Shutdown();
+  imgui::shutdown();
   ImGui::DestroyContext();
 
   return EXIT_SUCCESS;

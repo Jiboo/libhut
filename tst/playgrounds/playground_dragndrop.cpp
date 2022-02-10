@@ -40,7 +40,7 @@
 
 using namespace hut;
 
-static constexpr const auto BUFF_SIZE = 4096;
+constexpr const static auto BUFF_SIZE = 4096;
 
 struct drop_target {
   std::unique_ptr<u8[]>                                         buff_             = std::make_unique<u8[]>(BUFF_SIZE);
@@ -109,12 +109,12 @@ struct my_drop_target_interface : drop_target_interface {
     std::cout << "my_drop_target_interface::on_drop " << _action << ", read " << read << " bytes from dragndrop"
               << std::endl;
     u8 sink[1024];
-    while (_receiver.read(sink))
+    while (_receiver.read(sink) != 0)
       ;
   }
 };
 
-int main(int, char **) {
+int main(int /*unused*/, char ** /*unused*/) {
   display dsp("hut dragndrop playground");
   window  win(dsp);
   win.title(u8"hut dragndrop playground");
@@ -136,7 +136,7 @@ int main(int, char **) {
   targets.emplace_back();
 
   win.dragndrop_target(std::make_shared<my_drop_target_interface>(targets));
-  win.on_mouse.connect([&](u8 _button, mouse_event_type _type, vec2 _coords) {
+  win.on_mouse_.connect([&](u8 _button, mouse_event_type _type, vec2 _coords) {
     if (_type == MDOWN && _button == 1 && bbox_contains(source_bbox, _coords)) {
       std::cout << "Starting drag with " << source_actions << ", " << source_formats << std::endl;
       win.dragndrop_start(source_actions, source_formats,
@@ -154,12 +154,12 @@ int main(int, char **) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!ImGui_ImplHut_Init(&dsp, &win, true))
+  if (!imgui::init(&dsp, &win, true))
     return EXIT_FAILURE;
   install_test_events(dsp, win);
 
-  win.on_draw.connect([&](VkCommandBuffer _buffer) {
-    ImGui_ImplHut_NewFrame();
+  win.on_draw_.connect([&](VkCommandBuffer _buffer) {
+    imgui::new_frame();
     ImGui::NewFrame();
 
     if (ImGui::Begin("Drag source")) {
@@ -169,8 +169,8 @@ int main(int, char **) {
 
       ImGui::InputTextMultiline("Source data", source_data, sizeof(source_data));
 
-      ImGui_HutFlag("formats", &source_formats, format_mime_type);
-      ImGui_HutFlag("actions", &source_actions, action_name);
+      imgui::flagged_multi("formats", &source_formats, format_mime_type);
+      imgui::flagged_multi("actions", &source_actions, action_name);
 
       if (ImGui::Button("Add drop target")) {
         targets.emplace_back();
@@ -189,26 +189,26 @@ int main(int, char **) {
 
         ImGui::LabelText("Dropped data", "%s", target.buff_.get());
 
-        ImGui_HutFlag("allowed formats", &target.allowed_formats_, format_mime_type);
-        ImGui_HutFlag("allowed actions", &target.allowed_actions_, action_name);
-        ImGui_HutFlagSelect<dragndrop_actions>("pref. action", &target.preferred_action_, action_name);
-        ImGui_HutFlagReorder<clipboard_formats>("pref. format", target.preferred_formats_.data(), format_mime_type);
+        imgui::flagged_multi("allowed formats", &target.allowed_formats_, format_mime_type);
+        imgui::flagged_multi("allowed actions", &target.allowed_actions_, action_name);
+        imgui::flagged_single<dragndrop_actions>("pref. action", &target.preferred_action_, action_name);
+        imgui::flagged_reorder<clipboard_formats>("pref. format", target.preferred_formats_.data(), format_mime_type);
       }
       ImGui::End();
     }
 
     ImGui::Render();
-    ImGui_ImplHut_RenderDrawData(_buffer, ImGui::GetDrawData());
+    imgui::render(_buffer, ImGui::GetDrawData());
     return false;
   });
-  win.on_frame.connect([&](display::duration _dt) {
+  win.on_frame_.connect([&](display::duration _dt) {
     dsp.post([&](auto) { win.invalidate(true); });
     return false;
   });
 
   dsp.dispatch();
 
-  ImGui_ImplHut_Shutdown();
+  imgui::shutdown();
   ImGui::DestroyContext();
 
   return EXIT_SUCCESS;

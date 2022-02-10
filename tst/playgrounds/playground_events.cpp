@@ -38,7 +38,7 @@
 
 using namespace hut;
 
-int main(int, char **) {
+int main(int /*unused*/, char ** /*unused*/) {
   display dsp("hut events playground");
 
   window win(dsp);
@@ -48,84 +48,78 @@ int main(int, char **) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!ImGui_ImplHut_Init(&dsp, &win, true))
+  if (!imgui::init(&dsp, &win, true))
     return EXIT_FAILURE;
 
   bool handle_on_pause_events = false;
-  win.on_pause.connect([&]() {
+  win.on_pause_.connect([&]() {
     std::cout << "on_pause" << std::endl;
     return handle_on_pause_events;
   });
 
   bool handle_on_resume_events = false;
-  win.on_resume.connect([&]() {
+  win.on_resume_.connect([&]() {
     std::cout << "on_resume" << std::endl;
     return handle_on_resume_events;
   });
 
   bool handle_on_focus_events = false;
-  win.on_focus.connect([&]() {
-    std::cout << "on_focus" << std::endl;
+  win.on_focus_.connect([&](bool _focused) {
+    std::cout << "on_focus " << _focused << std::endl;
     return handle_on_focus_events;
   });
 
-  bool handle_on_blur_events = false;
-  win.on_blur.connect([&]() {
-    std::cout << "on_blur" << std::endl;
-    return handle_on_blur_events;
-  });
-
   bool handle_on_close_events = false;
-  win.on_close.connect([&]() {
+  win.on_close_.connect([&]() {
     std::cout << "on_close" << std::endl;
     return handle_on_close_events;
   });
 
   bool handle_on_expose_events = false;
-  win.on_expose.connect([&](uvec4 _dirty) {
+  win.on_expose_.connect([&](uvec4 _dirty) {
     std::cout << "on_expose " << _dirty << std::endl;
     return handle_on_expose_events;
   });
 
   bool handle_on_resize_events = false;
-  win.on_resize.connect([&](u16vec2 _size, u32 _scale) {
+  win.on_resize_.connect([&](u16vec2 _size, u32 _scale) {
     std::cout << "on_resize " << _size << ", " << _scale << std::endl;
     return handle_on_resize_events;
   });
 
   struct datapoint {
-    std::array<float, 512> samples = {};
-    float                  min = FLT_MAX, max = FLT_MIN, avg = 0;
-    u32                    count = samples.size() - 1;
+    std::array<float, 512> samples_ = {};
+    float                  min_ = FLT_MAX, max_ = FLT_MIN, avg_ = 0;
+    u32                    count_ = samples_.size() - 1;
 
-    void add(float sample) {
-      count++;
-      if (count >= samples.size()) {
-        count = 0;
-        min   = FLT_MAX;
-        max   = FLT_MIN;
-        avg   = 0;
+    void add(float _sample) {
+      count_++;
+      if (count_ >= samples_.size()) {
+        count_ = 0;
+        min_   = FLT_MAX;
+        max_   = FLT_MIN;
+        avg_   = 0;
       }
 
-      samples[count] = sample;
-      if (sample > max)
-        max = sample;
-      if (sample < min)
-        min = sample;
-      avg += sample;
+      samples_[count_] = _sample;
+      if (_sample > max_)
+        max_ = _sample;
+      if (_sample < min_)
+        min_ = _sample;
+      avg_ += _sample;
     }
 
-    float average() const { return avg / float(count); }
+    [[nodiscard]] float average() const { return avg_ / float(count_); }
   };
 
   bool handle_on_touch_events = false;
-  win.on_touch.connect([&](u8 _finger, touch_event_type _type, vec2 _pos) {
+  win.on_touch_.connect([&](u8 _finger, touch_event_type _type, vec2 _pos) {
     std::cout << "on_touch " << (int)_finger << " " << _type << " " << _pos << std::endl;
     return handle_on_touch_events;
   });
 
   bool handle_on_mouse_events = false;
-  win.on_mouse.connect([&](u8 _button, mouse_event_type _type, vec2 _pos) {
+  win.on_mouse_.connect([&](u8 _button, mouse_event_type _type, vec2 _pos) {
     if (_type == MMOVE)
       return handle_on_mouse_events;
     std::cout << "on_mouse " << (int)_button << " " << _type << " " << _pos << std::endl;
@@ -133,13 +127,13 @@ int main(int, char **) {
   });
 
   bool handle_on_kmods_events = false;
-  win.on_kmods.connect([&](modifiers _mods) {
+  win.on_kmods_.connect([&](modifiers _mods) {
     std::cout << "on_kmods " << _mods << std::endl;
     return handle_on_kmods_events;
   });
 
   bool handle_on_key_events = false;
-  win.on_key.connect([&](keycode _kcode, keysym _ksym, bool _down) {
+  win.on_key_.connect([&](keycode _kcode, keysym _ksym, bool _down) {
     char  kcode_name[128];
     char *end = dsp.keycode_name(kcode_name, _kcode);
     *end      = 0;
@@ -153,7 +147,7 @@ int main(int, char **) {
   });
 
   bool handle_on_char_events = false;
-  win.on_char.connect([&](char32_t _utf32) {
+  win.on_char_.connect([&](char32_t _utf32) {
     char8_t utf8[6];
     *to_utf8(utf8, _utf32) = 0;
     std::cout << "on_char " << (char *)utf8 << std::endl;
@@ -169,7 +163,7 @@ int main(int, char **) {
   auto      events_period      = display::clock::duration::max();
 
   bool handle_on_time_events = false;
-  win.on_time.connect([&](u32 _time) {
+  win.on_time_.connect([&](u32 _time) {
     auto handled = display::clock::now();
 
     auto clock_time = std::chrono::time_point<display::clock>(std::chrono::duration<u32, std::milli>(_time));
@@ -193,23 +187,22 @@ int main(int, char **) {
 #endif
 
   bool handle_on_frame_events = false;
-  win.on_frame.connect([&](display::duration _dt) {
+  win.on_frame_.connect([&](display::duration _dt) {
     //std::cout << "on_frame " << _dt << std::endl;
     dsp.post([&](auto) { win.invalidate(true); });
     return handle_on_frame_events;
   });
 
   bool handle_on_draw_events = false;
-  win.on_draw.connect([&](VkCommandBuffer _buffer) {
+  win.on_draw_.connect([&](VkCommandBuffer _buffer) {
     //std::cout << "on_draw " << std::endl;
-    ImGui_ImplHut_NewFrame();
+    imgui::new_frame();
     ImGui::NewFrame();
 
     if (ImGui::Begin("Default overrides")) {
       ImGui::Checkbox("on_pause", &handle_on_pause_events);
       ImGui::Checkbox("on_resume", &handle_on_resume_events);
       ImGui::Checkbox("on_focus", &handle_on_focus_events);
-      ImGui::Checkbox("on_blur", &handle_on_blur_events);
       ImGui::Separator();
 
       ImGui::Checkbox("on_close", &handle_on_close_events);
@@ -235,14 +228,14 @@ int main(int, char **) {
 #if defined(HUT_ENABLE_TIME_EVENTS)
     if (ImGui::Begin("Time data")) {
       char header[128];
-      snprintf(header, sizeof(header), "min/avg/max: %f/%f/%f", latencies.min, latencies.average(), latencies.max);
-      ImGui::PlotHistogram("latencies", latencies.samples.data(), latencies.samples.size(), 0, header, 0, 1000 / 24.f,
-                           ImVec2(latencies.samples.size(), 100));
+      snprintf(header, sizeof(header), "min/avg/max: %f/%f/%f", latencies.min_, latencies.average(), latencies.max_);
+      ImGui::PlotHistogram("latencies", latencies.samples_.data(), latencies.samples_.size(), 0, header, 0, 1000 / 24.f,
+                           ImVec2(latencies.samples_.size(), 100));
 
-      snprintf(header, sizeof(header), "min/avg/max: %f/%f/%f", separations.min, separations.average(),
-               separations.max);
-      ImGui::PlotHistogram("separations", separations.samples.data(), separations.samples.size(), 0, header, 0,
-                           1000 / 24.f, ImVec2(separations.samples.size(), 100));
+      snprintf(header, sizeof(header), "min/avg/max: %f/%f/%f", separations.min_, separations.average(),
+               separations.max_);
+      ImGui::PlotHistogram("separations", separations.samples_.data(), separations.samples_.size(), 0, header, 0,
+                           1000 / 24.f, ImVec2(separations.samples_.size(), 100));
 
       ImGui::Text("Event per second: %f", events_per_seconds / std::chrono::duration<double>(events_period).count());
     }
@@ -250,14 +243,14 @@ int main(int, char **) {
 #endif
 
     ImGui::Render();
-    ImGui_ImplHut_RenderDrawData(_buffer, ImGui::GetDrawData());
+    imgui::render(_buffer, ImGui::GetDrawData());
     return handle_on_draw_events;
   });
 
   install_resizable_movable(win);
 
   dsp.dispatch();
-  ImGui_ImplHut_Shutdown();
+  imgui::shutdown();
   ImGui::DestroyContext();
 
   return EXIT_SUCCESS;

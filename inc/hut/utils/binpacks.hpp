@@ -34,24 +34,24 @@
 
 namespace hut::binpack {
 
-template<typename T>
+template<typename TSizeType>
 class linear1d {
  public:
   struct block {
-    bool used_;
-    T    offset_;
-    T    size_;
+    bool      used_;
+    TSizeType offset_;
+    TSizeType size_;
   };
 
  private:
-  using base_type = T;
-  using type      = T;
+  using base_type = TSizeType;
+  using type      = TSizeType;
 
   size_t             last_found_fit_ = 0;
-  T                  pool_size_, allocated_size_ = 0;
+  TSizeType          pool_size_, allocated_size_ = 0;
   std::vector<block> blocks_;
 
-  void emplace_at(size_t _index, bool _status, T _offset, T _size) {
+  void emplace_at(size_t _index, bool _status, TSizeType _offset, TSizeType _size) {
     assert(_index <= blocks_.size());
     blocks_.emplace(blocks_.begin() + _index, block{_status, _offset, _size});
   }
@@ -70,13 +70,13 @@ class linear1d {
   }
 
   struct fit {
-    size_t index_;
-    T      offset_;
-    T      aligned_offset_;
-    T      aligned_size_;
+    size_t    index_;
+    TSizeType offset_;
+    TSizeType aligned_offset_;
+    TSizeType aligned_size_;
   };
 
-  [[nodiscard]] std::optional<fit> find_first_fit(T _size, T _align) const {
+  [[nodiscard]] std::optional<fit> find_first_fit(TSizeType _size, TSizeType _align) const {
     const auto blocks_count = blocks_.size();
     fit        result;
     for (size_t i = 0; i < blocks_count; i++) {
@@ -100,7 +100,7 @@ class linear1d {
     return {};
   }
 
-  [[nodiscard]] std::optional<size_t> find_offset(T _offset) {
+  [[nodiscard]] std::optional<size_t> find_offset(TSizeType _offset) {
     const auto blocks_count = blocks_.size();
     for (size_t i = 0; i < blocks_count; i++) {
       if (blocks_[i].offset_ == _offset)
@@ -109,7 +109,7 @@ class linear1d {
     return {};
   }
 
-  T split(const fit &_fit) {
+  TSizeType split(const fit &_fit) {
     // Compute size/offset for new block after split
     const auto split_block      = blocks_[_fit.index_];
     const auto new_block_size   = split_block.size_ - _fit.aligned_size_;
@@ -135,7 +135,7 @@ class linear1d {
     assert(blocks_[_index].used_ == true);
     blocks_[_index].used_       = false;
     const auto blocks_count     = blocks_.size();
-    T          accumulated_size = blocks_[_index].size_;
+    TSizeType  accumulated_size = blocks_[_index].size_;
     size_t     ibegin           = _index;
     size_t     iend             = _index;
     for (size_t i = _index + 1; i < blocks_count; i++) {
@@ -158,12 +158,12 @@ class linear1d {
   }
 
  public:
-  explicit linear1d(T _pool_size)
+  explicit linear1d(TSizeType _pool_size)
       : pool_size_(_pool_size) {
     reset();
   }
 
-  std::optional<T> pack(T _size, T _align = 0) {
+  std::optional<TSizeType> pack(TSizeType _size, TSizeType _align = 0) {
     assert(_size > 0);
     auto first_fit = find_first_fit(_size, _align);
     if (!first_fit)
@@ -173,9 +173,11 @@ class linear1d {
     return split(*first_fit);
   }
 
-  [[nodiscard]] bool try_fit(T _size, T _align = 0) const { return find_first_fit(_size, _align).has_value(); }
+  [[nodiscard]] bool try_fit(TSizeType _size, TSizeType _align = 0) const {
+    return find_first_fit(_size, _align).has_value();
+  }
 
-  void offer(T _offset) {
+  void offer(TSizeType _offset) {
     auto found = find_offset(_offset);
     assert(found);
     allocated_size_ -= blocks_[*found].size_;
@@ -188,16 +190,16 @@ class linear1d {
     last_found_fit_ = 0;
   }
 
-  [[nodiscard]] T capacity() const { return pool_size_; }
-  [[nodiscard]] T allocated() const { return allocated_size_; }
-  [[nodiscard]] T free() const { return pool_size_ - allocated_size_; }
+  [[nodiscard]] TSizeType capacity() const { return pool_size_; }
+  [[nodiscard]] TSizeType allocated() const { return allocated_size_; }
+  [[nodiscard]] TSizeType free() const { return pool_size_ - allocated_size_; }
 
   [[nodiscard]] bool empty() const {
     assert(!blocks_.empty());
     return blocks_.size() == 1 && !blocks_[0].used_;
   }
 
-  [[nodiscard]] T upper_bound() const {
+  [[nodiscard]] TSizeType upper_bound() const {
     for (auto it = blocks_.crbegin(); it != blocks_.crend(); ++it) {
       if (it->used_)
         return it->offset_ + it->size_;
@@ -213,14 +215,14 @@ class linear1d {
   }
 };
 
-template<typename T, typename TUnderlying>
+template<typename TSizeType, typename TUnderlying>
 struct adaptor1d_dummy2d {
   // NOTE JBL: Dummy adapter to display a 1d as 2d
 
   TUnderlying underlying_;
 
-  using base_type = T;
-  using type      = vec<2, T>;
+  using base_type = TSizeType;
+  using type      = vec<2, TSizeType>;
 
   explicit adaptor1d_dummy2d(const type &_size)
       : underlying_(_size.x) {}
@@ -237,34 +239,34 @@ struct adaptor1d_dummy2d {
   bool empty() { return underlying_.empty(); }
 };
 
-template<typename T, T TAlignment>
+template<typename TSizeType, TSizeType TAlignment>
 struct shelve_separator_align {
   u16 select_shelve(u16 _size) { return align(_size, TAlignment); }
 };
 
-template<typename T, T TMin>
+template<typename TSizeType, TSizeType TMin>
 struct shelve_separator_pow {
   u16 select_shelve(u16 _size) { return std::max(std::bit_ceil(_size), u16(TMin)); }
 };
 
-template<typename T, typename TShelveSelector>
+template<typename TSizeType, typename TShelveSelector>
 struct shelve {
   // Uses a linear1d to maintain a shelves list, and another linear1d in each shelve to arrange elements horizontally
-  using base_type = T;
-  using type      = vec<2, T>;
+  using base_type = TSizeType;
+  using type      = vec<2, TSizeType>;
 
   struct row {
-    T           y_;
-    linear1d<T> suballocator_;
+    TSizeType           y_;
+    linear1d<TSizeType> suballocator_;
 
-    row(T _y, T _sizex)
+    row(TSizeType _y, TSizeType _sizex)
         : y_(_y)
         , suballocator_(_sizex) {}
   };
 
-  type                            size_;
-  linear1d<T>                     shelves_allocator_;
-  std::unordered_multimap<T, row> rows_;
+  type                                    size_;
+  linear1d<TSizeType>                     shelves_allocator_;
+  std::unordered_multimap<TSizeType, row> rows_;
 
   explicit shelve(const type &_size)
       : size_(_size)

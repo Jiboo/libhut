@@ -126,20 +126,20 @@ class pipeline {
   void init_bindings() {
     constexpr auto &VBINDINGS = TVertexRefl::DESCRIPTOR_BINDINGS;
 
-    for (auto &VBINDING : VBINDINGS) {
-      bindings_.emplace_back(VBINDING);
+    for (auto &vbinding : VBINDINGS) {
+      bindings_.emplace_back(vbinding);
     }
 
-    for (auto &FBINDING : TFragRefl::DESCRIPTOR_BINDINGS) {
+    for (auto &fbinding : TFragRefl::DESCRIPTOR_BINDINGS) {
       bool in_vert_stage = false;
       for (u32 i = 0; i < VBINDINGS.size(); i++) {
-        if (FBINDING.binding == VBINDINGS[i].binding) {
-          bindings_[i].stageFlags |= FBINDING.stageFlags;
+        if (fbinding.binding == VBINDINGS[i].binding) {
+          bindings_[i].stageFlags |= fbinding.stageFlags;
           in_vert_stage = true;
         }
       }
       if (!in_vert_stage)
-        bindings_.emplace_back(FBINDING);
+        bindings_.emplace_back(fbinding);
     }
   }
 

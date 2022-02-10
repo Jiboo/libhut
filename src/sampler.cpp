@@ -36,7 +36,7 @@
 
 #include "hut/display.hpp"
 
-using namespace hut;
+namespace hut {
 
 sampler::sampler(display &_display, const sampler_params &_params)
     : sampler_(VK_NULL_HANDLE)
@@ -49,7 +49,7 @@ sampler::sampler(display &_display, const sampler_params &_params)
   sampler_info.addressModeU            = _params.addressMode_;
   sampler_info.addressModeV            = _params.addressMode_;
   sampler_info.addressModeW            = _params.addressMode_;
-  bool enable_filtering                = _params.anisotropy_ && _display.features().samplerAnisotropy;
+  bool enable_filtering                = _params.anisotropy_ && (_display.features().samplerAnisotropy != 0u);
   sampler_info.anisotropyEnable        = enable_filtering ? VK_TRUE : VK_FALSE;
   sampler_info.maxAnisotropy           = enable_filtering ? _display.properties().limits.maxSamplerAnisotropy : 0;
   sampler_info.borderColor             = VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
@@ -67,9 +67,11 @@ sampler::sampler(display &_display, const sampler_params &_params)
 }
 
 sampler::~sampler() {
-  if (sampler_) {
+  if (sampler_ != nullptr) {
     HUT_PROFILE_FUN(PSAMPLER)
     HUT_PVK(vkDeviceWaitIdle, device_);
     HUT_PVK(vkDestroySampler, device_, sampler_, nullptr);
   }
 }
+
+}  // namespace hut

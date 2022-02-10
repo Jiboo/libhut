@@ -43,8 +43,8 @@ class renderer;
 
 using index = u32;
 
-using pipeline = hut::pipeline<index, render2d_vert_spv_refl, render2d_frag_spv_refl, const hut::shared_ubo &,
-                               const hut::shared_atlas &, const hut::shared_sampler &>;
+using pipeline = pipeline<index, render2d_vert_spv_refl, render2d_frag_spv_refl, const shared_ubo &,
+                          const shared_atlas &, const shared_sampler &>;
 
 using vertex   = pipeline::vertex;
 using instance = pipeline::instance;
@@ -74,7 +74,7 @@ inline void set(instance &_target, u16vec4 _bbox, u8vec4 _from, u8vec4 _to, grad
   _target.pos_box_.y |= (_corner_softness & 0xF) << 12;
 
   if (_subimg) {
-    _target.uv_box_ = hut::packSnorm<u16>(_subimg->texcoords());
+    _target.uv_box_ = packSnorm<u16>(_subimg->texcoords());
     assert(_subimg->page() <= 0xF);
     _target.pos_box_.z |= (_subimg->page() & 0xF) << 12;
   } else {
@@ -94,7 +94,7 @@ struct batch {
   shared_instances        buffer_;
   binpack::linear1d<uint> suballocator_;
 
-  void                           release(render2d_suballoc *);
+  void                           release(render2d_suballoc *_suballoc);
   [[nodiscard]] render2d_updator update_raw_impl(uint _offset_bytes, uint _size_bytes);
   void                           zero_raw(uint _offset_bytes, uint _size_bytes);
 
@@ -116,7 +116,7 @@ class renderer {
   renderer(render_target &_target, shared_buffer _buffer, const shared_ubo &_ubo, shared_atlas _atlas,
            const shared_sampler &_sampler, renderer_params _params = {});
 
-  void draw(VkCommandBuffer);
+  void draw(VkCommandBuffer _buffer);
 
   suballoc<instance, details::batch> allocate(uint _count);
 

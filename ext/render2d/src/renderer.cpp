@@ -29,9 +29,7 @@
 
 #include <utility>
 
-using namespace hut;
-using namespace hut::render2d;
-using namespace hut::render2d::details;
+namespace hut::render2d {
 
 renderer::renderer(render_target &_target, shared_buffer _buffer, const shared_ubo &_ubo, shared_atlas _atlas,
                    const shared_sampler &_sampler, renderer_params _params)
@@ -43,8 +41,8 @@ renderer::renderer(render_target &_target, shared_buffer _buffer, const shared_u
   pipeline_.write(0, _ubo, atlas_, _sampler);
 }
 
-batch &renderer::grow(uint _count) {
-  return batches_.emplace_back(batch{buffer_->allocate<instance>(_count), binpack::linear1d<uint>{_count}});
+details::batch &renderer::grow(uint _count) {
+  return batches_.emplace_back(details::batch{buffer_->allocate<instance>(_count), binpack::linear1d<uint>{_count}});
 }
 
 void renderer::draw(VkCommandBuffer _buffer) {
@@ -57,7 +55,7 @@ void renderer::draw(VkCommandBuffer _buffer) {
   }
 }
 
-suballoc<instance, batch> renderer::allocate(uint _count) {
+suballoc<instance, details::batch> renderer::allocate(uint _count) {
   uint size_bytes = sizeof(instance) * _count;
   for (auto &batch : batches_) {
     auto fit = batch.suballocator_.pack(_count);
@@ -72,6 +70,8 @@ suballoc<instance, batch> renderer::allocate(uint _count) {
   return {&new_batch, *fit, size_bytes};
 }
 
+namespace details {
+
 void batch::release(render2d_suballoc *_suballoc) {
   assert(_suballoc->parent() == this);
   buffer_->zero_raw(_suballoc->offset_bytes(), _suballoc->size_bytes());
@@ -85,3 +85,7 @@ render2d_updator batch::update_raw_impl(uint _offset_bytes, uint _size_bytes) {
 void batch::zero_raw(uint _offset_bytes, uint _size_bytes) {
   buffer_->zero_raw(_offset_bytes, _size_bytes);
 }
+
+}  // namespace details
+
+}  // namespace hut::render2d

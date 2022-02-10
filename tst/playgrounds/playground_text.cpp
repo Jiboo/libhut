@@ -25,7 +25,7 @@
  * SOFTWARE.
  */
 
-//#define HUT_TEXT_SAMPLE_ENABLE_IMGUI
+#define HUT_TEXT_SAMPLE_ENABLE_IMGUI
 
 #include <random>
 
@@ -49,7 +49,7 @@
 
 using namespace hut;
 
-int main(int, char **) {
+int main(int /*unused*/, char ** /*unused*/) {
   display dsp("hut text playground");
 
   auto buf = std::make_shared<buffer>(dsp, 1024 * 1024);
@@ -70,7 +70,7 @@ int main(int, char **) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!ImGui_ImplHut_Init(&dsp, &win, true))
+  if (!imgui::init(&dsp, &win, true))
     return EXIT_FAILURE;
 #endif
   install_test_events(dsp, win, ubo);
@@ -1101,8 +1101,7 @@ int main(int, char **) {
         "arcu, in sollicitudin libero aliquam ac. Donec a justo sit amet risus maximus bibendum a id ex. Aliquam ac "
         "mauris blandit, consectetur libero faucibus, hendrerit turpis. Vestibulum sed nulla cursus, dictum nisi vel, "
         "commodo tellus. Nam placerat orci a nisl porta mollis. Nam sed tempor arcu. Morbi vehicula quam quis arcu "
-        "elementum, sit amet laoreet tortor commodo. Ut eu vehicula leo. Nam imperdiet, nibh nec pretium nulla."
-      ;
+        "elementum, sit amet laoreet tortor commodo. Ut eu vehicula leo. Nam imperdiet, nibh nec pretium nulla.";
 
   std::vector<std::u8string_view> words{16000};
 
@@ -1153,11 +1152,11 @@ int main(int, char **) {
   relayout(win.size(), win.scale());
   auto after_update = clock::now();
 
-  win.on_draw.connect([&](VkCommandBuffer _buffer) {
+  win.on_draw_.connect([&](VkCommandBuffer _buffer) {
     r.draw(_buffer);
 
 #ifdef HUT_TEXT_SAMPLE_ENABLE_IMGUI
-    ImGui_ImplHut_NewFrame();
+    imgui::new_frame();
     ImGui::NewFrame();
 
     if (ImGui::Begin("Hello, world!")) {
@@ -1172,7 +1171,7 @@ int main(int, char **) {
         after_release = clock::now();
 
         before_alloc = clock::now();
-        paragraph    = r->allocate(words);
+        paragraph    = r.allocate(words);
         after_alloc  = clock::now();
 
         before_update = clock::now();
@@ -1181,7 +1180,7 @@ int main(int, char **) {
       }
 
       using msdur = std::chrono::duration<float, std::milli>;
-      ImGui::Text("Words %zu, codepoints %zu, size %zu", words.size(), utf8codepointcount(text_input),
+      ImGui::Text("Words %zu, codepoints %zu, size %zu", words.size(), utf8_codepoint_count(text_input),
                   strlen((char *)text_input));
       ImGui::Text("Parent %p, Offset: %d, size: %d", paragraph.instances().parent(),
                   paragraph.instances().offset_bytes(), paragraph.instances().size_bytes());
@@ -1198,25 +1197,25 @@ int main(int, char **) {
     ImGui::End();
 
     ImGui::Render();
-    ImGui_ImplHut_RenderDrawData(_buffer, ImGui::GetDrawData());
+    imgui::render(_buffer, ImGui::GetDrawData());
 #endif
 
     return false;
   });
 
 #ifdef HUT_TEXT_SAMPLE_ENABLE_IMGUI
-  win.on_frame.connect([&](display::duration _dt) {
+  win.on_frame_.connect([&](display::duration _dt) {
     dsp.post([&](auto) { win.invalidate(true); });
     return false;
   });
 #endif
 
-  win.on_resize.connect(relayout);
+  win.on_resize_.connect(relayout);
 
   dsp.dispatch();
 
 #ifdef HUT_TEXT_SAMPLE_ENABLE_IMGUI
-  ImGui_ImplHut_Shutdown();
+  imgui::shutdown();
   ImGui::DestroyContext();
 #endif
 

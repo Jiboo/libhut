@@ -34,7 +34,7 @@
 
 namespace hut::imgdec {
 
-shared_image    load_png(display &, std::span<const u8> _data);
-shared_subimage load_png(const shared_atlas &, std::span<const u8> _data);
+shared_image    load_png(display &_display, std::span<const u8> _data);
+shared_subimage load_png(const shared_atlas &_atlas, std::span<const u8> _data);
 
 }  // namespace hut::imgdec
