@@ -84,7 +84,7 @@ struct hut_imgui_impl_ctx {
 };
 
 const char *get_clipboard_text(void *_user_data) {
-  hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(ImGui::GetIO().BackendRendererUserData);
+  hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(_user_data);
 
   auto &target = ctx.clipboard_buffer_;
   target.clear();
@@ -109,7 +109,7 @@ const char *get_clipboard_text(void *_user_data) {
 }
 
 void set_clipboard_text(void *_user_data, const char *_text) {
-  hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(ImGui::GetIO().BackendRendererUserData);
+  hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(_user_data);
   ctx.window_->clipboard_offer(clipboard_formats{FTEXT_PLAIN},
                                [buffer{std::string(_text)}](clipboard_format _mime, clipboard_sender &_sender) {
                                  if (_mime == FTEXT_PLAIN) {
@@ -129,6 +129,7 @@ bool init(display *_d, window *_w, bool _install_callbacks) {
 
   io.GetClipboardTextFn = get_clipboard_text;
   io.SetClipboardTextFn = set_clipboard_text;
+  io.ClipboardUserData  = io.BackendRendererUserData;
 
   ctx.display_    = _d;
   ctx.window_     = _w;
@@ -208,10 +209,10 @@ void render(VkCommandBuffer _cmd_buffer, ImDrawData *_draw_data) {
         pcmd->UserCallback(cmd_list, pcmd);
       } else {
         VkRect2D scissor = {};
-        int      clip_x  = pcmd->ClipRect.x * scale.x;
-        int      clip_y  = pcmd->ClipRect.y * scale.y;
-        uint     clip_w  = (pcmd->ClipRect.z - pcmd->ClipRect.x) * scale.x;
-        uint     clip_h  = (pcmd->ClipRect.w - pcmd->ClipRect.y) * scale.y;
+        int      clip_x  = int(pcmd->ClipRect.x * scale.x);
+        int      clip_y  = int(pcmd->ClipRect.y * scale.y);
+        uint     clip_w  = uint((pcmd->ClipRect.z - pcmd->ClipRect.x) * scale.x);
+        uint     clip_h  = uint((pcmd->ClipRect.w - pcmd->ClipRect.y) * scale.y);
         scissor.offset   = {clip_x, clip_y};
         scissor.extent   = {clip_w, clip_h};
         HUT_PVK(vkCmdSetScissor, _cmd_buffer, 0, 1, &scissor);
@@ -377,7 +378,7 @@ bool handle_key(keycode _kcode, keysym _ksym, bool _down) {
   ImGuiIO            &io  = ImGui::GetIO();
   hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(io.BackendRendererUserData);
 
-#if !defined(NDEBUG) && 1
+#if !defined(NDEBUG) && 0
   char  kcode_name[64];
   char *kcode_name_end = ctx.display_->keycode_name(kcode_name, _kcode);
   *kcode_name_end      = 0;
@@ -389,8 +390,7 @@ bool handle_key(keycode _kcode, keysym _ksym, bool _down) {
 
   std::cout << "OnKey "
             << "keycode:" << _kcode << " (name: " << kcode_name << ", char:" << (char *)kcode_idle_char_utf8 << "), "
-            << "keysym: " << _ksym << " (" << keysym_name(_ksym) << "), "
-            << "down:" << _down << std::endl;
+            << "keysym: " << _ksym << ", down:" << _down << std::endl;
 #endif
 
   io.AddKeyEvent(imgui_keysym(_ksym), _down);

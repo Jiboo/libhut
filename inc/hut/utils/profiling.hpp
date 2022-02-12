@@ -28,6 +28,8 @@
 #pragma once
 
 #ifdef HUT_ENABLE_PROFILING
+//#  define HUT_PROFILING_PROFILE
+
 #  include <cassert>
 
 #  include <array>
@@ -67,7 +69,6 @@
 namespace hut {
 
 enum profiling_category : u8 {
-  PDEFAULT,
   PDISPLAY,
   PRENDERTARGET,
   PWINDOW,
@@ -86,7 +87,6 @@ enum profiling_category : u8 {
 
 inline std::ostream &operator<<(std::ostream &_os, const profiling_category &_in) {
   switch (_in) {
-    case PDEFAULT: return _os << "?";
     case PDISPLAY: return _os << "display";
     case PRENDERTARGET: return _os << "rendertarget";
     case PWINDOW: return _os << "window";
@@ -100,7 +100,7 @@ inline std::ostream &operator<<(std::ostream &_os, const profiling_category &_in
     case PGPU: return _os << "gpu";
     case PEVENT: return _os << "event";
     case PPIPELINE: return _os << "pipeline";
-    case PWAYLAND: return _os << "wyaland";
+    case PWAYLAND: return _os << "wayland";
     default: assert(false); return _os;
   }
 }
@@ -115,7 +115,7 @@ using hut::operator<<;
 
 struct noop_component {
   template<typename... TNextCtorArgs>
-  noop_component(TNextCtorArgs &&..._rest) {
+  explicit noop_component(TNextCtorArgs &&..._rest) {
     static_assert(sizeof...(TNextCtorArgs) == 0, "Some construction parameters were discarded");
   }
 
@@ -145,7 +145,7 @@ struct timestamp_component : TNextParent {
   time_point timestamp_;
 
   template<typename... TNextCtorArgs>
-  timestamp_component(time_point _tp, TNextCtorArgs &&..._rest)
+  explicit timestamp_component(time_point _tp, TNextCtorArgs &&..._rest)
       : TNextParent{std::forward<TNextCtorArgs>(_rest)...}
       , timestamp_{_tp} {}
 
@@ -164,7 +164,7 @@ struct duration_component : TNextParent {
   duration duration_;
 
   template<typename... TNextCtorArgs>
-  duration_component(duration _dur, TNextCtorArgs &&..._rest)
+  explicit duration_component(duration _dur, TNextCtorArgs &&..._rest)
       : TNextParent{std::forward<TNextCtorArgs>(_rest)...}
       , duration_{_dur} {}
 
@@ -185,7 +185,7 @@ struct threadid_component : TNextParent {
   TKeyType thread_;
 
   template<typename... TNextCtorArgs>
-  threadid_component(TKeyType _tid, TNextCtorArgs &&..._rest)
+  explicit threadid_component(TKeyType _tid, TNextCtorArgs &&..._rest)
       : TNextParent{std::forward<TNextCtorArgs>(_rest)...}
       , thread_{_tid} {}
 
@@ -198,7 +198,7 @@ struct threadid_component : TNextParent {
 template<fixed_string TName, typename TNextParent>
 struct static_threadid_component : TNextParent {
   template<typename... TNextCtorArgs>
-  static_threadid_component(TNextCtorArgs &&..._rest)
+  explicit static_threadid_component(TNextCtorArgs &&..._rest)
       : TNextParent{std::forward<TNextCtorArgs>(_rest)...} {}
 
   void dump(std::ostream &_os) {
@@ -207,14 +207,22 @@ struct static_threadid_component : TNextParent {
   }
 };
 
-using stacktrace = boost::stacktrace::stacktrace;
+constexpr auto STACKTRACE_DEPTH = 8;
+using stacktrace                = boost::stacktrace::stacktrace;
+using stacktraces_registry      = std::unordered_map<u32, stacktrace>;
+using stacktrace_entry          = boost::stacktrace::frame::native_frame_ptr_t;
+struct resolved_entry {
+  std::string name_, source_file_;
+  size_t      line_;
+};
+using stacktrace_entries_cache = std::unordered_map<stacktrace_entry, resolved_entry>;
 
 template<typename TKeyType, typename TNextParent>
 struct stacktrace_component : TNextParent {
   TKeyType stacktrace_hash_;
 
   template<typename... TNextCtorArgs>
-  stacktrace_component(TKeyType _stacktrace_hash, TNextCtorArgs &&..._rest)
+  explicit stacktrace_component(TKeyType _stacktrace_hash, TNextCtorArgs &&..._rest)
       : TNextParent{std::forward<TNextCtorArgs>(_rest)...}
       , stacktrace_hash_{_stacktrace_hash} {}
 
@@ -266,7 +274,7 @@ struct dispatcher_component : TNextParent {
   TKeyType dispatcher_slot_;
 
   template<typename... TNextCtorArgs>
-  dispatcher_component(TKeyType _slot, TNextCtorArgs &&..._rest)
+  explicit dispatcher_component(TKeyType _slot, TNextCtorArgs &&..._rest)
       : TNextParent{std::forward<TNextCtorArgs>(_rest)...}
       , dispatcher_slot_{_slot} {}
 
@@ -350,14 +358,14 @@ class basic_event : public TFirstParent {
   }
 
   template<typename... TEventArgs, typename... TParentsCtorArgs>
-  basic_event(std::tuple<TEventArgs...> &&_event_args, TParentsCtorArgs &&..._parent_args)
+  explicit basic_event(std::tuple<TEventArgs...> &&_event_args, TParentsCtorArgs &&..._parent_args)
       : TFirstParent{std::forward<TParentsCtorArgs>(_parent_args)...} {
     static_assert(DATA_SIZE >= sizeof(_event_args), "Not enough args storage");
     new (&args_as<TEventArgs...>()) args_tuple<TEventArgs...>(std::move(_event_args));
   }
 
   template<typename... TParentsCtorArgs>
-  basic_event(TParentsCtorArgs &&..._parent_args)
+  explicit basic_event(TParentsCtorArgs &&..._parent_args)
       : TFirstParent{std::forward<TParentsCtorArgs>(_parent_args)...} {}
 
   void dispatch(dispatch_op _op, void *_data) {
@@ -369,17 +377,20 @@ class basic_event : public TFirstParent {
   ~basic_event() { dispatch(DESTROY, nullptr); }
 };
 
-using profile_clock_f32 = diff_clock_wrapper<std::chrono::steady_clock, float>;
-using dispatcher_u16    = u16;
-using stacktrace_u32    = u32;
-using threadid_u16      = u16;
+using clock_f32      = diff_clock_wrapper<std::chrono::steady_clock, float>;
+using dispatcher_u16 = u16;
+using stacktrace_u32 = u32;
+using threadid_u16   = u16;
 
-using complete_components = timestamp_component<
-    profile_clock_f32,
-    duration_component<
-        profile_clock_f32,
-        stacktrace_component<stacktrace_u32,
-                             threadid_component<threadid_u16, dispatcher_component<dispatcher_u16, noop_component>>>>>;
+// clang-format off
+using complete_components =
+  timestamp_component<clock_f32,
+    duration_component<clock_f32,
+      stacktrace_component<stacktrace_u32,
+        threadid_component<threadid_u16,
+          dispatcher_component<dispatcher_u16,
+            noop_component>>>>>;
+// clang-format on
 
 #  ifdef __cpp_lib_hardware_interference_size
 constexpr size_t CACHE_LINE_BYTE_SIZE = std::hardware_constructive_interference_size;
@@ -390,8 +401,8 @@ constexpr size_t CACHE_LINE_BYTE_SIZE = 2 * sizeof(std::max_align_t);
 using complete_event = basic_event<dispatcher_u16, CACHE_LINE_BYTE_SIZE, complete_components>;
 
 namespace size_tests {
-static_assert(sizeof(timestamp_component<profile_clock_f32, noop_component>) == 4);
-static_assert(sizeof(duration_component<profile_clock_f32, noop_component>) == 4);
+static_assert(sizeof(timestamp_component<clock_f32, noop_component>) == 4);
+static_assert(sizeof(duration_component<clock_f32, noop_component>) == 4);
 static_assert(sizeof(stacktrace_component<stacktrace_u32, noop_component>) == 4);
 static_assert(sizeof(threadid_component<threadid_u16, noop_component>) == 2);
 static_assert(sizeof(dispatcher_component<dispatcher_u16, noop_component>) == 2);
@@ -404,9 +415,11 @@ using cpu_frames = std::vector<std::vector<complete_event>>;
 
 constexpr size_t FRAME_HISTORY = 20;
 struct thread_data {
-  cpu_frames completed_{FRAME_HISTORY};
+  std::mutex frames_mutex_;
+  cpu_frames frames_{FRAME_HISTORY};
 
-  std::unordered_map<u32, stacktrace> stacktrace_cache_;
+  std::mutex           registry_mutex_;
+  stacktraces_registry registry_;
 };
 
 struct threads_data {
@@ -430,10 +443,13 @@ struct threads_data {
     return *s_tls_data;
   }
 
-  static std::vector<complete_event> &my_queue() { return get().completed_[g_frame_index]; }
+  static std::vector<complete_event> &my_queue() {
+    auto            &tdata = get();
+    std::scoped_lock lock_completed(tdata.frames_mutex_);
+    return tdata.frames_[g_frame_index];
+  }
 
   static void next_frame() {
-    std::scoped_lock lock{g_mapping_mutex};
     if (g_dump_requested && !g_dump_in_progress.load()) {
       g_dump_in_progress.store(true);
       std::thread{background_dump, collect_frames()}.detach();
@@ -442,72 +458,81 @@ struct threads_data {
 
     auto prev = g_frame_index.load();
     auto next = (prev + 1) % FRAME_HISTORY;
+
+    std::scoped_lock lock_mapping{g_mapping_mutex};
     for (auto &thread : g_threads_mapping) {
-      thread.second->completed_[next].clear();
+      std::scoped_lock lock_completed(thread.second->frames_mutex_);
+      thread.second->frames_[next].clear();
     }
     g_frame_index.store(next);
   }
 
   static void request_dump() { g_dump_requested = true; }
 
-  struct frame_cache {
-    std::string name_, source_file_;
-    size_t      line_;
-  };
-
   static void dump_stackframes(std::ostream &_os) {
-    using frames_cache_map = std::unordered_map<const void *, frame_cache>;
-
-    static frames_cache_map           s_frames_cache;
+    static stacktraces_registry       s_registry;
+    static stacktrace_entries_cache   s_entries;
     static std::unordered_set<size_t> s_done;
     static std::stringstream          s_json_cache;
 
-    for (auto &thread_data : g_threads_mapping) {
-      for (const auto &entry : thread_data.second->stacktrace_cache_) {
-        if (!s_done.emplace(entry.first).second)
-          continue;
-        const auto &vec  = entry.second.as_vector();
-        const auto  size = (int)vec.size();
-        for (int i = size - 1; i >= 0; --i) {
-          s_json_cache << ",\n\"" << entry.first;
-          if (i != 0)
-            s_json_cache << '_' << i;
+    auto before = clock_f32::now();
+    {
+      std::scoped_lock mapping_lock{g_mapping_mutex};
+      for (auto &mapping : g_threads_mapping) {
+        std::scoped_lock cache_lock(mapping.second->registry_mutex_);
+        s_registry.insert(mapping.second->registry_.begin(), mapping.second->registry_.end());
+      }
+    }
+    auto copied = clock_f32::now();
 
-          auto frame   = vec[i];
-          auto itcache = s_frames_cache.find(frame.address());
-          if (itcache == s_frames_cache.end()) {
-            auto result = s_frames_cache.emplace(frame.address(),
-                                                 frame_cache{frame.name(), frame.source_file(), frame.source_line()});
-            itcache     = result.first;
-          }
+    for (const auto &strace : s_registry) {
+      if (!s_done.emplace(strace.first).second)
+        continue;
+      const auto &vec  = strace.second.as_vector();
+      const auto  size = (int)vec.size();
+      for (int i = size - 1; i >= 0; --i) {
+        s_json_cache << ",\n\"" << strace.first;
+        if (i != 0)
+          s_json_cache << '_' << i;
 
-          s_json_cache << "\":{\"name\":\"";
-          escape_json(s_json_cache, itcache->second.name_);
-          s_json_cache << " at ";
-          escape_json(s_json_cache, itcache->second.source_file_);
-          s_json_cache << ':' << itcache->second.line_;
-          if (i != (size - 1))
-            s_json_cache << "\",\"parent\":\"" << entry.first << '_' << (i + 1);
-          s_json_cache << "\"}";
+        auto entry   = vec[i];
+        auto itcache = s_entries.find(entry.address());
+        if (itcache == s_entries.end()) {
+          auto result = s_entries.emplace(entry.address(),
+                                          resolved_entry{entry.name(), entry.source_file(), entry.source_line()});
+          itcache     = result.first;
         }
+
+        s_json_cache << "\":{\"name\":\"";
+        escape_json(s_json_cache, itcache->second.name_);
+        s_json_cache << " at ";
+        escape_json(s_json_cache, itcache->second.source_file_);
+        s_json_cache << ':' << itcache->second.line_;
+        if (i != (size - 1))
+          s_json_cache << "\",\"parent\":\"" << strace.first << '_' << (i + 1);
+        s_json_cache << "\"}";
       }
     }
     _os << s_json_cache.view();
+#  ifdef HUT_PROFILING_PROFILE
+    std::cout << "[hut] dumped stackframes in " << (clock_f32::now() - before) << " (locked " << (copied - before)
+              << ")" << std::endl;
+#  endif  // HUT_PROFILING_PROFILE
   }
 
-  struct frames {
-    cpu_frames cpu_frames_;
-  };
-
-  static frames collect_frames() {
-    assert(g_mapping_mutex.try_lock() == false);
-
-    frames result;
+  static cpu_frames collect_frames() {
+    auto             before = clock_f32::now();
+    cpu_frames       result;
+    std::scoped_lock lock{g_mapping_mutex};
     for (auto &thread : g_threads_mapping) {
-      for (auto &frame : thread.second->completed_) {
-        result.cpu_frames_.emplace_back(std::move(frame));
+      std::scoped_lock lock_completed(thread.second->frames_mutex_);
+      for (auto &frame : thread.second->frames_) {
+        result.emplace_back(std::move(frame));
       }
     }
+#  ifdef HUT_PROFILING_PROFILE
+    std::cout << "[hut] collected profiling frames in " << (clock_f32::now() - before) << std::endl;
+#  endif  // HUT_PROFILING_PROFILE
     return result;
   }
 
@@ -532,47 +557,54 @@ struct threads_data {
     return filename.str();
   }
 
-  static void background_dump(frames &&_frames) {
+  static void background_dump(cpu_frames &&_frames) {
+    auto before   = clock_f32::now();
     auto filename = unique_profiline_path();
-    std::cout << "[hut] Starting background profiling dump to: " << filename << "..." << std::endl;
+    std::cout << "[hut] starting background profiling dump to: " << filename << "..." << std::endl;
     std::ofstream os{filename};
 
     os << std::fixed << "{\"traceEvents\":[{}";
-    for (auto &frame : _frames.cpu_frames_) {
+    for (auto &frame : _frames) {
       for (auto &event : frame) {
         os << "," << std::endl;
         event.dump(os);
       }
     }
+
+#  ifdef HUT_PROFILING_PROFILE
+    std::cout << "[hut] dumped frames in " << (clock_f32::now() - before) << std::endl;
+#  endif  // HUT_PROFILING_PROFILE
+
     os << "],\"stackFrames\":{\"dummy\":{\"name\":\"dummy\"}";
     dump_stackframes(os);
     os << "}}" << std::defaultfloat << std::endl;
 
-    std::cout << "[hut] Wrote profiling to: " << filename << std::endl;
+    std::cout << "[hut] wrote profiling to: " << filename << " in " << (clock_f32::now() - before) << std::endl;
     g_dump_in_progress.store(false);
   }
 };
 
-inline u32 hash_stacktrace(stacktrace &&_stacktrace) {
+inline u32 register_stacktrace(stacktrace &&_stacktrace) {
   u32 result = rehash<u32>(boost::stacktrace::hash_value(_stacktrace));
   {
-    auto &thread_data = threads_data::get();
-    thread_data.stacktrace_cache_.try_emplace(result, std::move(_stacktrace));
+    auto            &tdata = threads_data::get();
+    std::scoped_lock lock_cache(tdata.registry_mutex_);
+    tdata.registry_.try_emplace(result, std::move(_stacktrace));
   }
   return result;
 }
 
 template<typename TEventType, typename... TEventArgs>
 struct complete_event_scope {
-  std::vector<TEventType>      &buffer_;
-  std::tuple<TEventArgs...>     args_;
-  profile_clock_f32::time_point start_timestamp_;
-  stacktrace_u32                stacktrace_;
-  threadid_u16                  threadid_;
-  dispatcher_u16                dispatcher_;
+  std::vector<TEventType>  &buffer_;
+  std::tuple<TEventArgs...> args_;
+  clock_f32::time_point     start_timestamp_;
+  stacktrace_u32            stacktrace_;
+  threadid_u16              threadid_;
+  dispatcher_u16            dispatcher_;
 
   complete_event_scope(std::vector<TEventType> &_buffer, std::tuple<TEventArgs...> &&_event_args,
-                       profile_clock_f32::time_point _start, stacktrace_u32 _stacktrace, threadid_u16 _threadid,
+                       clock_f32::time_point _start, stacktrace_u32 _stacktrace, threadid_u16 _threadid,
                        dispatcher_u16 _dispatcher)
       : buffer_{_buffer}
       , args_{std::move(_event_args)}
@@ -582,7 +614,7 @@ struct complete_event_scope {
       , dispatcher_{_dispatcher} {}
 
   ~complete_event_scope() {
-    auto duration = profile_clock_f32::now() - start_timestamp_;
+    auto duration = clock_f32::now() - start_timestamp_;
     buffer_.emplace_back(std::move(args_), start_timestamp_, duration, stacktrace_, threadid_, dispatcher_);
   }
 };
@@ -592,12 +624,22 @@ template<fixed_string TFormat, fixed_string_array TArgNames, profiling_category 
 auto make_complete_event_scope(std::vector<TEventType> &_buffer, std::tuple<TEventArgs...> &&_event_args) {
   static auto s_slot = dispatcher_repository<dispatcher_u16>::slot(
       dispatcher_impl<TFormat, TArgNames, type::COMPLETE, TProfileCat, TEventType, TEventArgs...>);
-  return complete_event_scope<TEventType, TEventArgs...>{_buffer,
-                                                         std::move(_event_args),
-                                                         profile_clock_f32::now(),
-                                                         hash_stacktrace(stacktrace{1, 8}),
-                                                         this_thread<threadid_u16>(),
-                                                         s_slot};
+
+  auto before = clock_f32::now();
+  auto trace  = stacktrace{1, STACKTRACE_DEPTH};
+  auto traced = clock_f32::now();
+  auto hash   = register_stacktrace(std::move(trace));
+  auto hashed = clock_f32::now();
+
+#  ifdef HUT_PROFILING_PROFILE
+  if (hashed - before > 100ms) {
+    std::cout << "[hut] collecting a single stacktrace for an event in " << (traced - before) << " and hashed in "
+              << (hashed - traced) << std::endl;
+  }
+#  endif  // HUT_PROFILING_PROFILE
+
+  return complete_event_scope<TEventType, TEventArgs...>{_buffer, std::move(_event_args),      hashed,
+                                                         hash,    this_thread<threadid_u16>(), s_slot};
 }
 
 #  define HUT_PROFILE_TRANSFORM_STRINGIFY(MR, MData, MElement) BOOST_PP_STRINGIZE(MElement)

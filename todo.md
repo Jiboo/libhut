@@ -9,6 +9,7 @@ fix:
 refactor:
 
 - refactor buffer into two separate concepts, to have symmetry with atlas vs image classes.
+- optimize staging to batch them, possibly using VK_KHR_copy_commands2 for staging with same src&dst.
 
 features:
 
@@ -19,3 +20,5 @@ features:
 - [imgdec] add streaming and progressive decoding APIs
 - moar unit tests
 - some way to automate gui testing, simulate inputs and checks framebuffer?
+- VK_EXT_validation_features
+- VK_EXT_calibrated_timestamps for GPU profiling

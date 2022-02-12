@@ -172,7 +172,7 @@ void buffer_page_data::zero_raw(uint _offset_bytes, uint _size_bytes) const {
 
 #ifdef HUT_DEBUG_STAGING
 void buffer::debug() {
-  std::cout << "[buffer] " << this << " contents:" << std::endl;
+  std::cout << "[hut] buffer " << this << " contents:" << std::endl;
   for (const auto &page : pages_) {
     std::cout << "\tVkBuffer " << page.buffer_ << " size:" << page.size() << std::endl;
 

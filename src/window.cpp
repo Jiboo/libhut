@@ -352,9 +352,10 @@ void window::redraw(display::time_point _tp) {
   constexpr auto MAX_FRAME_TIME = 1000ms / 10.f;
   auto           done           = display::clock::now();
   auto           diff_frame     = done - last_frame_;
+
   if (diff_frame > MAX_FRAME_TIME) {
 #ifdef HUT_ENABLE_VALIDATION_DEBUG
-    std::cout << "Frame overbudget " << diff_frame << " > " << MAX_FRAME_TIME << std::endl;
+    std::cout << "[hut] frame over-budget " << diff_frame << " > " << MAX_FRAME_TIME << std::endl;
 #endif
 #ifdef HUT_ENABLE_PROFILING
     profiling::threads_data::request_dump();

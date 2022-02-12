@@ -1,16 +1,16 @@
-libhut is library a vulkan & wayland wrapper.
+libhut is a vulkan & wayland wrapper library.
 You can use optional extensions, that can be configured at build time with cmake options.
 
 This is a hobby project, expect building nightmare, runtime crashes, missing features/documentation/tests,
 although contributions are welcome.
 
-Available extensions:
+Extensions:
 
-- imgdec: decode various images and upload them to gpu easily
+- imgdec: decode various images and upload them to gpu
 - imgui: DearImGui backend implementation for libhut
 - ktx2: minimal ktx2 support (no basisu or supercompression)
-- render2d: axis-aligned box drawing
-- renderdoc: allows triggering renderdoc captures programmatically, useful for headless unittests
+- render2d: axis-aligned box drawing with rounded corners, feather, gradients, ...
+- renderdoc: allows triggering renderdoc captures programmatically (used to debug headless unittests)
 - text: text layout and rendering
 - ui: lightweight ui toolkit using render2d and text extensions
 
