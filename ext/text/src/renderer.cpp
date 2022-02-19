@@ -91,6 +91,8 @@ void renderer::draw(VkCommandBuffer _buff) {
   pipeline_.bind_pipeline(_buff);
   pipeline_.bind_descriptor(_buff, 0);
   for (const auto &batch : batches_) {
+    if (batch.dstore_.suballocator_.empty())
+      continue;
     pipeline_.bind_indices(_buff, batch.mstore_.indices_);
     pipeline_.bind_vertices(_buff, batch.mstore_.vertices_);
     pipeline_.bind_instances(_buff, batch.dstore_.instances_);

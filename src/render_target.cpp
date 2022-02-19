@@ -122,7 +122,7 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
   color_attachment.format                  = _init_params.format_;
   color_attachment.samples                 = sample_count_;
   color_attachment.loadOp                  = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  color_attachment.storeOp                 = VK_ATTACHMENT_STORE_OP_STORE;
+  color_attachment.storeOp                 = VK_ATTACHMENT_STORE_OP_DONT_CARE;
   color_attachment.stencilLoadOp           = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
   color_attachment.stencilStoreOp          = VK_ATTACHMENT_STORE_OP_DONT_CARE;
   color_attachment.initialLayout           = _init_params.initial_layout_;
@@ -149,8 +149,8 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
     VkAttachmentDescription color_attachment_resolve{};
     color_attachment_resolve.format         = _init_params.format_;
     color_attachment_resolve.samples        = VK_SAMPLE_COUNT_1_BIT;
-    color_attachment_resolve.loadOp         = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    color_attachment_resolve.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
+    color_attachment_resolve.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    color_attachment_resolve.storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     color_attachment_resolve.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     color_attachment_resolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     color_attachment_resolve.initialLayout  = _init_params.initial_layout_;
@@ -236,8 +236,6 @@ void render_target::begin_rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
 
   VkCommandBufferBeginInfo begin_info = {};
   begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  begin_info.flags                    = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-  begin_info.pInheritanceInfo         = nullptr;  // Optional
   HUT_PVK(vkBeginCommandBuffer, _cb, &begin_info);
 
   VkRenderPassBeginInfo render_pass_info = {};

@@ -50,6 +50,8 @@ void renderer::draw(VkCommandBuffer _buffer) {
   pipeline_.bind_pipeline(_buffer);
   pipeline_.bind_descriptor(_buffer, 0);
   for (const auto &batch : batches_) {
+    if (batch.suballocator_.empty())
+      continue;
     pipeline_.bind_instances(_buffer, batch.buffer_);
     pipeline_.draw(_buffer, 6, batch.suballocator_.upper_bound(), 0, 0);
   }

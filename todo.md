@@ -20,5 +20,3 @@ features:
 - [imgdec] add streaming and progressive decoding APIs
 - moar unit tests
 - some way to automate gui testing, simulate inputs and checks framebuffer?
-- VK_EXT_validation_features
-- VK_EXT_calibrated_timestamps for GPU profiling

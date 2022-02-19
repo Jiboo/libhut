@@ -43,7 +43,7 @@ struct offscreen_params {
   image::subresource subres_{};
 };
 
-class offscreen : public render_target {
+class offscreen final : public render_target {
  public:
   offscreen() = delete;
 
@@ -54,7 +54,7 @@ class offscreen : public render_target {
   offscreen &operator=(offscreen &&) noexcept = delete;
 
   explicit offscreen(const shared_image &_target, offscreen_params _init_params = {});
-  ~offscreen();
+  ~offscreen() final;
 
   using draw_callback = std::function<void(VkCommandBuffer)>;
   void draw(const draw_callback &_callback);

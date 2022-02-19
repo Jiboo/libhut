@@ -61,7 +61,7 @@ class render_target {
   render_target &operator=(render_target &&) noexcept = delete;
 
   explicit render_target(display &_display);
-  ~render_target();
+  virtual ~render_target();
 
   [[nodiscard]] const render_target_params &params() const { return render_target_params_; }
   [[nodiscard]] display                    &parent() { return *display_; }

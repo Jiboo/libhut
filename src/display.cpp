@@ -376,6 +376,10 @@ void display::init_vulkan_instance(const char *_app_name, u32 _app_version, std:
     if (strcmp(extension.extensionName, VK_EXT_DEBUG_REPORT_EXTENSION_NAME) == 0)
       _extensions.emplace_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 #endif
+#ifdef HUT_ENABLE_VALIDATION_FEATURES
+    if (strcmp(extension.extensionName, VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME) == 0)
+      _extensions.emplace_back(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
+#endif
   }
 
   VkApplicationInfo app_info  = {};
@@ -393,6 +397,20 @@ void display::init_vulkan_instance(const char *_app_name, u32 _app_version, std:
   info.enabledLayerCount       = (u32)G_ENABLED_LAYERS.size();
   info.ppEnabledLayerNames     = G_ENABLED_LAYERS.data();
   info.pApplicationInfo        = &app_info;
+
+#ifdef HUT_ENABLE_VALIDATION_FEATURES
+  std::array<VkValidationFeatureEnableEXT, 5> enabled_validation_features = {
+      VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
+      VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT,
+      VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT,
+      VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
+  };
+  VkValidationFeaturesEXT validation_features       = {};
+  validation_features.sType                         = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+  validation_features.enabledValidationFeatureCount = enabled_validation_features.size();
+  validation_features.pEnabledValidationFeatures    = enabled_validation_features.data();
+  info.pNext                                        = &validation_features;
+#endif
 
   VkResult result = HUT_PVK(vkCreateInstance, &info, nullptr, &instance_);
   if (result != VK_SUCCESS)
@@ -493,6 +511,7 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   core_features.samplerAnisotropy                      = device_features_.samplerAnisotropy;
   core_features.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
   core_features.multiDrawIndirect                      = VK_TRUE;
+  core_features.drawIndirectFirstInstance              = VK_TRUE;
   //core_features.textureCompressionBC = VK_TRUE;
   //core_features.textureCompressionASTC_LDR = VK_TRUE;
   //core_features.textureCompressionETC2 = VK_TRUE;

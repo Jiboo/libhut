@@ -79,7 +79,7 @@ struct window_params {
   uvec2 size_ = {800, 600}, min_size_ = {0, 0}, max_size_ = {0, 0};
 };
 
-class window : public render_target {
+class window final : public render_target {
   friend class display;
 
  public:
@@ -112,7 +112,7 @@ class window : public render_target {
   window &operator=(window &&) noexcept = delete;
 
   explicit window(display &_display, const window_params &_init_params = {});
-  ~window();
+  ~window() final;
 
   void close();
   void pause();

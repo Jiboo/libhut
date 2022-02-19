@@ -29,6 +29,8 @@
 #include <iostream>
 #include <random>
 
+#include "hut/utils/chrono.hpp"
+
 #include "hut/display.hpp"
 #include "hut/window.hpp"
 
@@ -44,6 +46,14 @@ std::shared_ptr<window> create_window(display &_display, window_params _params, 
   result->title(_title);
   result->clear_color(_clearc);
   install_test_events(_display, *result);
+
+  result->on_frame_.connect([&_display, wref = std::weak_ptr{result}](display::duration _dt) {
+    _display.post([wref](auto) {
+      if (auto locked = wref.lock())
+        locked->invalidate(true);
+    });
+    return false;
+  });
 
   return result;
 }
@@ -150,6 +160,16 @@ int main(int /*unused*/, char ** /*unused*/) {
   });
   win.on_frame_.connect([&](display::duration _dt) {
     dsp.post([&](auto) { win.invalidate(true); });
+    return false;
+  });
+
+  win.on_key_.connect([](keycode, keysym _sym, bool _down) {
+#ifdef HUT_ENABLE_PROFILING
+    if (_sym == KSYM_P && _down)
+      profiling::threads_data::request_dump();
+#endif  // HUT_ENABLE_PROFILING
+    if (_sym == KSYM_F && _down)
+      std::this_thread::sleep_for(100ms);
     return false;
   });
 

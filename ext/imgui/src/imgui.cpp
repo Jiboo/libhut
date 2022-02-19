@@ -119,7 +119,8 @@ void set_clipboard_text(void *_user_data, const char *_text) {
 }
 
 bool init(display *_d, window *_w, bool _install_callbacks) {
-  ImGuiIO &io                = ImGui::GetIO();
+  ImGuiIO &io = ImGui::GetIO();
+  assert(io.BackendPlatformUserData == nullptr);
   io.BackendRendererUserData = new hut_imgui_impl_ctx;
   hut_imgui_impl_ctx &ctx    = *static_cast<hut_imgui_impl_ctx *>(io.BackendRendererUserData);
 
