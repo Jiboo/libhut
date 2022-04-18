@@ -1121,9 +1121,13 @@ int main(int /*unused*/, char ** /*unused*/) {
   auto before_alloc   = clock::now();
   auto paragraph      = r.allocate(words);
   auto after_alloc    = clock::now();
+  auto before_update = clock::now();
+  auto after_update  = clock::now();
+
   u32  current_scale  = win.scale();
 
-  auto relayout = [&](u16vec2 _size, u32 _scale) {
+  auto relayout = [&](u16vec2_px _size, u32 _scale) {
+    before_update = clock::now();
     if (_scale != current_scale) {
       current_scale = _scale;
       font->reset_to_size(FONT_SIZE * _scale);
@@ -1131,9 +1135,9 @@ int main(int /*unused*/, char ** /*unused*/) {
       paragraph = r.allocate(words);
     }
     const auto win_width   = _size.x * _scale;
-    uint       line_height = FONT_SIZE.value_ * _scale;
-    uint       space_width = line_height / 4;
-    uvec2      offset      = {0, line_height};
+    u32_px       line_height = FONT_SIZE * _scale;
+    u32_px       space_width = line_height / 4;
+    uvec2_px      offset      = {0, line_height};
     auto       staging     = paragraph.instances().update();
     for (uint i = 0; i < paragraph.size(); i++) {
       const auto bbox       = paragraph.bbox(i);
@@ -1145,12 +1149,10 @@ int main(int /*unused*/, char ** /*unused*/) {
       staging[i] = {offset, colors::WHITE};
       offset.x += bbox.z + space_width;
     }
+    after_update = clock::now();
     return false;
   };
-
-  auto before_update = clock::now();
   relayout(win.size(), win.scale());
-  auto after_update = clock::now();
 
   win.on_draw_.connect([&](VkCommandBuffer _buffer) {
     r.draw(_buffer);

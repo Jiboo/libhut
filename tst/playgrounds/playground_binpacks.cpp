@@ -71,8 +71,8 @@ void debug(const binpack::shelve<TSizeType, TShelveSelector> &_packer) {
 }
 
 template<typename TPacker>
-void packer(const char *_name = "Packer", u16vec2 _bounds = {8 * 1024, 8 * 1024}, u16vec2 _min_rect = {5, 5},
-            u16vec2 _max_rect = {100, 100}) {
+void packer(const char *_name = "Packer", u16vec2_px _bounds = {8 * 1024, 8 * 1024}, u16vec2_px _min_rect = {5, 5},
+            u16vec2_px _max_rect = {100, 100}) {
   ImGui::SetNextWindowContentSize({float(_bounds.x), float(_bounds.y)});
   if (ImGui::Begin(_name, nullptr, ImGuiWindowFlags_HorizontalScrollbar)) {
     using hrclock_t = std::chrono::high_resolution_clock;
@@ -85,7 +85,7 @@ void packer(const char *_name = "Packer", u16vec2 _bounds = {8 * 1024, 8 * 1024}
     static float                s_total_add_time = 0;
     static std::vector<float>   s_rem_timings;
     static float                s_total_rem_time = 0;
-    static auto                 s_padding        = ivec2{0, 0};
+    static u16vec2_px           s_padding = {0, 0};
 
     auto rand_norm = [&]() {
       std::uniform_real_distribution<> dis(0.0, 1.0);
@@ -96,7 +96,7 @@ void packer(const char *_name = "Packer", u16vec2 _bounds = {8 * 1024, 8 * 1024}
       return dis(s_gen);
     };
     auto rand_size = [&]() {
-      return u16vec2{(_max_rect.x - _min_rect.x) * rand_norm() + _min_rect.x,
+      return u16vec2_px{(_max_rect.x - _min_rect.x) * rand_norm() + _min_rect.x,
                      (_max_rect.y - _min_rect.y) * rand_norm() + _min_rect.y};
     };
     auto reset = [&]() {
@@ -112,14 +112,14 @@ void packer(const char *_name = "Packer", u16vec2 _bounds = {8 * 1024, 8 * 1024}
     auto add_one = [&]() {
       auto rect_size = rand_size();
       auto before    = hrclock_t::now();
-      auto rect      = s_packer.pack(rect_size + u16vec2(s_padding));
+      auto rect      = s_packer.pack(rect_size + s_padding);
       auto after     = hrclock_t::now();
       auto time      = std::chrono::duration_cast<dur_t>(after - before).count();
       s_total_add_time += time;
       s_add_timings.emplace_back(time);
       if (rect) {
-        s_surface += rect_size.x * rect_size.y;
-        s_packed.emplace_back(make_bbox_with_origin_size(rect.value(), rect_size - u16vec2(s_padding)));
+        s_surface += float(rect_size.x) * float(rect_size.y);
+        s_packed.emplace_back(make_bbox_with_origin_size(u16vec2_px{*rect}, rect_size - s_padding));
       }
       return rect.has_value();
     };
@@ -166,10 +166,10 @@ void packer(const char *_name = "Packer", u16vec2 _bounds = {8 * 1024, 8 * 1024}
         ;
     }
     ImGui::SameLine();
-    ImGui::InputInt2("Padding", &s_padding.x);
+    ImGui::InputScalarN("Padding", ImGuiDataType_U16, &s_padding.x, 2, nullptr, nullptr, "%d", 0);
     ImGui::Text("Packed %zu/%zu (with %zu rem), %f%% surface, %fms total add (%fms/op), %fms total rem (%fms/op)",
                 s_packed.size(), s_add_timings.size(), s_rem_timings.size(),
-                s_surface / float(_bounds.x * _bounds.y) * 100, s_total_add_time,
+                s_surface / float(_bounds.x) * float(_bounds.y) * 100, s_total_add_time,
                 s_total_add_time / s_add_timings.size(), s_total_rem_time, s_total_rem_time / s_rem_timings.size());
     ImGui::PlotHistogram("Add", s_add_timings.data(), s_add_timings.size(), 0, nullptr, FLT_MAX, FLT_MAX,
                          ImVec2(0, 200));
@@ -179,7 +179,7 @@ void packer(const char *_name = "Packer", u16vec2 _bounds = {8 * 1024, 8 * 1024}
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     ImVec2      p         = ImGui::GetCursorScreenPos();
 
-    draw_list->AddRect(ImVec2(p.x, p.y), ImVec2(p.x + _bounds.x, p.y + _bounds.y), IM_COL32(255, 0, 0, 255));
+    draw_list->AddRect(ImVec2(p.x, p.y), ImVec2(p.x + (float)_bounds.x, p.y + (float)_bounds.y), IM_COL32(255, 0, 0, 255));
     for (auto &rect : s_packed) {
       draw_list->AddRectFilled(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w),
                                IM_COL32(255, 255, 0, 127));
@@ -188,7 +188,7 @@ void packer(const char *_name = "Packer", u16vec2 _bounds = {8 * 1024, 8 * 1024}
     }
     debug(s_packer);
 
-    ImGui::Dummy(ImVec2(_bounds.x, _bounds.y));
+    ImGui::Dummy(ImVec2(float(_bounds.x), float(_bounds.y)));
   }
   ImGui::End();
 }

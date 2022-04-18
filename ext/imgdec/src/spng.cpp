@@ -102,7 +102,7 @@ std::shared_ptr<image> load_png(display &_display, std::span<const u8> _data) {
   if (!result)
     return nullptr;
 
-  if (!do_read(result->update(), *ctx, iparams.size_.y, decode_format))
+  if (!do_read(result->update(), *ctx, (uint)iparams.size_.y, decode_format))
     return nullptr;
 
   return result;
@@ -120,7 +120,7 @@ shared_subimage load_png(const shared_atlas &_atlas, std::span<const u8> _data) 
   if (!result)
     return nullptr;
 
-  if (!do_read(result->update(), *ctx, iparams.size_.y, decode_format))
+  if (!do_read(result->update(), *ctx, (uint)iparams.size_.y, decode_format))
     return nullptr;
 
   return result;

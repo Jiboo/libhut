@@ -48,7 +48,7 @@ void window::handle_toplevel_configure(void *_data, xdg_toplevel * /*unused*/, i
                                        wl_array *_states) {
   auto *w = static_cast<window *>(_data);
   if (_width > 0 && _height > 0) {
-    u16vec2 new_size{_width, _height};
+    u16vec2_px new_size{_width, _height};
     if (new_size != w->size_) {
       w->size_ = new_size;
       w->init_vulkan_surface();

@@ -47,6 +47,7 @@
 
 #include "hut/utils/flagged.hpp"
 #include "hut/utils/fwd.hpp"
+#include "hut/utils/length.hpp"
 #include "hut/utils/math.hpp"
 #include "hut/utils/sstream.hpp"
 
@@ -244,7 +245,7 @@ class display {
     return (TSignature)get_proc_impl(_name);
   }
 
-  [[nodiscard]] u16vec2 max_tex_size() const {
+  [[nodiscard]] u16vec2_px max_tex_size() const {
     auto dim = limits().maxImageDimension2D;
     return {dim, dim};
   }

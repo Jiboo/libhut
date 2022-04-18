@@ -29,6 +29,7 @@
 
 #include <imgui.h>
 
+#include "hut/utils/length.hpp"
 #include "hut/utils/math.hpp"
 
 #include "hut/display.hpp"
@@ -49,8 +50,8 @@ IMGUI_IMPL_API void        rem_image(ImTextureID _id);
 
 // Callbacks (installed by default if you enable 'install_callbacks' during initialization)
 // You can also handle inputs yourself and use those as a reference.
-IMGUI_IMPL_API bool handle_resize(u16vec2 _size, u32 _scale);
-IMGUI_IMPL_API bool handle_mouse(u8 _button, mouse_event_type _type, vec2 _pos);
+IMGUI_IMPL_API bool handle_resize(u16vec2_px _size, u32 _scale);
+IMGUI_IMPL_API bool handle_mouse(u8 _button, mouse_event_type _type, vec2_px _pos);
 IMGUI_IMPL_API bool handle_key(keycode _kcode, keysym _ksym, bool _down);
 IMGUI_IMPL_API bool handle_char(char32_t _utf32_char);
 IMGUI_IMPL_API bool handle_focus(bool _focused);

@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include "hut/utils/length.hpp"
+
 #include "hut/image.hpp"
 #include "hut/subimage.hpp"
 
@@ -36,19 +38,19 @@ class atlas {
   template<typename TIndice, typename TVertexRefl, typename TFragRefl, typename... TExtraAttachments>
   friend class pipeline;
 
-  constexpr static u16vec2 PADDING = {1, 1};
+  constexpr static u16vec2_px PADDING = {1, 1};
 
  public:
   atlas(display &_display, const image_params &_params);
 
   shared_image           page(uint _index) { return pages_[_index].image_; }
   [[nodiscard]] size_t   page_count() const { return pages_.size(); }
-  [[nodiscard]] u16vec2  size() const { return params_.size_; }
+  [[nodiscard]] u16vec2_px  size() const { return params_.size_; }
   [[nodiscard]] VkFormat format() const { return params_.format_; }
 
-  shared_subimage alloc(const u16vec2 &_bounds);
-  shared_subimage pack(const u16vec2 &_bounds, std::span<const u8> _data, uint _src_row_pitch);
-  image::updator  update(const subimage &_sub, const u16vec4 &_bounds);
+  shared_subimage alloc(const u16vec2_px &_bounds);
+  shared_subimage pack(const u16vec2_px &_bounds, std::span<const u8> _data, uint _src_row_pitch);
+  image::updator  update(const subimage &_sub, const u16vec4_px &_bounds);
   void            free(subimage &&_sub);
 
  private:

@@ -29,7 +29,7 @@
 
 #include <memory>
 
-#include "hut/utils/size.hpp"
+#include "hut/utils/length.hpp"
 
 #include "hut/atlas.hpp"
 #include "hut/buffer.hpp"
@@ -56,7 +56,7 @@ class font {
   font(font &&) noexcept = delete;
   font &operator=(font &&) noexcept = delete;
 
-  font(std::span<const u8> _data, const size_px<uint> &_size, bool _hinting = true);
+  font(std::span<const u8> _data, const u16_px &_size, bool _hinting = true);
   ~font();
 
   struct glyph {
@@ -69,7 +69,7 @@ class font {
   uint  char_index(char32_t _unichar);
   glyph load(const shared_atlas &_atlas, uint _char_index, render_mode _rmode = render_mode::NORMAL);
 
-  void reset_to_size(const size_px<uint> &_size);
+  void reset_to_size(const u16_px &_size);
 
  private:
   FT_Face                         face_ = nullptr;

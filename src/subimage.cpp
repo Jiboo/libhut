@@ -48,7 +48,7 @@ vec4 subimage::texcoords() const {
   return result;
 }
 
-image::updator subimage::update(u16vec4 _bounds) {
+image::updator subimage::update(u16vec4_px _bounds) {
   HUT_PROFILE_FUN(PIMAGE)
   auto update_size     = bbox_size(_bounds);
   auto update_origin   = bbox_origin(_bounds);

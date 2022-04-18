@@ -35,7 +35,7 @@ struct proj_ubo {
   mat4  proj_{1};
   float dpi_scale_ = 1;
 
-  explicit proj_ubo(u16vec2 _size) { proj_ = ortho<float>(0.f, float(_size.x), 0.f, float(_size.y)); }
+  explicit proj_ubo(u16vec2_px _size) { proj_ = ortho<float>(0.f, float(_size.x), 0.f, float(_size.y)); }
 };
 using shared_proj_ubo = shared_buffer_suballoc<proj_ubo>;
 

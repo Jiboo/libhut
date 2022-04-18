@@ -90,14 +90,14 @@ class window final : public render_target {
   event<u16vec4>                on_expose_;  // sys request win to redraw this rect
   event<VkCommandBuffer>        on_draw_;    // win is dirty, needs to rebuild command buffer
   event<display::duration>      on_frame_;   // win will soon be drawn (use this to animate values)
-  event<u16vec2, u32 /*scale*/> on_resize_;  // sys changed win size or scaling
+  event<u16vec2_px, u32 /*scale*/> on_resize_;  // sys changed win size or scaling
 
 #if defined(HUT_ENABLE_TIME_EVENTS)
   event<u32> on_time_;  // contains timestamps of sys events, to measure hut latency
 #endif
 
-  event<u8 /*finger*/, touch_event_type, vec2 /*pos*/> on_touch_;
-  event<u8 /*button*/, mouse_event_type, vec2 /*pos*/> on_mouse_;
+  event<u8 /*finger*/, touch_event_type, vec2_px /*pos*/> on_touch_;
+  event<u8 /*button*/, mouse_event_type, vec2_px /*pos*/> on_mouse_;
 
   event<modifiers /*mods*/>             on_kmods_;
   event<keycode, keysym, bool /*down*/> on_key_;
@@ -122,7 +122,7 @@ class window final : public render_target {
   void maximize(bool _set = true);
   void fullscreen(bool _set = true);
 
-  u16vec2 size() const { return size_; }
+  u16vec2_px size() const { return size_; }
   u32     scale() const { return scale_; }
 
   void interactive_resize(edge _edge);
@@ -167,7 +167,7 @@ class window final : public render_target {
   VkSemaphore sem_available_ = VK_NULL_HANDLE;
   VkSemaphore sem_rendered_  = VK_NULL_HANDLE;
 
-  u16vec2             size_, pos_;
+  u16vec2_px             size_, pos_;
   display::time_point last_frame_ = display::clock::now();
   bool                minimized_  = false;
   u32                 scale_      = 1;

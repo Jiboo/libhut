@@ -37,6 +37,7 @@
 #include <harfbuzz/hb-ft.h>
 #include <harfbuzz/hb.h>
 
+#include "hut/utils/color.hpp"
 #include "hut/utils/profiling.hpp"
 #include "hut/utils/sstream.hpp"
 
@@ -56,7 +57,7 @@ struct ft_library_holder {
   }
 };
 
-font::font(std::span<const u8> _data, const size_px<uint> &_size, bool _hinting) {
+font::font(std::span<const u8> _data, const u16_px &_size, bool _hinting) {
   static ft_library_holder s_lib_holder;
 
   load_flags_ = FT_LOAD_COLOR | (_hinting ? FT_LOAD_FORCE_AUTOHINT : FT_LOAD_NO_HINTING);
@@ -129,7 +130,7 @@ font::glyph font::load_internal(const shared_atlas &_atlas, uint _char_index, re
     auto *dst        = update.data();
     for (uint y = 0; y < render.rows; y++) {
       auto *src_row = src + static_cast<size_t>(render.width * y);
-      auto *dst_row = (u8vec4 *)(dst + static_cast<size_t>(update.staging_row_pitch() * y));
+      auto *dst_row = (u8vec4_rgba *)(dst + static_cast<size_t>(update.staging_row_pitch() * y));
       for (uint x = 0; x < render.width; x++) {
         auto  src_pixel = *(src_row + x);
         auto &dst_pixel = *(dst_row + x);
@@ -160,11 +161,11 @@ font::glyph font::load(const shared_atlas &_atlas, uint _char_index, render_mode
   return it->second;
 }
 
-void font::reset_to_size(const size_px<uint> &_size) {
+void font::reset_to_size(const u16_px &_size) {
   HUT_PROFILE_SCOPE(PFONT, "font::font::reset_to_size")
   std::unique_lock lk{mutex_};
   cache_.clear();
-  FT_Set_Pixel_Sizes(face_, 0, _size.value_);
+  FT_Set_Pixel_Sizes(face_, 0, (FT_UInt)_size);
 
   if (font_ != nullptr)
     hb_font_destroy(font_);

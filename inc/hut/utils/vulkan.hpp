@@ -33,20 +33,20 @@
 
 namespace hut {
 
-inline i16vec2 offset2_16(VkOffset2D _in) {
-  return i16vec2{_in.x, _in.y};
+inline i16vec2_px offset2_16(VkOffset2D _in) {
+  return i16vec2_px{_in.x, _in.y};
 }
-inline i16vec3 offset3_16(VkOffset3D _in) {
-  return i16vec3{_in.x, _in.y, _in.z};
+inline i16vec3_px offset3_16(VkOffset3D _in) {
+  return i16vec3_px{_in.x, _in.y, _in.z};
 }
-inline i16vec2 extent2_16(VkExtent2D _in) {
-  return u16vec2{_in.width, _in.height};
+inline u16vec2_px extent2_16(VkExtent2D _in) {
+  return u16vec2_px{_in.width, _in.height};
 }
-inline i16vec3 extent3_16(VkExtent3D _in) {
-  return u16vec3{_in.width, _in.height, _in.depth};
+inline u16vec3_px extent3_16(VkExtent3D _in) {
+  return u16vec3_px{_in.width, _in.height, _in.depth};
 }
-inline vec4 color4_32(VkClearColorValue _in) {
-  return vec4{_in.float32[0], _in.float32[1], _in.float32[2], _in.float32[3]};
+inline f32vec4_rgba color4_32(VkClearColorValue _in) {
+  return f32vec4_rgba{_in.float32[0], _in.float32[1], _in.float32[2], _in.float32[3]};
 }
 
 }  // namespace hut

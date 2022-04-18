@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include "hut/utils/color.hpp"
+#include "hut/utils/length.hpp"
+
 #include "hut/offscreen.hpp"
 #include "hut/pipeline.hpp"
 
@@ -11,15 +14,15 @@
 
 using namespace hut;
 
-constexpr u8vec4 D = {0, 0, 0, 0};          // Default pixel values after image creation
-constexpr u8vec4 C = {0, 0, 0, 255};        // Cleared for framebuffer
-constexpr u8vec4 W = {255, 255, 255, 255};  // Drawn
-constexpr u8vec4 I = {128, 128, 128, 128};  // Untouched
+constexpr u8vec4_rgba D = {0, 0, 0, 0};          // Default pixel values after image creation
+constexpr u8vec4_rgba C = {0, 0, 0, 255};        // Cleared for framebuffer
+constexpr u8vec4_rgba W = {255, 255, 255, 255};  // Drawn
+constexpr u8vec4_rgba I = {128, 128, 128, 128};  // Untouched
 
-void dump(u8vec4 *_data, u16vec4 _box) {
-  for (int x = _box.x; x < _box.z; x++) {
-    for (int y = _box.y; y < _box.w; y++) {
-      auto pixel = _data[_box.z * y + x];
+void dump(u8vec4_rgba *_data, u16vec4_px _box) {
+  for (int x = int(_box.x); x < int(_box.z); x++) {
+    for (int y = int(_box.y); y < int(_box.w); y++) {
+      auto pixel = _data[int(_box.z) * y + x];
       if (pixel == D)
         std::cout << "D";
       else if (pixel == C)
@@ -80,7 +83,7 @@ TEST(offscreen, offscreen_download) {
 
   d.flush_staged();  // staging has to be explicitly flushed in offscreen mode
 
-  u8vec4 pixel_data[5 * 5] = {
+  u8vec4_rgba pixel_data[5 * 5] = {
       // clang-format off
       I, I, I, I, I,
       I, I, I, I, I,
@@ -92,7 +95,7 @@ TEST(offscreen, offscreen_download) {
   ofs.download(std::span<u8>(&pixel_data[0].x, sizeof(pixel_data)), 5 * 4, image::subresource{{0, 0, 4, 4}});
 
   // 4*4 copy into a 5*5 buffer, extra pixel should be untouched, the rest is default initialized to transparent on image creation
-  u8vec4 pixel_ref[5 * 5] = {
+  u8vec4_rgba pixel_ref[5 * 5] = {
       // clang-format off
       D, D, D, D, I,
       D, D, D, D, I,
@@ -140,10 +143,10 @@ TEST(offscreen, offscreen_basic) {
 
   ofs.draw([&](VkCommandBuffer _cb) { rgb_pipeline->draw(_cb, 0, indices, instances, vertices); });
 
-  u8vec4 pixel_data[4 * 4];
+  u8vec4_rgba pixel_data[4 * 4];
   ofs.download(std::span<u8>(&pixel_data[0].x, sizeof(pixel_data)), 4 * 4);
 
-  u8vec4 pixel_ref[4 * 4] = {
+  u8vec4_rgba pixel_ref[4 * 4] = {
       // clang-format off
       W, W, C, C,
       W, W, C, C,
@@ -178,7 +181,7 @@ TEST(offscreen, offscreen_download_offset) {
 
   d.flush_staged();  // staging has to be explicitly flushed in offscreen mode
 
-  u8vec4 pixel_data[5 * 5] = {
+  u8vec4_rgba pixel_data[5 * 5] = {
       // clang-format off
       I, I, I, I, I,
       I, I, I, I, I,
@@ -189,7 +192,7 @@ TEST(offscreen, offscreen_download_offset) {
   };
   ofs.download(std::span<u8>(&pixel_data[0].x, sizeof(pixel_data)), 5 * 4, image::subresource{{2, 2, 4, 4}});
 
-  u8vec4 pixel_ref[5 * 5] = {
+  u8vec4_rgba pixel_ref[5 * 5] = {
       // clang-format off
       W, D, I, I, I,
       D, D, I, I, I,
@@ -245,7 +248,7 @@ TEST(offscreen, offscreen_render_offset) {
 
   ofs.draw([&](VkCommandBuffer _cb) { rgb_pipeline->draw(_cb, 0, indices, instances, vertices); });
 
-  u8vec4 pixel_data[4 * 4] = {
+  u8vec4_rgba pixel_data[4 * 4] = {
       // clang-format off
       I, I, I, I,
       I, I, I, I,
@@ -256,7 +259,7 @@ TEST(offscreen, offscreen_render_offset) {
   ofs.download(std::span<u8>(&pixel_data[0].x, sizeof(pixel_data)), 4 * 4, image::subresource{{0, 0, 4, 4}});
 
   // Draw one white pixel at [2,2] (W), rest of the 3*3 offscreen should have been cleared (C), rest of the 4*4 image should be untouched,
-  u8vec4 pixel_ref[4 * 4] = {
+  u8vec4_rgba pixel_ref[4 * 4] = {
       // clang-format off
       D, D, D, D,
       D, W, C, D,

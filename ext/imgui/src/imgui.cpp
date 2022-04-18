@@ -304,7 +304,7 @@ void rem_image(ImTextureID _id) {
   ctx.reusable_bindings_ids_.emplace_back(reinterpret_cast<size_t>(_id));
 }
 
-bool handle_resize(u16vec2 _size, u32 _scale) {
+bool handle_resize(u16vec2_px _size, u32 _scale) {
   ImGuiIO            &io  = ImGui::GetIO();
   hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(io.BackendRendererUserData);
 
@@ -338,7 +338,7 @@ cursor_type hut_cursor_type(ImGuiMouseCursor _input) {
   return result;
 }
 
-bool handle_mouse(u8 _button, mouse_event_type _type, vec2 _pos) {
+bool handle_mouse(u8 _button, mouse_event_type _type, vec2_px _pos) {
   ImGuiIO            &io  = ImGui::GetIO();
   hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(io.BackendRendererUserData);
 
@@ -347,7 +347,7 @@ bool handle_mouse(u8 _button, mouse_event_type _type, vec2 _pos) {
     case MUP: io.AddMouseButtonEvent(_button - 1, false); break;
     case MWHEEL_DOWN: io.AddMouseWheelEvent(0, -1); break;
     case MWHEEL_UP: io.AddMouseWheelEvent(0, +1); break;
-    case MMOVE: io.AddMousePosEvent(_pos.x, _pos.y); break;
+    case MMOVE: io.AddMousePosEvent((f32)_pos.x, (f32)_pos.y); break;
   }
 
   auto request_cursor = io.MouseDrawCursor ? CNONE : hut_cursor_type(ImGui::GetMouseCursor());

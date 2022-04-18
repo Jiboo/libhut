@@ -82,7 +82,7 @@ int main(int /*unused*/, char ** /*unused*/) {
   });
 
   bool handle_on_resize_events = false;
-  win.on_resize_.connect([&](u16vec2 _size, u32 _scale) {
+  win.on_resize_.connect([&](u16vec2_px _size, u32 _scale) {
     std::cout << "on_resize " << _size << ", " << _scale << std::endl;
     return handle_on_resize_events;
   });

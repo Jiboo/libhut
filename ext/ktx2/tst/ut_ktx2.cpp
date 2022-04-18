@@ -18,7 +18,7 @@ TEST(ktx2, tex_rgba8888_ktx2) {
 
   ASSERT_TRUE(result.has_value());
   auto img = result.value();
-  EXPECT_EQ(u16vec2(256, 256), img->size());
+  EXPECT_EQ(u16vec2_px(256, 256), img->size());
   EXPECT_EQ(1, img->layers());
   EXPECT_EQ(7, img->levels());
   EXPECT_EQ(VK_FORMAT_R8G8B8A8_SRGB, img->format());
@@ -38,7 +38,7 @@ TEST(ktx2, tex_bc1_ktx2) {
 
   ASSERT_TRUE(result.has_value());
   auto img = result.value();
-  EXPECT_EQ(u16vec2(256, 256), img->size());
+  EXPECT_EQ(u16vec2_px(256, 256), img->size());
   EXPECT_EQ(1, img->layers());
   EXPECT_EQ(7, img->levels());
   EXPECT_EQ(VK_FORMAT_BC1_RGBA_SRGB_BLOCK, img->format());
@@ -57,7 +57,7 @@ TEST(ktx2, tex_2layers_bc1_ktx2) {
 
   ASSERT_TRUE(result.has_value());
   auto img = result.value();
-  EXPECT_EQ(u16vec2(256, 256), img->size());
+  EXPECT_EQ(u16vec2_px(256, 256), img->size());
   EXPECT_EQ(2, img->layers());
   EXPECT_EQ(7, img->levels());
   EXPECT_EQ(VK_FORMAT_BC1_RGBA_SRGB_BLOCK, img->format());
@@ -72,7 +72,7 @@ TEST(ktx2, tex_cubemap_bc1_ktx2) {
 
   ASSERT_TRUE(result.has_value());
   auto img = result.value();
-  EXPECT_EQ(u16vec2(256, 256), img->size());
+  EXPECT_EQ(u16vec2_px(256, 256), img->size());
   EXPECT_EQ(6, img->layers());
   EXPECT_EQ(7, img->levels());
   EXPECT_EQ(VK_FORMAT_BC1_RGBA_SRGB_BLOCK, img->format());

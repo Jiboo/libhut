@@ -40,7 +40,7 @@ namespace hut {
 class display;
 
 struct image_params {
-  u16vec2               size_;
+  u16vec2_px               size_;
   VkFormat              format_;
   u16                   levels_     = 1;
   u16                   layers_     = 1;
@@ -57,7 +57,7 @@ class image {
 
  public:
   struct subresource {
-    u16vec4 coords_;
+    u16vec4_px coords_;
     u16     level_ = 0;
     u16     layer_ = 0;
   };
@@ -111,7 +111,7 @@ class image {
     [[nodiscard]] u8       *data() { return data_.data(); }
     [[nodiscard]] size_t    size_bytes() const { return data_.size_bytes(); }
     [[nodiscard]] uint      staging_row_pitch() const { return staging_row_pitch_; }
-    [[nodiscard]] uint      image_row_pitch() const { return target_->bpp() * bbox_size(subres_.coords_).x / 8; }
+    [[nodiscard]] uint      image_row_pitch() const { return target_->bpp() * (uint)bbox_size(subres_.coords_).x / 8; }
   };
 
   static std::shared_ptr<image> load_raw(display &_display, std::span<const u8> _data, uint _data_row_pitch,
@@ -134,7 +134,7 @@ class image {
 
   [[nodiscard]] u8       bpp() const { return format_info::from(params_.format_).bpp(); }
   [[nodiscard]] VkFormat format() const { return params_.format_; }
-  [[nodiscard]] u16vec2  size() const { return params_.size_; }
+  [[nodiscard]] u16vec2_px  size() const { return params_.size_; }
   [[nodiscard]] u16      levels() const { return params_.levels_; }
   [[nodiscard]] u16      layers() const { return params_.layers_; }
 

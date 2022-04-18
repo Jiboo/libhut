@@ -63,7 +63,7 @@ void install_resizable_movable(window &_win) {
 
 template<typename TUBO>
 void install_resizable_ubo(window &_win, shared_buffer_suballoc<TUBO> _ubo) {
-  _win.on_resize_.connect([_ubo](const u16vec2 &_size, u32 _scale) {
+  _win.on_resize_.connect([_ubo](const u16vec2_px &_size, u32 _scale) {
     mat4 proj = ortho<float>(0.f, float(_size.x * _scale), 0.f, float(_size.y * _scale));
     _ubo->set_subone(0, offsetof(TUBO, proj_), sizeof(mat4), &proj);
 

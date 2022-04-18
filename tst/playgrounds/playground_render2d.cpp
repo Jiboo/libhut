@@ -74,17 +74,18 @@ int main(int /*unused*/, char ** /*unused*/) {
 
   auto rand_color = [&]() {
     auto hsv  = vec3{rand_norm() * 360, 0.99, 0.95};
-    auto rgba = vec4(rgbColor(hsv), rand_norm() * 0.75 + 0.25);
-    return u8vec4(rgba * 255);
+    auto rgba = f32vec4_rgba(rgbColor(hsv), rand_norm() * 0.75 + 0.25);
+    return u8vec4_rgba(rgba * 255);
   };
 
   auto quads = box_renderer.allocate(15 * 15 + 1);
 
-  u16     bbox_min        = 0;
-  u16     bbox_max        = 1000;
-  u16vec4 custom_bbox     = {0, 0, 0, 0};
-  u8vec4  custom_col_from = {255, 0, 0, 255};
-  u8vec4  custom_col_to   = {0, 0, 255, 255};
+  u16_px     bbox_min        = 0_px;
+  u16_px     bbox_max        = 1000_px;
+  u16vec4_px custom_bbox     = {0, 0, 0, 0};
+  u8vec4_rgba  custom_col_from = {255, 0, 0, 255};
+  u8vec4_rgba  custom_col_to   = {0, 0, 255, 255};
+
   u16     custom_radius   = 8;
   u16     custom_softness = 1;
   u16     extra_min       = 0;
@@ -97,12 +98,13 @@ int main(int /*unused*/, char ** /*unused*/) {
   bool    grid_fixed_gradient         = false;
   bool    grid_release_before_realloc = false;
   bool    grid_no_params              = false;
-  u16vec2 grid_size                   = {75, 75};
-  u16     grid_min                    = 10;
-  u16     grid_max                    = 200;
-  float   scroll_min                  = -800;
-  float   scroll_max                  = 800;
-  vec2    scroll                      = {0, 0};
+
+  u16vec2_px grid_size                   = {75, 75};
+  u16_px     grid_min                    = 10_px;
+  u16_px     grid_max                    = 200_px;
+  f32_px   scroll_min                  = -800._px;
+  f32_px   scroll_max                  = 800_px;
+  vec2_px    scroll                      = {0, 0};
 
   win.on_draw_.connect([&](VkCommandBuffer _buffer) {
     imgui::new_frame();
@@ -111,8 +113,8 @@ int main(int /*unused*/, char ** /*unused*/) {
     if (ImGui::Begin("renderer2d")) {
       gen.seed(std::mt19937::default_seed);
 
-      u16vec2 origin = bbox_origin(custom_bbox);
-      u16vec2 size   = bbox_size(custom_bbox);
+      u16vec2_px origin = bbox_origin(custom_bbox);
+      u16vec2_px size   = bbox_size(custom_bbox);
       ImGui::SliderScalarN("Origin", ImGuiDataType_U16, &origin, 2, &bbox_min, &bbox_max);
       ImGui::SliderScalarN("Size", ImGuiDataType_U16, &size, 2, &bbox_min, &bbox_max);
       custom_bbox = make_bbox_with_origin_size(origin, size);
@@ -157,8 +159,9 @@ int main(int /*unused*/, char ** /*unused*/) {
       for (unsigned i = 0; i < quads.size() - 1; i++) {
         auto    line = i / 15;
         auto    col  = i % 15;
-        u16vec4 bbox = make_bbox_with_origin_size(
-            u16vec2{8} + u16vec2{col * (grid_size.x + 8), line * (grid_size.y + 8)}, grid_size);
+        constexpr u16_px padding = 8_px;
+        auto offset = u16vec2_px{(grid_size.x + padding) * col, (grid_size.y + padding) * line};
+        u16vec4_px bbox = make_bbox_with_origin_size(u16vec2_px{padding} + offset, grid_size);
         render2d::set(iupdator[i], bbox * scale, grid_fixed_colors ? custom_col_from : rand_color(),
                       grid_fixed_colors ? custom_col_to : rand_color(),
                       grid_fixed_gradient ? render2d::gradient(custom_gradient) : render2d::gradient(i % 4),

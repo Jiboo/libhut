@@ -120,8 +120,8 @@ VkMemoryRequirements image::create(display &_display, const image_params &_param
   VkImageCreateInfo image_info = {};
   image_info.sType             = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   image_info.imageType         = VK_IMAGE_TYPE_2D;
-  image_info.extent.width      = _params.size_.x;
-  image_info.extent.height     = _params.size_.y;
+  image_info.extent.width      = (uint)_params.size_.x;
+  image_info.extent.height     = (uint)_params.size_.y;
   image_info.extent.depth      = 1;
   image_info.mipLevels         = _params.levels_;
   image_info.arrayLayers       = _params.layers_;
@@ -159,17 +159,17 @@ void image::update(subresource _subres, std::span<const u8> _data, uint _src_row
   HUT_PROFILE_FUN(PIMAGE, _subres.coords_, _subres.level_, _subres.layer_)
   auto updto = update(_subres);
   auto size  = bbox_size(_subres.coords_);
-  assert(_data.size_bytes() == static_cast<size_t>(_src_row_pitch * size.y));
+  assert(_data.size_bytes() == static_cast<size_t>(_src_row_pitch * (uint)size.y));
   auto mip_size = params_.size_ >> _subres.level_;
   assert(mip_size.x >= size.x && mip_size.y >= size.y);
 
   if (_src_row_pitch == updto.staging_row_pitch() || params_.tiling_ == VK_IMAGE_TILING_OPTIMAL) {
     memcpy(updto.data(), _data.data(), _data.size_bytes());
   } else {
-    uint row_bit_size = size.x * bpp();
+    uint row_bit_size = (uint)size.x * bpp();
     assert(row_bit_size >= 8);
     uint row_byte_size = row_bit_size / 8;
-    for (uint y = 0; y < size.y; y++) {
+    for (uint y = 0; y < (uint)size.y; y++) {
       auto       *dst_row = updto.data() + static_cast<size_t>(y * updto.staging_row_pitch());
       const auto *src_row = _data.data() + static_cast<size_t>(y * _src_row_pitch);
       memcpy(dst_row, src_row, row_byte_size);
@@ -183,11 +183,11 @@ image::updator image::update(subresource _subres) {
   const auto &limits       = display_->limits();
   uint        buffer_align = limits.optimalBufferCopyRowPitchAlignment;
   uint        offset_align = std::max(VkDeviceSize(4), limits.optimalBufferCopyOffsetAlignment);
-  uint        row_bit_size = size.x * bpp();
+  uint        row_bit_size = (uint)size.x * bpp();
   assert(row_bit_size >= 8);
   uint row_byte_size     = row_bit_size / 8;
   uint staging_row_pitch = align(row_byte_size, buffer_align);
-  auto byte_size         = size.y * staging_row_pitch;
+  auto byte_size         = (uint)size.y * staging_row_pitch;
 
   std::lock_guard lk(display_->staging_mutex_);
 
@@ -226,9 +226,9 @@ void image::finalize_update(image::updator &_update) {
 
   display::buffer_image_copy copy = {};
   copy.imageExtent                = {(uint)size.x, (uint)size.y, 1};
-  copy.imageOffset                = {origin.x, origin.y, 0};
+  copy.imageOffset                = {(int)origin.x, (int)origin.y, 0};
   copy.bufferRowLength   = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : ((_update.staging_row_pitch_ * 8) / bpp());
-  copy.bufferImageHeight = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : size.y;
+  copy.bufferImageHeight = params_.tiling_ == VK_IMAGE_TILING_OPTIMAL ? 0 : (uint)size.y;
   copy.bufferOffset      = _update.staging_.offset_bytes();
   copy.imageSubresource  = subres_layers;
   copy.source_           = _update.staging_.parent()->buffer_;

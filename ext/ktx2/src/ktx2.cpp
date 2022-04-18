@@ -32,6 +32,8 @@
 
 #include <bit>
 
+#include "hut/utils/length.hpp"
+
 namespace hut::ktx {
 
 bool is_prohibited_format(VkFormat _format) {
@@ -217,11 +219,11 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
   shared_image img = std::make_shared<image>(_display, iparams);
   for (u16 level = 0; level < iparams.levels_; level++) {
     const auto &level_range = levels[level];
-    u16vec2     level_size  = iparams.size_ >> level;
-    u32         bit_stride  = level_size.x * img->bpp();
+    u16vec2_px  level_size  = iparams.size_ >> level;
+    uint         bit_stride  = (uint)level_size.x * img->bpp();
     assert(bit_stride > 8);
-    u32  byte_stride       = bit_stride / 8;
-    auto layer_byte_length = byte_stride * level_size.y;
+    uint  byte_stride       = bit_stride / 8;
+    auto layer_byte_length = byte_stride * (uint)level_size.y;
     assert(level_range.uncompressed_byte_length_ == static_cast<size_t>(layer_byte_length * iparams.layers_));
 
     for (u16 layer = 0; layer < iparams.layers_; layer++) {

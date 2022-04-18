@@ -27,6 +27,8 @@
 
 #include <numbers>
 
+#include "hut/utils/color.hpp"
+
 #include "hut/display.hpp"
 #include "hut/pipeline.hpp"
 #include "hut/window.hpp"
@@ -88,20 +90,20 @@ int main(int /*unused*/, char ** /*unused*/) {
   skybox_params.size_              = {4, 4};
   skybox_params.format_            = VK_FORMAT_R8G8B8A8_UNORM;
   auto                skybox_image = std::make_shared<image>(d, skybox_params);
-  u8vec4              pixels[16];
-  std::span<const u8> pixels_ref{&pixels[0][0], 16 * sizeof(u8vec4)};
-  std::fill(std::begin(pixels), std::end(pixels), u8vec4{0xFF, 0x00, 0x00, 0x80});
-  skybox_image->update({{0, 0, 4, 4}, 0, 0}, pixels_ref, 4 * sizeof(u8vec4));
-  std::fill(std::begin(pixels), std::end(pixels), u8vec4{0x00, 0xFF, 0x00, 0x80});
-  skybox_image->update({{0, 0, 4, 4}, 0, 1}, pixels_ref, 4 * sizeof(u8vec4));
-  std::fill(std::begin(pixels), std::end(pixels), u8vec4{0xFF, 0xFF, 0x00, 0x80});
-  skybox_image->update({{0, 0, 4, 4}, 0, 2}, pixels_ref, 4 * sizeof(u8vec4));
-  std::fill(std::begin(pixels), std::end(pixels), u8vec4{0x00, 0x00, 0xFF, 0x80});
-  skybox_image->update({{0, 0, 4, 4}, 0, 3}, pixels_ref, 4 * sizeof(u8vec4));
-  std::fill(std::begin(pixels), std::end(pixels), u8vec4{0xFF, 0x00, 0xFF, 0x80});
-  skybox_image->update({{0, 0, 4, 4}, 0, 4}, pixels_ref, 4 * sizeof(u8vec4));
-  std::fill(std::begin(pixels), std::end(pixels), u8vec4{0x00, 0xFF, 0xFF, 0x80});
-  skybox_image->update({{0, 0, 4, 4}, 0, 5}, pixels_ref, 4 * sizeof(u8vec4));
+  u8vec4_rgba              pixels[16];
+  std::span<const u8> pixels_ref{&pixels[0][0], 16 * sizeof(u8vec4_rgba)};
+  std::fill(std::begin(pixels), std::end(pixels), u8vec4_rgba{0xFF, 0x00, 0x00, 0x80});
+  skybox_image->update({{0, 0, 4, 4}, 0, 0}, pixels_ref, 4 * sizeof(u8vec4_rgba));
+  std::fill(std::begin(pixels), std::end(pixels), u8vec4_rgba{0x00, 0xFF, 0x00, 0x80});
+  skybox_image->update({{0, 0, 4, 4}, 0, 1}, pixels_ref, 4 * sizeof(u8vec4_rgba));
+  std::fill(std::begin(pixels), std::end(pixels), u8vec4_rgba{0xFF, 0xFF, 0x00, 0x80});
+  skybox_image->update({{0, 0, 4, 4}, 0, 2}, pixels_ref, 4 * sizeof(u8vec4_rgba));
+  std::fill(std::begin(pixels), std::end(pixels), u8vec4_rgba{0x00, 0x00, 0xFF, 0x80});
+  skybox_image->update({{0, 0, 4, 4}, 0, 3}, pixels_ref, 4 * sizeof(u8vec4_rgba));
+  std::fill(std::begin(pixels), std::end(pixels), u8vec4_rgba{0xFF, 0x00, 0xFF, 0x80});
+  skybox_image->update({{0, 0, 4, 4}, 0, 4}, pixels_ref, 4 * sizeof(u8vec4_rgba));
+  std::fill(std::begin(pixels), std::end(pixels), u8vec4_rgba{0x00, 0xFF, 0xFF, 0x80});
+  skybox_image->update({{0, 0, 4, 4}, 0, 5}, pixels_ref, 4 * sizeof(u8vec4_rgba));
 
   auto skybox_sampler  = std::make_shared<sampler>(d);
   auto skybox_pipeline = std::make_unique<pipeline_skybox>(w);
@@ -126,8 +128,8 @@ int main(int /*unused*/, char ** /*unused*/) {
     return false;
   });
 
-  w.on_resize_.connect([&](const u16vec2 &_size, u32 _scale) {
-    mat4 new_proj = perspective(radians(45.0f), _size.x / (float)_size.y, 0.001f, 1000.0f);
+  w.on_resize_.connect([&](const u16vec2_px &_size, u32 _scale) {
+    mat4 new_proj = perspective(radians(45.0f), (float)_size.x / (float)_size.y, 0.001f, 1000.0f);
     ubo->set_subone(0, offsetof(vp_ubo, proj_), sizeof(mat4), &new_proj);
     return false;
   });

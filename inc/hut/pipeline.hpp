@@ -49,7 +49,7 @@ struct common_ubo {
   mat4  view_{1};
   float dpi_scale_ = 1;
 
-  explicit common_ubo(u16vec2 _size) { proj_ = ortho<float>(0.f, float(_size.x), 0.f, float(_size.y)); }
+  explicit common_ubo(u16vec2_px _size) { proj_ = ortho<float>(0.f, float(_size.x), 0.f, float(_size.y)); }
 };
 
 using shared_ubo = shared_buffer_suballoc<common_ubo>;
@@ -233,7 +233,7 @@ class pipeline {
       throw std::runtime_error("failed to create pipeline layout!");
   }
 
-  void init_pipeline(u16vec4 _default_viewport, VkSampleCountFlagBits _samples, const pipeline_params &_params) {
+  void init_pipeline(u16vec4_px _default_viewport, VkSampleCountFlagBits _samples, const pipeline_params &_params) {
     HUT_PROFILE_SCOPE(PPIPELINE, "pipeline({},{})::init_pipeline", TVertexRefl::FILENAME, TFragRefl::FILENAME)
     auto size   = bbox_size(_default_viewport);
     auto origin = bbox_origin(_default_viewport);
@@ -273,16 +273,16 @@ class pipeline {
     assembly_create_info.primitiveRestartEnable = VK_FALSE;
 
     VkViewport viewport = {};
-    viewport.x          = origin.x;
-    viewport.y          = size.y;
-    viewport.width      = size.x;
-    viewport.height     = size.y;
+    viewport.x          = (f32)origin.x;
+    viewport.y          = (f32)origin.y;
+    viewport.width      = (f32)size.x;
+    viewport.height     = (f32)size.y;
     viewport.minDepth   = 0.0f;
     viewport.maxDepth   = 1.0f;
 
     VkRect2D scissor = {};
-    scissor.offset   = {origin.x, origin.y};
-    scissor.extent   = {size.x, size.y};
+    scissor.offset   = {(int)origin.x, (int)origin.y};
+    scissor.extent   = {(uint)size.x, (uint)size.y};
 
     VkPipelineViewportStateCreateInfo viewport_create_info = {};
     viewport_create_info.sType                             = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;

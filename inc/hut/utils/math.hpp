@@ -45,6 +45,29 @@ constexpr inline TType NUMAX = std::numeric_limits<TType>::max();
 template<typename TType>
 constexpr inline TType NUMIN = std::numeric_limits<TType>::min();
 
+template<typename TEnum>
+constexpr std::underlying_type_t<TEnum> to_underlying(TEnum _val) noexcept {
+  return static_cast<std::underlying_type_t<TEnum>>(_val);
+}
+
+template<typename TIn>
+concept arithmetic = std::is_arithmetic_v<TIn>;
+
+template<length_t TSize, arithmetic TVec, arithmetic TScalar> requires (!std::is_same_v<TVec, TScalar>)
+constexpr auto operator*(vec<TSize, TVec> _v, TScalar _s) {
+  return _v *= _s;
+}
+
+template<length_t TSize, arithmetic TVec, arithmetic TScalar> requires (!std::is_same_v<TVec, TScalar>)
+constexpr auto operator*(TScalar _s, vec<TSize, TVec> _v) {
+  return _v *= _s;
+}
+
+template<length_t TSize, arithmetic TVec, arithmetic TScalar> requires (!std::is_same_v<TVec, TScalar>)
+constexpr auto operator/(vec<TSize, TVec> _v, TScalar _s) {
+  return _v /= _s;
+}
+
 template<typename TType, TType... TValues>
 constexpr TType max() {
   TType values[] = {TValues...};
@@ -79,6 +102,8 @@ inline vec<2, TType, TQualifier> bbox_origin(const vec<4, TType, TQualifier> &_i
 
 template<typename TType, qualifier TQualifier = defaultp>
 inline vec<2, TType, TQualifier> bbox_size(const vec<4, TType, TQualifier> &_input) {
+  assert(_input[2] >= _input[0]);
+  assert(_input[3] >= _input[1]);
   return vec<2, TType, TQualifier>{_input[2] - _input[0], _input[3] - _input[1]};
 }
 

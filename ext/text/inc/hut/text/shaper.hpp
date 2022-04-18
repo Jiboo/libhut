@@ -59,7 +59,7 @@ class shaper {
   explicit shaper(shared_font _font, render_mode _rmode = shaper::render_mode::NORMAL);
   ~shaper();
 
-  using shape_callback = std::function<void(uint /*index*/, i16vec4 /*quad*/, vec4 /*uv*/, uint /*atlas_page*/)>;
+  using shape_callback = std::function<void(uint /*index*/, i16vec4_px /*quad*/, vec4 /*uv*/, uint /*atlas_page*/)>;
   void shape(const shared_atlas &_atlas, std::u8string_view _text, const shape_callback &_cb);
 
  private:

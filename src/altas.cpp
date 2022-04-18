@@ -36,7 +36,7 @@ atlas::atlas(display &_display, const image_params &_params)
     : display_(_display)
     , params_(_params) {
   HUT_PROFILE_FUN(PIMAGE)
-  if (params_.size_ == u16vec2{0, 0}) {
+  if (params_.size_ == u16vec2_px{0, 0}) {
     params_.size_ = {_display.limits().maxImageDimension2D, _display.limits().maxImageDimension2D};
   }
   add_page();
@@ -47,32 +47,32 @@ void atlas::add_page() {
   pages_.emplace_back(std::make_shared<image>(display_, params_));
 }
 
-shared_subimage atlas::alloc(const u16vec2 &_bounds) {
+shared_subimage atlas::alloc(const u16vec2_px &_bounds) {
   HUT_PROFILE_FUN(PIMAGE, _bounds)
-  assert(_bounds.x > 0);
-  assert(_bounds.y > 0);
+  assert(_bounds.x > 0_px);
+  assert(_bounds.y > 0_px);
   auto padded = _bounds + PADDING;
   assert(padded.x < params_.size_.x);
   assert(padded.y < params_.size_.y);
   for (uint i = 0; i < pages_.size(); i++) {
     auto packed = pages_[i].packer_.pack(padded);
     if (packed)
-      return std::make_shared<subimage>(this, i, make_bbox_with_origin_size(*packed, _bounds));
+      return std::make_shared<subimage>(this, i, make_bbox_with_origin_size(u16vec2_px{*packed}, _bounds));
   }
   add_page();
   auto packed = pages_.back().packer_.pack(padded);
   assert(packed.has_value());
-  return std::make_shared<subimage>(this, pages_.size() - 1, make_bbox_with_origin_size(packed.value(), _bounds));
+  return std::make_shared<subimage>(this, pages_.size() - 1, make_bbox_with_origin_size(u16vec2_px{*packed}, _bounds));
 }
 
-shared_subimage atlas::pack(const u16vec2 &_bounds, std::span<const u8> _data, uint _src_row_pitch) {
+shared_subimage atlas::pack(const u16vec2_px &_bounds, std::span<const u8> _data, uint _src_row_pitch) {
   HUT_PROFILE_FUN(PIMAGE, _bounds)
   shared_subimage result = alloc(_bounds);
   pages_[result->page()].image_->update({result->bounds()}, _data, _src_row_pitch);
   return result;
 }
 
-image::updator atlas::update(const subimage &_sub, const u16vec4 &_bounds) {
+image::updator atlas::update(const subimage &_sub, const u16vec4_px &_bounds) {
   HUT_PROFILE_FUN(PIMAGE, _sub.page(), _sub.bounds(), _bounds)
   assert(_sub.from(this));
   return pages_[_sub.page()].image_->update({_bounds});

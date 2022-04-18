@@ -66,7 +66,7 @@ renderer::renderer(render_target &_target, shared_buffer _buffer, const shared_f
     , buffer_(std::move(_buffer))
     , atlas_(std::move(_atlas))
     , shaper_(_font) {
-  constexpr u16 MAX_ATLAS_BOUNDS = 32 * 1024;
+  constexpr u16_px MAX_ATLAS_BOUNDS = 32_px * 1024;
   assert(atlas_->size().x <= MAX_ATLAS_BOUNDS && atlas_->size().y <= MAX_ATLAS_BOUNDS);
   if (_params.initial_mesh_store_size_ > 0 && _params.initial_draw_store_size_ > 0)
     grow(_params.initial_mesh_store_size_, _params.initial_draw_store_size_);
@@ -117,7 +117,7 @@ renderer::paragraph_holder renderer::allocate(std::span<const std::u8string_view
   auto draw_alloc = best_batch.dstore_.suballocator_.pack(_words.size());
   assert(draw_alloc);
   paragraph_holder result{&best_batch, *draw_alloc, uint(_words.size() * sizeof(instance))};
-  result.bboxes_ = std::make_unique<i16vec4[]>(_words.size());
+  result.bboxes_ = std::make_unique<i16vec4_px[]>(_words.size());
 
   auto cupdator = best_batch.dstore_.commands_->update_raw(sizeof(VkDrawIndexedIndirectCommand) * *draw_alloc,
                                                            sizeof(VkDrawIndexedIndirectCommand) * _words.size());
@@ -207,7 +207,7 @@ word::word(renderer *_parent, batch &_batch, uint _alloc, uint _codepoints, std:
   auto *vertices = reinterpret_cast<vertex *>(vupdator.staging().data());
   auto *indices  = reinterpret_cast<index_t *>(iupdator.staging().data());
 
-  auto callback = [vertices, indices, this](uint _index, i16vec4 _coords, vec4 _uv, uint _atlas_page) {
+  auto callback = [vertices, indices, this](uint _index, i16vec4_px _coords, vec4 _uv, uint _atlas_page) {
     vertices[_index * 4 + 0] = {{_coords.x, _coords.y}, encode_atlas_page_xy({_uv.x, _uv.y}, _atlas_page)};
     vertices[_index * 4 + 1] = {{_coords.x, _coords.w}, encode_atlas_page_xy({_uv.x, _uv.w}, _atlas_page)};
     vertices[_index * 4 + 2] = {{_coords.z, _coords.y}, encode_atlas_page_xy({_uv.z, _uv.y}, _atlas_page)};

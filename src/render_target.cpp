@@ -60,7 +60,7 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
   const auto size       = bbox_size(_init_params.box_);
   const auto offset     = bbox_origin(_init_params.box_);
 
-  assert(size.x > 0 && size.y > 0);
+  assert(size.x > 0_px && size.y > 0_px);
 
   if (render_target_params_.flags_ & render_target_params::FMULTISAMPLING) {
     const auto        &limits = display_->limits();
@@ -220,8 +220,8 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
     fb_info.renderPass              = renderpass_;
     fb_info.attachmentCount         = fb_attachments.size();
     fb_info.pAttachments            = fb_attachments.data();
-    fb_info.width                   = offset.x + size.x;
-    fb_info.height                  = offset.y + size.y;
+    fb_info.width                   = (int)offset.x + (uint)size.x;
+    fb_info.height                  = (int)offset.y + (uint)size.y;
     fb_info.layers                  = 1;
 
     if (HUT_PVK(vkCreateFramebuffer, device, &fb_info, nullptr, &fbos_[i]) != VK_SUCCESS)
@@ -242,8 +242,8 @@ void render_target::begin_rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
   render_pass_info.sType                 = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
   render_pass_info.renderPass            = renderpass_;
   render_pass_info.framebuffer           = _fbo;
-  render_pass_info.renderArea.offset     = {offset.x, offset.y};
-  render_pass_info.renderArea.extent     = {size.x, size.y};
+  render_pass_info.renderArea.offset     = {(int)offset.x, (int)offset.y};
+  render_pass_info.renderArea.extent     = {(uint)size.x, (uint)size.y};
 
   std::vector<VkClearValue> clear_colors;
   clear_colors.emplace_back(VkClearValue{.color = render_target_params_.clear_color_});
@@ -260,15 +260,15 @@ void render_target::begin_rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
   // to enable secondary command buffers
 
   VkRect2D scissor = {};
-  scissor.offset   = {offset.x, offset.y};
-  scissor.extent   = {size.x, size.y};
+  scissor.offset   = {(int)offset.x, (int)offset.y};
+  scissor.extent   = {(uint)size.x, (uint)size.y};
   HUT_PVK(vkCmdSetScissor, _cb, 0, 1, &scissor);
 
   VkViewport viewport = {};
-  viewport.x          = offset.x;
-  viewport.y          = offset.y;
-  viewport.width      = size.x;
-  viewport.height     = size.y;
+  viewport.x          = (f32)offset.x;
+  viewport.y          = (f32)offset.y;
+  viewport.width      = (f32)size.x;
+  viewport.height     = (f32)size.y;
   viewport.minDepth   = 0.0f;
   viewport.maxDepth   = 1.0f;
   HUT_PVK(vkCmdSetViewport, _cb, 0, 1, &viewport);

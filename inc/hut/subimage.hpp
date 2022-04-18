@@ -35,7 +35,7 @@ class subimage {
  private:
   atlas  *atlas_ = nullptr;
   uint    page_{};
-  u16vec4 bounds_{};
+  u16vec4_px bounds_{};
 
  public:
   subimage() = default;
@@ -71,10 +71,10 @@ class subimage {
 
   [[nodiscard]] bool    valid() const { return atlas_ != nullptr; }
   [[nodiscard]] uint    page() const { return page_; }
-  [[nodiscard]] u16vec4 bounds() const { return bounds_; }
+  [[nodiscard]] u16vec4_px bounds() const { return bounds_; }
   [[nodiscard]] vec4    texcoords() const;
 
-  image::updator update(u16vec4 _bounds);
+  image::updator update(u16vec4_px _bounds);
   image::updator update() { return update(bounds_); }
 };
 

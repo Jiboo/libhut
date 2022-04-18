@@ -29,6 +29,8 @@
 
 #include <utility>
 
+#include "hut/utils/color.hpp"
+#include "hut/utils/length.hpp"
 #include "hut/utils/math.hpp"
 
 #include "hut/atlas.hpp"
@@ -56,16 +58,16 @@ using shared_instances = pipeline::shared_instances;
 enum gradient : u16 { T2B, L2R, TL2BR, TR2BL };
 
 // Helper to write to an instance
-inline void set(instance &_target, u16vec4 _bbox, u8vec4 _from, u8vec4 _to, gradient _gradient = T2B,
+inline void set(instance &_target, u16vec4_px _bbox, u8vec4_rgba _from, u8vec4_rgba _to, gradient _gradient = T2B,
                 uint _corner_radius = 0, uint _corner_softness = 0,
                 const shared_subimage &_subimg = shared_subimage{}) {
   _target.col_from_ = _from;
   _target.col_to_   = _to;
 
-  assert(_bbox.x <= 0xFFF);
-  assert(_bbox.y <= 0xFFF);
-  assert(_bbox.z <= 0xFFF);
-  assert(_bbox.w <= 0xFFF);
+  assert(_bbox.x <= 0xFFF_px);
+  assert(_bbox.y <= 0xFFF_px);
+  assert(_bbox.z <= 0xFFF_px);
+  assert(_bbox.w <= 0xFFF_px);
   _target.pos_box_ = _bbox;
 
   assert(_corner_radius <= 0xF);
