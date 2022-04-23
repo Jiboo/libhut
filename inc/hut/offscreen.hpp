@@ -47,10 +47,10 @@ class offscreen final : public render_target {
  public:
   offscreen() = delete;
 
-  offscreen(const offscreen &) = delete;
+  offscreen(const offscreen &)            = delete;
   offscreen &operator=(const offscreen &) = delete;
 
-  offscreen(offscreen &&) noexcept = delete;
+  offscreen(offscreen &&) noexcept            = delete;
   offscreen &operator=(offscreen &&) noexcept = delete;
 
   explicit offscreen(const shared_image &_target, offscreen_params _init_params = {});

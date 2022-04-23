@@ -83,13 +83,13 @@ class window final : public render_target {
   friend class display;
 
  public:
-  event<>                       on_pause_;   // sys asked win to stop rendering
-  event<>                       on_resume_;  // sys asked win to resume rendering
-  event<bool>                   on_focus_;   // sys gave keyboard focus to win
-  event<>                       on_close_;   // overridable, sys requested win to close
-  event<u16vec4>                on_expose_;  // sys request win to redraw this rect
-  event<VkCommandBuffer>        on_draw_;    // win is dirty, needs to rebuild command buffer
-  event<display::duration>      on_frame_;   // win will soon be drawn (use this to animate values)
+  event<>                          on_pause_;   // sys asked win to stop rendering
+  event<>                          on_resume_;  // sys asked win to resume rendering
+  event<bool>                      on_focus_;   // sys gave keyboard focus to win
+  event<>                          on_close_;   // overridable, sys requested win to close
+  event<u16vec4>                   on_expose_;  // sys request win to redraw this rect
+  event<VkCommandBuffer>           on_draw_;    // win is dirty, needs to rebuild command buffer
+  event<display::duration>         on_frame_;   // win will soon be drawn (use this to animate values)
   event<u16vec2_px, u32 /*scale*/> on_resize_;  // sys changed win size or scaling
 
 #if defined(HUT_ENABLE_TIME_EVENTS)
@@ -105,10 +105,10 @@ class window final : public render_target {
 
   window() = delete;
 
-  window(const window &) = delete;
+  window(const window &)            = delete;
   window &operator=(const window &) = delete;
 
-  window(window &&) noexcept = delete;
+  window(window &&) noexcept            = delete;
   window &operator=(window &&) noexcept = delete;
 
   explicit window(display &_display, const window_params &_init_params = {});
@@ -122,8 +122,12 @@ class window final : public render_target {
   void maximize(bool _set = true);
   void fullscreen(bool _set = true);
 
-  u16vec2_px size() const { return size_; }
-  u32     scale() const { return scale_; }
+  u16vec2_px size() const {
+    return size_;
+  }
+  u32 scale() const {
+    return scale_;
+  }
 
   void interactive_resize(edge _edge);
   void interactive_move();
@@ -141,7 +145,9 @@ class window final : public render_target {
   using receive_clipboard_data = std::function<void(clipboard_format /*selected_format*/, clipboard_receiver &)>;
   bool clipboard_receive(clipboard_formats _supported_formats, receive_clipboard_data &&_callback);
 
-  void dragndrop_target(const std::shared_ptr<drop_target_interface> &_received) { drop_target_interface_ = _received; }
+  void dragndrop_target(const std::shared_ptr<drop_target_interface> &_received) {
+    drop_target_interface_ = _received;
+  }
 
   using send_dragndrop_data
       = std::function<void(dragndrop_action /*_action*/, clipboard_format /*_selected_format*/, clipboard_sender &)>;
@@ -167,7 +173,7 @@ class window final : public render_target {
   VkSemaphore sem_available_ = VK_NULL_HANDLE;
   VkSemaphore sem_rendered_  = VK_NULL_HANDLE;
 
-  u16vec2_px             size_, pos_;
+  u16vec2_px          size_, pos_;
   display::time_point last_frame_ = display::clock::now();
   bool                minimized_  = false;
   u32                 scale_      = 1;

@@ -80,31 +80,31 @@ int main(int /*unused*/, char ** /*unused*/) {
 
   auto quads = box_renderer.allocate(15 * 15 + 1);
 
-  u16_px     bbox_min        = 0_px;
-  u16_px     bbox_max        = 1000_px;
-  u16vec4_px custom_bbox     = {0, 0, 0, 0};
-  u8vec4_rgba  custom_col_from = {255, 0, 0, 255};
-  u8vec4_rgba  custom_col_to   = {0, 0, 255, 255};
+  u16_px      bbox_min        = 0_px;
+  u16_px      bbox_max        = 1000_px;
+  u16vec4_px  custom_bbox     = {0, 0, 0, 0};
+  u8vec4_rgba custom_col_from = {255, 0, 0, 255};
+  u8vec4_rgba custom_col_to   = {0, 0, 255, 255};
 
-  u16     custom_radius   = 8;
-  u16     custom_softness = 1;
-  u16     extra_min       = 0;
-  u16     extra_max       = 15;
-  int     custom_gradient = 0;
-  bool    custom_use_tex  = false;
+  u16  custom_radius   = 8;
+  u16  custom_softness = 1;
+  u16  extra_min       = 0;
+  u16  extra_max       = 15;
+  int  custom_gradient = 0;
+  bool custom_use_tex  = false;
 
-  bool    grid_use_tex                = false;
-  bool    grid_fixed_colors           = false;
-  bool    grid_fixed_gradient         = false;
-  bool    grid_release_before_realloc = false;
-  bool    grid_no_params              = false;
+  bool grid_use_tex                = false;
+  bool grid_fixed_colors           = false;
+  bool grid_fixed_gradient         = false;
+  bool grid_release_before_realloc = false;
+  bool grid_no_params              = false;
 
-  u16vec2_px grid_size                   = {75, 75};
-  u16_px     grid_min                    = 10_px;
-  u16_px     grid_max                    = 200_px;
-  f32_px   scroll_min                  = -800._px;
-  f32_px   scroll_max                  = 800_px;
-  vec2_px    scroll                      = {0, 0};
+  u16vec2_px grid_size  = {75, 75};
+  u16_px     grid_min   = 10_px;
+  u16_px     grid_max   = 200_px;
+  f32_px     scroll_min = -800._px;
+  f32_px     scroll_max = 800_px;
+  vec2_px    scroll     = {0, 0};
 
   win.on_draw_.connect([&](VkCommandBuffer _buffer) {
     imgui::new_frame();
@@ -157,11 +157,11 @@ int main(int /*unused*/, char ** /*unused*/) {
       auto iupdator = quads.update();
       u16  scale    = win.scale();
       for (unsigned i = 0; i < quads.size() - 1; i++) {
-        auto    line = i / 15;
-        auto    col  = i % 15;
-        constexpr u16_px padding = 8_px;
-        auto offset = u16vec2_px{(grid_size.x + padding) * col, (grid_size.y + padding) * line};
-        u16vec4_px bbox = make_bbox_with_origin_size(u16vec2_px{padding} + offset, grid_size);
+        auto             line    = i / 15;
+        auto             col     = i % 15;
+        constexpr u16_px PADDING = 8_px;
+        auto             offset  = u16vec2_px{(grid_size.x + PADDING) * col, (grid_size.y + PADDING) * line};
+        u16vec4_px       bbox    = make_bbox_with_origin_size(u16vec2_px{PADDING} + offset, grid_size);
         render2d::set(iupdator[i], bbox * scale, grid_fixed_colors ? custom_col_from : rand_color(),
                       grid_fixed_colors ? custom_col_to : rand_color(),
                       grid_fixed_gradient ? render2d::gradient(custom_gradient) : render2d::gradient(i % 4),

@@ -59,7 +59,7 @@ class sampler {
  public:
   sampler() = delete;
 
-  sampler(const sampler &) = delete;
+  sampler(const sampler &)            = delete;
   sampler &operator=(const sampler &) = delete;
 
   sampler(sampler &&_other) noexcept

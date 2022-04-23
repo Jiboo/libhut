@@ -384,10 +384,10 @@ class pipeline {
  public:
   pipeline() = delete;
 
-  pipeline(const pipeline &) = delete;
+  pipeline(const pipeline &)            = delete;
   pipeline &operator=(const pipeline &) = delete;
 
-  pipeline(pipeline &&) noexcept = delete;
+  pipeline(pipeline &&) noexcept            = delete;
   pipeline &operator=(pipeline &&) noexcept = delete;
 
   explicit pipeline(render_target &_target, const pipeline_params &_params = {})

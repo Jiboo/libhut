@@ -41,7 +41,7 @@ struct render_target_params {
   };
   using flags = flagged<flag, flag::FLAG_LAST_VALUE>;
 
-  u16vec4_px                  box_;
+  u16vec4_px               box_;
   VkFormat                 format_;
   VkClearColorValue        clear_color_         = {{0, 0, 0, 1}};
   VkClearDepthStencilValue clear_depth_stencil_ = {1, 0};
@@ -54,10 +54,10 @@ class render_target {
  public:
   render_target() = delete;
 
-  render_target(const render_target &) = delete;
+  render_target(const render_target &)            = delete;
   render_target &operator=(const render_target &) = delete;
 
-  render_target(render_target &&) noexcept = delete;
+  render_target(render_target &&) noexcept            = delete;
   render_target &operator=(render_target &&) noexcept = delete;
 
   explicit render_target(display &_display);

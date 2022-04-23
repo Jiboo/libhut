@@ -46,7 +46,7 @@ class suballoc {
   suballoc() = delete;
   ~suballoc() { release(); }
 
-  suballoc(const suballoc &) = delete;
+  suballoc(const suballoc &)            = delete;
   suballoc &operator=(const suballoc &) = delete;
 
   suballoc(suballoc &&_other) noexcept
@@ -143,7 +143,7 @@ class updator {
       parent_->finalize(this);
   }
 
-  updator(const updator &) = delete;
+  updator(const updator &)            = delete;
   updator &operator=(const updator &) = delete;
 
   updator(updator &&_other) noexcept

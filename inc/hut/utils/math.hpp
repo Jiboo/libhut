@@ -53,17 +53,20 @@ constexpr std::underlying_type_t<TEnum> to_underlying(TEnum _val) noexcept {
 template<typename TIn>
 concept arithmetic = std::is_arithmetic_v<TIn>;
 
-template<length_t TSize, arithmetic TVec, arithmetic TScalar> requires (!std::is_same_v<TVec, TScalar>)
+template<length_t TSize, arithmetic TVec, arithmetic TScalar>
+  requires(!std::is_same_v<TVec, TScalar>)
 constexpr auto operator*(vec<TSize, TVec> _v, TScalar _s) {
   return _v *= _s;
 }
 
-template<length_t TSize, arithmetic TVec, arithmetic TScalar> requires (!std::is_same_v<TVec, TScalar>)
+template<length_t TSize, arithmetic TVec, arithmetic TScalar>
+  requires(!std::is_same_v<TVec, TScalar>)
 constexpr auto operator*(TScalar _s, vec<TSize, TVec> _v) {
   return _v *= _s;
 }
 
-template<length_t TSize, arithmetic TVec, arithmetic TScalar> requires (!std::is_same_v<TVec, TScalar>)
+template<length_t TSize, arithmetic TVec, arithmetic TScalar>
+  requires(!std::is_same_v<TVec, TScalar>)
 constexpr auto operator/(vec<TSize, TVec> _v, TScalar _s) {
   return _v /= _s;
 }

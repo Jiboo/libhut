@@ -43,10 +43,10 @@ class atlas {
  public:
   atlas(display &_display, const image_params &_params);
 
-  shared_image           page(uint _index) { return pages_[_index].image_; }
-  [[nodiscard]] size_t   page_count() const { return pages_.size(); }
-  [[nodiscard]] u16vec2_px  size() const { return params_.size_; }
-  [[nodiscard]] VkFormat format() const { return params_.format_; }
+  shared_image             page(uint _index) { return pages_[_index].image_; }
+  [[nodiscard]] size_t     page_count() const { return pages_.size(); }
+  [[nodiscard]] u16vec2_px size() const { return params_.size_; }
+  [[nodiscard]] VkFormat   format() const { return params_.format_; }
 
   shared_subimage alloc(const u16vec2_px &_bounds);
   shared_subimage pack(const u16vec2_px &_bounds, std::span<const u8> _data, uint _src_row_pitch);

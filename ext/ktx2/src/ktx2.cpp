@@ -220,9 +220,9 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
   for (u16 level = 0; level < iparams.levels_; level++) {
     const auto &level_range = levels[level];
     u16vec2_px  level_size  = iparams.size_ >> level;
-    uint         bit_stride  = (uint)level_size.x * img->bpp();
+    uint        bit_stride  = (uint)level_size.x * img->bpp();
     assert(bit_stride > 8);
-    uint  byte_stride       = bit_stride / 8;
+    uint byte_stride       = bit_stride / 8;
     auto layer_byte_length = byte_stride * (uint)level_size.y;
     assert(level_range.uncompressed_byte_length_ == static_cast<size_t>(layer_byte_length * iparams.layers_));
 

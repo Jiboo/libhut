@@ -40,7 +40,7 @@ namespace hut {
 class display;
 
 struct image_params {
-  u16vec2_px               size_;
+  u16vec2_px            size_;
   VkFormat              format_;
   u16                   levels_     = 1;
   u16                   layers_     = 1;
@@ -58,8 +58,8 @@ class image {
  public:
   struct subresource {
     u16vec4_px coords_;
-    u16     level_ = 0;
-    u16     layer_ = 0;
+    u16        level_ = 0;
+    u16        layer_ = 0;
   };
 
   class updator {
@@ -82,7 +82,7 @@ class image {
    public:
     updator() = delete;
 
-    updator(const updator &) = delete;
+    updator(const updator &)            = delete;
     updator &operator=(const updator &) = delete;
 
     updator(updator &&_other) noexcept
@@ -119,10 +119,10 @@ class image {
 
   image() = delete;
 
-  image(const image &) = delete;
+  image(const image &)            = delete;
   image &operator=(const image &) = delete;
 
-  image(image &&) noexcept = delete;
+  image(image &&) noexcept            = delete;
   image &operator=(image &&) noexcept = delete;
 
   image(display &_display, const image_params &_params);
@@ -132,11 +132,11 @@ class image {
   updator update(subresource _subres);
   updator update() { return update({make_bbox_with_origin_size({0, 0}, params_.size_)}); }
 
-  [[nodiscard]] u8       bpp() const { return format_info::from(params_.format_).bpp(); }
-  [[nodiscard]] VkFormat format() const { return params_.format_; }
-  [[nodiscard]] u16vec2_px  size() const { return params_.size_; }
-  [[nodiscard]] u16      levels() const { return params_.levels_; }
-  [[nodiscard]] u16      layers() const { return params_.layers_; }
+  [[nodiscard]] u8         bpp() const { return format_info::from(params_.format_).bpp(); }
+  [[nodiscard]] VkFormat   format() const { return params_.format_; }
+  [[nodiscard]] u16vec2_px size() const { return params_.size_; }
+  [[nodiscard]] u16        levels() const { return params_.levels_; }
+  [[nodiscard]] u16        layers() const { return params_.layers_; }
 
   [[nodiscard]] VkImageView view() const { return view_; }
 

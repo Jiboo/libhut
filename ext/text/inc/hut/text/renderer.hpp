@@ -74,9 +74,9 @@ struct draw_store {
 };
 
 struct word {
-  uint    alloc_;
-  uint    glyphs_;
-  uint    ref_count_ = 0;
+  uint       alloc_;
+  uint       glyphs_;
+  uint       ref_count_ = 0;
   i16vec4_px bbox_;
 
   word(renderer *_parent, batch &_batch, uint _alloc, uint _codepoints, std::u8string_view _text);
@@ -108,14 +108,14 @@ class paragraph_holder {
   friend struct details::batch;
 
   text_suballoc                  instances_;
-  std::unique_ptr<i16vec4_px[]>     bboxes_;
+  std::unique_ptr<i16vec4_px[]>  bboxes_;
   std::unique_ptr<string_hash[]> hashes_;
 
  public:
   paragraph_holder() = delete;
   ~paragraph_holder() { release(); }
 
-  paragraph_holder(const paragraph_holder &) = delete;
+  paragraph_holder(const paragraph_holder &)            = delete;
   paragraph_holder &operator=(const paragraph_holder &) = delete;
 
   paragraph_holder(paragraph_holder &&_other) noexcept
@@ -142,7 +142,7 @@ class paragraph_holder {
   }
 
   text_suballoc &instances() { return instances_; }
-  i16vec4_px        bbox(size_t _index) { return bboxes_[_index]; }
+  i16vec4_px     bbox(size_t _index) { return bboxes_[_index]; }
   uint           size() { return instances_.size(); }
 };
 

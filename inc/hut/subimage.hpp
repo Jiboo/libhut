@@ -33,8 +33,8 @@ namespace hut {
 
 class subimage {
  private:
-  atlas  *atlas_ = nullptr;
-  uint    page_{};
+  atlas     *atlas_ = nullptr;
+  uint       page_{};
   u16vec4_px bounds_{};
 
  public:
@@ -69,10 +69,10 @@ class subimage {
   void               release();
   [[nodiscard]] bool from(const atlas *_pool) const { return atlas_ == _pool; }
 
-  [[nodiscard]] bool    valid() const { return atlas_ != nullptr; }
-  [[nodiscard]] uint    page() const { return page_; }
+  [[nodiscard]] bool       valid() const { return atlas_ != nullptr; }
+  [[nodiscard]] uint       page() const { return page_; }
   [[nodiscard]] u16vec4_px bounds() const { return bounds_; }
-  [[nodiscard]] vec4    texcoords() const;
+  [[nodiscard]] vec4       texcoords() const;
 
   image::updator update(u16vec4_px _bounds);
   image::updator update() { return update(bounds_); }

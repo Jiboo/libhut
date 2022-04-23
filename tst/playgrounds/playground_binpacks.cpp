@@ -85,7 +85,7 @@ void packer(const char *_name = "Packer", u16vec2_px _bounds = {8 * 1024, 8 * 10
     static float                s_total_add_time = 0;
     static std::vector<float>   s_rem_timings;
     static float                s_total_rem_time = 0;
-    static u16vec2_px           s_padding = {0, 0};
+    static u16vec2_px           s_padding        = {0, 0};
 
     auto rand_norm = [&]() {
       std::uniform_real_distribution<> dis(0.0, 1.0);
@@ -97,7 +97,7 @@ void packer(const char *_name = "Packer", u16vec2_px _bounds = {8 * 1024, 8 * 10
     };
     auto rand_size = [&]() {
       return u16vec2_px{(_max_rect.x - _min_rect.x) * rand_norm() + _min_rect.x,
-                     (_max_rect.y - _min_rect.y) * rand_norm() + _min_rect.y};
+                        (_max_rect.y - _min_rect.y) * rand_norm() + _min_rect.y};
     };
     auto reset = [&]() {
       s_gen.seed(std::mt19937::default_seed);
@@ -179,7 +179,8 @@ void packer(const char *_name = "Packer", u16vec2_px _bounds = {8 * 1024, 8 * 10
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     ImVec2      p         = ImGui::GetCursorScreenPos();
 
-    draw_list->AddRect(ImVec2(p.x, p.y), ImVec2(p.x + (float)_bounds.x, p.y + (float)_bounds.y), IM_COL32(255, 0, 0, 255));
+    draw_list->AddRect(ImVec2(p.x, p.y), ImVec2(p.x + (float)_bounds.x, p.y + (float)_bounds.y),
+                       IM_COL32(255, 0, 0, 255));
     for (auto &rect : s_packed) {
       draw_list->AddRectFilled(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w),
                                IM_COL32(255, 255, 0, 127));

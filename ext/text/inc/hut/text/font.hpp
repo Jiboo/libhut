@@ -50,10 +50,10 @@ class font {
  public:
   font() = delete;
 
-  font(const font &) = delete;
+  font(const font &)            = delete;
   font &operator=(const font &) = delete;
 
-  font(font &&) noexcept = delete;
+  font(font &&) noexcept            = delete;
   font &operator=(font &&) noexcept = delete;
 
   font(std::span<const u8> _data, const u16_px &_size, bool _hinting = true);

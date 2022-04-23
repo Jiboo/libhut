@@ -38,14 +38,16 @@ struct f32vec4_rgba;
 
 struct u8vec4_rgba : u8vec4 {
   using u8vec4::u8vec4;
-  constexpr explicit u8vec4_rgba(const u8vec4 &_raw) : u8vec4{_raw} {}
+  constexpr explicit u8vec4_rgba(const u8vec4 &_raw)
+      : u8vec4{_raw} {}
 
   constexpr operator f32vec4_rgba() const;
 };
 
 struct f32vec4_rgba : f32vec4 {
   using f32vec4::f32vec4;
-  constexpr explicit f32vec4_rgba(const f32vec4 &_raw) : f32vec4{_raw} {}
+  constexpr explicit f32vec4_rgba(const f32vec4 &_raw)
+      : f32vec4{_raw} {}
 
   constexpr operator u8vec4_rgba() const;
 };

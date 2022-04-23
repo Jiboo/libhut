@@ -99,16 +99,16 @@ void renderer::draw(VkCommandBuffer _buff) {
     pipeline_.bind_instances(_buff, batch.dstore_.instances_);
 
     constexpr bool OPTIMIZE = true;
-    const uint lower = OPTIMIZE ? batch.dstore_.suballocator_.lower_bound() : 0;
-    const uint upper = OPTIMIZE ? batch.dstore_.suballocator_.upper_bound() : batch.dstore_.suballocator_.capacity();
+    const uint     lower    = OPTIMIZE ? batch.dstore_.suballocator_.lower_bound() : 0;
+    const uint     upper    = OPTIMIZE ? batch.dstore_.suballocator_.upper_bound() : batch.dstore_.suballocator_.capacity();
     assert(upper >= lower);
     pipeline_.draw_indexed(_buff, batch.dstore_.commands_, upper - lower, lower, sizeof(VkDrawIndexedIndirectCommand));
   }
 }
 
 details::batch &renderer::grow(uint _mesh_store_size, uint _draw_store_size) {
-  auto mesh_back_size  = batches_.empty() ? 0 : batches_.back().mstore_.suballocator_.capacity();
-  auto draw_back_size  = batches_.empty() ? 0 : batches_.back().dstore_.suballocator_.capacity();
+  auto mesh_back_size = batches_.empty() ? 0 : batches_.back().mstore_.suballocator_.capacity();
+  auto draw_back_size = batches_.empty() ? 0 : batches_.back().dstore_.suballocator_.capacity();
 
   auto mesh_store_size = std::max(_mesh_store_size, mesh_back_size * 2);
   auto draw_store_size = std::max(_draw_store_size, draw_back_size * 2);
@@ -190,7 +190,7 @@ mesh_store::mesh_store(renderer *_parent, uint _size)
     : vertices_(_parent->buffer_->allocate<vertex>(_size * 4))
     , indices_(_parent->buffer_->allocate<index_t>(_size * 6))
     , suballocator_(_size) {
-  if constexpr (false) { // NOTE JBL: Not need to clear, they are initialized if used
+  if constexpr (false) {  // NOTE JBL: Not need to clear, they are initialized if used
     vertices_->zero();
     indices_->zero();
   }
@@ -256,7 +256,7 @@ void batch::release_words(std::span<string_hash> _hashes) {
     word.ref_count_--;
     if (word.ref_count_ == 0) {
       mstore_.suballocator_.offer(word.alloc_);
-      if constexpr (false) { // NOTE JBL: Assume we don't need to clear, the commands were removed
+      if constexpr (false) {  // NOTE JBL: Assume we don't need to clear, the commands were removed
         mstore_.vertices_->zero(word.alloc_ * 4, word.glyphs_ * 4);
         mstore_.indices_->zero(word.alloc_ * 6, word.glyphs_ * 6);
       }

@@ -213,10 +213,10 @@ class display {
 
   display() = delete;
 
-  display(const display &) = delete;
+  display(const display &)            = delete;
   display &operator=(const display &) = delete;
 
-  display(display &&) noexcept = delete;
+  display(display &&) noexcept            = delete;
   display &operator=(display &&) noexcept = delete;
 
   explicit display(const char *_app_name, u32 _app_version = VK_MAKE_VERSION(1, 0, 0),

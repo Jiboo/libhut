@@ -83,7 +83,7 @@ int main(int /*unused*/, char ** /*unused*/) {
   char8_t text_input[1024 * 1024];
 
   std::mt19937 gen;
-  auto gen_norm = [&]() {
+  auto         gen_norm = [&]() {
     std::uniform_real_distribution<> dis(0.0, 1.0);
     return dis(gen);
   };
@@ -92,21 +92,22 @@ int main(int /*unused*/, char ** /*unused*/) {
     return dis(gen);
   };
   auto gen_vowel = [&]() {
-    constexpr char8_t vowels[] = { 'a', 'e', 'y', 'u', 'i', 'o'};
-    std::uniform_int_distribution<> dis(0, sizeof(vowels) - 1);
-    return vowels[dis(gen)];
+    constexpr char8_t               VOWELS[] = {'a', 'e', 'y', 'u', 'i', 'o'};
+    std::uniform_int_distribution<> dis(0, sizeof(VOWELS) - 1);
+    return VOWELS[dis(gen)];
   };
   auto gen_consonant = [&]() {
-    constexpr char8_t consonants[] = { 'z', 'r', 't', 'p', 'q', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'w', 'x', 'c', 'v', 'b', 'n' };
-    std::uniform_int_distribution<> dis(0, sizeof(consonants) - 1);
-    return consonants[dis(gen)];
+    constexpr char8_t CONSONANTS[]
+        = {'z', 'r', 't', 'p', 'q', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'w', 'x', 'c', 'v', 'b', 'n'};
+    std::uniform_int_distribution<> dis(0, sizeof(CONSONANTS) - 1);
+    return CONSONANTS[dis(gen)];
   };
   auto gen_word = [&](char8_t *_dst, bool _start) {
     uint word_size = gen_uint(2, 10);
     for (uint i = 0; i < word_size; i++) {
-      f32 current = gen_norm();
-      char c = current > 0.66 ? gen_consonant() : gen_vowel();
-      *_dst++ = (i == 0 && _start) ? toupper(c) : c;
+      f32  current = gen_norm();
+      char c       = current > 0.66 ? gen_consonant() : gen_vowel();
+      *_dst++      = (i == 0 && _start) ? toupper(c) : c;
     }
     return _dst;
   };
@@ -119,8 +120,7 @@ int main(int /*unused*/, char ** /*unused*/) {
         if (comma > 0.9)
           *_dst++ = ',';
         *_dst++ = ' ';
-      }
-      else {
+      } else {
         *_dst++ = '.';
       }
     }
@@ -129,7 +129,7 @@ int main(int /*unused*/, char ** /*unused*/) {
   auto gen_paragraph = [&](char8_t *_dst) {
     uint paragraph_size = gen_uint(4, 8);
     for (uint i = 0; i < paragraph_size; i++) {
-      _dst = gen_phrase(_dst);
+      _dst    = gen_phrase(_dst);
       *_dst++ = (i == paragraph_size - 1) ? '\n' : ' ';
     }
     return _dst;
@@ -162,10 +162,10 @@ int main(int /*unused*/, char ** /*unused*/) {
   auto before_alloc   = clock::now();
   auto paragraph      = r.allocate(words);
   auto after_alloc    = clock::now();
-  auto before_update = clock::now();
-  auto after_update  = clock::now();
+  auto before_update  = clock::now();
+  auto after_update   = clock::now();
 
-  u32  current_scale  = win.scale();
+  u32  current_scale          = win.scale();
   bool release_before_realloc = false;
 
   auto relayout = [&](u16vec2_px _size, u32 _scale) {
@@ -176,9 +176,9 @@ int main(int /*unused*/, char ** /*unused*/) {
       paragraph = r.allocate(words);
     }
     const auto win_width   = _size.x * _scale;
-    u32_px       line_height = FONT_SIZE * _scale;
-    u32_px       space_width = line_height / 4;
-    uvec2_px      offset      = {0, line_height};
+    u32_px     line_height = FONT_SIZE * _scale;
+    u32_px     space_width = line_height / 4;
+    uvec2_px   offset      = {0, line_height};
     auto       staging     = paragraph.instances().update();
     for (uint i = 0; i < paragraph.size(); i++) {
       const auto bbox       = paragraph.bbox(i);
@@ -264,8 +264,7 @@ int main(int /*unused*/, char ** /*unused*/) {
       paragraph = r.allocate(words);
       relayout(win.size(), win.scale());
       win.invalidate(true);
-    }
-    else if (_sym == KSYM_R && _down) {
+    } else if (_sym == KSYM_R && _down) {
       paragraph.release();
       paragraph = r.allocate(words);
       relayout(win.size(), win.scale());

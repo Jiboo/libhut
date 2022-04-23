@@ -43,9 +43,9 @@ class sstream {
   explicit sstream(const std::string &_base) { stream_ << _base; }
   explicit sstream(const std::string_view _base) { stream_ << _base; }
 
-  sstream(const sstream &) = delete;
-  sstream &operator=(const sstream &) = delete;
-  sstream(sstream &&_base) noexcept   = default;
+  sstream(const sstream &)                = delete;
+  sstream &operator=(const sstream &)     = delete;
+  sstream(sstream &&_base) noexcept       = default;
   sstream &operator=(sstream &&) noexcept = default;
 
   template<typename TType>

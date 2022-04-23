@@ -41,7 +41,7 @@ class shaper {
 
   shaper() = delete;
 
-  shaper(const shaper &) = delete;
+  shaper(const shaper &)            = delete;
   shaper &operator=(const shaper &) = delete;
 
   shaper(shaper &&_other) noexcept
