@@ -93,19 +93,26 @@ void renderer::draw(VkCommandBuffer _buff) {
   for (const auto &batch : batches_) {
     if (batch.dstore_.suballocator_.empty())
       continue;
+
     pipeline_.bind_indices(_buff, batch.mstore_.indices_);
     pipeline_.bind_vertices(_buff, batch.mstore_.vertices_);
     pipeline_.bind_instances(_buff, batch.dstore_.instances_);
-    pipeline_.draw_indexed(_buff, batch.dstore_.commands_, batch.dstore_.suballocator_.upper_bound(),
-                           sizeof(VkDrawIndexedIndirectCommand));
+
+    constexpr bool OPTIMIZE = true;
+    const uint lower = OPTIMIZE ? batch.dstore_.suballocator_.lower_bound() : 0;
+    const uint upper = OPTIMIZE ? batch.dstore_.suballocator_.upper_bound() : batch.dstore_.suballocator_.capacity();
+    assert(upper >= lower);
+    pipeline_.draw_indexed(_buff, batch.dstore_.commands_, upper - lower, lower, sizeof(VkDrawIndexedIndirectCommand));
   }
 }
 
 details::batch &renderer::grow(uint _mesh_store_size, uint _draw_store_size) {
   auto mesh_back_size  = batches_.empty() ? 0 : batches_.back().mstore_.suballocator_.capacity();
   auto draw_back_size  = batches_.empty() ? 0 : batches_.back().dstore_.suballocator_.capacity();
+
   auto mesh_store_size = std::max(_mesh_store_size, mesh_back_size * 2);
   auto draw_store_size = std::max(_draw_store_size, draw_back_size * 2);
+
   assert(mesh_store_size > 0 && draw_store_size > 0);
   return batches_.emplace_back(details::batch{this, mesh_store_size, draw_store_size});
 }
@@ -116,11 +123,10 @@ renderer::paragraph_holder renderer::allocate(std::span<const std::u8string_view
 
   auto draw_alloc = best_batch.dstore_.suballocator_.pack(_words.size());
   assert(draw_alloc);
-  paragraph_holder result{&best_batch, *draw_alloc, uint(_words.size() * sizeof(instance))};
+  paragraph_holder result{&best_batch, uint(*draw_alloc * sizeof(instance)), uint(_words.size() * sizeof(instance))};
   result.bboxes_ = std::make_unique<i16vec4_px[]>(_words.size());
 
-  auto cupdator = best_batch.dstore_.commands_->update_raw(sizeof(VkDrawIndexedIndirectCommand) * *draw_alloc,
-                                                           sizeof(VkDrawIndexedIndirectCommand) * _words.size());
+  auto cupdator = best_batch.dstore_.commands_->update(*draw_alloc, _words.size());
 
   for (uint i = 0; i < winfo.size(); i++) {
     const auto hash       = winfo.hashes_[i];
@@ -184,25 +190,33 @@ mesh_store::mesh_store(renderer *_parent, uint _size)
     : vertices_(_parent->buffer_->allocate<vertex>(_size * 4))
     , indices_(_parent->buffer_->allocate<index_t>(_size * 6))
     , suballocator_(_size) {
+  if constexpr (false) { // NOTE JBL: Not need to clear, they are initialized if used
+    vertices_->zero();
+    indices_->zero();
+  }
 }
 
 draw_store::draw_store(renderer *_parent, uint _size)
     : instances_(_parent->buffer_->allocate<instance>(_size))
     , commands_(_parent->buffer_->allocate<VkDrawIndexedIndirectCommand>(_size))
     , suballocator_(_size) {
+  if constexpr (false) {  // NOTE JBL: Not need to clear, they are initialized if used
+    instances_->zero();
+  }
+  commands_->zero();
 }
 
 word::word(renderer *_parent, batch &_batch, uint _alloc, uint _codepoints, std::u8string_view _text)
     : alloc_(_alloc)
     , glyphs_(0)
     , bbox_(NUMAX<f32>, NUMAX<f32>, NUMIN<f32>, NUMIN<f32>) {
-  const auto vertices_offset = sizeof(vertex) * 4 * _alloc;
-  const auto indices_offset  = sizeof(index_t) * 6 * _alloc;
-  const auto vertices_size   = sizeof(vertex) * 4 * _codepoints;
-  const auto indices_size    = sizeof(index_t) * 6 * _codepoints;
+  const auto vertices_offset = 4 * _alloc;
+  const auto vertices_size   = 4 * _codepoints;
+  const auto indices_offset  = 6 * _alloc;
+  const auto indices_size    = 6 * _codepoints;
 
-  auto vupdator = _batch.mstore_.vertices_->update_raw(vertices_offset, vertices_size);
-  auto iupdator = _batch.mstore_.indices_->update_raw(indices_offset, indices_size);
+  auto vupdator = _batch.mstore_.vertices_->update(vertices_offset, vertices_size);
+  auto iupdator = _batch.mstore_.indices_->update(indices_offset, indices_size);
 
   auto *vertices = reinterpret_cast<vertex *>(vupdator.staging().data());
   auto *indices  = reinterpret_cast<index_t *>(iupdator.staging().data());
@@ -230,8 +244,8 @@ word::word(renderer *_parent, batch &_batch, uint _alloc, uint _codepoints, std:
 }
 
 void batch::release(text_suballoc *_suballoc) {
-  dstore_.commands_->zero_raw(_suballoc->offset_bytes(), _suballoc->size_bytes());
-  dstore_.suballocator_.offer(_suballoc->offset_bytes());
+  dstore_.commands_->zero(_suballoc->offset(), _suballoc->size());
+  dstore_.suballocator_.offer(_suballoc->offset());
 }
 
 void batch::release_words(std::span<string_hash> _hashes) {
@@ -242,9 +256,10 @@ void batch::release_words(std::span<string_hash> _hashes) {
     word.ref_count_--;
     if (word.ref_count_ == 0) {
       mstore_.suballocator_.offer(word.alloc_);
-      /*mstore.vertices_->zero(word.alloc_ * 4, word.codepoints_ * 4);
-      mstore.indices_->zero(word.alloc_ * 6, word.codepoints_ * 6);*/
-      // NOTE JBL: Assume we don't need to clear, the commands were removed..
+      if constexpr (false) { // NOTE JBL: Assume we don't need to clear, the commands were removed
+        mstore_.vertices_->zero(word.alloc_ * 4, word.glyphs_ * 4);
+        mstore_.indices_->zero(word.alloc_ * 6, word.glyphs_ * 6);
+      }
       // TODO JBL: Also decrease refcount of glyphs cache in shaper?
       auto result = cache_.erase(hash);
       assert(result == 1);

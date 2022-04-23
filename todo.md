@@ -4,12 +4,13 @@ fix:
 - xdg_toplevel_resize seems to ignore xdg_toplevel_set_min/max_size (repro on mutter and weston)
 - gnome rescales my window during overlap between screens with different scales, unsure how to detect it and trigger
   on_scale at that time, as we get a wl_surface.enter as soon as there is overlap but the gnome scaling happens when
-  like more than 50% of the window is on a different scale.
+  like more than 50% of the window is on a different scale
+- change image::create to allocate from a buffer, instead of allocating its own memory for all images
 
 refactor:
 
-- refactor buffer into two separate concepts, to have symmetry with atlas vs image classes.
-- optimize staging to batch them, possibly using VK_KHR_copy_commands2 for staging with same src&dst.
+- refactor buffer into two separate concepts, to have symmetry with atlas vs image classes
+- optimize staging to batch them, possibly using VK_KHR_copy_commands2 for staging with same src&dst
 
 features:
 

@@ -110,7 +110,7 @@ struct batch {
 }  // namespace details
 
 struct renderer_params : pipeline_params {
-  uint initial_batch_size_bytes_ = 256 * sizeof(instance);
+  uint initial_batch_size_instances_ = 1024;
 };
 
 class renderer {

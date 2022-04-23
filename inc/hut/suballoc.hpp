@@ -89,6 +89,7 @@ class suballoc {
   [[nodiscard]] uint size() const { return size_bytes() / sizeof(TContained); }
 
   updator_t update_raw(uint _offset_bytes, uint _size_bytes) {
+    assert(_offset_bytes + _size_bytes <= size_bytes_);
     return parent_->template update_raw<TContained>(offset_bytes_ + _offset_bytes, _size_bytes);
   }
   updator_t update(uint _offset, uint _size = 1) {
@@ -97,6 +98,7 @@ class suballoc {
   updator_t update() { return update(0, size()); }
 
   void zero_raw(uint _offset_bytes, uint _size_bytes) {
+    assert(_offset_bytes + _size_bytes <= size_bytes_);
     return parent_->zero_raw(offset_bytes_ + _offset_bytes, _size_bytes);
   }
   void zero(uint _offset, uint _size = 1) { zero_raw(_offset * sizeof(TContained), _size * sizeof(TContained)); }

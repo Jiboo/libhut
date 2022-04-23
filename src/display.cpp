@@ -46,9 +46,11 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT _flag
                                                      VkDebugReportObjectTypeEXT /*_obj_type*/, u64 /*_obj*/,
                                                      size_t /*_location*/, i32 /*_code*/, const char *_prefix,
                                                      const char *_msg, void * /*_data*/) {
-  if (strcmp(_prefix, "Loader Message") == 0)
+  if (strcmp(_prefix, "Loader Message") >= 0)
     return VK_FALSE;
-  if (strcmp(_prefix, "radv") == 0)
+  if (strcmp(_prefix, "radv") >= 0)
+    return VK_FALSE;
+  if (strcmp(_msg, "SYNC-HAZARD-WRITE_AFTER_WRITE") >= 0)
     return VK_FALSE;
 
   char level;

@@ -199,6 +199,14 @@ class linear1d {
     return blocks_.size() == 1 && !blocks_[0].used_;
   }
 
+  [[nodiscard]] TSizeType lower_bound() const {
+    for (auto it = blocks_.cbegin(); it != blocks_.cend(); ++it) {
+      if (it->used_)
+        return it->offset_;
+    }
+    return 0;
+  }
+
   [[nodiscard]] TSizeType upper_bound() const {
     for (auto it = blocks_.crbegin(); it != blocks_.crend(); ++it) {
       if (it->used_)

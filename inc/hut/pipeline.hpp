@@ -672,8 +672,9 @@ class pipeline {
   }
 
   void draw_indexed(VkCommandBuffer _buffer, const shared_indexed_commands &_commands, uint _commands_count,
-                    uint _stride_bytes) {
-    HUT_PVK(vkCmdDrawIndexedIndirect, _buffer, _commands->parent()->buffer_, _commands->offset_bytes(), _commands_count,
+                    uint _commands_offset, uint _stride_bytes) {
+    uint byte_offset = _commands->offset_bytes() + _commands_offset * _stride_bytes;
+    HUT_PVK(vkCmdDrawIndexedIndirect, _buffer, _commands->parent()->buffer_, byte_offset, _commands_count,
             _stride_bytes);
   }
 

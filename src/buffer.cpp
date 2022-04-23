@@ -123,6 +123,7 @@ void buffer_page_data::release_impl(buffer_suballoc<u8> *_suballoc) {
 buffer_updator<u8> buffer_page_data::update_raw_impl(uint _offset_bytes, uint _size_bytes) {
   HUT_PROFILE_FUN(PBUFFER, _offset_bytes, _size_bytes)
   assert(parent_);
+  assert(_offset_bytes + _size_bytes <= size());
   auto         &display = parent_->display_;
   auto          lk      = std::lock_guard{display.staging_mutex_};
   auto          staging = display.staging_->allocate_raw(_size_bytes);
@@ -155,6 +156,7 @@ void buffer_page_data::finalize_impl(buffer_updator<u8> *_updator) {
 void buffer_page_data::zero_raw(uint _offset_bytes, uint _size_bytes) const {
   HUT_PROFILE_FUN(PBUFFER, _offset_bytes, _size_bytes)
   assert(parent_);
+  assert(_offset_bytes + _size_bytes <= size());
   display::buffer_zero zero = {};
   zero.size_                = _size_bytes;
   zero.offset_              = _offset_bytes;

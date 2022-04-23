@@ -36,13 +36,15 @@ renderer::renderer(render_target &_target, shared_buffer _buffer, const shared_u
     : pipeline_(_target, _params)
     , buffer_(std::move(_buffer))
     , atlas_(std::move(_atlas)) {
-  if (_params.initial_batch_size_bytes_ > 0)
-    grow(_params.initial_batch_size_bytes_);
+  if (_params.initial_batch_size_instances_ > 0)
+    grow(_params.initial_batch_size_instances_);
   pipeline_.write(0, _ubo, atlas_, _sampler);
 }
 
-details::batch &renderer::grow(uint _count) {
-  return batches_.emplace_back(details::batch{buffer_->allocate<instance>(_count), binpack::linear1d<uint>{_count}});
+details::batch &renderer::grow(uint _instances_count) {
+  details::batch &result = batches_.emplace_back(details::batch{buffer_->allocate<instance>(_instances_count), binpack::linear1d<uint>{_instances_count}});
+  result.buffer_->zero();
+  return result;
 }
 
 void renderer::draw(VkCommandBuffer _buffer) {
@@ -53,31 +55,37 @@ void renderer::draw(VkCommandBuffer _buffer) {
     if (batch.suballocator_.empty())
       continue;
     pipeline_.bind_instances(_buffer, batch.buffer_);
-    pipeline_.draw(_buffer, 6, batch.suballocator_.upper_bound(), 0, 0);
+
+    constexpr bool OPTIMIZE = true;
+    const uint lower = OPTIMIZE ? batch.suballocator_.lower_bound() : 0;
+    const uint upper = OPTIMIZE ? batch.suballocator_.upper_bound() : batch.suballocator_.capacity();
+    assert(upper >= lower);
+    pipeline_.draw(_buffer, 6, upper - lower, 0, lower);
   }
 }
 
-suballoc<instance, details::batch> renderer::allocate(uint _count) {
-  uint size_bytes = sizeof(instance) * _count;
+suballoc<instance, details::batch> renderer::allocate(uint _instances_count) {
+  uint size_bytes = _instances_count * sizeof(instance);
   for (auto &batch : batches_) {
-    auto fit = batch.suballocator_.pack(_count);
+    auto fit = batch.suballocator_.pack(_instances_count);
     if (fit)
-      return {&batch, *fit, size_bytes};
+      return {&batch, uint(*fit * sizeof(instance)), size_bytes};
   }
 
-  auto &new_batch = grow(std::max<uint>(_count, batches_.back().size() * 2));
-  auto  fit       = new_batch.suballocator_.pack(_count);
+  const uint back_size = batches_.back().size();
+  auto &new_batch = grow(std::max<uint>(_instances_count, back_size * 2));
+  const auto  fit       = new_batch.suballocator_.pack(_instances_count);
   assert(fit);
 
-  return {&new_batch, *fit, size_bytes};
+  return {&new_batch, uint(*fit * sizeof(instance)), size_bytes};
 }
 
 namespace details {
 
 void batch::release(render2d_suballoc *_suballoc) {
   assert(_suballoc->parent() == this);
-  buffer_->zero_raw(_suballoc->offset_bytes(), _suballoc->size_bytes());
-  suballocator_.offer(_suballoc->offset_bytes());
+  _suballoc->zero();
+  suballocator_.offer(_suballoc->offset());
 }
 
 render2d_updator batch::update_raw_impl(uint _offset_bytes, uint _size_bytes) {
