@@ -76,7 +76,7 @@ PackConstructorInitializers: Never
 PointerAlignment: Right
 
 QualifierAlignment: Custom
-QualifierOrder: ['constexpr', 'const', 'static', 'inline', 'type']
+QualifierOrder: [ 'constexpr', 'const', 'static', 'inline', 'type' ]
 
 ReferenceAlignment: Right
 ReflowComments: false

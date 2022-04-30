@@ -5,7 +5,6 @@ fix:
 - gnome rescales my window during overlap between screens with different scales, unsure how to detect it and trigger
   on_scale at that time, as we get a wl_surface.enter as soon as there is overlap but the gnome scaling happens when
   like more than 50% of the window is on a different scale
-- change image::create to allocate from a buffer, instead of allocating its own memory for all images
 
 refactor:
 

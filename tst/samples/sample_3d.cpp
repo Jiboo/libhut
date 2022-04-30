@@ -38,19 +38,19 @@
 using namespace hut;
 
 int main(int /*unused*/, char ** /*unused*/) {
-  display d("hut demo3d");
-  auto    b = std::make_shared<buffer>(d, 1024 * 1024);
+  display       dsp("hut demo3d");
+  shared_buffer buf = std::make_shared<buffer>(dsp);
 
   window_params params;
   params.flags_.set(window_params::FDEPTH);
   params.flags_.set(window_params::FMULTISAMPLING);
   params.flags_.set(window_params::FTRANSPARENT);
 
-  window w(d, params);
+  window w(dsp, buf, params);
   w.clear_color({0.1f, 0.1f, 0.1f, 0.0f});
   w.title(u8"hut demo3d win");
 
-  auto indices = b->allocate<u16>(36);
+  auto indices = buf->allocate<u16>(36);
   {
     auto iupdator = indices->update();
     iupdator.set({
@@ -58,15 +58,15 @@ int main(int /*unused*/, char ** /*unused*/) {
     });
   }
 
-  auto ubo = b->allocate<vp_ubo>(1, d.ubo_align());
+  auto ubo = buf->allocate<vp_ubo>(1, dsp.ubo_align());
   ubo->set(vp_ubo{
       perspective(radians(45.0f), float(w.size().x) / float(w.size().y), 0.001f, 1000.0f),
       lookAt(vec3{0, 0, 5}, vec3{0, 0, 0}, vec3{0, -1, 0}),
   });
 
   auto rgb3d_pipeline  = std::make_unique<pipeline_rgb3d>(w);
-  auto rgb3d_instances = b->allocate<pipeline_rgb3d::instance>(1);
-  auto rgb3d_vertices  = b->allocate<pipeline_rgb3d::vertex>(8);
+  auto rgb3d_instances = buf->allocate<pipeline_rgb3d::instance>(1);
+  auto rgb3d_vertices  = buf->allocate<pipeline_rgb3d::vertex>(8);
   rgb3d_vertices->set({
       // back
       pipeline_rgb3d::vertex{{-1, -1, 1}, {0, 0, 0}},
@@ -89,7 +89,7 @@ int main(int /*unused*/, char ** /*unused*/) {
   skybox_params.layers_            = 6;
   skybox_params.size_              = {4, 4};
   skybox_params.format_            = VK_FORMAT_R8G8B8A8_UNORM;
-  auto                skybox_image = std::make_shared<image>(d, skybox_params);
+  auto                skybox_image = std::make_shared<image>(dsp, buf, skybox_params);
   u8vec4_rgba         pixels[16];
   std::span<const u8> pixels_ref{&pixels[0][0], 16 * sizeof(u8vec4_rgba)};
   std::fill(std::begin(pixels), std::end(pixels), u8vec4_rgba{0xFF, 0x00, 0x00, 0x80});
@@ -105,9 +105,9 @@ int main(int /*unused*/, char ** /*unused*/) {
   std::fill(std::begin(pixels), std::end(pixels), u8vec4_rgba{0x00, 0xFF, 0xFF, 0x80});
   skybox_image->update({{0, 0, 4, 4}, 0, 5}, pixels_ref, 4 * sizeof(u8vec4_rgba));
 
-  auto skybox_sampler  = std::make_shared<sampler>(d);
+  auto skybox_sampler  = std::make_shared<sampler>(dsp);
   auto skybox_pipeline = std::make_unique<pipeline_skybox>(w);
-  auto skybox_vertices = b->allocate<pipeline_skybox::vertex>(8);
+  auto skybox_vertices = buf->allocate<pipeline_skybox::vertex>(8);
   skybox_vertices->set({
       // back
       pipeline_skybox::vertex{{-9, -9, 9}, {-1, -1, 1}},
@@ -178,5 +178,5 @@ int main(int /*unused*/, char ** /*unused*/) {
     return false;
   });
 
-  return d.dispatch();
+  return dsp.dispatch();
 }

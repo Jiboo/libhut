@@ -115,8 +115,9 @@ struct my_drop_target_interface : drop_target_interface {
 };
 
 int main(int /*unused*/, char ** /*unused*/) {
-  display dsp("hut dragndrop playground");
-  window  win(dsp);
+  display       dsp("hut dragndrop playground");
+  shared_buffer buf = std::make_shared<buffer>(dsp);
+  window        win(dsp, buf);
   win.title(u8"hut dragndrop playground");
   win.clear_color({0, 0, 0, 1});
 
@@ -154,7 +155,7 @@ int main(int /*unused*/, char ** /*unused*/) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!imgui::init(&dsp, &win, true))
+  if (!imgui::init(&dsp, &win, buf, true))
     return EXIT_FAILURE;
   install_test_events(dsp, win);
 

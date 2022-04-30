@@ -40,9 +40,9 @@
 
 using namespace hut;
 
-std::shared_ptr<window> create_window(display &_display, window_params _params, std::u8string_view _title,
-                                      vec4 _clearc) {
-  auto result = std::make_shared<window>(_display, _params);
+std::shared_ptr<window> create_window(display &_display, const shared_buffer &_storage, window_params _params,
+                                      std::u8string_view _title, vec4 _clearc) {
+  auto result = std::make_shared<window>(_display, _storage, _params);
   result->title(_title);
   result->clear_color(_clearc);
   install_test_events(_display, *result);
@@ -71,18 +71,19 @@ const char *window_params_flag_name(window_params::flag _flag) {
 }
 
 int main(int /*unused*/, char ** /*unused*/) {
-  display dsp("hut window playground");
+  display       dsp("hut window playground");
+  shared_buffer buf = std::make_shared<buffer>(dsp);
 
   window_params wp;
   wp.flags_.set(window_params::FTRANSPARENT);
-  window win(dsp, wp);
+  window win(dsp, buf, wp);
   win.title(u8"hut window playground");
   win.clear_color({0, 0, 0, 1});
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!imgui::init(&dsp, &win, true))
+  if (!imgui::init(&dsp, &win, buf, true))
     return EXIT_FAILURE;
   install_test_events(dsp, win);
 
@@ -147,7 +148,7 @@ int main(int /*unused*/, char ** /*unused*/) {
       ImGui::ColorEdit4("Clear color", &create_clear_color.x);
 
       if (ImGui::Button("create"))
-        windows.emplace_back(create_window(dsp, params, create_title, create_clear_color));
+        windows.emplace_back(create_window(dsp, buf, params, create_title, create_clear_color));
       if (ImGui::Button("close all"))
         dsp.post([&](auto) { windows.clear(); });
     }

@@ -65,7 +65,7 @@ void renderer::draw(VkCommandBuffer _buffer) {
   }
 }
 
-suballoc<instance, details::batch> renderer::allocate(uint _instances_count) {
+boxes_holder renderer::allocate(uint _instances_count) {
   uint size_bytes = _instances_count * sizeof(instance);
   for (auto &batch : batches_) {
     auto fit = batch.suballocator_.pack(_instances_count);

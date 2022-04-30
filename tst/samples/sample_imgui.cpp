@@ -39,16 +39,17 @@
 using namespace hut;
 
 int main(int /*unused*/, char ** /*unused*/) {
-  display dsp("hut demo");
+  display       dsp("hut demo");
+  shared_buffer buf = std::make_shared<buffer>(dsp);
 
-  window win(dsp);
+  window win(dsp, buf);
   win.clear_color({0, 0, 0, 1});
   win.title(u8"hut imgui demo");
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!imgui::init(&dsp, &win, true))
+  if (!imgui::init(&dsp, &win, buf, true))
     return EXIT_FAILURE;
   install_test_events(dsp, win);
 

@@ -247,7 +247,7 @@ void window::init_vulkan_surface() {
     pass_params.flags_ |= render_target_params::FMULTISAMPLING;
   if (params_.flags_ & window_params::FDEPTH)
     pass_params.flags_ |= render_target_params::FDEPTH;
-  reinit_pass(pass_params, swapchain_imageviews_);
+  reinit_pass(storage_, pass_params, swapchain_imageviews_);
 
   if (!primary_cbs_.empty())
     HUT_PVK(vkFreeCommandBuffers, display_.device_, display_.commandg_pool_, primary_cbs_.size(), primary_cbs_.data());

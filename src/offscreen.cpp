@@ -40,7 +40,7 @@
 
 namespace hut {
 
-offscreen::offscreen(const shared_image &_target, offscreen_params _init_params)
+offscreen::offscreen(const shared_image &_target, const shared_buffer &_storage, offscreen_params _init_params)
     : render_target(*_target->display_)
     , params_(std::move(_init_params))
     , target_(_target) {
@@ -61,7 +61,7 @@ offscreen::offscreen(const shared_image &_target, offscreen_params _init_params)
   pass_params.initial_layout_ = VK_IMAGE_LAYOUT_UNDEFINED;
   pass_params.final_layout_   = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-  reinit_pass(pass_params, std::span<VkImageView>{&_target->view_, 1});
+  reinit_pass(_storage, pass_params, std::span<VkImageView>{&_target->view_, 1});
 
   VkCommandBufferAllocateInfo alloc_info = {};
   alloc_info.sType                       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;

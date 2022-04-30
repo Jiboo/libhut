@@ -80,7 +80,8 @@ class render_target {
   VkRenderPass               renderpass_ = VK_NULL_HANDLE;
   std::vector<VkFramebuffer> fbos_;
 
-  void        reinit_pass(const render_target_params &_init_params, std::span<VkImageView> _images);
+  void        reinit_pass(const shared_buffer &_storage, const render_target_params &_init_params,
+                          std::span<VkImageView> _images);
   void        begin_rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb);
   static void end_rebuild_cb(VkCommandBuffer _cb);
 };

@@ -46,11 +46,11 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT _flag
                                                      VkDebugReportObjectTypeEXT /*_obj_type*/, u64 /*_obj*/,
                                                      size_t /*_location*/, i32 /*_code*/, const char *_prefix,
                                                      const char *_msg, void * /*_data*/) {
-  if (strcmp(_prefix, "Loader Message") >= 0)
+  if (strcmp(_prefix, "Loader Message") == 0)
     return VK_FALSE;
-  if (strcmp(_prefix, "radv") >= 0)
+  if (strcmp(_prefix, "radv") == 0)
     return VK_FALSE;
-  if (strcmp(_msg, "SYNC-HAZARD-WRITE_AFTER_WRITE") >= 0)
+  if (strstr(_msg, "SYNC-HAZARD-WRITE_AFTER_WRITE") != nullptr)
     return VK_FALSE;
 
   char level;
@@ -564,7 +564,7 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   staging_params.permanent_map_ = true;
   staging_params.type_          = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
   staging_params.usage_ = VkBufferUsageFlagBits(VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-  staging_              = std::make_shared<buffer>(*this, 1024 * 1024, staging_params);
+  staging_              = std::make_shared<buffer>(*this, staging_params);
 
   VkCommandBufferAllocateInfo alloc_info = {};
   alloc_info.sType                       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;

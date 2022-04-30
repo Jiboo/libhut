@@ -112,8 +112,9 @@ void window::surface_leave(void *_data, struct wl_surface *_surface, struct wl_o
     w->trigger_scale();
 }
 
-window::window(display &_display, const window_params &_init_params)
+window::window(display &_display, const shared_buffer &_storage, const window_params &_init_params)
     : render_target(_display)
+    , storage_(_storage)
     , display_(_display)
     , params_(_init_params)
     , size_(_init_params.size_) {

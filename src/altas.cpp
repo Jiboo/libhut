@@ -32,8 +32,9 @@
 
 namespace hut {
 
-atlas::atlas(display &_display, const image_params &_params)
+atlas::atlas(display &_display, const shared_buffer &_storage, const image_params &_params)
     : display_(_display)
+    , storage_(_storage)
     , params_(_params) {
   HUT_PROFILE_FUN(PIMAGE)
   if (params_.size_ == u16vec2_px{0, 0}) {
@@ -44,7 +45,7 @@ atlas::atlas(display &_display, const image_params &_params)
 
 void atlas::add_page() {
   HUT_PROFILE_FUN(PIMAGE)
-  pages_.emplace_back(std::make_shared<image>(display_, params_));
+  pages_.emplace_back(std::make_shared<image>(display_, storage_, params_));
 }
 
 shared_subimage atlas::alloc(const u16vec2_px &_bounds) {

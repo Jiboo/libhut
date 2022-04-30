@@ -50,18 +50,17 @@
 using namespace hut;
 
 int main(int /*unused*/, char ** /*unused*/) {
-  display dsp("hut text playground");
+  display       dsp("hut text playground");
+  shared_buffer buf = std::make_shared<buffer>(dsp);
 
-  auto buf = std::make_shared<buffer>(dsp, 1024 * 1024);
-
-  window win(dsp);
+  window win(dsp, buf);
   win.clear_color({0, 0, 0, 1});
   win.title(u8"hut text playground");
 
   auto ubo = buf->allocate<common_ubo>(1, dsp.ubo_align());
   ubo->set(common_ubo{win.size()});
   auto fontatlas
-      = std::make_shared<atlas>(dsp, image_params{.size_ = dsp.max_tex_size(), .format_ = VK_FORMAT_R8_UNORM});
+      = std::make_shared<atlas>(dsp, buf, image_params{.size_ = dsp.max_tex_size(), .format_ = VK_FORMAT_R8_UNORM});
   auto           samp      = std::make_shared<sampler>(dsp);
   constexpr auto FONT_SIZE = 16_px;
   auto           font      = std::make_shared<text::font>(tst_woff2::Roboto_Regular_woff2, FONT_SIZE);
@@ -70,7 +69,7 @@ int main(int /*unused*/, char ** /*unused*/) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!imgui::init(&dsp, &win, true))
+  if (!imgui::init(&dsp, &win, buf, true))
     return EXIT_FAILURE;
 #endif
   install_test_events(dsp, win, ubo);

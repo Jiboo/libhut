@@ -148,6 +148,8 @@ class paragraph_holder {
 
 }  // namespace details
 
+using paragraph_holder = details::paragraph_holder;
+
 struct renderer_params : pipeline_params {
   uint initial_mesh_store_size_ = 8 * 1024;
   uint initial_draw_store_size_ = 1024;
@@ -159,8 +161,6 @@ class renderer {
   friend struct details::word;
 
  public:
-  using paragraph_holder = details::paragraph_holder;
-
   renderer(render_target &_target, shared_buffer _buffer, const shared_font &_font, const shared_ubo &_ubo,
            shared_atlas _atlas, const shared_sampler &_sampler, renderer_params _params = renderer_params{});
 

@@ -36,10 +36,10 @@
 
 namespace hut {
 
-buffer::buffer(display &_display, uint _size, const buffer_params &_params)
+buffer::buffer(display &_display, const buffer_params &_params)
     : display_(_display)
     , params_(_params) {
-  grow(_size);
+  grow(_params.initial_byte_size_);
 }
 
 buffer_suballoc<u8> buffer::allocate_raw(uint _size_bytes, uint _align) {
@@ -50,8 +50,9 @@ buffer_suballoc<u8> buffer::allocate_raw(uint _size_bytes, uint _align) {
       return {&page, *fit, _size_bytes};
   }
 
-  auto &new_buffer = grow(std::max<uint>(_size_bytes, pages_.back().size() * 2));
-  auto  fit        = new_buffer.suballocator_.pack(_size_bytes, _align);
+  uint  aligned_new_size = align<uint>(_size_bytes, _align);
+  auto &new_buffer       = grow(std::max<uint>(aligned_new_size, pages_.back().size() * 2));
+  auto  fit              = new_buffer.suballocator_.pack(_size_bytes, _align);
   assert(fit);
 
   return {&new_buffer, *fit, _size_bytes};

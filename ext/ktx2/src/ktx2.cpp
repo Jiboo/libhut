@@ -118,7 +118,8 @@ bool is_special_depth_format(VkFormat _format) {
   }
 }
 
-std::optional<shared_image> load(display &_display, std::span<const u8> _input, const load_params &_params) {
+std::optional<shared_image> load(display &_display, const shared_buffer &_storage, std::span<const u8> _input,
+                                 const load_params &_params) {
   static_assert(std::endian::native == std::endian::little);
 
   struct level_ranges {
@@ -216,7 +217,7 @@ std::optional<shared_image> load(display &_display, std::span<const u8> _input, 
     }
   }
 
-  shared_image img = std::make_shared<image>(_display, iparams);
+  shared_image img = std::make_shared<image>(_display, _storage, iparams);
   for (u16 level = 0; level < iparams.levels_; level++) {
     const auto &level_range = levels[level];
     u16vec2_px  level_size  = iparams.size_ >> level;

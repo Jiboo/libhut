@@ -11,9 +11,10 @@
 using namespace hut;
 
 TEST(ktx2, tex_rgba8888_ktx2) {
-  display d("ktx2");
+  display       d("ktx2");
+  shared_buffer b = std::make_shared<buffer>(d);
 
-  auto result = ktx::load(d, tst_data::tex_rgba8888_ktx2);
+  auto result = ktx::load(d, b, tst_data::tex_rgba8888_ktx2);
   d.flush_staged();
 
   ASSERT_TRUE(result.has_value());
@@ -25,7 +26,8 @@ TEST(ktx2, tex_rgba8888_ktx2) {
 }
 
 TEST(ktx2, tex_bc1_ktx2) {
-  display d("ktx2");
+  display       d("ktx2");
+  shared_buffer b = std::make_shared<buffer>(d);
 
 #ifdef HUT_ENABLE_RENDERDOC
   renderdoc::frame_begin();
@@ -33,7 +35,7 @@ TEST(ktx2, tex_bc1_ktx2) {
 
   ktx::load_params kparams;
   kparams.tiling_ = VK_IMAGE_TILING_OPTIMAL;
-  auto result     = ktx::load(d, tst_data::tex_bc1_ktx2, kparams);
+  auto result     = ktx::load(d, b, tst_data::tex_bc1_ktx2, kparams);
   d.flush_staged();
 
   ASSERT_TRUE(result.has_value());
@@ -49,10 +51,12 @@ TEST(ktx2, tex_bc1_ktx2) {
 }
 
 TEST(ktx2, tex_2layers_bc1_ktx2) {
-  display          d("ktx2");
+  display       d("ktx2");
+  shared_buffer b = std::make_shared<buffer>(d);
+
   ktx::load_params kparams;
   kparams.tiling_ = VK_IMAGE_TILING_OPTIMAL;
-  auto result     = ktx::load(d, tst_data::tex_2layers_bc1_ktx2, kparams);
+  auto result     = ktx::load(d, b, tst_data::tex_2layers_bc1_ktx2, kparams);
   d.flush_staged();
 
   ASSERT_TRUE(result.has_value());
@@ -64,10 +68,12 @@ TEST(ktx2, tex_2layers_bc1_ktx2) {
 }
 
 TEST(ktx2, tex_cubemap_bc1_ktx2) {
-  display          d("ktx2");
+  display       d("ktx2");
+  shared_buffer b = std::make_shared<buffer>(d);
+
   ktx::load_params kparams;
   kparams.tiling_ = VK_IMAGE_TILING_OPTIMAL;
-  auto result     = ktx::load(d, tst_data::tex_cubemap_bc1_ktx2, kparams);
+  auto result     = ktx::load(d, b, tst_data::tex_cubemap_bc1_ktx2, kparams);
   d.flush_staged();
 
   ASSERT_TRUE(result.has_value());

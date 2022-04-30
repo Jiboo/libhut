@@ -111,7 +111,7 @@ class window final : public render_target {
   window(window &&) noexcept            = delete;
   window &operator=(window &&) noexcept = delete;
 
-  explicit window(display &_display, const window_params &_init_params = {});
+  explicit window(display &_display, const shared_buffer &_storage, const window_params &_init_params = {});
   ~window() final;
 
   void close();
@@ -156,6 +156,7 @@ class window final : public render_target {
 
  protected:
   display      &display_;
+  shared_buffer storage_;
   window_params params_;
 
   VkSurfaceKHR surface_ = VK_NULL_HANDLE;

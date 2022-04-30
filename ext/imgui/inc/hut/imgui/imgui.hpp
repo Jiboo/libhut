@@ -37,7 +37,7 @@
 
 namespace hut::imgui {
 
-IMGUI_IMPL_API bool init(display *_d, window *_w, bool _install_callbacks);
+IMGUI_IMPL_API bool init(display *_d, window *_w, const shared_buffer &_b, bool _install_callbacks);
 IMGUI_IMPL_API void shutdown();
 IMGUI_IMPL_API void new_frame();
 IMGUI_IMPL_API void render(VkCommandBuffer _buffer, ImDrawData *_draw_data);

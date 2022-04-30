@@ -114,8 +114,8 @@ class image {
     [[nodiscard]] uint      image_row_pitch() const { return target_->bpp() * (uint)bbox_size(subres_.coords_).x / 8; }
   };
 
-  static std::shared_ptr<image> load_raw(display &_display, std::span<const u8> _data, uint _data_row_pitch,
-                                         const image_params &_params);
+  static std::shared_ptr<image> load_raw(display &_display, const shared_buffer &_storage, std::span<const u8> _data,
+                                         uint _data_row_pitch, const image_params &_params);
 
   image() = delete;
 
@@ -125,7 +125,7 @@ class image {
   image(image &&) noexcept            = delete;
   image &operator=(image &&) noexcept = delete;
 
-  image(display &_display, const image_params &_params);
+  image(display &_display, const shared_buffer &_storage, const image_params &_params);
   ~image();
 
   void    update(subresource _subres, std::span<const u8> _data, uint _src_row_pitch);
@@ -141,18 +141,15 @@ class image {
   [[nodiscard]] VkImageView view() const { return view_; }
 
  private:
-  static VkMemoryRequirements create(display &_display, const image_params &_params, VkImage *_image,
-                                     VkDeviceMemory *_image_memory);
-
   void finalize_update(updator &_update);
 
   display     *display_;
   image_params params_;
 
-  VkImage              image_  = VK_NULL_HANDLE;
-  VkDeviceMemory       memory_ = VK_NULL_HANDLE;
-  VkMemoryRequirements mem_reqs_{};
-  VkImageView          view_ = VK_NULL_HANDLE;
+  shared_buffer_suballoc<u8> alloc_;
+
+  VkImage     image_ = VK_NULL_HANDLE;
+  VkImageView view_  = VK_NULL_HANDLE;
 };
 
 }  // namespace hut

@@ -40,13 +40,13 @@
 
 namespace hut {
 
-std::shared_ptr<image> image::load_raw(display &_display, std::span<const u8> _data, uint _data_row_pitch,
-                                       const image_params &_params) {
+std::shared_ptr<image> image::load_raw(display &_display, const shared_buffer &_storage, std::span<const u8> _data,
+                                       uint _data_row_pitch, const image_params &_params) {
   HUT_PROFILE_FUN(PIMAGE)
   assert(_params.levels_ == 1);
   assert(_params.layers_ == 1);
 
-  auto dst = std::make_shared<image>(_display, _params);
+  auto dst = std::make_shared<image>(_display, _storage, _params);
   dst->update({u16vec4{0, 0, _params.size_}}, _data, _data_row_pitch);
 
   return dst;
@@ -57,14 +57,40 @@ image::~image() {
   auto *const device = display_->device();
   HUT_PVK(vkDestroyImageView, device, view_, nullptr);
   HUT_PVK(vkDestroyImage, device, image_, nullptr);
-  HUT_PVK(vkFreeMemory, device, memory_, nullptr);
 }
 
-image::image(display &_display, const image_params &_params)
+image::image(display &_display, const shared_buffer &_storage, const image_params &_params)
     : display_(&_display)
     , params_(_params) {
   HUT_PROFILE_FUN(PIMAGE)
-  mem_reqs_ = create(_display, _params, &image_, &memory_);
+
+  VkImageCreateInfo image_info = {};
+  image_info.sType             = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+  image_info.imageType         = VK_IMAGE_TYPE_2D;
+  image_info.extent.width      = (uint)_params.size_.x;
+  image_info.extent.height     = (uint)_params.size_.y;
+  image_info.extent.depth      = 1;
+  image_info.mipLevels         = _params.levels_;
+  image_info.arrayLayers       = _params.layers_;
+  image_info.format            = _params.format_;
+  image_info.tiling            = _params.tiling_;
+  image_info.initialLayout     = VK_IMAGE_LAYOUT_PREINITIALIZED;
+  image_info.usage             = _params.usage_;
+  image_info.samples           = _params.samples_;
+  image_info.sharingMode       = VK_SHARING_MODE_EXCLUSIVE;
+  image_info.flags             = _params.flags_;
+
+  if (HUT_PVK(vkCreateImage, _display.device(), &image_info, nullptr, &image_) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create image!");
+  }
+
+  VkMemoryRequirements mem_req;
+  HUT_PVK(vkGetImageMemoryRequirements, _display.device(), image_, &mem_req);
+
+  // FIXME: Assert that mem_req.memoryTypeBits is compatible with _storage
+  alloc_ = _storage->allocate<u8>(mem_req.size, mem_req.alignment);
+
+  HUT_PVK(vkBindImageMemory, _display.device(), image_, alloc_->parent()->memory_, alloc_->offset_bytes());
 
   const bool            cubemap             = (params_.flags_ & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT) != 0u;
   VkImageViewCreateInfo view_info           = {};
@@ -112,47 +138,6 @@ image::image(display &_display, const image_params &_params)
     display_->stage_transition(post, range);
     display_->staging_jobs_--;
   });
-}
-
-VkMemoryRequirements image::create(display &_display, const image_params &_params, VkImage *_image,
-                                   VkDeviceMemory *_image_memory) {
-  HUT_PROFILE_FUN(PIMAGE)
-  VkImageCreateInfo image_info = {};
-  image_info.sType             = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-  image_info.imageType         = VK_IMAGE_TYPE_2D;
-  image_info.extent.width      = (uint)_params.size_.x;
-  image_info.extent.height     = (uint)_params.size_.y;
-  image_info.extent.depth      = 1;
-  image_info.mipLevels         = _params.levels_;
-  image_info.arrayLayers       = _params.layers_;
-  image_info.format            = _params.format_;
-  image_info.tiling            = _params.tiling_;
-  image_info.initialLayout     = VK_IMAGE_LAYOUT_PREINITIALIZED;
-  image_info.usage             = _params.usage_;
-  image_info.samples           = _params.samples_;
-  image_info.sharingMode       = VK_SHARING_MODE_EXCLUSIVE;
-  image_info.flags             = _params.flags_;
-
-  if (HUT_PVK(vkCreateImage, _display.device(), &image_info, nullptr, _image) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create image!");
-  }
-
-  VkMemoryRequirements mem_req;
-  HUT_PVK(vkGetImageMemoryRequirements, _display.device(), *_image, &mem_req);
-
-  VkMemoryAllocateInfo alloc_info = {};
-  alloc_info.sType                = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  alloc_info.allocationSize       = mem_req.size;
-  auto memtype                    = _display.find_memory_type(mem_req.memoryTypeBits, _params.properties_);
-  alloc_info.memoryTypeIndex      = memtype.first;
-
-  if (HUT_PVK(vkAllocateMemory, _display.device(), &alloc_info, nullptr, _image_memory) != VK_SUCCESS) {
-    throw std::runtime_error("failed to allocate image memory!");
-  }
-
-  HUT_PVK(vkBindImageMemory, _display.device(), *_image, *_image_memory, 0);
-
-  return mem_req;
 }
 
 void image::update(subresource _subres, std::span<const u8> _data, uint _src_row_pitch) {

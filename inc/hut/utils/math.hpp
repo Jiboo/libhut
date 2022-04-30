@@ -99,31 +99,31 @@ constexpr TType align(TType _input, unsigned _align) {
 }
 
 template<typename TType, qualifier TQualifier = defaultp>
-inline vec<2, TType, TQualifier> bbox_origin(const vec<4, TType, TQualifier> &_input) {
+constexpr inline vec<2, TType, TQualifier> bbox_origin(const vec<4, TType, TQualifier> &_input) {
   return vec<2, TType, TQualifier>{_input[0], _input[1]};
 }
 
 template<typename TType, qualifier TQualifier = defaultp>
-inline vec<2, TType, TQualifier> bbox_size(const vec<4, TType, TQualifier> &_input) {
+constexpr inline vec<2, TType, TQualifier> bbox_size(const vec<4, TType, TQualifier> &_input) {
   assert(_input[2] >= _input[0]);
   assert(_input[3] >= _input[1]);
   return vec<2, TType, TQualifier>{_input[2] - _input[0], _input[3] - _input[1]};
 }
 
 template<typename TType, qualifier TQualifier = defaultp>
-inline vec<2, TType, TQualifier> bbox_center(const vec<4, TType, TQualifier> &_input) {
+constexpr inline vec<2, TType, TQualifier> bbox_center(const vec<4, TType, TQualifier> &_input) {
   const auto size = bbox_size(_input);
   return vec<2, TType, TQualifier>{_input[0] + size.x / 2, _input[1] + size.y / 2};
 }
 
 template<typename TBox, typename TPoint, qualifier TQualifier = defaultp>
-bool bbox_contains(const vec<4, TBox, TQualifier> &_box, const vec<2, TPoint, TQualifier> &_point) {
+constexpr inline bool bbox_contains(const vec<4, TBox, TQualifier> &_box, const vec<2, TPoint, TQualifier> &_point) {
   return _point.x >= _box.x && _point.x <= _box.z && _point.y >= _box.y && _point.y <= _box.w;
 }
 
 template<typename TType, qualifier TQualifier = defaultp>
-inline vec<4, TType, TQualifier> make_bbox_with_origin_size(const vec<2, TType, TQualifier> &_offset,
-                                                            const vec<2, TType, TQualifier> &_size) {
+constexpr inline vec<4, TType, TQualifier> make_bbox_with_origin_size(const vec<2, TType, TQualifier> &_offset,
+                                                                      const vec<2, TType, TQualifier> &_size) {
   return vec<4, TType, TQualifier>{_offset.x, _offset.y, _offset.x + _size.x, _offset.y + _size.y};
 }
 

@@ -49,6 +49,7 @@ struct load_params {
   VkImageCreateFlags    flags_      = image_params{}.flags_;
 };
 
-std::optional<shared_image> load(display &_display, std::span<const u8> _input, const load_params &_params = {});
+std::optional<shared_image> load(display &_display, const shared_buffer &_storage, std::span<const u8> _input,
+                                 const load_params &_params = {});
 
 }  // namespace hut::ktx

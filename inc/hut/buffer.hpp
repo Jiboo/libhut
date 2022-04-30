@@ -92,18 +92,19 @@ struct buffer_page_data {
 }  // namespace details
 
 struct buffer_params {
-  bool                  permanent_map_ = false;
-  VkMemoryPropertyFlags type_          = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-  VkBufferUsageFlagBits usage_         = VkBufferUsageFlagBits(
-              VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT
-              | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
+  bool                  permanent_map_     = false;
+  uint                  initial_byte_size_ = 32 * 1024 * 1024;
+  VkMemoryPropertyFlags type_              = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  VkBufferUsageFlagBits usage_             = VkBufferUsageFlagBits(
+                  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT
+                  | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
 };
 
 class buffer {
   friend struct details::buffer_page_data;
 
  public:
-  buffer(display &_display, uint _size, const buffer_params &_params = {});
+  buffer(display &_display, const buffer_params &_params = {});
 
   buffer_suballoc<u8> allocate_raw(uint _size_bytes, uint _align = 4);
 

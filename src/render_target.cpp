@@ -54,7 +54,8 @@ render_target::~render_target() {
     HUT_PVK(vkDestroyRenderPass, display_->device(), renderpass_, nullptr);
 }
 
-void render_target::reinit_pass(const render_target_params &_init_params, std::span<VkImageView> _images) {
+void render_target::reinit_pass(const shared_buffer &_storage, const render_target_params &_init_params,
+                                std::span<VkImageView> _images) {
   HUT_PROFILE_FUN(PRENDERTARGET)
   render_target_params_ = _init_params;
   const auto size       = bbox_size(_init_params.box_);
@@ -80,7 +81,7 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
       params.usage_      = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
       params.aspect_     = VK_IMAGE_ASPECT_COLOR_BIT;
       params.samples_    = sample_count_;
-      msaa_rendertarget_ = std::make_shared<image>(*display_, params);
+      msaa_rendertarget_ = std::make_shared<image>(*display_, _storage, params);
     }
   }
 
@@ -107,7 +108,7 @@ void render_target::reinit_pass(const render_target_params &_init_params, std::s
     params.usage_   = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     params.aspect_  = VK_IMAGE_ASPECT_DEPTH_BIT;
     params.samples_ = sample_count_;
-    depth_          = std::make_shared<image>(*display_, params);
+    depth_          = std::make_shared<image>(*display_, _storage, params);
   }
 
   VkSubpassDependency dependency = {};

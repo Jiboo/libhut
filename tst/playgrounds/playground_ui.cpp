@@ -35,17 +35,18 @@
 using namespace hut;
 
 int main(int /*unused*/, char ** /*unused*/) {
-  display d("hut ui playground");
+  display       dsp("hut ui playground");
+  shared_buffer buf = std::make_shared<buffer>(dsp);
 
   window_params wp;
   wp.flags_.set(window_params::FTRANSPARENT);
-  window w(d, wp);
-  w.title(u8"hut ui playground");
-  w.clear_color({0, 0, 0, 1});
+  window win(dsp, buf, wp);
+  win.title(u8"hut ui playground");
+  win.clear_color({0, 0, 0, 1});
 
-  install_test_events(d, w);
+  install_test_events(dsp, win);
 
-  d.dispatch();
+  dsp.dispatch();
 
   return EXIT_SUCCESS;
 }

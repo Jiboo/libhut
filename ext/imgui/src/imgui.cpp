@@ -118,7 +118,7 @@ void set_clipboard_text(void *_user_data, const char *_text) {
                                });
 }
 
-bool init(display *_d, window *_w, bool _install_callbacks) {
+bool init(display *_d, window *_w, const shared_buffer &_b, bool _install_callbacks) {
   ImGuiIO &io = ImGui::GetIO();
   assert(io.BackendPlatformUserData == nullptr);
   io.BackendRendererUserData = new hut_imgui_impl_ctx;
@@ -134,6 +134,7 @@ bool init(display *_d, window *_w, bool _install_callbacks) {
 
   ctx.display_    = _d;
   ctx.window_     = _w;
+  ctx.buffer_     = _b;
   ctx.last_frame_ = display::clock::now();
 
   if (_install_callbacks) {
@@ -161,7 +162,7 @@ void shutdown() {
 void new_frame() {
   ImGuiIO            &io  = ImGui::GetIO();
   hut_imgui_impl_ctx &ctx = *static_cast<hut_imgui_impl_ctx *>(io.BackendRendererUserData);
-  if (!ctx.buffer_)
+  if (!ctx.ubo_)
     create_device_objects();
 
   const auto now   = display::clock::now();
@@ -247,8 +248,6 @@ bool create_device_objects() {
   int            height;
   io.Fonts->GetTexDataAsRGBA32(&data, &width, &height);
 
-  ctx.buffer_ = std::make_shared<buffer>(*ctx.display_, 4 * 1024 * 1024);
-
   ctx.ubo_ = ctx.buffer_->allocate<common_ubo>(1, ctx.display_->ubo_align());
   ctx.ubo_->set(common_ubo{ctx.window_->size()});
 
@@ -257,7 +256,7 @@ bool create_device_objects() {
   image_params  atlas_params;
   atlas_params.size_   = {width, height};
   atlas_params.format_ = VK_FORMAT_R8G8B8A8_UNORM;
-  auto image           = image::load_raw(*ctx.display_, pixels, width * 4, atlas_params);
+  auto image           = image::load_raw(*ctx.display_, ctx.buffer_, pixels, width * 4, atlas_params);
   auto samp            = std::make_shared<sampler>(*ctx.display_);
   io.Fonts->TexID      = add_image(image, samp);
 

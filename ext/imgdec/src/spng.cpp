@@ -91,14 +91,14 @@ bool do_read(image::updator &&_target, spng_ctx &_ctx, uint _rows, spng_format _
   return true;
 }
 
-std::shared_ptr<image> load_png(display &_display, std::span<const u8> _data) {
+std::shared_ptr<image> load_png(display &_display, const shared_buffer &_storage, std::span<const u8> _data) {
   auto         ctx = std::unique_ptr<spng_ctx, decltype(&spng_ctx_free)>(spng_ctx_new(0), spng_ctx_free);
   image_params iparams;
   spng_format  decode_format;
   if (!prepare_read(&iparams, &decode_format, *ctx, _data))
     return nullptr;
 
-  auto result = std::make_shared<image>(_display, iparams);
+  auto result = std::make_shared<image>(_display, _storage, iparams);
   if (!result)
     return nullptr;
 

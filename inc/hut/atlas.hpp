@@ -41,7 +41,7 @@ class atlas {
   constexpr static u16vec2_px PADDING = {1, 1};
 
  public:
-  atlas(display &_display, const image_params &_params);
+  atlas(display &_display, const shared_buffer &_storage, const image_params &_params);
 
   shared_image             page(uint _index) { return pages_[_index].image_; }
   [[nodiscard]] size_t     page_count() const { return pages_.size(); }
@@ -68,6 +68,7 @@ class atlas {
   };
 
   display               &display_;
+  shared_buffer          storage_;
   image_params           params_;
   std::vector<page_data> pages_;
 };

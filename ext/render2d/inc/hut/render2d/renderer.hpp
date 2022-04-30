@@ -109,6 +109,8 @@ struct batch {
 };
 }  // namespace details
 
+using boxes_holder = suballoc<instance, details::batch>;
+
 struct renderer_params : pipeline_params {
   uint initial_batch_size_instances_ = 1024;
 };
@@ -120,7 +122,7 @@ class renderer {
 
   void draw(VkCommandBuffer _buffer);
 
-  suballoc<instance, details::batch> allocate(uint _count);
+  boxes_holder allocate(uint _count);
 
  private:
   std::list<details::batch> batches_;

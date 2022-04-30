@@ -195,16 +195,17 @@ void packer(const char *_name = "Packer", u16vec2_px _bounds = {8 * 1024, 8 * 10
 }
 
 int main(int /*unused*/, char ** /*unused*/) {
-  display dsp("hut binpack playground");
+  display       dsp("hut binpack playground");
+  shared_buffer buf = std::make_shared<buffer>(dsp);
 
-  window win(dsp);
+  window win(dsp, buf);
   win.clear_color({0, 0, 0, 1});
   win.title(u8"hut binpack playground");
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!imgui::init(&dsp, &win, true))
+  if (!imgui::init(&dsp, &win, buf, true))
     return EXIT_FAILURE;
   install_test_events(dsp, win);
 

@@ -44,42 +44,43 @@ TEST(offscreen, display_noop) {
 
 TEST(offscreen, buffer_noop) {
   display d("buffer_noop");
-  auto    b = std::make_shared<buffer>(d, 1024 * 1024);
+  auto    b = std::make_shared<buffer>(d);
 }
 
 TEST(offscreen, image_noop) {
   display d("image_noop");
+  auto    b = std::make_shared<buffer>(d);
 
   image_params params;
   params.size_   = {4, 4};
   params.format_ = VK_FORMAT_R8G8B8A8_UNORM;
-  auto img       = std::make_shared<image>(d, params);
+  auto img       = std::make_shared<image>(d, b, params);
 }
 
 TEST(offscreen, offscreen_noop) {
   display d("offscreen_noop");
+  auto    b = std::make_shared<buffer>(d);
 
   image_params params;
   params.size_   = {4, 4};
   params.format_ = VK_FORMAT_R8G8B8A8_UNORM;
   params.usage_ |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-  auto img = std::make_shared<image>(d, params);
+  auto img = std::make_shared<image>(d, b, params);
 
-  auto ofs = std::make_shared<offscreen>(img);
+  auto ofs = std::make_shared<offscreen>(img, b);
 }
 
 TEST(offscreen, offscreen_download) {
   display d("offscreen_download");
-
-  auto buff = std::make_shared<buffer>(d, 1024 * 1024);
+  auto    b = std::make_shared<buffer>(d);
 
   image_params iparams;
   iparams.size_   = {4, 4};
   iparams.format_ = VK_FORMAT_R8G8B8A8_UNORM;
   iparams.usage_ |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-  auto img = std::make_shared<image>(d, iparams);
+  auto img = std::make_shared<image>(d, b, iparams);
 
-  auto ofs = offscreen(img);
+  auto ofs = offscreen(img, b);
 
   d.flush_staged();  // staging has to be explicitly flushed in offscreen mode
 
@@ -111,31 +112,30 @@ TEST(offscreen, offscreen_download) {
 
 TEST(offscreen, offscreen_basic) {
   display d("offscreen_basic");
-
-  auto buff = std::make_shared<buffer>(d, 1024 * 1024);
+  auto    b = std::make_shared<buffer>(d);
 
   image_params iparams;
   iparams.size_   = {4, 4};
   iparams.format_ = VK_FORMAT_R8G8B8A8_UNORM;
   iparams.usage_ |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-  auto img = std::make_shared<image>(d, iparams);
-  auto ofs = offscreen(img);
+  auto img = std::make_shared<image>(d, b, iparams);
+  auto ofs = offscreen(img, b);
 
   auto rgb_pipeline = std::make_shared<pipeline_rgb>(ofs);
-  auto indices      = buff->allocate<u16>(6);
+  auto indices      = b->allocate<u16>(6);
   indices->set({0, 1, 2, 2, 1, 3});
-  auto vertices = buff->allocate<pipeline_rgb::vertex>(4);
+  auto vertices = b->allocate<pipeline_rgb::vertex>(4);
   vertices->set({
       pipeline_rgb::vertex{{0, 0}, {1, 1, 1}},
       pipeline_rgb::vertex{{0, 2}, {1, 1, 1}},
       pipeline_rgb::vertex{{2, 0}, {1, 1, 1}},
       pipeline_rgb::vertex{{2, 2}, {1, 1, 1}},
   });
-  auto instances = buff->allocate<pipeline_rgb::instance>(2);
+  auto instances = b->allocate<pipeline_rgb::instance>(2);
   instances->set({pipeline_rgb::instance{make_transform_mat4({0, 0}, {1, 1, 1})},
                   pipeline_rgb::instance{make_transform_mat4({2, 2}, {1, 1, 1})}});
 
-  auto ubo = buff->allocate<proj_ubo>(1, d.ubo_align());
+  auto ubo = b->allocate<proj_ubo>(1, d.ubo_align());
   ubo->set(proj_ubo{iparams.size_});
   rgb_pipeline->write(0, ubo);
 
@@ -161,14 +161,13 @@ TEST(offscreen, offscreen_basic) {
 
 TEST(offscreen, offscreen_download_offset) {
   display d("offscreen_download_offset");
-
-  auto buff = std::make_shared<buffer>(d, 1024 * 1024);
+  auto    b = std::make_shared<buffer>(d);
 
   image_params iparams;
   iparams.size_   = {4, 4};
   iparams.format_ = VK_FORMAT_R8G8B8A8_UNORM;
   iparams.usage_ |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-  auto img = std::make_shared<image>(d, iparams);
+  auto img = std::make_shared<image>(d, b, iparams);
 
   {
     // Set pixel at [2,2]
@@ -177,7 +176,7 @@ TEST(offscreen, offscreen_download_offset) {
     memcpy(ptr + (2 * updator.staging_row_pitch() + 2 * 4), &W, 4);
   }
 
-  auto ofs = offscreen(img);
+  auto ofs = offscreen(img, b);
 
   d.flush_staged();  // staging has to be explicitly flushed in offscreen mode
 
@@ -208,39 +207,38 @@ TEST(offscreen, offscreen_download_offset) {
 
 TEST(offscreen, offscreen_render_offset) {
   display d("offscreen_render_offset");
+  auto    b = std::make_shared<buffer>(d);
 
 #ifdef HUT_ENABLE_RENDERDOC
   renderdoc::frame_begin();
 #endif
 
-  auto buff = std::make_shared<buffer>(d, 1024 * 1024);
-
   image_params iparams;
   iparams.size_   = {4, 4};
   iparams.format_ = VK_FORMAT_R8G8B8A8_UNORM;
   iparams.usage_ |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-  auto img = std::make_shared<image>(d, iparams);
+  auto img = std::make_shared<image>(d, b, iparams);
 
   offscreen_params oparams;
   oparams.subres_.coords_ = make_bbox_with_origin_size(u16vec2{1, 1}, {2, 2});
-  auto ofs                = offscreen(img, oparams);
+  auto ofs                = offscreen(img, b, oparams);
 
   auto rgb_pipeline = std::make_shared<pipeline_rgb>(ofs);
-  auto indices      = buff->allocate<u16>(6);
+  auto indices      = b->allocate<u16>(6);
   indices->set({0, 1, 2, 2, 1, 3});
-  auto vertices = buff->allocate<pipeline_rgb::vertex>(4);
+  auto vertices = b->allocate<pipeline_rgb::vertex>(4);
   vertices->set({
       pipeline_rgb::vertex{{0, 0}, {1, 1, 1}},
       pipeline_rgb::vertex{{0, 1}, {1, 1, 1}},
       pipeline_rgb::vertex{{1, 0}, {1, 1, 1}},
       pipeline_rgb::vertex{{1, 1}, {1, 1, 1}},
   });
-  auto instances = buff->allocate<pipeline_rgb::instance>(1);
+  auto instances = b->allocate<pipeline_rgb::instance>(1);
   instances->set({
       pipeline_rgb::instance{make_transform_mat4({1, 1}, {1, 1, 1})},
   });
 
-  auto ubo = buff->allocate<proj_ubo>(1, d.ubo_align());
+  auto ubo = b->allocate<proj_ubo>(1, d.ubo_align());
   ubo->set(proj_ubo{iparams.size_});
   rgb_pipeline->write(0, ubo);
 

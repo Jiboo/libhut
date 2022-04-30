@@ -100,7 +100,7 @@ void renderer::draw(VkCommandBuffer _buff) {
 
     constexpr bool OPTIMIZE = true;
     const uint     lower    = OPTIMIZE ? batch.dstore_.suballocator_.lower_bound() : 0;
-    const uint     upper    = OPTIMIZE ? batch.dstore_.suballocator_.upper_bound() : batch.dstore_.suballocator_.capacity();
+    const uint upper = OPTIMIZE ? batch.dstore_.suballocator_.upper_bound() : batch.dstore_.suballocator_.capacity();
     assert(upper >= lower);
     pipeline_.draw_indexed(_buff, batch.dstore_.commands_, upper - lower, lower, sizeof(VkDrawIndexedIndirectCommand));
   }
@@ -117,7 +117,7 @@ details::batch &renderer::grow(uint _mesh_store_size, uint _draw_store_size) {
   return batches_.emplace_back(details::batch{this, mesh_store_size, draw_store_size});
 }
 
-renderer::paragraph_holder renderer::allocate(std::span<const std::u8string_view> _words) {
+paragraph_holder renderer::allocate(std::span<const std::u8string_view> _words) {
   words_info winfo{_words};
   auto      &best_batch = find_best_fit(winfo);
 

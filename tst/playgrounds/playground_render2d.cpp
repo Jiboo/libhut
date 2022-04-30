@@ -43,15 +43,15 @@
 using namespace hut;
 
 int main(int /*unused*/, char ** /*unused*/) {
-  display dsp("hut render2d playground");
-  auto    buf = std::make_shared<buffer>(dsp, 256 * 1024 * 1024);
+  display       dsp("hut render2d playground");
+  shared_buffer buf = std::make_shared<buffer>(dsp);
 
-  window win(dsp);
+  window win(dsp, buf);
   win.title(u8"hut render2d playground");
   win.clear_color({1, 1, 1, 1});
 
-  auto texatlas
-      = std::make_shared<atlas>(dsp, image_params{.size_ = dsp.max_tex_size(), .format_ = VK_FORMAT_R8G8B8A8_UNORM});
+  auto texatlas = std::make_shared<atlas>(
+      dsp, buf, image_params{.size_ = dsp.max_tex_size(), .format_ = VK_FORMAT_R8G8B8A8_UNORM});
   auto samp = std::make_shared<sampler>(dsp);
   auto tex  = imgdec::load_png(texatlas, tst_png::tex1_png);
   auto ubo  = buf->allocate<common_ubo>(1, dsp.ubo_align());
@@ -62,7 +62,7 @@ int main(int /*unused*/, char ** /*unused*/) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!imgui::init(&dsp, &win, true))
+  if (!imgui::init(&dsp, &win, buf, true))
     return EXIT_FAILURE;
   install_test_events<common_ubo>(dsp, win, ubo);
 

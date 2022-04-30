@@ -39,16 +39,16 @@
 using namespace hut;
 
 int main(int /*unused*/, char ** /*unused*/) {
-  display dsp("hut events playground");
-
-  window win(dsp);
+  display       dsp("hut events playground");
+  shared_buffer buf = std::make_shared<buffer>(dsp);
+  window        win(dsp, buf);
   win.title(u8"hut events playground");
   win.clear_color({0, 0, 0, 1});
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
-  if (!imgui::init(&dsp, &win, true))
+  if (!imgui::init(&dsp, &win, buf, true))
     return EXIT_FAILURE;
 
   bool handle_on_pause_events = false;
