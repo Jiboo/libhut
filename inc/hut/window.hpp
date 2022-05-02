@@ -87,7 +87,7 @@ class window final : public render_target {
   event<>                          on_resume_;  // sys asked win to resume rendering
   event<bool>                      on_focus_;   // sys gave keyboard focus to win
   event<>                          on_close_;   // overridable, sys requested win to close
-  event<u16vec4>                   on_expose_;  // sys request win to redraw this rect
+  event<u16bbox_px>                on_expose_;  // sys request win to redraw this rect
   event<VkCommandBuffer>           on_draw_;    // win is dirty, needs to rebuild command buffer
   event<display::duration>         on_frame_;   // win will soon be drawn (use this to animate values)
   event<u16vec2_px, u32 /*scale*/> on_resize_;  // sys changed win size or scaling
@@ -111,7 +111,7 @@ class window final : public render_target {
   window(window &&) noexcept            = delete;
   window &operator=(window &&) noexcept = delete;
 
-  explicit window(display &_display, const shared_buffer &_storage, const window_params &_init_params = {});
+  explicit window(display &_display, shared_buffer _storage, const window_params &_init_params = {});
   ~window() final;
 
   void close();

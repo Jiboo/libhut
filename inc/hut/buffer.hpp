@@ -106,10 +106,10 @@ class buffer {
  public:
   buffer(display &_display, const buffer_params &_params = {});
 
-  buffer_suballoc<u8> allocate_raw(uint _size_bytes, uint _align = 4);
+  [[nodiscard]] buffer_suballoc<u8> allocate_raw(uint _size_bytes, uint _align = 4);
 
   template<typename TSubType>
-  shared_buffer_suballoc<TSubType> allocate(uint _count, uint _align = 4) {
+  [[nodiscard]] shared_buffer_suballoc<TSubType> allocate(uint _count, uint _align = 4) {
     auto raw_alloc = allocate_raw(_count * sizeof(TSubType), _align);
     return std::make_shared<buffer_suballoc<TSubType>>(std::move(*raw_alloc.template reinterpret_as<TSubType>()));
   }

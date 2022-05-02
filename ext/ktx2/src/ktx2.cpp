@@ -181,7 +181,7 @@ std::optional<shared_image> load(display &_display, const shared_buffer &_storag
     if (iparams.format_ == VK_FORMAT_UNDEFINED)
       return {};  // FIXME http://github.khronos.org/KTX-Specification/#_use_of_vk_format_undefined
 
-    u32 type_size   = read_u32();
+    read_u32();  // type_size
     iparams.size_.x = read_u32();
     iparams.size_.y = read_u32();
     u32 pixel_depth = read_u32();
@@ -202,12 +202,12 @@ std::optional<shared_image> load(display &_display, const shared_buffer &_storag
     if (compression != 0)
       return {};  // FIXME Support some compression
 
-    u32 dfd_byte_offset = read_u32();
-    u32 dfd_byte_length = read_u32();
-    u32 kvd_byte_offset = read_u32();
-    u32 kvd_byte_length = read_u32();
-    u64 sgd_byte_offset = read_u64();
-    u64 sgd_byte_length = read_u64();
+    read_u32();  // dfd_byte_offset
+    read_u32();  // dfd_byte_length
+    read_u32();  // kvd_byte_offset
+    read_u32();  // kvd_byte_length
+    read_u64();  // sgd_byte_offset
+    read_u64();  // sgd_byte_length
 
     for (uint level = 0; level < iparams.levels_; level++) {
       auto &range                     = levels[level];

@@ -117,13 +117,13 @@ details::batch &renderer::grow(uint _mesh_store_size, uint _draw_store_size) {
   return batches_.emplace_back(details::batch{this, mesh_store_size, draw_store_size});
 }
 
-paragraph_holder renderer::allocate(std::span<const std::u8string_view> _words) {
+words_holder renderer::allocate(std::span<const std::u8string_view> _words) {
   words_info winfo{_words};
   auto      &best_batch = find_best_fit(winfo);
 
   auto draw_alloc = best_batch.dstore_.suballocator_.pack(_words.size());
   assert(draw_alloc);
-  paragraph_holder result{&best_batch, uint(*draw_alloc * sizeof(instance)), uint(_words.size() * sizeof(instance))};
+  words_holder result{&best_batch, uint(*draw_alloc * sizeof(instance)), uint(_words.size() * sizeof(instance))};
   result.bboxes_ = std::make_unique<i16vec4_px[]>(_words.size());
 
   auto cupdator = best_batch.dstore_.commands_->update(*draw_alloc, _words.size());
@@ -190,25 +190,17 @@ mesh_store::mesh_store(renderer *_parent, uint _size)
     : vertices_(_parent->buffer_->allocate<vertex>(_size * 4))
     , indices_(_parent->buffer_->allocate<index_t>(_size * 6))
     , suballocator_(_size) {
-  if constexpr (false) {  // NOTE JBL: Not need to clear, they are initialized if used
-    vertices_->zero();
-    indices_->zero();
-  }
 }
 
 draw_store::draw_store(renderer *_parent, uint _size)
     : instances_(_parent->buffer_->allocate<instance>(_size))
     , commands_(_parent->buffer_->allocate<VkDrawIndexedIndirectCommand>(_size))
     , suballocator_(_size) {
-  if constexpr (false) {  // NOTE JBL: Not need to clear, they are initialized if used
-    instances_->zero();
-  }
   commands_->zero();
 }
 
 word::word(renderer *_parent, batch &_batch, uint _alloc, uint _codepoints, std::u8string_view _text)
     : alloc_(_alloc)
-    , glyphs_(0)
     , bbox_(NUMAX<f32>, NUMAX<f32>, NUMIN<f32>, NUMIN<f32>) {
   const auto vertices_offset = 4 * _alloc;
   const auto vertices_size   = 4 * _codepoints;
@@ -256,10 +248,6 @@ void batch::release_words(std::span<string_hash> _hashes) {
     word.ref_count_--;
     if (word.ref_count_ == 0) {
       mstore_.suballocator_.offer(word.alloc_);
-      if constexpr (false) {  // NOTE JBL: Assume we don't need to clear, the commands were removed
-        mstore_.vertices_->zero(word.alloc_ * 4, word.glyphs_ * 4);
-        mstore_.indices_->zero(word.alloc_ * 6, word.glyphs_ * 6);
-      }
       // TODO JBL: Also decrease refcount of glyphs cache in shaper?
       auto result = cache_.erase(hash);
       assert(result == 1);

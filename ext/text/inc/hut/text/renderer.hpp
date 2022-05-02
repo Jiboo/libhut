@@ -75,7 +75,7 @@ struct draw_store {
 
 struct word {
   uint       alloc_;
-  uint       glyphs_;
+  uint       glyphs_    = 0;
   uint       ref_count_ = 0;
   i16vec4_px bbox_;
 
@@ -103,7 +103,7 @@ struct batch {
   }
 };
 
-class paragraph_holder {
+class words_holder {
   friend class text::renderer;
   friend struct details::batch;
 
@@ -112,17 +112,17 @@ class paragraph_holder {
   std::unique_ptr<string_hash[]> hashes_;
 
  public:
-  paragraph_holder() = delete;
-  ~paragraph_holder() { release(); }
+  words_holder() = delete;
+  ~words_holder() { release(); }
 
-  paragraph_holder(const paragraph_holder &)            = delete;
-  paragraph_holder &operator=(const paragraph_holder &) = delete;
+  words_holder(const words_holder &)            = delete;
+  words_holder &operator=(const words_holder &) = delete;
 
-  paragraph_holder(paragraph_holder &&_other) noexcept
+  words_holder(words_holder &&_other) noexcept
       : instances_(std::move(_other.instances_))
       , bboxes_(std::move(_other.bboxes_))
       , hashes_(std::move(_other.hashes_)) {}
-  paragraph_holder &operator=(paragraph_holder &&_other) noexcept {
+  words_holder &operator=(words_holder &&_other) noexcept {
     if (&_other != this) {
       instances_ = std::move(_other.instances_);
       bboxes_    = std::move(_other.bboxes_);
@@ -131,7 +131,7 @@ class paragraph_holder {
     return *this;
   }
 
-  paragraph_holder(batch *_parent, uint _offset_bytes, uint _size_bytes)
+  words_holder(batch *_parent, uint _offset_bytes, uint _size_bytes)
       : instances_(_parent, _offset_bytes, _size_bytes) {}
 
   void release() {
@@ -148,7 +148,7 @@ class paragraph_holder {
 
 }  // namespace details
 
-using paragraph_holder = details::paragraph_holder;
+using words_holder = details::words_holder;
 
 struct renderer_params : pipeline_params {
   uint initial_mesh_store_size_ = 8 * 1024;
@@ -164,7 +164,7 @@ class renderer {
   renderer(render_target &_target, shared_buffer _buffer, const shared_font &_font, const shared_ubo &_ubo,
            shared_atlas _atlas, const shared_sampler &_sampler, renderer_params _params = renderer_params{});
 
-  paragraph_holder allocate(std::span<const std::u8string_view> _words);
+  words_holder allocate(std::span<const std::u8string_view> _words);
 
   void draw(VkCommandBuffer _buff);
 

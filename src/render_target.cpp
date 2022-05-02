@@ -58,8 +58,8 @@ void render_target::reinit_pass(const shared_buffer &_storage, const render_targ
                                 std::span<VkImageView> _images) {
   HUT_PROFILE_FUN(PRENDERTARGET)
   render_target_params_ = _init_params;
-  const auto size       = bbox_size(_init_params.box_);
-  const auto offset     = bbox_origin(_init_params.box_);
+  const auto size       = _init_params.box_.size();
+  const auto offset     = _init_params.box_.origin();
 
   assert(size.x > 0_px && size.y > 0_px);
 
@@ -232,8 +232,8 @@ void render_target::reinit_pass(const shared_buffer &_storage, const render_targ
 
 void render_target::begin_rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
   HUT_PROFILE_FUN(PRENDERTARGET)
-  auto offset = bbox_origin(render_target_params_.box_);
-  auto size   = bbox_size(render_target_params_.box_);
+  auto offset = render_target_params_.box_.origin();
+  auto size   = render_target_params_.box_.size();
 
   VkCommandBufferBeginInfo begin_info = {};
   begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;

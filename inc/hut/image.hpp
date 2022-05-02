@@ -30,6 +30,7 @@
 #include <memory>
 #include <set>
 
+#include "hut/utils/bbox.hpp"
 #include "hut/utils/format.hpp"
 
 #include "hut/buffer.hpp"
@@ -57,7 +58,7 @@ class image {
 
  public:
   struct subresource {
-    u16vec4_px coords_;
+    u16bbox_px coords_;
     u16        level_ = 0;
     u16        layer_ = 0;
   };
@@ -111,7 +112,7 @@ class image {
     [[nodiscard]] u8       *data() { return data_.data(); }
     [[nodiscard]] size_t    size_bytes() const { return data_.size_bytes(); }
     [[nodiscard]] uint      staging_row_pitch() const { return staging_row_pitch_; }
-    [[nodiscard]] uint      image_row_pitch() const { return target_->bpp() * (uint)bbox_size(subres_.coords_).x / 8; }
+    [[nodiscard]] uint      image_row_pitch() const { return target_->bpp() * (u16)subres_.coords_.width() / 8; }
   };
 
   static std::shared_ptr<image> load_raw(display &_display, const shared_buffer &_storage, std::span<const u8> _data,
@@ -130,7 +131,7 @@ class image {
 
   void    update(subresource _subres, std::span<const u8> _data, uint _src_row_pitch);
   updator update(subresource _subres);
-  updator update() { return update({make_bbox_with_origin_size({0, 0}, params_.size_)}); }
+  updator update() { return update({u16bbox_px::with_origin_size({0, 0}, params_.size_)}); }
 
   [[nodiscard]] u8         bpp() const { return format_info::from(params_.format_).bpp(); }
   [[nodiscard]] VkFormat   format() const { return params_.format_; }

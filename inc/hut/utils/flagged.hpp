@@ -36,7 +36,7 @@
 
 namespace hut {
 
-template<typename TEnum, TEnum TEnd, typename TUnderlying = u32>
+template<typename TEnum, TEnum TEnd, typename TUnderlying = uint32_t>
 class flagged {
  private:
   TUnderlying active_ = 0;
@@ -46,7 +46,7 @@ class flagged {
 
  public:
   constexpr static size_t      UNDERLYING_BITS = sizeof(TUnderlying) * 8;
-  constexpr static TUnderlying mask(TEnum _flag) { return 1U << _flag; }
+  constexpr static TUnderlying mask(TEnum _flag) { return 1u << _flag; }
   static_assert(std::bit_width(mask(TEnd)) <= UNDERLYING_BITS, "underlying type too small to hold values to end");
 
   using enum_type                       = TEnum;
@@ -114,7 +114,7 @@ class flagged {
     TUnderlying current_;
 
     constexpr const_iterator &operator++() {
-      shifted_ = shifted_ >> 1U;
+      shifted_ = shifted_ >> 1u;
       current_++;
       auto to_skip = std::countr_zero(shifted_);
       shifted_     = to_skip == UNDERLYING_BITS ? 0 : shifted_ >> to_skip;
@@ -125,16 +125,16 @@ class flagged {
     constexpr TEnum operator*() const { return static_cast<TEnum>(current_); }
   };
 
-  constexpr const_iterator cbegin() const {
+  [[nodiscard]] constexpr const_iterator cbegin() const {
     TUnderlying to_skip = std::countr_zero(active_);
     return const_iterator{active_ >> to_skip, to_skip};
   }
-  constexpr const_iterator begin() const { return cbegin(); }
-  constexpr const_iterator cend() const { return const_iterator{0, UNDERLYING_BITS}; }
-  constexpr const_iterator end() const { return cend(); }
+  [[nodiscard]] constexpr const_iterator begin() const { return cbegin(); }
+  [[nodiscard]] constexpr const_iterator cend() const { return const_iterator{0, UNDERLYING_BITS}; }
+  [[nodiscard]] constexpr const_iterator end() const { return cend(); }
 };
 
-template<typename TEnum, TEnum TEnd, typename TUnderlying = u32>
+template<typename TEnum, TEnum TEnd, typename TUnderlying = uint32_t>
 inline std::ostream &operator<<(std::ostream &_os, flagged<TEnum, TEnd, TUnderlying> _flags) {
   _os << "(";
   for (auto it = _flags.cbegin(); it != _flags.end(); ++it) {

@@ -32,7 +32,6 @@
 
 #include "hut/utils/utf.hpp"
 
-#include "hut/buffer.hpp"
 #include "hut/display.hpp"
 #include "hut/image.hpp"
 #include "hut/pipeline.hpp"
@@ -92,10 +91,10 @@ const char *get_clipboard_text(void *_user_data) {
   std::atomic_bool done = false;
   ctx.window_->clipboard_receive(clipboard_formats{FTEXT_PLAIN},
                                  [&](clipboard_format _mime, clipboard_receiver &_receiver) {
-                                   u8     buffer[2048];
-                                   size_t read_bytes;
+                                   std::array<u8, 2048> buffer;
+                                   size_t               read_bytes;
                                    while ((read_bytes = _receiver.read(buffer)) != 0u) {
-                                     target += std::string_view{(char *)buffer, read_bytes};
+                                     target += std::string_view{(char *)buffer.data(), read_bytes};
                                    }
                                    done = true;
                                  });
@@ -113,7 +112,8 @@ void set_clipboard_text(void *_user_data, const char *_text) {
   ctx.window_->clipboard_offer(clipboard_formats{FTEXT_PLAIN},
                                [buffer{std::string(_text)}](clipboard_format _mime, clipboard_sender &_sender) {
                                  if (_mime == FTEXT_PLAIN) {
-                                   _sender.write({(u8 *)buffer.data(), buffer.size()});
+                                   auto written = _sender.write({(u8 *)buffer.data(), buffer.size()});
+                                   assert(written == buffer.size());
                                  }
                                });
 }

@@ -233,10 +233,10 @@ class pipeline {
       throw std::runtime_error("failed to create pipeline layout!");
   }
 
-  void init_pipeline(u16vec4_px _default_viewport, VkSampleCountFlagBits _samples, const pipeline_params &_params) {
+  void init_pipeline(u16bbox_px _default_viewport, VkSampleCountFlagBits _samples, const pipeline_params &_params) {
     HUT_PROFILE_SCOPE(PPIPELINE, "pipeline({},{})::init_pipeline", TVertexRefl::FILENAME, TFragRefl::FILENAME)
-    auto size   = bbox_size(_default_viewport);
-    auto origin = bbox_origin(_default_viewport);
+    auto size   = _default_viewport.size();
+    auto origin = _default_viewport.origin();
 
     VkPipelineShaderStageCreateInfo vert_stage_info = {};
     vert_stage_info.sType                           = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;

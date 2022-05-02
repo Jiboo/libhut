@@ -29,7 +29,7 @@
 
 #include <cassert>
 
-#include "hut/utils/math.hpp"
+#include "hut/utils/glm.hpp"
 
 namespace hut {
 
@@ -44,6 +44,8 @@ struct u8vec4_rgba : u8vec4 {
   constexpr operator f32vec4_rgba() const;
 };
 
+HUT_SCALAR_OPERATORS(, u8vec4_rgba, u8vec4_rgba)
+
 struct f32vec4_rgba : f32vec4 {
   using f32vec4::f32vec4;
   constexpr explicit f32vec4_rgba(const f32vec4 &_raw)
@@ -52,12 +54,14 @@ struct f32vec4_rgba : f32vec4 {
   constexpr operator u8vec4_rgba() const;
 };
 
+HUT_SCALAR_OPERATORS(, f32vec4_rgba, f32vec4_rgba)
+
 constexpr u8vec4_rgba::operator f32vec4_rgba() const {
   return f32vec4_rgba{f32vec4{*this} / 255.f};
 }
 
 constexpr f32vec4_rgba::operator u8vec4_rgba() const {
-  return u8vec4_rgba{*this * 255.f};
+  return u8vec4_rgba{f32vec4{*this} * 255.f};
 }
 
 inline std::ostream &operator<<(std::ostream &_os, const u8vec4_rgba &_n) {

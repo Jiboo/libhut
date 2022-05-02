@@ -28,6 +28,7 @@
 #pragma once
 
 #include "array.hpp"
+#include "bbox.hpp"
 #include "binpacks.hpp"
 #include "chrono.hpp"
 #include "color.hpp"
@@ -35,9 +36,11 @@
 #include "flagged.hpp"
 #include "format.hpp"
 #include "fwd.hpp"
+#include "glm.hpp"
 #include "hash.hpp"
 #include "length.hpp"
 #include "math.hpp"
+#include "preprocessor.hpp"
 #include "profiling.hpp"
 #include "sstream.hpp"
 #include "string.hpp"

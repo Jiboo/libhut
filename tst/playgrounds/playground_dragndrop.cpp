@@ -49,7 +49,7 @@ struct drop_target {
   dragndrop_action                                              preferred_action_ = DNDCOPY;
   std::array<clipboard_format, CLIPBOARD_FORMAT_LAST_VALUE + 1> preferred_formats_
       = {FIMAGE_PNG, FIMAGE_JPEG, FIMAGE_BMP, FTEXT_HTML, FTEXT_URI_LIST, FTEXT_PLAIN};
-  vec4 bbox_ = {0, 0, 0, 0};
+  u16bbox_px bbox_ = {0, 0, 0, 0};
 };
 
 struct my_drop_target_interface : drop_target_interface {
@@ -68,13 +68,13 @@ struct my_drop_target_interface : drop_target_interface {
     target_          = nullptr;
   }
 
-  move_result on_move(vec2 _pos) override {
+  move_result on_move(vec2_px _pos) override {
     //std::cout << "my_drop_target_interface::on_move " << _pos << std::endl;
     constexpr move_result DEFAULT_RESULT = {dragndrop_actions{DNDNONE}, DNDNONE, FTEXT_PLAIN};
     move_result           result         = DEFAULT_RESULT;
 
     for (auto &target : targets_) {
-      if (bbox_contains(target.bbox_, _pos) && (target.allowed_formats_ & current_formats_)) {
+      if (target.bbox_.contains(_pos) && (target.allowed_formats_ & current_formats_)) {
         if (target_ != &target) {
           for (auto f : target.preferred_formats_) {
             if (target.allowed_formats_.query(f) && current_formats_.query(f)) {
@@ -121,24 +121,24 @@ int main(int /*unused*/, char ** /*unused*/) {
   win.title(u8"hut dragndrop playground");
   win.clear_color({0, 0, 0, 1});
 
-  auto last_item_pos = [](vec4 *_dst) {
+  auto last_item_pos = [](u16bbox_px *_dst) {
     auto min = ImGui::GetItemRectMin();
     auto max = ImGui::GetItemRectMax();
     *_dst    = {min.x, min.y, max.x, max.y};
   };
 
-  char source_data[BUFF_SIZE] = "Hello world from libhut";
-  auto source_formats         = clipboard_formats{FTEXT_PLAIN};
-  auto source_actions         = dragndrop_actions{DNDCOPY};
-  vec4 source_bbox{0, 0, 0, 0};
+  char       source_data[BUFF_SIZE] = "Hello world from libhut";
+  auto       source_formats         = clipboard_formats{FTEXT_PLAIN};
+  auto       source_actions         = dragndrop_actions{DNDCOPY};
+  u16bbox_px source_bbox{0, 0, 0, 0};
 
   std::vector<drop_target> targets;
   targets.reserve(16);
   targets.emplace_back();
 
   win.dragndrop_target(std::make_shared<my_drop_target_interface>(targets));
-  win.on_mouse_.connect([&](u8 _button, mouse_event_type _type, vec2 _coords) {
-    if (_type == MDOWN && _button == 1 && bbox_contains(source_bbox, _coords)) {
+  win.on_mouse_.connect([&](u8 _button, mouse_event_type _type, vec2_px _coords) {
+    if (_type == MDOWN && _button == 1 && source_bbox.contains(_coords)) {
       std::cout << "Starting drag with " << source_actions << ", " << source_formats << std::endl;
       win.dragndrop_start(source_actions, source_formats,
                           [&](dragndrop_action _action, clipboard_format _mime, clipboard_sender &_sender) {

@@ -30,7 +30,7 @@
 #include <bit>
 #include <optional>
 
-#include "hut/utils/math.hpp"
+#include "hut/utils/glm.hpp"
 
 namespace hut::binpack {
 

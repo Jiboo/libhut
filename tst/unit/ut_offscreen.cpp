@@ -19,10 +19,10 @@ constexpr u8vec4_rgba C = {0, 0, 0, 255};        // Cleared for framebuffer
 constexpr u8vec4_rgba W = {255, 255, 255, 255};  // Drawn
 constexpr u8vec4_rgba I = {128, 128, 128, 128};  // Untouched
 
-void dump(u8vec4_rgba *_data, u16vec4_px _box) {
-  for (int x = int(_box.x); x < int(_box.z); x++) {
-    for (int y = int(_box.y); y < int(_box.w); y++) {
-      auto pixel = _data[int(_box.z) * y + x];
+void dump(u8vec4_rgba *_data, u16bbox_px _bbox) {
+  for (int x = int(_bbox.x); x < int(_bbox.z); x++) {
+    for (int y = int(_bbox.y); y < int(_bbox.w); y++) {
+      auto pixel = _data[int(_bbox.z) * y + x];
       if (pixel == D)
         std::cout << "D";
       else if (pixel == C)
@@ -220,7 +220,7 @@ TEST(offscreen, offscreen_render_offset) {
   auto img = std::make_shared<image>(d, b, iparams);
 
   offscreen_params oparams;
-  oparams.subres_.coords_ = make_bbox_with_origin_size(u16vec2{1, 1}, {2, 2});
+  oparams.subres_.coords_ = u16bbox_px::with_origin_size({1, 1}, {2, 2});
   auto ofs                = offscreen(img, b, oparams);
 
   auto rgb_pipeline = std::make_shared<pipeline_rgb>(ofs);

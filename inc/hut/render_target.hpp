@@ -30,6 +30,8 @@
 #include <chrono>
 #include <string>
 
+#include "hut/utils/bbox.hpp"
+
 #include "hut/display.hpp"
 
 namespace hut {
@@ -41,7 +43,7 @@ struct render_target_params {
   };
   using flags = flagged<flag, flag::FLAG_LAST_VALUE>;
 
-  u16vec4_px               box_;
+  u16bbox_px               box_;
   VkFormat                 format_;
   VkClearColorValue        clear_color_         = {{0, 0, 0, 1}};
   VkClearDepthStencilValue clear_depth_stencil_ = {1, 0};

@@ -46,8 +46,8 @@ offscreen::offscreen(const shared_image &_target, const shared_buffer &_storage,
     , target_(_target) {
   HUT_PROFILE_FUN(POFFSCREEN)
 
-  if (params_.subres_.coords_ == u16vec4_px{0, 0, 0, 0})
-    params_.subres_.coords_ = make_bbox_with_origin_size(u16vec2_px{0, 0}, target_->size());
+  if (params_.subres_.coords_ == u16bbox_px{0, 0, 0, 0})
+    params_.subres_.coords_ = u16bbox_px::with_origin_size(u16vec2_px{0, 0}, target_->size());
 
   render_target_params pass_params;
   pass_params.clear_color_         = render_target_params_.clear_color_;
@@ -113,11 +113,11 @@ void offscreen::draw(const draw_callback &_callback) {
 void offscreen::download(std::span<u8> _dst, uint _data_row_pitch, image::subresource _src) {
   HUT_PROFILE_FUN(POFFSCREEN, _src.coords_, _src.level_, _src.layer_)
   // Downloading whole image seems more suitable
-  if (_src.coords_ == u16vec4_px{0, 0, 0, 0})
-    _src.coords_ = make_bbox_with_origin_size({0, 0}, target_->size());
+  if (_src.coords_ == u16bbox_px{0, 0, 0, 0})
+    _src.coords_ = u16bbox_px::with_origin_size({0, 0}, target_->size());
 
-  const auto size   = bbox_size(_src.coords_);
-  const auto origin = bbox_origin(_src.coords_);
+  const auto size   = _src.coords_.size();
+  const auto origin = _src.coords_.origin();
 
   assert(_src.coords_.z <= target_->size().x);
   assert(_src.coords_.w <= target_->size().y);

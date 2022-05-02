@@ -82,7 +82,7 @@ int main(int /*unused*/, char ** /*unused*/) {
 
   u16_px      bbox_min        = 0_px;
   u16_px      bbox_max        = 1000_px;
-  u16vec4_px  custom_bbox     = {0, 0, 0, 0};
+  u16bbox_px  custom_bbox     = {0, 0, 0, 0};
   u8vec4_rgba custom_col_from = {255, 0, 0, 255};
   u8vec4_rgba custom_col_to   = {0, 0, 255, 255};
 
@@ -113,22 +113,20 @@ int main(int /*unused*/, char ** /*unused*/) {
     if (ImGui::Begin("renderer2d")) {
       gen.seed(std::mt19937::default_seed);
 
-      u16vec2_px origin = bbox_origin(custom_bbox);
-      u16vec2_px size   = bbox_size(custom_bbox);
+      u16vec2_px origin = custom_bbox.origin();
+      u16vec2_px size   = custom_bbox.size();
       ImGui::SliderScalarN("Origin", ImGuiDataType_U16, &origin, 2, &bbox_min, &bbox_max);
       ImGui::SliderScalarN("Size", ImGuiDataType_U16, &size, 2, &bbox_min, &bbox_max);
-      custom_bbox = make_bbox_with_origin_size(origin, size);
+      custom_bbox = u16bbox_px::with_origin_size(origin, size);
       {
-        float color_buff[4] = {custom_col_from.r / 255.f, custom_col_from.g / 255.f, custom_col_from.b / 255.f,
-                               custom_col_from.a / 255.f};
-        ImGui::ColorEdit4("From", color_buff);
-        custom_col_from = u16vec4{color_buff[0] * 255, color_buff[1] * 255, color_buff[2] * 255, color_buff[3] * 255};
+        f32vec4_rgba color_buff = custom_col_from;
+        ImGui::ColorEdit4("From", &color_buff.r);
+        custom_col_from = color_buff;
       }
       {
-        float color_buff[4]
-            = {custom_col_to.r / 255.f, custom_col_to.g / 255.f, custom_col_to.b / 255.f, custom_col_to.a / 255.f};
-        ImGui::ColorEdit4("To", color_buff);
-        custom_col_to = u16vec4{color_buff[0] * 255, color_buff[1] * 255, color_buff[2] * 255, color_buff[3] * 255};
+        f32vec4_rgba color_buff = custom_col_to;
+        ImGui::ColorEdit4("To", &color_buff.r);
+        custom_col_to = color_buff;
       }
       ImGui::SliderScalar("Corner radius", ImGuiDataType_U16, &custom_radius, &extra_min, &extra_max);
       ImGui::SliderScalar("Corner softness", ImGuiDataType_U16, &custom_softness, &extra_min, &extra_max);
@@ -161,7 +159,7 @@ int main(int /*unused*/, char ** /*unused*/) {
         auto             col     = i % 15;
         constexpr u16_px PADDING = 8_px;
         auto             offset  = u16vec2_px{(grid_size.x + PADDING) * col, (grid_size.y + PADDING) * line};
-        u16vec4_px       bbox    = make_bbox_with_origin_size(u16vec2_px{PADDING} + offset, grid_size);
+        u16bbox_px       bbox    = u16bbox_px::with_origin_size(u16vec2_px{PADDING} + offset, grid_size);
         render2d::set(iupdator[i], bbox * scale, grid_fixed_colors ? custom_col_from : rand_color(),
                       grid_fixed_colors ? custom_col_to : rand_color(),
                       grid_fixed_gradient ? render2d::gradient(custom_gradient) : render2d::gradient(i % 4),

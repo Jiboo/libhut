@@ -167,8 +167,8 @@ class clipboard_sender {
   void open(int _fd);
 
  public:
-  void    close();
-  ssize_t write(std::span<const u8> _data) const;
+  void                  close();
+  [[nodiscard]] ssize_t write(std::span<const u8> _data) const;
 };
 
 class clipboard_receiver {
@@ -180,8 +180,8 @@ class clipboard_receiver {
   void open(int _fd);
 
  public:
-  void    close();
-  ssize_t read(std::span<u8> _data) const;
+  void                  close();
+  [[nodiscard]] ssize_t read(std::span<u8> _data) const;
 };
 
 struct drop_target_interface {
@@ -194,7 +194,7 @@ struct drop_target_interface {
   };
 
   virtual void        on_enter(dragndrop_actions, clipboard_formats)  = 0;
-  virtual move_result on_move(vec2)                                   = 0;
+  virtual move_result on_move(vec2_px)                                = 0;
   virtual void        on_drop(dragndrop_action, clipboard_receiver &) = 0;
 };
 

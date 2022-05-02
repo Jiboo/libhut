@@ -77,15 +77,15 @@ void packer(const char *_name = "Packer", u16vec2_px _bounds = {8 * 1024, 8 * 10
   if (ImGui::Begin(_name, nullptr, ImGuiWindowFlags_HorizontalScrollbar)) {
     using hrclock_t = std::chrono::high_resolution_clock;
     using dur_t     = std::chrono::duration<float, std::milli>;
-    static TPacker              s_packer(_bounds);
-    static std::vector<u16vec4> s_packed;
-    static std::mt19937         s_gen;
-    static float                s_surface = 0;
-    static std::vector<float>   s_add_timings;
-    static float                s_total_add_time = 0;
-    static std::vector<float>   s_rem_timings;
-    static float                s_total_rem_time = 0;
-    static u16vec2_px           s_padding        = {0, 0};
+    static TPacker                 s_packer(_bounds);
+    static std::vector<u16bbox_px> s_packed;
+    static std::mt19937            s_gen;
+    static float                   s_surface = 0;
+    static std::vector<float>      s_add_timings;
+    static float                   s_total_add_time = 0;
+    static std::vector<float>      s_rem_timings;
+    static float                   s_total_rem_time = 0;
+    static u16vec2_px              s_padding        = {0, 0};
 
     auto rand_norm = [&]() {
       std::uniform_real_distribution<> dis(0.0, 1.0);
@@ -119,20 +119,20 @@ void packer(const char *_name = "Packer", u16vec2_px _bounds = {8 * 1024, 8 * 10
       s_add_timings.emplace_back(time);
       if (rect) {
         s_surface += float(rect_size.x) * float(rect_size.y);
-        s_packed.emplace_back(make_bbox_with_origin_size(u16vec2_px{*rect}, rect_size - s_padding));
+        s_packed.emplace_back(u16bbox_px::with_origin_size(u16vec2_px{*rect}, rect_size - s_padding));
       }
       return rect.has_value();
     };
     auto remove_rand = [&]() {
       auto index     = rand_int(s_packed.size());
-      auto rect_size = bbox_size(s_packed[index]);
+      auto rect_size = s_packed[index].size();
       auto before    = hrclock_t::now();
       s_packer.offer(s_packed[index]);
       auto after = hrclock_t::now();
       auto time  = std::chrono::duration_cast<dur_t>(after - before).count();
       s_total_rem_time += time;
       s_rem_timings.emplace_back(time);
-      s_surface -= rect_size.x * rect_size.y;
+      s_surface -= (u16)rect_size.x * (u16)rect_size.y;
       s_packed.erase(s_packed.begin() + index);
     };
 
@@ -181,7 +181,7 @@ void packer(const char *_name = "Packer", u16vec2_px _bounds = {8 * 1024, 8 * 10
 
     draw_list->AddRect(ImVec2(p.x, p.y), ImVec2(p.x + (float)_bounds.x, p.y + (float)_bounds.y),
                        IM_COL32(255, 0, 0, 255));
-    for (auto &rect : s_packed) {
+    for (u16vec4 rect : s_packed) {
       draw_list->AddRectFilled(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w),
                                IM_COL32(255, 255, 0, 127));
       draw_list->AddRect(ImVec2(p.x + rect.x, p.y + rect.y), ImVec2(p.x + rect.z, p.y + rect.w),

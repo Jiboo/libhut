@@ -53,7 +53,7 @@ struct sampler_params {
 };
 
 class sampler {
-  VkSampler sampler_ = VK_NULL_HANDLE;
+  VkSampler sampler_;
   VkDevice  device_;
 
  public:

@@ -30,7 +30,7 @@
 
 namespace hut {
 
-void install_resizable_movable(window &_win) {
+inline void install_resizable_movable(window &_win) {
   _win.on_mouse_.connect([&](u8 _button, mouse_event_type _type, vec2 _coords) {
     constexpr float RESIZE_BORDER_THRESHOLD = 20;
 
@@ -61,26 +61,26 @@ void install_resizable_movable(window &_win) {
   });
 }
 
-template<typename TUBO>
-void install_resizable_ubo(window &_win, shared_buffer_suballoc<TUBO> _ubo) {
+template<typename TUniform>
+inline void install_resizable_ubo(window &_win, shared_buffer_suballoc<TUniform> _ubo) {
   _win.on_resize_.connect([_ubo](const u16vec2_px &_size, u32 _scale) {
     mat4 proj = ortho<float>(0.f, float(_size.x * _scale), 0.f, float(_size.y * _scale));
-    _ubo->set_subone(0, offsetof(TUBO, proj_), sizeof(mat4), &proj);
+    _ubo->set_subone(0, offsetof(TUniform, proj_), sizeof(mat4), &proj);
 
     float dpi_scale{static_cast<float>(_scale)};
-    _ubo->set_subone(0, offsetof(TUBO, dpi_scale_), sizeof(dpi_scale), &dpi_scale);
+    _ubo->set_subone(0, offsetof(TUniform, dpi_scale_), sizeof(dpi_scale), &dpi_scale);
     return false;
   });
 }
 
-void install_test_events(display &_display, window &_win) {
+inline void install_test_events(display &_display, window &_win) {
   install_resizable_movable(_win);
 }
 
-template<typename TUBO>
-void install_test_events(display &_display, window &_win, shared_buffer_suballoc<TUBO> _ubo) {
+template<typename TUniform>
+inline void install_test_events(display &_display, window &_win, shared_buffer_suballoc<TUniform> _ubo) {
   install_test_events(_display, _win);
-  install_resizable_ubo<TUBO>(_win, _ubo);
+  install_resizable_ubo<TUniform>(_win, _ubo);
 }
 
 }  // namespace hut

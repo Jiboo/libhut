@@ -47,7 +47,7 @@ std::shared_ptr<image> image::load_raw(display &_display, const shared_buffer &_
   assert(_params.layers_ == 1);
 
   auto dst = std::make_shared<image>(_display, _storage, _params);
-  dst->update({u16vec4{0, 0, _params.size_}}, _data, _data_row_pitch);
+  dst->update({u16bbox_px{0, 0, _params.size_}}, _data, _data_row_pitch);
 
   return dst;
 }
@@ -143,7 +143,7 @@ image::image(display &_display, const shared_buffer &_storage, const image_param
 void image::update(subresource _subres, std::span<const u8> _data, uint _src_row_pitch) {
   HUT_PROFILE_FUN(PIMAGE, _subres.coords_, _subres.level_, _subres.layer_)
   auto updto = update(_subres);
-  auto size  = bbox_size(_subres.coords_);
+  auto size  = _subres.coords_.size();
   assert(_data.size_bytes() == static_cast<size_t>(_src_row_pitch * (uint)size.y));
   auto mip_size = params_.size_ >> _subres.level_;
   assert(mip_size.x >= size.x && mip_size.y >= size.y);
@@ -164,7 +164,7 @@ void image::update(subresource _subres, std::span<const u8> _data, uint _src_row
 
 image::updator image::update(subresource _subres) {
   HUT_PROFILE_FUN(PIMAGE, _subres.coords_, _subres.level_, _subres.layer_)
-  auto        size         = bbox_size(_subres.coords_);
+  auto        size         = _subres.coords_.size();
   const auto &limits       = display_->limits();
   uint        buffer_align = limits.optimalBufferCopyRowPitchAlignment;
   uint        offset_align = std::max(VkDeviceSize(4), limits.optimalBufferCopyOffsetAlignment);
@@ -183,8 +183,8 @@ image::updator image::update(subresource _subres) {
 
 void image::finalize_update(image::updator &_update) {
   HUT_PROFILE_FUN(PIMAGE, _update.subres_.coords_, _update.subres_.level_, _update.subres_.layer_)
-  auto size   = bbox_size(_update.subres_.coords_);
-  auto origin = bbox_origin(_update.subres_.coords_);
+  auto size   = _update.subres_.coords_.size();
+  auto origin = _update.subres_.coords_.origin();
 
   VkImageSubresourceLayers subres_layers = {};
   subres_layers.aspectMask               = VK_IMAGE_ASPECT_COLOR_BIT;

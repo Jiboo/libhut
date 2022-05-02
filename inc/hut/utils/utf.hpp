@@ -123,14 +123,14 @@ inline std::u8string to_utf8(char32_t _src) {
 
 inline char32_t to_utf32(char16_t _c) {
   //https://unicode.org/faq/utf_bom.html#utf16-4
-  typedef u16     UTF16;
-  typedef u32     UTF32;
-  constexpr UTF32 LEAD_OFFSET      = 0xD800 - (0x10000U >> 10U);
-  constexpr UTF32 SURROGATE_OFFSET = 0x10000 - (0xD800U << 10U) - 0xDC00;
+  using UTF16                      = char16_t;
+  using UTF32                      = char32_t;
+  constexpr UTF32 LEAD_OFFSET      = 0xD800 - (0x10000u >> 10u);
+  constexpr UTF32 SURROGATE_OFFSET = 0x10000 - (0xD800u << 10u) - 0xDC00;
   const UTF16     uc               = _c;
-  const UTF16     lead             = LEAD_OFFSET + (uc >> 10U);
-  const UTF16     trail            = 0xDC00 + (uc & 0x3FFU);
-  const UTF32     codepoint        = (lead << 10U) + trail + SURROGATE_OFFSET;
+  const UTF16     lead             = LEAD_OFFSET + (uc >> 10u);
+  const UTF16     trail            = 0xDC00 + (uc & 0x3FFu);
+  const UTF32     codepoint        = (lead << 10u) + trail + SURROGATE_OFFSET;
   return codepoint;
 }
 

@@ -29,11 +29,19 @@
 
 #include <ratio>
 
+#include "hut/utils/glm.hpp"
 #include "hut/utils/math.hpp"
+#include "hut/utils/preprocessor.hpp"
 
 namespace hut {
 
 enum unit { PIXEL, POINT, INCH, MILLIMETERS };
+
+#define HUT_FOR_EACH_UNIT(XMACRO, ...)                                                                                 \
+  XMACRO(px, PIXEL __VA_OPT__(, ) __VA_ARGS__)                                                                         \
+  XMACRO(pt, POINT __VA_OPT__(, ) __VA_ARGS__)                                                                         \
+  XMACRO(in, INCH __VA_OPT__(, ) __VA_ARGS__)                                                                          \
+  XMACRO(mm, MILLIMETERS __VA_OPT__(, ) __VA_ARGS__)
 
 inline std::ostream &operator<<(std::ostream &_os, unit _u) {
   switch (_u) {
@@ -45,16 +53,16 @@ inline std::ostream &operator<<(std::ostream &_os, unit _u) {
   }
 }
 
-template<typename TUnderlying, unit TUnit>
+template<unit TUnit, typename TUnderlying>
 struct length {
  private:
   TUnderlying value_;
 
  public:
   template<typename TOtherUnderlying>
-  using common = length<std::common_type_t<TUnderlying, TOtherUnderlying>, TUnit>;
+  using common = length<TUnit, std::common_type_t<TUnderlying, TOtherUnderlying>>;
   template<typename TOtherUnderlying>
-  using compat = length<TOtherUnderlying, TUnit>;
+  using compat = length<TUnit, TOtherUnderlying>;
 
   constexpr length()                            = default;
   constexpr length(const length &_o)            = default;
@@ -188,114 +196,60 @@ struct length {
   }
 };
 
-template<typename TUnderlying, unit TUnit>
-inline std::ostream &operator<<(std::ostream &_os, length<TUnderlying, TUnit> _n) {
+template<unit TUnit, typename TUnderlying>
+inline std::ostream &operator<<(std::ostream &_os, length<TUnit, TUnderlying> _n) {
   return _os << static_cast<TUnderlying>(_n) << TUnit;
 }
 
-#define HUT_DECLARE_LENGTH(UNIT_SUFFIX, UNIT_ENUMERATOR)                                                               \
+#define HUT_DECLARE_LENGTH_NUMERIC(TYPE, NAME, SUFFIX) using NAME##_##SUFFIX = length_##SUFFIX##_t<TYPE>;
+
+#define HUT_DECLARE_LENGTH(SUFFIX, ENUMERATOR)                                                                         \
   template<typename TUnderlying>                                                                                       \
-  using length_##UNIT_SUFFIX = length<TUnderlying, UNIT_ENUMERATOR>;                                                   \
-  using u8_##UNIT_SUFFIX     = length_##UNIT_SUFFIX<u8>;                                                               \
-  using i8_##UNIT_SUFFIX     = length_##UNIT_SUFFIX<i8>;                                                               \
-  using u16_##UNIT_SUFFIX    = length_##UNIT_SUFFIX<u16>;                                                              \
-  using i16_##UNIT_SUFFIX    = length_##UNIT_SUFFIX<i16>;                                                              \
-  using u32_##UNIT_SUFFIX    = length_##UNIT_SUFFIX<u32>;                                                              \
-  using i32_##UNIT_SUFFIX    = length_##UNIT_SUFFIX<i32>;                                                              \
-  using f32_##UNIT_SUFFIX    = length_##UNIT_SUFFIX<f32>;                                                              \
-  using f64_##UNIT_SUFFIX    = length_##UNIT_SUFFIX<f64>;                                                              \
-  constexpr inline length_##UNIT_SUFFIX<long long unsigned> operator"" _##UNIT_SUFFIX(long long unsigned _in) {        \
-    return length_##UNIT_SUFFIX<long long unsigned>{_in};                                                              \
+  using length_##SUFFIX##_t = length<ENUMERATOR, TUnderlying>;                                                         \
+  HUT_FOR_EACH_NUMERIC(HUT_DECLARE_LENGTH_NUMERIC, SUFFIX)                                                             \
+  constexpr inline length_##SUFFIX##_t<long long unsigned> operator"" _##SUFFIX(long long unsigned _in) {              \
+    return length_##SUFFIX##_t<long long unsigned>{_in};                                                               \
   }                                                                                                                    \
-  constexpr inline length_##UNIT_SUFFIX<long double> operator"" _##UNIT_SUFFIX(long double _in) {                      \
-    return length_##UNIT_SUFFIX<long double>{_in};                                                                     \
+  constexpr inline length_##SUFFIX##_t<long double> operator"" _##SUFFIX(long double _in) {                            \
+    return length_##SUFFIX##_t<long double>{_in};                                                                      \
   }
 
-HUT_DECLARE_LENGTH(px, PIXEL)
-HUT_DECLARE_LENGTH(pt, POINT)
-HUT_DECLARE_LENGTH(in, INCH)
-HUT_DECLARE_LENGTH(mm, MILLIMETERS)
+HUT_FOR_EACH_UNIT(HUT_DECLARE_LENGTH)
 
-template<typename TOutput = f32, typename TUnderlying, unit TUnit>
-constexpr length_px<TOutput> scale(length<TUnderlying, TUnit> _length, uint _screen_dpi) {
+template<unit TUnit, typename TUnderlying, typename TOutput = f32>
+constexpr length_px_t<TOutput> scale(length<TUnit, TUnderlying> _length, uint _screen_dpi) {
   constexpr TOutput UNIT_CONVERSION_RATIOS[]{
-      0, 1. / 72, 1,
+      // clang-format off
+      0,
+      1. / 72,
+      1,
       5. / 127,  // 127/5 = 25.4, and 1in = 25.4mm
+      // clang-format on
   };
 
   if constexpr (TUnit == PIXEL)
     return _length;
 
   constexpr double RATIO = UNIT_CONVERSION_RATIOS[to_underlying(TUnit)];
-  return length_px<TOutput>{static_cast<TOutput>(static_cast<TUnderlying>(_length) * (RATIO * _screen_dpi))};
+  return length_px_t<TOutput>{static_cast<TOutput>(static_cast<TUnderlying>(_length) * (RATIO * _screen_dpi))};
 }
 
-#define HUT_DECLARE_LENGTH_VEC_ALIASES(SIZE, UNIT)                                                                     \
-  using u8vec##SIZE##_##UNIT  = vec_##UNIT<SIZE, u8>;                                                                  \
-  using i8vec##SIZE##_##UNIT  = vec_##UNIT<SIZE, i8>;                                                                  \
-  using u16vec##SIZE##_##UNIT = vec_##UNIT<SIZE, u16>;                                                                 \
-  using i16vec##SIZE##_##UNIT = vec_##UNIT<SIZE, i16>;                                                                 \
-  using u32vec##SIZE##_##UNIT = vec_##UNIT<SIZE, u32>;                                                                 \
-  using uvec##SIZE##_##UNIT   = vec_##UNIT<SIZE, u32>;                                                                 \
-  using i32vec##SIZE##_##UNIT = vec_##UNIT<SIZE, i32>;                                                                 \
-  using ivec##SIZE##_##UNIT   = vec_##UNIT<SIZE, i32>;                                                                 \
-  using f32vec##SIZE##_##UNIT = vec_##UNIT<SIZE, f32>;                                                                 \
-  using fvec##SIZE##_##UNIT   = vec_##UNIT<SIZE, f32>;                                                                 \
-  using vec##SIZE##_##UNIT    = vec_##UNIT<SIZE, f32>;                                                                 \
-  using f64vec##SIZE##_##UNIT = vec_##UNIT<SIZE, f64>;                                                                 \
-  using dvec##SIZE##_##UNIT   = vec_##UNIT<SIZE, f64>;
+#define HUT_DECLARE_LENGTH_VEC_NUMERIC(TYPE, NAME, SIZE, SUFFIX)                                                       \
+  using NAME##vec##SIZE##_##SUFFIX = vec_##SUFFIX##_t<SIZE, TYPE>;
+#define HUT_DECLARE_LENGTH_VEC_ALIASES(SIZE, SUFFIX) HUT_FOR_EACH_NUMERIC(HUT_DECLARE_LENGTH_VEC_NUMERIC, SIZE, SUFFIX)
 
-#define HUT_DECLARE_LENGTH_VEC(UNIT)                                                                                   \
+#define HUT_DECLARE_LENGTH_VEC(SUFFIX, ENUMERATOR)                                                                     \
   template<length_t TSize, typename TUnderlying>                                                                       \
-  using vec_##UNIT = vec<TSize, length_##UNIT<TUnderlying>>;                                                           \
-  HUT_DECLARE_LENGTH_VEC_ALIASES(1, UNIT)                                                                              \
-  HUT_DECLARE_LENGTH_VEC_ALIASES(2, UNIT)                                                                              \
-  HUT_DECLARE_LENGTH_VEC_ALIASES(3, UNIT)                                                                              \
-  HUT_DECLARE_LENGTH_VEC_ALIASES(4, UNIT)
+  using vec_##SUFFIX##_t = vec<TSize, length_##SUFFIX##_t<TUnderlying>>;                                               \
+  HUT_DECLARE_LENGTH_VEC_ALIASES(1, SUFFIX)                                                                            \
+  HUT_DECLARE_LENGTH_VEC_ALIASES(2, SUFFIX)                                                                            \
+  HUT_DECLARE_LENGTH_VEC_ALIASES(3, SUFFIX)                                                                            \
+  HUT_DECLARE_LENGTH_VEC_ALIASES(4, SUFFIX)
 
-HUT_DECLARE_LENGTH_VEC(px)
-HUT_DECLARE_LENGTH_VEC(pt)
-HUT_DECLARE_LENGTH_VEC(in)
-HUT_DECLARE_LENGTH_VEC(mm)
+HUT_FOR_EACH_UNIT(HUT_DECLARE_LENGTH_VEC)
 
-template<length_t TSize, typename TUnderlying, unit TUnit, arithmetic TScalar>
-constexpr auto operator*(const vec<TSize, length<TUnderlying, TUnit>> &_v, TScalar _s) {
-  vec<TSize, length<std::common_type_t<TUnderlying, TScalar>, TUnit>> result{_v};
-  for (length_t i = 0; i < TSize; i++)
-    result[i] *= _s;
-  return result;
-}
-
-template<length_t TSize, typename TUnderlying, unit TUnit, arithmetic TScalar>
-constexpr auto operator*(TScalar _s, const vec<TSize, length<TUnderlying, TUnit>> &_v) {
-  vec<TSize, length<std::common_type_t<TUnderlying, TScalar>, TUnit>> result{_v};
-  for (length_t i = 0; i < TSize; i++)
-    result[i] *= _s;
-  return result;
-}
-
-template<length_t TSize, typename TUnderlying, unit TUnit, arithmetic TScalar>
-constexpr auto operator/(const vec<TSize, length<TUnderlying, TUnit>> &_v, TScalar _s) {
-  vec<TSize, length<std::common_type_t<TUnderlying, TScalar>, TUnit>> result{_v};
-  for (length_t i = 0; i < TSize; i++)
-    result[i] /= _s;
-  return result;
-}
-
-template<length_t TSize, typename TUnderlying, unit TUnit, arithmetic TScalar>
-constexpr auto operator<<(TScalar _s, const vec<TSize, length<TUnderlying, TUnit>> &_v) {
-  vec<TSize, length<std::common_type_t<TUnderlying, TScalar>, TUnit>> result{_v};
-  for (length_t i = 0; i < TSize; i++)
-    result[i] <<= _s;
-  return result;
-}
-
-template<length_t TSize, typename TUnderlying, unit TUnit, arithmetic TScalar>
-constexpr auto operator>>(const vec<TSize, length<TUnderlying, TUnit>> &_v, TScalar _s) {
-  vec<TSize, length<std::common_type_t<TUnderlying, TScalar>, TUnit>> result{_v};
-  for (length_t i = 0; i < TSize; i++)
-    result[i] >>= _s;
-  return result;
-}
+HUT_SCALAR_OPERATORS(HUT_PACK(length_t TSize, unit TUnit, typename TUnderlying),
+                     HUT_PACK(vec<TSize, length<TUnit, TUnderlying>>),
+                     HUT_PACK(vec<TSize, length<TUnit, std::common_type_t<TUnderlying, TScalar>>>))
 
 }  // namespace hut

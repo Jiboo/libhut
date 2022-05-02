@@ -37,7 +37,7 @@
 #include "hut/pipeline.hpp"
 
 struct FT_FaceRec_;
-typedef FT_FaceRec_ *FT_Face;
+using FT_Face = FT_FaceRec_ *;
 struct hb_font_t;
 
 namespace hut::text {

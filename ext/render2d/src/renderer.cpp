@@ -41,11 +41,9 @@ renderer::renderer(render_target &_target, shared_buffer _buffer, const shared_u
   pipeline_.write(0, _ubo, atlas_, _sampler);
 }
 
-details::batch &renderer::grow(uint _instances_count) {
-  details::batch &result = batches_.emplace_back(
-      details::batch{buffer_->allocate<instance>(_instances_count), binpack::linear1d<uint>{_instances_count}});
-  result.buffer_->zero();
-  return result;
+void renderer::grow(uint _instances_count) {
+  batches_.emplace_back(buffer_->allocate<instance>(_instances_count), _instances_count);
+  batches_.back().buffer_->zero();
 }
 
 void renderer::draw(VkCommandBuffer _buffer) {
@@ -74,7 +72,8 @@ boxes_holder renderer::allocate(uint _instances_count) {
   }
 
   const uint back_size = batches_.back().size();
-  auto      &new_batch = grow(std::max<uint>(_instances_count, back_size * 2));
+  grow(std::max<uint>(_instances_count, back_size * 2));
+  auto      &new_batch = batches_.back();
   const auto fit       = new_batch.suballocator_.pack(_instances_count);
   assert(fit);
 

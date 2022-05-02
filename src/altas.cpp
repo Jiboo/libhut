@@ -32,9 +32,9 @@
 
 namespace hut {
 
-atlas::atlas(display &_display, const shared_buffer &_storage, const image_params &_params)
+atlas::atlas(display &_display, shared_buffer _storage, const image_params &_params)
     : display_(_display)
-    , storage_(_storage)
+    , storage_(std::move(_storage))
     , params_(_params) {
   HUT_PROFILE_FUN(PIMAGE)
   if (params_.size_ == u16vec2_px{0, 0}) {
@@ -58,12 +58,13 @@ shared_subimage atlas::alloc(const u16vec2_px &_bounds) {
   for (uint i = 0; i < pages_.size(); i++) {
     auto packed = pages_[i].packer_.pack(padded);
     if (packed)
-      return std::make_shared<subimage>(this, i, make_bbox_with_origin_size(u16vec2_px{*packed}, _bounds));
+      return std::make_shared<subimage>(this, i, u16bbox_px::with_origin_size(u16vec2_px{*packed}, _bounds));
   }
   add_page();
   auto packed = pages_.back().packer_.pack(padded);
   assert(packed.has_value());
-  return std::make_shared<subimage>(this, pages_.size() - 1, make_bbox_with_origin_size(u16vec2_px{*packed}, _bounds));
+  return std::make_shared<subimage>(this, pages_.size() - 1,
+                                    u16bbox_px::with_origin_size(u16vec2_px{*packed}, _bounds));
 }
 
 shared_subimage atlas::pack(const u16vec2_px &_bounds, std::span<const u8> _data, uint _src_row_pitch) {
@@ -73,7 +74,7 @@ shared_subimage atlas::pack(const u16vec2_px &_bounds, std::span<const u8> _data
   return result;
 }
 
-image::updator atlas::update(const subimage &_sub, const u16vec4_px &_bounds) {
+image::updator atlas::update(const subimage &_sub, const u16bbox_px &_bounds) {
   HUT_PROFILE_FUN(PIMAGE, _sub.page(), _sub.bounds(), _bounds)
   assert(_sub.from(this));
   return pages_[_sub.page()].image_->update({_bounds});

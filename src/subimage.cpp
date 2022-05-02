@@ -35,7 +35,6 @@ void subimage::release() {
   HUT_PROFILE_FUN(PIMAGE)
   if (atlas_ != nullptr)
     atlas_->free(std::move(*this));
-  atlas_ = nullptr;
 }
 
 vec4 subimage::texcoords() const {
@@ -48,12 +47,9 @@ vec4 subimage::texcoords() const {
   return result;
 }
 
-image::updator subimage::update(u16vec4_px _bounds) {
+image::updator subimage::update(u16bbox_px _update_bounds) {
   HUT_PROFILE_FUN(PIMAGE)
-  auto update_size     = bbox_size(_bounds);
-  auto update_origin   = bbox_origin(_bounds);
-  auto subimage_origin = bbox_origin(bounds_);
-  auto image_bounds    = make_bbox_with_origin_size(subimage_origin + update_origin, update_size);
+  auto image_bounds = u16bbox_px::with_origin_size(bounds_.origin() + _update_bounds.origin(), _update_bounds.size());
   return atlas_->update(*this, image_bounds);
 }
 

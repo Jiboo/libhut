@@ -41,7 +41,7 @@ class atlas {
   constexpr static u16vec2_px PADDING = {1, 1};
 
  public:
-  atlas(display &_display, const shared_buffer &_storage, const image_params &_params);
+  atlas(display &_display, shared_buffer _storage, const image_params &_params);
 
   shared_image             page(uint _index) { return pages_[_index].image_; }
   [[nodiscard]] size_t     page_count() const { return pages_.size(); }
@@ -50,7 +50,7 @@ class atlas {
 
   shared_subimage alloc(const u16vec2_px &_bounds);
   shared_subimage pack(const u16vec2_px &_bounds, std::span<const u8> _data, uint _src_row_pitch);
-  image::updator  update(const subimage &_sub, const u16vec4_px &_bounds);
+  image::updator  update(const subimage &_sub, const u16bbox_px &_bounds);
   void            free(subimage &&_sub);
 
  private:

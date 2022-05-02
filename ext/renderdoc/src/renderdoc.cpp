@@ -34,42 +34,7 @@
 
 namespace hut::renderdoc {
 
-RENDERDOC_API_1_4_1 *details::init() {
-  if (void *mod = dlopen("librenderdoc.so", RTLD_NOW | RTLD_NOLOAD)) {
-    RENDERDOC_API_1_4_1 *rdoc_api;
-    pRENDERDOC_GetAPI    RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)dlsym(mod, "RENDERDOC_GetAPI");
-    if (RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_4_1, (void **)&rdoc_api) == 1) {
-      details::configure(rdoc_api);
-      return rdoc_api;
-    }
-  }
-  return nullptr;
-}
-
-RENDERDOC_API_1_4_1 *renderdoc_get() {
-  static RENDERDOC_API_1_4_1 *rdoc_api = details::init();
-  return rdoc_api;
-}
-
-void frame_begin() {
-  auto *api = renderdoc_get();
-  if (!api)
-    return;
-
-  api->StartFrameCapture(nullptr, nullptr);
-}
-
-void frame_end(const char *_comment) {
-  auto *api = renderdoc_get();
-  if (!api)
-    return;
-
-  api->EndFrameCapture(nullptr, nullptr);
-  if (_comment != nullptr)
-    api->SetCaptureFileComments(nullptr, _comment);
-}
-
-void details::configure(RENDERDOC_API_1_4_1 *_api) {
+void configure(RENDERDOC_API_1_4_1 *_api) {
   auto curdir = std::filesystem::current_path();
   _api->SetCaptureFilePathTemplate("hut_renderdoc");
   _api->SetLogFilePathTemplate("hut_renderdoc");
@@ -78,6 +43,40 @@ void details::configure(RENDERDOC_API_1_4_1 *_api) {
   _api->SetCaptureOptionU32(eRENDERDOC_Option_RefAllResources, 1);
   _api->SetCaptureOptionU32(eRENDERDOC_Option_CaptureAllCmdLists, 1);
   _api->SetCaptureOptionU32(eRENDERDOC_Option_DebugOutputMute, 1);
+}
+
+RENDERDOC_API_1_4_1 *init() {
+  RENDERDOC_API_1_4_1 *rdoc_api = nullptr;
+  if (void *mod = dlopen("librenderdoc.so", RTLD_NOW | RTLD_NOLOAD)) {
+    auto get_api = (pRENDERDOC_GetAPI)dlsym(mod, "RENDERDOC_GetAPI");
+    if (get_api(eRENDERDOC_API_Version_1_4_1, (void **)&rdoc_api) == 1) {
+      configure(rdoc_api);
+    }
+  }
+  return rdoc_api;
+}
+
+RENDERDOC_API_1_4_1 *renderdoc_get() {
+  static RENDERDOC_API_1_4_1 *s_rdoc_api = init();
+  return s_rdoc_api;
+}
+
+void frame_begin() {
+  auto *api = renderdoc_get();
+  if (api == nullptr)
+    return;
+
+  api->StartFrameCapture(nullptr, nullptr);
+}
+
+void frame_end(const char *_comment) {
+  auto *api = renderdoc_get();
+  if (api == nullptr)
+    return;
+
+  api->EndFrameCapture(nullptr, nullptr);
+  if (_comment != nullptr)
+    api->SetCaptureFileComments(nullptr, _comment);
 }
 
 }  // namespace hut::renderdoc

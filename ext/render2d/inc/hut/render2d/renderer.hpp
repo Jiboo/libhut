@@ -58,7 +58,7 @@ using shared_instances = pipeline::shared_instances;
 enum gradient : u16 { T2B, L2R, TL2BR, TR2BL };
 
 // Helper to write to an instance
-inline void set(instance &_target, u16vec4_px _bbox, u8vec4_rgba _from, u8vec4_rgba _to, gradient _gradient = T2B,
+inline void set(instance &_target, u16bbox_px _bbox, u8vec4_rgba _from, u8vec4_rgba _to, gradient _gradient = T2B,
                 uint _corner_radius = 0, uint _corner_softness = 0,
                 const shared_subimage &_subimg = shared_subimage{}) {
   _target.col_from_ = _from;
@@ -96,6 +96,10 @@ struct batch {
   shared_instances        buffer_;
   binpack::linear1d<uint> suballocator_;
 
+  batch(shared_instances _buffer, uint _instances_count)
+      : buffer_(std::move(_buffer))
+      , suballocator_(_instances_count) {}
+
   void                           release(render2d_suballoc *_suballoc);
   [[nodiscard]] render2d_updator update_raw_impl(uint _offset_bytes, uint _size_bytes);
   void                           zero_raw(uint _offset_bytes, uint _size_bytes);
@@ -131,7 +135,7 @@ class renderer {
   shared_buffer buffer_;
   shared_atlas  atlas_;
 
-  details::batch &grow(uint _count);
+  void grow(uint _count);
 };
 
 }  // namespace hut::render2d
