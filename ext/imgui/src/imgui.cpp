@@ -359,8 +359,8 @@ bool handle_mouse(u8 _button, mouse_event_type _type, vec2_px _pos) {
 }
 
 ImGuiKey imgui_keysym(keysym _ksym) {
-  ImGuiKey ImGuiKey_Linefeed = ImGuiKey_None;
-  ImGuiKey ImGuiKey_SysReq   = ImGuiKey_None;
+  ImGuiKey ImGuiKey_Linefeed = ImGuiKey_None;  // NOLINT(readability-identifier-naming)
+  ImGuiKey ImGuiKey_SysReq   = ImGuiKey_None;  // NOLINT(readability-identifier-naming)
 
   switch (_ksym) {
 #define HUT_MAP_KEYSYM(FORMAT_LINUX, FORMAT_X11, FORMAT_IMGUI)                                                         \

@@ -30,12 +30,10 @@
 #include <cstddef>
 #include <cstring>
 
-#include <iostream>
-
 #include "hut/utils/format.hpp"
 #include "hut/utils/profiling.hpp"
+#include "hut/utils/vulkan.hpp"
 
-#include "hut/buffer.hpp"
 #include "hut/display.hpp"
 
 namespace hut {
@@ -64,6 +62,15 @@ image::image(display &_display, const shared_buffer &_storage, const image_param
     , params_(_params) {
   HUT_PROFILE_FUN(PIMAGE)
 
+  const auto max_bounds = u16vec2_px{u16_px{_display.limits().maxImageDimension2D}};
+  if (params_.size_ == u16vec2_px{0, 0}) {
+    params_.size_ = max_bounds;
+  }
+  params_.size_ = min(max_bounds, params_.size_);
+
+  assert(params_.size_.x > 0_px);
+  assert(params_.size_.y > 0_px);
+
   VkImageCreateInfo image_info = {};
   image_info.sType             = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   image_info.imageType         = VK_IMAGE_TYPE_2D;
@@ -80,9 +87,7 @@ image::image(display &_display, const shared_buffer &_storage, const image_param
   image_info.sharingMode       = VK_SHARING_MODE_EXCLUSIVE;
   image_info.flags             = _params.flags_;
 
-  if (HUT_PVK(vkCreateImage, _display.device(), &image_info, nullptr, &image_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create image!");
-  }
+  HUT_VVK(HUT_PVK(vkCreateImage, _display.device(), &image_info, nullptr, &image_));
 
   VkMemoryRequirements mem_req;
   HUT_PVK(vkGetImageMemoryRequirements, _display.device(), image_, &mem_req);
@@ -104,9 +109,7 @@ image::image(display &_display, const shared_buffer &_storage, const image_param
   view_info.subresourceRange.baseArrayLayer = 0;
   view_info.subresourceRange.layerCount     = cubemap ? 6 : 1;
 
-  if (HUT_PVK(vkCreateImageView, _display.device(), &view_info, nullptr, &view_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create texture image view!");
-  }
+  HUT_VVK(HUT_PVK(vkCreateImageView, _display.device(), &view_info, nullptr, &view_));
 
   if ((_params.usage_ & VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0)
     return;

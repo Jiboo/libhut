@@ -9,50 +9,59 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
       - name: update
         run: |
-          sudo apt update -yq
+          apt update -yq
       - name: devenv
         run: |
-          sudo apt install -yq build-essential software-properties-common cmake clang llvm
-          shopt -s globstar
+          apt install -yq build-essential software-properties-common cmake clang-format clang-tidy clang libc++-dev
       - name: builddeps
         run: |
-          sudo apt install -yq wayland-protocols glslang-tools libvulkan-dev libglm-dev libwayland-bin libwayland-dev libxkbcommon-dev libgtest-dev libharfbuzz-dev
+          apt install -yq wayland-protocols glslang-tools libvulkan-dev libglm-dev libwayland-bin libwayland-dev libxkbcommon-dev libgtest-dev libharfbuzz-dev librenderdoc-dev
       - name: dumpenv
         run: |
           export
           lsb_release -a
           bash --version
-          shopt
           cmake --version
           make --version
-          cc --version
-          cxx --version
+          clang --version
+          clang++ --version
           wayland-scanner --version
           glslangValidator --version
       - name: cmake
-        run: cmake .
+        run: |
+          CC=clang
+          CXX=clang++
+          CXXFLAGS=-stdlib=libc++
+          cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON -DHUT_CI=True .
       - name: build
-        run: cmake --build . --parallel
+        run: |
+          cmake --build . --parallel
       - name: tidy
-        run: clang-tidy ext/**/*.cpp src/**/*.cpp tst/**/*.cpp
+        run: |
+          shopt -s globstar
+          clang-tidy --version
+          clang-tidy -p . ext/**/*.cpp src/**/*.cpp tst/**/*.cpp
       - name: format
-        run: clang-format --style=file --Werror --dry-run ext/**/*.hpp ext/**/*.cpp inc/**/*.hpp src/**/*.hpp src/**/*.cpp tst/**/*.hpp tst/**/*.cpp
+        run: |
+          shopt -s globstar
+          clang-format --version
+          clang-format --style=file --dry-run ext/**/*.hpp ext/**/*.cpp inc/**/*.hpp src/**/*.cpp tst/**/*.hpp tst/**/*.cpp
       - name: testdeps
         run: |
-          sudo apt install -yq vulkan-utils weston
+          apt install -yq vulkan-tools vulkan-validationlayers weston valgrind 
           weston --version
           vulkaninfo
       - name: ctest
         run: |
           mkdir xdg_runtime_dir
-          export XDG_RUNTIME_DIR=xdg_runtie_dir
+          chmod 0700 xdg_runtime_dir
+          export XDG_RUNTIME_DIR=xdg_runtime_dir
           export HUT_DISPLAY=headless
-          sudo usermod -a -G weston-launch ${USER}
           weston --backend=headless-backend.so --socket=headless &
-          sleep 5
-          ctest --verbose .
+          sleep 10
+          valgrind ./hut_unittests

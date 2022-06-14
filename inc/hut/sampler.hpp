@@ -27,7 +27,9 @@
 
 #pragma once
 
+#include "hut/utils/fwd.hpp"
 #include "hut/utils/math.hpp"
+#include "hut/utils/vulkan.hpp"
 
 namespace hut {
 

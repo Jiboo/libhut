@@ -36,6 +36,10 @@ renderer::renderer(render_target &_target, shared_buffer _buffer, const shared_u
     : pipeline_(_target, _params)
     , buffer_(std::move(_buffer))
     , atlas_(std::move(_atlas)) {
+  const auto &features12 = _target.parent().features12();
+  if (features12.shaderSampledImageArrayNonUniformIndexing == VK_FALSE
+      || features12.descriptorBindingPartiallyBound == VK_FALSE)
+    throw std::runtime_error("vulkan device does not meet minimum requirements for render2d renderer");
   if (_params.initial_batch_size_instances_ > 0)
     grow(_params.initial_batch_size_instances_);
   pipeline_.write(0, _ubo, atlas_, _sampler);

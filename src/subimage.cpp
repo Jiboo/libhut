@@ -27,6 +27,8 @@
 
 #include "hut/subimage.hpp"
 
+#include "hut/utils/profiling.hpp"
+
 #include "hut/atlas.hpp"
 
 namespace hut {

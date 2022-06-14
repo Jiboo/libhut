@@ -29,9 +29,10 @@
 
 #include <algorithm>
 #include <iostream>
-#include <thread>
 
+#include "hut/utils/chrono.hpp"
 #include "hut/utils/profiling.hpp"
+#include "hut/utils/vulkan.hpp"
 
 #include "hut/display.hpp"
 #include "hut/image.hpp"
@@ -204,9 +205,7 @@ void window::init_vulkan_surface() {
   swapchain_infos.oldSwapchain   = old_swapchain;
 
   VkSwapchainKHR new_swapchain;
-  if (HUT_PVK(vkCreateSwapchainKHR, display_.device(), &swapchain_infos, nullptr, &new_swapchain) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create swap chain!");
-  }
+  HUT_VVK(HUT_PVK(vkCreateSwapchainKHR, display_.device(), &swapchain_infos, nullptr, &new_swapchain));
 
   HUT_PVK(vkDeviceWaitIdle, display_.device());
 
@@ -234,8 +233,7 @@ void window::init_vulkan_surface() {
     imagev_infos.subresourceRange.levelCount     = 1;
     imagev_infos.subresourceRange.baseArrayLayer = 0;
     imagev_infos.subresourceRange.layerCount     = 1;
-    if (HUT_PVK(vkCreateImageView, display_.device_, &imagev_infos, nullptr, &swapchain_imageviews_[i]) != VK_SUCCESS)
-      throw std::runtime_error("failed to create image views!");
+    HUT_VVK(HUT_PVK(vkCreateImageView, display_.device_, &imagev_infos, nullptr, &swapchain_imageviews_[i]));
   }
 
   render_target_params pass_params;
@@ -259,8 +257,7 @@ void window::init_vulkan_surface() {
   alloc_info.commandBufferCount          = images_count;
   alloc_info.commandPool                 = display_.commandg_pool_;
 
-  if (HUT_PVK(vkAllocateCommandBuffers, display_.device_, &alloc_info, primary_cbs_.data()) != VK_SUCCESS)
-    throw std::runtime_error("failed to allocate command buffers!");
+  HUT_VVK(HUT_PVK(vkAllocateCommandBuffers, display_.device_, &alloc_info, primary_cbs_.data()));
 
   if (sem_available_ != VK_NULL_HANDLE)
     HUT_PVK(vkDestroySemaphore, display_.device_, sem_available_, nullptr);
@@ -269,10 +266,8 @@ void window::init_vulkan_surface() {
 
   VkSemaphoreCreateInfo semaphore_info = {};
   semaphore_info.sType                 = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  if (HUT_PVK(vkCreateSemaphore, display_.device_, &semaphore_info, nullptr, &sem_available_) != VK_SUCCESS
-      || HUT_PVK(vkCreateSemaphore, display_.device_, &semaphore_info, nullptr, &sem_rendered_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create semaphores!");
-  }
+  HUT_VVK(HUT_PVK(vkCreateSemaphore, display_.device_, &semaphore_info, nullptr, &sem_available_));
+  HUT_VVK(HUT_PVK(vkCreateSemaphore, display_.device_, &semaphore_info, nullptr, &sem_rendered_));
 
   invalidate(true);
   dirty_.resize(images_count, 1u);
@@ -292,8 +287,8 @@ void window::redraw(display::time_point _tp) {
     invalidate(false);
     return;
   }
-  if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-    throw std::runtime_error("failed to acquire swap chain image!");
+  if (result != VK_SUBOPTIMAL_KHR) {
+    HUT_VVK(result);
   }
 
   if (dirty_[image_index] != 0u) {
@@ -324,8 +319,7 @@ void window::redraw(display::time_point _tp) {
   submit_info.signalSemaphoreCount = 1;
   submit_info.pSignalSemaphores    = signal_semaphores;
 
-  if (HUT_PVK(vkQueueSubmit, display_.queueg_, 1, &submit_info, VK_NULL_HANDLE) != VK_SUCCESS)
-    throw std::runtime_error("failed to submit draw command buffer!");
+  HUT_VVK(HUT_PVK(vkQueueSubmit, display_.queueg_, 1, &submit_info, VK_NULL_HANDLE));
 
   VkPresentInfoKHR present_info = {};
   present_info.sType            = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -342,13 +336,12 @@ void window::redraw(display::time_point _tp) {
   result = HUT_PVK(vkQueuePresentKHR, display_.queuep_, &present_info);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
     init_vulkan_surface();
-  } else if (result != VK_SUCCESS) {
-    throw std::runtime_error("failed to present swap chain image!");
+  } else {
+    HUT_VVK(result);
   }
 
   cbs_.clear();
 
-  constexpr auto MIN_FRAME_TIME = 1000ms / 144.f;
   constexpr auto MAX_FRAME_TIME = 1000ms / 10.f;
   auto           done           = display::clock::now();
   auto           diff_frame     = done - last_frame_;

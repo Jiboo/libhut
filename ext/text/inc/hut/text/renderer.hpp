@@ -70,6 +70,8 @@ struct draw_store {
   shared_indexed_commands commands_;
   binpack::linear1d<uint> suballocator_;
 
+  std::unique_ptr<VkDrawIndexedIndirectCommand[]> commands_fallback_;
+
   explicit draw_store(renderer *_parent, uint _size);
 };
 
@@ -83,13 +85,15 @@ struct word {
 };
 
 struct batch {
+  renderer  *parent_;
   mesh_store mstore_;
   draw_store dstore_;
 
   std::unordered_map<string_hash, word> cache_;
 
   batch(renderer *_parent, uint _mesh_store_size, uint _draw_store_size)
-      : mstore_(_parent, _mesh_store_size)
+      : parent_(_parent)
+      , mstore_(_parent, _mesh_store_size)
       , dstore_(_parent, _draw_store_size) {}
 
   void                       release_words(std::span<string_hash> _hashes);
@@ -105,7 +109,7 @@ struct batch {
 
 class words_holder {
   friend class text::renderer;
-  friend struct details::batch;
+  friend struct batch;
 
   text_suballoc                  instances_;
   std::unique_ptr<i16vec4_px[]>  bboxes_;
@@ -158,6 +162,7 @@ struct renderer_params : pipeline_params {
 class renderer {
   friend struct details::mesh_store;
   friend struct details::draw_store;
+  friend struct details::batch;
   friend struct details::word;
 
  public:
@@ -176,6 +181,8 @@ class renderer {
 
   std::list<details::batch> batches_;
 
+  bool use_indirect_fallback_;
+
   details::batch &grow(uint _mesh_store_size, uint _draw_store_size);
 
   struct words_info {
@@ -189,6 +196,8 @@ class renderer {
     [[nodiscard]] uint size() const { return texts_.size(); }
   };
   details::batch &find_best_fit(const words_info &_winfo);
+  words_holder    prepare_commands(const std::span<const std::u8string_view> &_words, words_info &_winfo,
+                                   details::batch &_batch, uint _alloc, VkDrawIndexedIndirectCommand *_commands_ptr);
 };
 
 }  // namespace hut::text

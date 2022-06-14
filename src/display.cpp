@@ -35,6 +35,7 @@
 #include <unordered_set>
 
 #include "hut/utils/profiling.hpp"
+#include "hut/utils/vulkan.hpp"
 
 #include "hut/buffer.hpp"
 #include "hut/window.hpp"
@@ -234,34 +235,17 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
   }
 #endif
 
-  VkPhysicalDeviceVulkan12Features features12{};
-  features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-  VkPhysicalDeviceFeatures2 features2{};
-  features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  features2.pNext = &features12;
-  HUT_PVK(vkGetPhysicalDeviceFeatures2, _device, &features2);
-  //VkPhysicalDeviceFeatures &features = features2.features;
-
-  if (features12.descriptorBindingPartiallyBound == VK_FALSE)
-    result.score_ = 0;
-  if (features12.shaderSampledImageArrayNonUniformIndexing == VK_FALSE)
-    result.score_ = 0;
-  if (features2.features.multiDrawIndirect == VK_FALSE)
-    result.score_ = 0;
-
 #ifdef HUT_ENABLE_VALIDATION_DEBUG
   std::cout << "[hut] rating device " << properties.deviceName << " using Vulkan "
-            << VK_VERSION_MAJOR(properties.apiVersion) << '.' << VK_VERSION_MINOR(properties.apiVersion) << ", "
-            << (result.score_ == 0 ? "don't" : "do") << " have minimum features." << std::endl;
+            << VK_VERSION_MAJOR(properties.apiVersion) << '.' << VK_VERSION_MINOR(properties.apiVersion) << "."
+            << std::endl;
 #endif
 
-  if (result.score_ == 0)
-    return result;
-
   u32 extension_count;
-  HUT_PVK(vkEnumerateDeviceExtensionProperties, _device, nullptr, &extension_count, nullptr);
+  HUT_VVK(HUT_PVK(vkEnumerateDeviceExtensionProperties, _device, nullptr, &extension_count, nullptr));
   std::vector<VkExtensionProperties> available_extensions(extension_count);
-  HUT_PVK(vkEnumerateDeviceExtensionProperties, _device, nullptr, &extension_count, available_extensions.data());
+  HUT_VVK(
+      HUT_PVK(vkEnumerateDeviceExtensionProperties, _device, nullptr, &extension_count, available_extensions.data()));
   bool has_swapchhain_ext = false;
   for (const auto &extension : available_extensions) {
     if (strcmp(extension.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0)
@@ -282,7 +266,7 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
 
       if (_dummy != nullptr) {
         VkBool32 present;
-        HUT_PVK(vkGetPhysicalDeviceSurfaceSupportKHR, _device, i, _dummy, &present);
+        HUT_VVK(HUT_PVK(vkGetPhysicalDeviceSurfaceSupportKHR, _device, i, _dummy, &present));
 
         if (props.queueCount > 0) {
           // prioritise dedicated queues
@@ -292,8 +276,10 @@ score_t rate_p_device(VkPhysicalDevice _device, VkSurfaceKHR _dummy) {
 
         u32 formats_count;
         u32 modes_count;
-        HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, _device, _dummy, &modes_count, nullptr);
-        HUT_PVK(vkGetPhysicalDeviceSurfaceFormatsKHR, _device, _dummy, &formats_count, nullptr);
+        if (HUT_PVK(vkGetPhysicalDeviceSurfacePresentModesKHR, _device, _dummy, &modes_count, nullptr) != VK_SUCCESS)
+          modes_count = 0;
+        if (HUT_PVK(vkGetPhysicalDeviceSurfaceFormatsKHR, _device, _dummy, &formats_count, nullptr) != VK_SUCCESS)
+          formats_count = 0;
 
         if (modes_count == 0)
           result.score_ = 0;
@@ -414,9 +400,7 @@ void display::init_vulkan_instance(const char *_app_name, u32 _app_version, std:
   info.pNext                                        = &validation_features;
 #endif
 
-  VkResult result = HUT_PVK(vkCreateInstance, &info, nullptr, &instance_);
-  if (result != VK_SUCCESS)
-    throw std::runtime_error(sstream("Couldn't create a vulkan instance, code: ") << result);
+  HUT_VVK(HUT_PVK(vkCreateInstance, &info, nullptr, &instance_));
 
 #ifdef HUT_ENABLE_VALIDATION
   if (std::find(_extensions.cbegin(), _extensions.cend(), VK_EXT_DEBUG_REPORT_EXTENSION_NAME) != _extensions.cend()) {
@@ -440,9 +424,9 @@ void display::init_vulkan_instance(const char *_app_name, u32 _app_version, std:
 void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   HUT_PROFILE_FUN(PDISPLAY)
   u32 device_count;
-  HUT_PVK(vkEnumeratePhysicalDevices, instance_, &device_count, nullptr);
+  HUT_VVK(HUT_PVK(vkEnumeratePhysicalDevices, instance_, &device_count, nullptr));
   std::vector<VkPhysicalDevice> physical_devices(device_count);
-  HUT_PVK(vkEnumeratePhysicalDevices, instance_, &device_count, physical_devices.data());
+  HUT_VVK(HUT_PVK(vkEnumeratePhysicalDevices, instance_, &device_count, physical_devices.data()));
 
   VkPhysicalDevice prefered_device = VK_NULL_HANDLE;
   score_t          prefered_rate;
@@ -456,12 +440,29 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   if (prefered_device == VK_NULL_HANDLE)
     throw std::runtime_error("No suitable vulkan devices");
 
-  HUT_PVK(vkGetPhysicalDeviceProperties, prefered_device, &device_props_);
-  HUT_PVK(vkGetPhysicalDeviceFeatures, prefered_device, &device_features_);
+  device_features12_       = VkPhysicalDeviceVulkan12Features{};
+  device_features12_.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+  device_features11_       = VkPhysicalDeviceVulkan11Features{};
+  device_features11_.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+  device_features11_.pNext = &device_features12_;
+  device_features_         = VkPhysicalDeviceFeatures2{};
+  device_features_.sType   = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  device_features_.pNext   = &device_features11_;
+  HUT_PVK(vkGetPhysicalDeviceFeatures2, prefered_device, &device_features_);
+
+  device_props12_       = VkPhysicalDeviceVulkan12Properties{};
+  device_props12_.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES;
+  device_props11_       = VkPhysicalDeviceVulkan11Properties{};
+  device_props11_.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES;
+  device_props11_.pNext = &device_props12_;
+  device_props_         = VkPhysicalDeviceProperties2{};
+  device_props_.sType   = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+  device_props_.pNext   = &device_props11_;
+  HUT_PVK(vkGetPhysicalDeviceProperties2, prefered_device, &device_props_);
 
 #ifdef HUT_ENABLE_VALIDATION_DEBUG
-  std::cout << "[hut] selected device " << device_props_.deviceName << " using Vulkan "
-            << VK_VERSION_MAJOR(device_props_.apiVersion) << '.' << VK_VERSION_MINOR(device_props_.apiVersion)
+  std::cout << "[hut] selected device " << properties().deviceName << " using Vulkan "
+            << VK_VERSION_MAJOR(properties().apiVersion) << '.' << VK_VERSION_MINOR(properties().apiVersion)
             << std::endl;
 #endif
 
@@ -493,10 +494,10 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   }
 
   u32 extension_count;
-  HUT_PVK(vkEnumerateDeviceExtensionProperties, prefered_device, nullptr, &extension_count, nullptr);
+  HUT_VVK(HUT_PVK(vkEnumerateDeviceExtensionProperties, prefered_device, nullptr, &extension_count, nullptr));
   std::vector<VkExtensionProperties> available_extensions(extension_count);
-  HUT_PVK(vkEnumerateDeviceExtensionProperties, prefered_device, nullptr, &extension_count,
-          available_extensions.data());
+  HUT_VVK(HUT_PVK(vkEnumerateDeviceExtensionProperties, prefered_device, nullptr, &extension_count,
+                  available_extensions.data()));
 
   std::vector<const char *> extensions = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
@@ -509,42 +510,34 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
 #endif
   }
 
-  VkPhysicalDeviceFeatures core_features               = {};
-  core_features.samplerAnisotropy                      = device_features_.samplerAnisotropy;
-  core_features.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
-  core_features.multiDrawIndirect                      = VK_TRUE;
-  core_features.drawIndirectFirstInstance              = VK_TRUE;
-  //core_features.textureCompressionBC = VK_TRUE;
-  //core_features.textureCompressionASTC_LDR = VK_TRUE;
-  //core_features.textureCompressionETC2 = VK_TRUE;
+  VkPhysicalDeviceVulkan12Features features12_request          = {};
+  features12_request.sType                                     = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+  features12_request.shaderSampledImageArrayNonUniformIndexing = features12().shaderSampledImageArrayNonUniformIndexing;
+  features12_request.descriptorBindingPartiallyBound           = features12().descriptorBindingPartiallyBound;
 
-  VkPhysicalDeviceDescriptorIndexingFeatures bindings_features = {};
-  bindings_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-  bindings_features.shaderSampledImageArrayNonUniformIndexing     = VK_TRUE;
-  bindings_features.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
-  bindings_features.descriptorBindingSampledImageUpdateAfterBind  = VK_TRUE;
-  bindings_features.descriptorBindingPartiallyBound               = VK_TRUE;
+  VkPhysicalDeviceVulkan11Features features11_request = {};
+  features11_request.sType                            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+  features11_request.pNext                            = &features12_request;
 
-  VkPhysicalDeviceFeatures2 device_features = {};
-  device_features.sType                     = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  device_features.pNext                     = &bindings_features;
-  device_features.features                  = core_features;
+  VkPhysicalDeviceFeatures2 features2          = {};
+  features2.sType                              = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  features2.pNext                              = &features11_request;
+  features2.features.samplerAnisotropy         = features().samplerAnisotropy;
+  features2.features.multiDrawIndirect         = features().multiDrawIndirect;
+  features2.features.drawIndirectFirstInstance = features().drawIndirectFirstInstance;
 
   VkDeviceCreateInfo device_info      = {};
   device_info.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
   device_info.pQueueCreateInfos       = queue_create_infos.data();
   device_info.queueCreateInfoCount    = (u32)queue_create_infos.size();
   device_info.pEnabledFeatures        = nullptr;
-  device_info.pNext                   = &device_features;
+  device_info.pNext                   = &features2;
   device_info.enabledExtensionCount   = (u32)extensions.size();
   device_info.ppEnabledExtensionNames = extensions.data();
   device_info.enabledLayerCount       = (u32)G_ENABLED_LAYERS.size();
   device_info.ppEnabledLayerNames     = G_ENABLED_LAYERS.data();
 
-  VkResult result = HUT_PVK(vkCreateDevice, pdevice_, &device_info, nullptr, &device_);
-  if (result != VK_SUCCESS)
-    throw std::runtime_error(sstream("Couldn't create a vulkan device, code: ") << result);
-
+  HUT_VVK(HUT_PVK(vkCreateDevice, pdevice_, &device_info, nullptr, &device_));
   HUT_PVK(vkGetDeviceQueue, device_, prefered_rate.iqueueg_, 0, &queueg_);
   HUT_PVK(vkGetDeviceQueue, device_, prefered_rate.iqueuec_, 0, &queuec_);
   HUT_PVK(vkGetDeviceQueue, device_, prefered_rate.iqueuet_, 0, &queuet_);
@@ -555,10 +548,7 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   pool_info.sType                   = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
   pool_info.queueFamilyIndex        = prefered_rate.iqueueg_;
   pool_info.flags                   = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-
-  if (HUT_PVK(vkCreateCommandPool, device_, &pool_info, nullptr, &commandg_pool_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create command pool!");
-  }
+  HUT_VVK(HUT_PVK(vkCreateCommandPool, device_, &pool_info, nullptr, &commandg_pool_));
 
   buffer_params staging_params;
   staging_params.permanent_map_ = true;
@@ -571,14 +561,12 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   alloc_info.level                       = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   alloc_info.commandPool                 = commandg_pool_;
   alloc_info.commandBufferCount          = 1;
-
-  HUT_PVK(vkAllocateCommandBuffers, device_, &alloc_info, &staging_cb_);
+  HUT_VVK(HUT_PVK(vkAllocateCommandBuffers, device_, &alloc_info, &staging_cb_));
 
   VkCommandBufferBeginInfo begin_info = {};
   begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   begin_info.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-  HUT_PVK(vkBeginCommandBuffer, staging_cb_, &begin_info);
+  HUT_VVK(HUT_PVK(vkBeginCommandBuffer, staging_cb_, &begin_info));
 }
 
 void display::destroy_vulkan() {

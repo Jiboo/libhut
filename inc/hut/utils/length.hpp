@@ -253,3 +253,8 @@ HUT_SCALAR_OPERATORS(HUT_PACK(length_t TSize, unit TUnit, typename TUnderlying),
                      HUT_PACK(vec<TSize, length<TUnit, std::common_type_t<TUnderlying, TScalar>>>))
 
 }  // namespace hut
+
+namespace std {
+template<hut::unit TUnit, typename TUnderlying>
+struct numeric_limits<hut::length<TUnit, TUnderlying>> : public numeric_limits<TUnderlying> {};
+}  // namespace std

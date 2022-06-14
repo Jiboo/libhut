@@ -25,6 +25,7 @@
  * SOFTWARE.
  */
 
+#include <iostream>
 #include <numbers>
 
 #include "hut/utils/color.hpp"
@@ -60,7 +61,7 @@ int main(int /*unused*/, char ** /*unused*/) {
 
   auto ubo = buf->allocate<vp_ubo>(1, dsp.ubo_align());
   ubo->set(vp_ubo{
-      perspective(radians(45.0f), float(w.size().x) / float(w.size().y), 0.001f, 1000.0f),
+      perspective(radians(45.0f), float(w.size().x) / float(w.size().y), 0.01f, 100.0f),
       lookAt(vec3{0, 0, 5}, vec3{0, 0, 0}, vec3{0, -1, 0}),
   });
 
@@ -129,7 +130,7 @@ int main(int /*unused*/, char ** /*unused*/) {
   });
 
   w.on_resize_.connect([&](const u16vec2_px &_size, u32 _scale) {
-    mat4 new_proj = perspective(radians(45.0f), (float)_size.x / (float)_size.y, 0.001f, 1000.0f);
+    mat4 new_proj = perspective(radians(45.0f), (float)_size.x / (float)_size.y, 0.01f, 100.0f);
     ubo->set_subone(0, offsetof(vp_ubo, proj_), sizeof(mat4), &new_proj);
     return false;
   });

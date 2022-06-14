@@ -66,6 +66,8 @@
 #  include "hut/utils/string.hpp"
 #endif  // HUT_ENABLE_PROFILING
 
+#include "hut/utils/glm.hpp"
+
 namespace hut {
 
 enum profiling_category : u8 {

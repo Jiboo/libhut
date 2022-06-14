@@ -56,35 +56,47 @@ using shared_vertices  = pipeline::shared_vertices;
 using shared_instances = pipeline::shared_instances;
 
 enum gradient : u16 { T2B, L2R, TL2BR, TR2BL };
+enum mode : u16 { ROUNDED, BORDER, SHADOW };
 
 // Helper to write to an instance
-inline void set(instance &_target, u16bbox_px _bbox, u8vec4_rgba _from, u8vec4_rgba _to, gradient _gradient = T2B,
-                uint _corner_radius = 0, uint _corner_softness = 0,
-                const shared_subimage &_subimg = shared_subimage{}) {
-  _target.col_from_ = _from;
-  _target.col_to_   = _to;
+struct box_params {
+  u16bbox_px  bbox_{0_px};
+  u8vec4_rgba from_{0};
+  u8vec4_rgba to_{0};
+  gradient    gradient_        = T2B;
+  mode        mode_            = ROUNDED;
+  uint        corner_radius_   = 0;
+  uint        corner_softness_ = 0;
+  subimage   *subimg_          = nullptr;
+};
 
-  assert(_bbox.x <= 0xFFF_px);
-  assert(_bbox.y <= 0xFFF_px);
-  assert(_bbox.z <= 0xFFF_px);
-  assert(_bbox.w <= 0xFFF_px);
-  _target.pos_box_ = _bbox;
+inline void set(instance &_target, box_params _params) {
+  _target.col_from_ = _params.from_;
+  _target.col_to_   = _params.to_;
 
-  assert(_corner_radius <= 0xF);
-  _target.pos_box_.x |= (_corner_radius & 0xF) << 12;
-  assert(_corner_softness <= 0xF);
-  _target.pos_box_.y |= (_corner_softness & 0xF) << 12;
+  assert(_params.bbox_.x <= 0xFFF_px);
+  assert(_params.bbox_.y <= 0xFFF_px);
+  assert(_params.bbox_.z <= 0xFFF_px);
+  assert(_params.bbox_.w <= 0xFFF_px);
+  _target.pos_box_ = _params.bbox_;
 
-  if (_subimg) {
-    _target.uv_box_ = packSnorm<u16>(_subimg->texcoords());
-    assert(_subimg->page() <= 0xF);
-    _target.pos_box_.z |= (_subimg->page() & 0xF) << 12;
+  assert(_params.corner_radius_ <= 0xF);
+  _target.pos_box_.x |= (_params.corner_radius_ & 0xF) << 12;
+  assert(_params.corner_softness_ <= 0xF);
+  _target.pos_box_.y |= (_params.corner_softness_ & 0xF) << 12;
+
+  if (_params.subimg_ != nullptr) {
+    _target.uv_box_ = packSnorm<u16>(_params.subimg_->texcoords());
+    assert(_params.subimg_->page() <= 0xF);
+    _target.pos_box_.z |= (_params.subimg_->page() & 0xF) << 12;
   } else {
     _target.uv_box_ = vec4(0);
   }
 
-  assert(_gradient <= 0xF);
-  _target.pos_box_.w |= (_gradient & 0xF) << 12;
+  assert(_params.gradient_ <= 0x3);
+  _target.pos_box_.w |= (_params.gradient_ & 0x3) << 12;
+  assert(_params.mode_ <= 0x3);
+  _target.pos_box_.w |= (_params.mode_ & 0x3) << 14;
 }
 
 namespace details {

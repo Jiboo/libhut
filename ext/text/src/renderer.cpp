@@ -27,6 +27,7 @@
 
 #include "hut/text/renderer.hpp"
 
+#include <iostream>
 #include <string_view>
 #include <utility>
 
@@ -57,6 +58,10 @@ ivec2 encode_atlas_page_xy(vec2 _in, uint _atlas_page) {
       break;
     default: throw std::runtime_error("not enough bits to encode atlas page in uv signs");
   }
+  assert(_in.x < NUMAX<i16>);
+  assert(_in.x > NUMIN<i16>);
+  assert(_in.y < NUMAX<i16>);
+  assert(_in.y > NUMIN<i16>);
   return packSnorm<i16>(_in);
 }
 
@@ -66,6 +71,18 @@ renderer::renderer(render_target &_target, shared_buffer _buffer, const shared_f
     , buffer_(std::move(_buffer))
     , atlas_(std::move(_atlas))
     , shaper_(_font) {
+  const auto &features   = _target.parent().features();
+  use_indirect_fallback_ = features.multiDrawIndirect != VK_TRUE || features.drawIndirectFirstInstance != VK_TRUE;
+  if (use_indirect_fallback_) {
+    std::cout << "[hut] text renderer had to fallback due to missing feature "
+              << " (multiDrawIndirect: " << features.multiDrawIndirect
+              << ", drawIndirectFirstInstance: " << features.drawIndirectFirstInstance << ")" << std::endl;
+  }
+  const auto &features12 = _target.parent().features12();
+  if (features12.shaderSampledImageArrayNonUniformIndexing == VK_FALSE
+      || features12.descriptorBindingPartiallyBound == VK_FALSE)
+    throw std::runtime_error("vulkan device does not meet minimum requirements for text renderer");
+
   constexpr u16_px MAX_ATLAS_BOUNDS = 32_px * 1024;
   assert(atlas_->size().x <= MAX_ATLAS_BOUNDS && atlas_->size().y <= MAX_ATLAS_BOUNDS);
   if (_params.initial_mesh_store_size_ > 0 && _params.initial_draw_store_size_ > 0)
@@ -102,7 +119,16 @@ void renderer::draw(VkCommandBuffer _buff) {
     const uint     lower    = OPTIMIZE ? batch.dstore_.suballocator_.lower_bound() : 0;
     const uint upper = OPTIMIZE ? batch.dstore_.suballocator_.upper_bound() : batch.dstore_.suballocator_.capacity();
     assert(upper >= lower);
-    pipeline_.draw_indexed(_buff, batch.dstore_.commands_, upper - lower, lower, sizeof(VkDrawIndexedIndirectCommand));
+    if (use_indirect_fallback_) {
+      pipeline_.draw_indexed(_buff, batch.dstore_.commands_, upper - lower, lower,
+                             sizeof(VkDrawIndexedIndirectCommand));
+    } else {
+      for (uint i = lower; i < upper; i++) {
+        auto &command = batch.dstore_.commands_fallback_[i];
+        pipeline_.draw_indexed(_buff, command.indexCount, command.instanceCount, command.firstIndex,
+                               command.vertexOffset, command.firstInstance);
+      }
+    }
   }
 }
 
@@ -123,37 +149,47 @@ words_holder renderer::allocate(std::span<const std::u8string_view> _words) {
 
   auto draw_alloc = best_batch.dstore_.suballocator_.pack(_words.size());
   assert(draw_alloc);
-  words_holder result{&best_batch, uint(*draw_alloc * sizeof(instance)), uint(_words.size() * sizeof(instance))};
+
+  if (use_indirect_fallback_) {
+    auto  cupdator     = best_batch.dstore_.commands_->update(*draw_alloc, _words.size());
+    auto *commands_ptr = reinterpret_cast<VkDrawIndexedIndirectCommand *>(cupdator.staging().data());
+    return prepare_commands(_words, winfo, best_batch, *draw_alloc, commands_ptr);
+  } else {
+    auto *commands_ptr = best_batch.dstore_.commands_fallback_.get() + *draw_alloc;
+    return prepare_commands(_words, winfo, best_batch, *draw_alloc, commands_ptr);
+  }
+}
+
+words_holder renderer::prepare_commands(const std::span<const std::u8string_view> &_words, renderer::words_info &_winfo,
+                                        details::batch &_batch, uint _alloc,
+                                        VkDrawIndexedIndirectCommand *_commands_ptr) {
+  words_holder result{&_batch, uint(_alloc * sizeof(instance)), uint(_words.size() * sizeof(instance))};
   result.bboxes_ = std::make_unique<i16vec4_px[]>(_words.size());
-
-  auto cupdator = best_batch.dstore_.commands_->update(*draw_alloc, _words.size());
-
-  for (uint i = 0; i < winfo.size(); i++) {
-    const auto hash       = winfo.hashes_[i];
-    const auto codepoints = winfo.codepoints_[i];
-    auto       it         = best_batch.cache_.find(hash);
-    if (it == best_batch.cache_.end()) {
-      auto word_alloc = best_batch.mstore_.suballocator_.pack(codepoints);
+  for (uint i = 0; i < _winfo.size(); i++) {
+    const auto hash       = _winfo.hashes_[i];
+    const auto codepoints = _winfo.codepoints_[i];
+    auto       it         = _batch.cache_.find(hash);
+    if (it == _batch.cache_.end()) {
+      auto word_alloc = _batch.mstore_.suballocator_.pack(codepoints);
       assert(word_alloc);
       auto emplaced
-          = best_batch.cache_.emplace(hash, details::word{this, best_batch, *word_alloc, codepoints, winfo.texts_[i]});
+          = _batch.cache_.emplace(hash, details::word{this, _batch, *word_alloc, codepoints, _winfo.texts_[i]});
       assert(emplaced.second);
       it = emplaced.first;
     }
     it->second.ref_count_++;
     result.bboxes_[i] = it->second.bbox_;
 
-    VkDrawIndexedIndirectCommand *cptr
-        = reinterpret_cast<VkDrawIndexedIndirectCommand *>(cupdator.staging().data()) + i;
+    VkDrawIndexedIndirectCommand *cptr = _commands_ptr + i;
 
-    cptr->firstInstance = *draw_alloc + i;
+    cptr->firstInstance = _alloc + i;
     cptr->instanceCount = 1;
     cptr->firstIndex    = it->second.alloc_ * 6;
     cptr->indexCount    = 6 * it->second.glyphs_;
     cptr->vertexOffset  = (int)it->second.alloc_ * 4;
   }
 
-  result.hashes_ = std::move(winfo.hashes_);
+  result.hashes_ = std::move(_winfo.hashes_);
   return result;
 }
 
@@ -194,9 +230,14 @@ mesh_store::mesh_store(renderer *_parent, uint _size)
 
 draw_store::draw_store(renderer *_parent, uint _size)
     : instances_(_parent->buffer_->allocate<instance>(_size))
-    , commands_(_parent->buffer_->allocate<VkDrawIndexedIndirectCommand>(_size))
     , suballocator_(_size) {
-  commands_->zero();
+  if (_parent->use_indirect_fallback_) {
+    commands_ = _parent->buffer_->allocate<VkDrawIndexedIndirectCommand>(_size);
+    commands_->zero();
+  } else {
+    commands_fallback_ = std::make_unique<VkDrawIndexedIndirectCommand[]>(_size);
+    memset(commands_fallback_.get(), 0, sizeof(VkDrawIndexedIndirectCommand) * _size);
+  }
 }
 
 word::word(renderer *_parent, batch &_batch, uint _alloc, uint _codepoints, std::u8string_view _text)
@@ -236,7 +277,13 @@ word::word(renderer *_parent, batch &_batch, uint _alloc, uint _codepoints, std:
 }
 
 void batch::release(text_suballoc *_suballoc) {
-  dstore_.commands_->zero(_suballoc->offset(), _suballoc->size());
+  if (parent_->use_indirect_fallback_) {
+    dstore_.commands_->zero(_suballoc->offset(), _suballoc->size());
+  } else {
+    std::fill(dstore_.commands_fallback_.get() + _suballoc->offset(),
+              dstore_.commands_fallback_.get() + _suballoc->offset() + _suballoc->size(),
+              VkDrawIndexedIndirectCommand{0});
+  }
   dstore_.suballocator_.offer(_suballoc->offset());
 }
 

@@ -27,11 +27,10 @@
 
 #pragma once
 
-#include <vulkan/vulkan.h>
-
 #include "hut/utils/fwd.hpp"
 #include "hut/utils/math.hpp"
 #include "hut/utils/profiling.hpp"
+#include "hut/utils/vulkan.hpp"
 
 #include "hut/atlas.hpp"
 #include "hut/buffer.hpp"
@@ -174,15 +173,16 @@ class pipeline {
     create_info.maxSets                    = _params.max_sets_;
     create_info.flags                      = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
 
-    if (vkCreateDescriptorPool(device_ref_, &create_info, nullptr, &descriptor_pool_) != VK_SUCCESS)
-      throw std::runtime_error("failed to create descriptor pool!");
+    HUT_VVK(HUT_PVK(vkCreateDescriptorPool, device_ref_, &create_info, nullptr, &descriptor_pool_));
   }
 
-  void init_descriptor_layout() {
+  void init_descriptor_layout(const display &_display) {
+    const auto &features12 = _display.features12();
+
     std::vector<VkDescriptorBindingFlagsEXT> bindings_flags(bindings_.size(), 0);
     for (size_t i = 0; i < bindings_.size(); i++) {
       const VkDescriptorSetLayoutBinding &binding = bindings_[i];
-      if (binding.descriptorCount > 1)
+      if (binding.descriptorCount > 1 && features12.descriptorBindingPartiallyBound == VK_TRUE)
         bindings_flags[i] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
     }
 
@@ -198,26 +198,25 @@ class pipeline {
     create_info.flags                           = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
     create_info.pNext                           = &bindings_flags_info;
 
-    if (vkCreateDescriptorSetLayout(device_ref_, &create_info, nullptr, &descriptor_layout_) != VK_SUCCESS)
-      throw std::runtime_error("failed to create descriptor set layout!");
+    HUT_VVK(HUT_PVK(vkCreateDescriptorSetLayout, device_ref_, &create_info, nullptr, &descriptor_layout_));
   }
 
   void init_shaders() {
+    // TODO Check for device feature, if shader capability SampledImageArrayNonUniformIndexing is used
+
     VkShaderModuleCreateInfo vert_create_info = {};
     vert_create_info.sType                    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     vert_create_info.codeSize                 = TVertexRefl::BYTECODE.size();
     vert_create_info.pCode                    = (u32 *)TVertexRefl::BYTECODE.data();
 
-    if (HUT_PVK(vkCreateShaderModule, device_ref_, &vert_create_info, nullptr, &vert_) != VK_SUCCESS)
-      throw std::runtime_error("failed to create vertex module!");
+    HUT_VVK(HUT_PVK(vkCreateShaderModule, device_ref_, &vert_create_info, nullptr, &vert_));
 
     VkShaderModuleCreateInfo frag_create_info = {};
     frag_create_info.sType                    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     frag_create_info.codeSize                 = TFragRefl::BYTECODE.size();
     frag_create_info.pCode                    = (u32 *)TFragRefl::BYTECODE.data();
 
-    if (HUT_PVK(vkCreateShaderModule, device_ref_, &frag_create_info, nullptr, &frag_) != VK_SUCCESS)
-      throw std::runtime_error("failed to create fragment module!");
+    HUT_VVK(HUT_PVK(vkCreateShaderModule, device_ref_, &frag_create_info, nullptr, &frag_));
   }
 
   void init_pipeline_layout() {
@@ -229,8 +228,7 @@ class pipeline {
     layout_create_info.setLayoutCount             = 1;
     layout_create_info.pSetLayouts                = set_layouts;
 
-    if (vkCreatePipelineLayout(device_ref_, &layout_create_info, nullptr, &layout_) != VK_SUCCESS)
-      throw std::runtime_error("failed to create pipeline layout!");
+    HUT_VVK(HUT_PVK(vkCreatePipelineLayout, device_ref_, &layout_create_info, nullptr, &layout_));
   }
 
   void init_pipeline(u16bbox_px _default_viewport, VkSampleCountFlagBits _samples, const pipeline_params &_params) {
@@ -376,9 +374,7 @@ class pipeline {
     pipeline_info.basePipelineHandle           = VK_NULL_HANDLE;
     pipeline_info.basePipelineIndex            = -1;  // Optional
 
-    if (HUT_PVK(vkCreateGraphicsPipelines, device_ref_, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &pipeline_)
-        != VK_SUCCESS)
-      throw std::runtime_error("failed to create graphics pipeline!");
+    HUT_VVK(HUT_PVK(vkCreateGraphicsPipelines, device_ref_, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &pipeline_));
   }
 
  public:
@@ -398,7 +394,7 @@ class pipeline {
 
     init_bindings();
     init_pools(_params);
-    init_descriptor_layout();
+    init_descriptor_layout(_target.parent());
     if (_params.max_sets_ > 0)
       resize_descriptors(_params.initial_sets_);
     init_shaders();
@@ -438,8 +434,7 @@ class pipeline {
     alloc_info.descriptorSetCount          = alloc_needed;
     alloc_info.pSetLayouts                 = layouts;
 
-    if (vkAllocateDescriptorSets(device_ref_, &alloc_info, descriptors_.data() + current_count) != VK_SUCCESS)
-      throw std::runtime_error("failed to allocate descriptor set!");
+    HUT_VVK(HUT_PVK(vkAllocateDescriptorSets, device_ref_, &alloc_info, descriptors_.data() + current_count));
   }
 
   uint count_descriptors() { return descriptors_.size(); }

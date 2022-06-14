@@ -61,9 +61,7 @@ sampler::sampler(display &_display, const sampler_params &_params)
   sampler_info.mipLodBias = _params.lodBias_;
   sampler_info.minLod     = _params.lodRange_.x;
   sampler_info.maxLod     = _params.lodRange_.y;
-  if (vkCreateSampler(device_, &sampler_info, nullptr, &sampler_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create texture sampler!");
-  }
+  HUT_VVK(HUT_PVK(vkCreateSampler, device_, &sampler_info, nullptr, &sampler_));
 }
 
 sampler::~sampler() {

@@ -48,7 +48,7 @@ int main(int /*unused*/, char ** /*unused*/) {
 
   window win(dsp, buf);
   win.title(u8"hut render2d playground");
-  win.clear_color({1, 1, 1, 1});
+  win.clear_color({0, 0, 0, 1});
 
   auto texatlas = std::make_shared<atlas>(
       dsp, buf, image_params{.size_ = dsp.max_tex_size(), .format_ = VK_FORMAT_R8G8B8A8_UNORM});
@@ -72,34 +72,38 @@ int main(int /*unused*/, char ** /*unused*/) {
     return dis(gen);
   };
 
-  auto rand_color = [&]() {
+  auto rand_color = [&](bool _rand_alpha = true) {
     auto hsv  = vec3{rand_norm() * 360, 0.99, 0.95};
-    auto rgba = f32vec4_rgba(rgbColor(hsv), rand_norm() * 0.75 + 0.25);
-    return u8vec4_rgba(rgba * 255);
+    auto rgba = f32vec4_rgba(rgbColor(hsv), _rand_alpha ? (rand_norm() * 0.75 + 0.25) : 1.0f);
+    return u8vec4_rgba(rgba);
   };
 
   auto quads = box_renderer.allocate(15 * 15 + 1);
 
-  u16_px      bbox_min        = 0_px;
-  u16_px      bbox_max        = 1000_px;
-  u16bbox_px  custom_bbox     = {0, 0, 0, 0};
-  u8vec4_rgba custom_col_from = {255, 0, 0, 255};
-  u8vec4_rgba custom_col_to   = {0, 0, 255, 255};
+  u16_px       bbox_min        = 0_px;
+  u16_px       bbox_max        = 1000_px;
+  u16bbox_px   custom_bbox     = {0, 0, 0, 0};
+  u8vec4_rgba  custom_col_from = {255, 0, 0, 255};
+  u8vec4_rgba  custom_col_to   = {0, 0, 255, 255};
+  f32vec4_rgba clear_color     = {0, 0, 0, 1};
 
   u16  custom_radius   = 8;
   u16  custom_softness = 1;
   u16  extra_min       = 0;
   u16  extra_max       = 15;
   int  custom_gradient = 0;
+  int  custom_mode     = 0;
   bool custom_use_tex  = false;
 
   bool grid_use_tex                = false;
   bool grid_fixed_colors           = false;
   bool grid_fixed_gradient         = false;
+  bool grid_fixed_mode             = true;
   bool grid_release_before_realloc = false;
   bool grid_no_params              = false;
+  bool grid_rand_transparency      = false;
 
-  u16vec2_px grid_size  = {75, 75};
+  u16vec2_px grid_size  = {50, 50};
   u16_px     grid_min   = 10_px;
   u16_px     grid_max   = 200_px;
   f32_px     scroll_min = -800._px;
@@ -112,6 +116,11 @@ int main(int /*unused*/, char ** /*unused*/) {
 
     if (ImGui::Begin("renderer2d")) {
       gen.seed(std::mt19937::default_seed);
+
+      if (ImGui::ColorEdit4("Window clear color", &clear_color.x))
+        win.clear_color(clear_color);
+
+      ImGui::Separator();
 
       u16vec2_px origin = custom_bbox.origin();
       u16vec2_px size   = custom_bbox.size();
@@ -133,6 +142,8 @@ int main(int /*unused*/, char ** /*unused*/) {
       constexpr const char *GRADIENTS[] = {"T2B", "L2R", "TL2BT", "TR2BL"};
       ImGui::Combo("Gradient", &custom_gradient, GRADIENTS, 4);
       ImGui::Checkbox("Use texture", &custom_use_tex);
+      constexpr const char *MODES[] = {"ROUNDED", "BORDER", "SHADOW"};
+      ImGui::Combo("Render mode", &custom_mode, MODES, 3);
 
       ImGui::Separator();
 
@@ -148,9 +159,11 @@ int main(int /*unused*/, char ** /*unused*/) {
 
       ImGui::SliderScalarN("Grid size", ImGuiDataType_U16, &grid_size, 2, &grid_min, &grid_max);
       ImGui::Checkbox("Grid use texture", &grid_use_tex);
+      ImGui::Checkbox("Grid render mode", &grid_fixed_mode);
       ImGui::Checkbox("Grid fixed colors", &grid_fixed_colors);
       ImGui::Checkbox("Grid fixed gradient", &grid_fixed_gradient);
       ImGui::Checkbox("Grid no feather/corner", &grid_no_params);
+      ImGui::Checkbox("Grid random transparency", &grid_rand_transparency);
 
       auto iupdator = quads.update();
       u16  scale    = win.scale();
@@ -160,14 +173,29 @@ int main(int /*unused*/, char ** /*unused*/) {
         constexpr u16_px PADDING = 8_px;
         auto             offset  = u16vec2_px{(grid_size.x + PADDING) * col, (grid_size.y + PADDING) * line};
         u16bbox_px       bbox    = u16bbox_px::with_origin_size(u16vec2_px{PADDING} + offset, grid_size);
-        render2d::set(iupdator[i], bbox * scale, grid_fixed_colors ? custom_col_from : rand_color(),
-                      grid_fixed_colors ? custom_col_to : rand_color(),
-                      grid_fixed_gradient ? render2d::gradient(custom_gradient) : render2d::gradient(i % 4),
-                      grid_no_params ? 0 : col, grid_no_params ? 0 : line, grid_use_tex ? tex : shared_subimage{});
+        render2d::set(
+            iupdator[i],
+            render2d::box_params{
+                .bbox_          = bbox * scale,
+                .from_          = grid_fixed_colors ? custom_col_from : rand_color(grid_rand_transparency),
+                .to_            = grid_fixed_colors ? custom_col_to : rand_color(grid_rand_transparency),
+                .gradient_      = grid_fixed_gradient ? render2d::gradient(custom_gradient) : render2d::gradient(i % 4),
+                .mode_          = grid_fixed_mode ? render2d::mode(custom_mode) : render2d::mode(i % 3),
+                .corner_radius_ = grid_no_params ? 0 : col,
+                .corner_softness_ = grid_no_params ? 0 : line,
+                .subimg_          = grid_use_tex ? tex.get() : nullptr,
+            });
       }
-      render2d::set(iupdator[quads.size() - 1], custom_bbox * scale, custom_col_from, custom_col_to,
-                    render2d::gradient(custom_gradient), custom_radius, custom_softness,
-                    custom_use_tex ? tex : shared_subimage{});
+      render2d::set(iupdator[quads.size() - 1], render2d::box_params{
+                                                    .bbox_            = custom_bbox * scale,
+                                                    .from_            = custom_col_from,
+                                                    .to_              = custom_col_to,
+                                                    .gradient_        = render2d::gradient(custom_gradient),
+                                                    .mode_            = render2d::mode(custom_mode),
+                                                    .corner_radius_   = custom_radius,
+                                                    .corner_softness_ = custom_softness,
+                                                    .subimg_          = custom_use_tex ? tex.get() : nullptr,
+                                                });
 
       ImGui::Separator();
 

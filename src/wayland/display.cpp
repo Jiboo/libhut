@@ -35,6 +35,7 @@
 #include <unistd.h>
 
 #include "hut/utils/profiling.hpp"
+#include "hut/utils/vulkan.hpp"
 
 #include "hut/buffer.hpp"
 #include "hut/window.hpp"
@@ -617,7 +618,7 @@ display::display(const char *_app_name, u32 _app_version, const char *_name)
     keyboard_repeat_ctx_.thread_ = std::thread(keyboard_repeat_thread, &keyboard_repeat_ctx_);
   }
 
-  if (data_device_manager_ != nullptr) {
+  if (data_device_manager_ != nullptr && seat_ != nullptr) {
     data_device_ = wl_data_device_manager_get_data_device(data_device_manager_, seat_);
     wl_data_device_add_listener(data_device_, &S_DATA_DEVICE_LISTENERS, this);
   }
@@ -635,8 +636,7 @@ display::display(const char *_app_name, u32 _app_version, const char *_name)
     auto        *func = get_proc<PFN_vkCreateWaylandSurfaceKHR>("vkCreateWaylandSurfaceKHR");
     VkSurfaceKHR dummy_surface;
     VkResult     vkr;
-    if ((vkr = func(instance_, &info, nullptr, &dummy_surface)) != VK_SUCCESS)
-      throw std::runtime_error(sstream("couldn't create vulkan dummy surface, code: ") << vkr);
+    HUT_VVK(func(instance_, &info, nullptr, &dummy_surface));
 
     init_vulkan_device(dummy_surface);
 

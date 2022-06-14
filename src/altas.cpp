@@ -37,9 +37,13 @@ atlas::atlas(display &_display, shared_buffer _storage, const image_params &_par
     , storage_(std::move(_storage))
     , params_(_params) {
   HUT_PROFILE_FUN(PIMAGE)
+  const auto max_bounds = u16vec2_px{u16_px{_display.limits().maxImageDimension2D}};
   if (params_.size_ == u16vec2_px{0, 0}) {
-    params_.size_ = {_display.limits().maxImageDimension2D, _display.limits().maxImageDimension2D};
+    params_.size_ = max_bounds;
   }
+  params_.size_ = min(max_bounds, params_.size_);
+  assert(params_.size_.x > 0_px);
+  assert(params_.size_.y > 0_px);
   add_page();
 }
 

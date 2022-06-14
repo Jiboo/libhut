@@ -122,12 +122,8 @@ class window final : public render_target {
   void maximize(bool _set = true);
   void fullscreen(bool _set = true);
 
-  u16vec2_px size() const {
-    return size_;
-  }
-  u32 scale() const {
-    return scale_;
-  }
+  u16vec2_px size() const { return size_; }
+  u32        scale() const { return scale_; }
 
   void interactive_resize(edge _edge);
   void interactive_move();
@@ -145,9 +141,7 @@ class window final : public render_target {
   using receive_clipboard_data = std::function<void(clipboard_format /*selected_format*/, clipboard_receiver &)>;
   bool clipboard_receive(clipboard_formats _supported_formats, receive_clipboard_data &&_callback);
 
-  void dragndrop_target(const std::shared_ptr<drop_target_interface> &_received) {
-    drop_target_interface_ = _received;
-  }
+  void dragndrop_target(const std::shared_ptr<drop_target_interface> &_received) { drop_target_interface_ = _received; }
 
   using send_dragndrop_data
       = std::function<void(dragndrop_action /*_action*/, clipboard_format /*_selected_format*/, clipboard_sender &)>;

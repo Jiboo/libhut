@@ -30,8 +30,8 @@
 #include <algorithm>
 #include <iostream>
 
-#include "hut/utils/math.hpp"
 #include "hut/utils/profiling.hpp"
+#include "hut/utils/vulkan.hpp"
 
 #include "hut/display.hpp"
 #include "hut/image.hpp"
@@ -191,8 +191,7 @@ void render_target::reinit_pass(const shared_buffer &_storage, const render_targ
   auto *const device = display_->device();
   if (renderpass_ != VK_NULL_HANDLE)
     HUT_PVK(vkDestroyRenderPass, device, renderpass_, nullptr);
-  if (HUT_PVK(vkCreateRenderPass, device, &render_pass_info, nullptr, &renderpass_) != VK_SUCCESS)
-    throw std::runtime_error("failed to create render pass!");
+  HUT_VVK(HUT_PVK(vkCreateRenderPass, device, &render_pass_info, nullptr, &renderpass_));
 
   for (auto &fbo : fbos_) {
     if (fbo != VK_NULL_HANDLE)
@@ -225,8 +224,7 @@ void render_target::reinit_pass(const shared_buffer &_storage, const render_targ
     fb_info.height                  = (int)offset.y + (uint)size.y;
     fb_info.layers                  = 1;
 
-    if (HUT_PVK(vkCreateFramebuffer, device, &fb_info, nullptr, &fbos_[i]) != VK_SUCCESS)
-      throw std::runtime_error("failed to create framebuffer!");
+    HUT_VVK(HUT_PVK(vkCreateFramebuffer, device, &fb_info, nullptr, &fbos_[i]));
   }
 }
 
@@ -278,8 +276,7 @@ void render_target::begin_rebuild_cb(VkFramebuffer _fbo, VkCommandBuffer _cb) {
 void render_target::end_rebuild_cb(VkCommandBuffer _cb) {
   HUT_PROFILE_FUN(PRENDERTARGET)
   HUT_PVK(vkCmdEndRenderPass, _cb);
-  if (HUT_PVK(vkEndCommandBuffer, _cb) != VK_SUCCESS)
-    throw std::runtime_error("failed to record command buffer!");
+  HUT_VVK(HUT_PVK(vkEndCommandBuffer, _cb));
 }
 
 }  // namespace hut

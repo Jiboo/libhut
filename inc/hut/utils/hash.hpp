@@ -45,7 +45,7 @@ inline void hash_combine(std::size_t &_seed) {
 template<typename TType, typename... TRest>
 inline void hash_combine(std::size_t &_seed, const TType &_v, TRest &&..._rest) {
   std::hash<TType> hasher;
-  _seed ^= hasher(_v) + 0x9e3779b9 + (_seed << 6U) + (_seed >> 2U);
+  _seed ^= hasher(_v) + 0x9e3779b9 + (_seed << 6u) + (_seed >> 2u);
   hash_combine(_seed, std::forward<TRest>(_rest)...);
 }
 

@@ -34,6 +34,7 @@
 #include <unistd.h>
 
 #include "hut/utils/profiling.hpp"
+#include "hut/utils/vulkan.hpp"
 
 #include "hut/display.hpp"
 
@@ -138,9 +139,7 @@ window::window(display &_display, shared_buffer _storage, const window_params &_
     fullscreen();
 
   auto     func = _display.get_proc<PFN_vkCreateWaylandSurfaceKHR>("vkCreateWaylandSurfaceKHR");
-  VkResult vkr;
-  if ((vkr = func(_display.instance_, &info, nullptr, &surface_)) != VK_SUCCESS)
-    throw std::runtime_error(sstream("couldn't create vulkan dummy surface, code: ") << vkr);
+  HUT_VVK(func(_display.instance_, &info, nullptr, &surface_));
 
   _display.windows_.emplace(wayland_surface_, this);
 

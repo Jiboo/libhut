@@ -34,6 +34,7 @@
 
 #include "hut/utils/math.hpp"
 #include "hut/utils/profiling.hpp"
+#include "hut/utils/vulkan.hpp"
 
 #include "hut/display.hpp"
 #include "hut/image.hpp"
@@ -68,13 +69,11 @@ offscreen::offscreen(const shared_image &_target, const shared_buffer &_storage,
   alloc_info.level                       = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   alloc_info.commandBufferCount          = 1;
   alloc_info.commandPool                 = display_->commandg_pool_;
-  if (HUT_PVK(vkAllocateCommandBuffers, display_->device_, &alloc_info, &cb_) != VK_SUCCESS)
-    throw std::runtime_error("failed to allocate command buffers!");
+  HUT_VVK(HUT_PVK(vkAllocateCommandBuffers, display_->device_, &alloc_info, &cb_));
 
   VkFenceCreateInfo fence_info = {};
   fence_info.sType             = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-  if (HUT_PVK(vkCreateFence, display_->device_, &fence_info, nullptr, &fence_) != VK_SUCCESS)
-    throw std::runtime_error("failed to allocate fence!");
+  HUT_VVK(HUT_PVK(vkCreateFence, display_->device_, &fence_info, nullptr, &fence_));
 }
 
 offscreen::~offscreen() {
@@ -92,14 +91,9 @@ void offscreen::flush_cb() {
   submit_info.commandBufferCount = 1;
   submit_info.pCommandBuffers    = &cb_;
 
-  if (HUT_PVK(vkQueueSubmit, display_->queueg_, 1, &submit_info, fence_) != VK_SUCCESS)
-    throw std::runtime_error("failed to submit draw command buffer!");
-
-  if (HUT_PVK(vkWaitForFences, display_->device_, 1, &fence_, VK_TRUE, 10ull * 1000 * 1000 * 1000)
-      != VK_SUCCESS)  // 10s timeout
-    throw std::runtime_error("error (or time out) while waiting for offscreen render");
-
-  HUT_PVK(vkResetFences, display_->device_, 1, &fence_);
+  HUT_VVK(HUT_PVK(vkQueueSubmit, display_->queueg_, 1, &submit_info, fence_));
+  HUT_VVK(HUT_PVK(vkWaitForFences, display_->device_, 1, &fence_, VK_TRUE, 10ull * 1000 * 1000 * 1000));  // 10s timeout
+  HUT_VVK(HUT_PVK(vkResetFences, display_->device_, 1, &fence_));
 }
 
 void offscreen::draw(const draw_callback &_callback) {
@@ -122,7 +116,7 @@ void offscreen::download(std::span<u8> _dst, uint _data_row_pitch, image::subres
   assert(_src.coords_.z <= target_->size().x);
   assert(_src.coords_.w <= target_->size().y);
 
-  const auto &limits       = display_->device_props_.limits;
+  const auto &limits       = display_->properties().limits;
   const uint  buffer_align = limits.optimalBufferCopyRowPitchAlignment;
   const uint  offset_align = std::max(VkDeviceSize(4), limits.optimalBufferCopyOffsetAlignment);
   const uint  row_bit_size = (uint)size.x * target_->bpp();

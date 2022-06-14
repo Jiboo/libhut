@@ -1,9 +1,34 @@
-#include <boost/type_traits/is_detected.hpp>
 #include <gtest/gtest.h>
 
 #include "hut/utils/length.hpp"
 
 using namespace hut;
+
+// https://en.cppreference.com/w/cpp/experimental/is_detected
+namespace details {
+template<class TDefault, class TAlwaysVoid, template<class...> class TOp, class... TArgs>
+struct detector {
+  using value_t = std::false_type;
+  using type    = TDefault;
+};
+
+template<class TDefault, template<class...> class TOp, class... TArgs>
+struct detector<TDefault, std::void_t<TOp<TArgs...>>, TOp, TArgs...> {
+  using value_t = std::true_type;
+  using type    = TOp<TArgs...>;
+};
+
+struct nonesuch {
+  ~nonesuch()                      = delete;
+  nonesuch(const nonesuch &)       = delete;
+  void operator=(const nonesuch &) = delete;
+};
+}  // namespace details
+
+template<template<class...> class TOp, class... TArgs>
+using is_detected = typename ::details::detector<::details::nonesuch, void, TOp, TArgs...>::value_t;
+template<template<class...> class TOp, class... TArgs>
+constexpr bool IS_DETECTED_V = is_detected<TOp, TArgs...>::value;
 
 static_assert(std::is_trivial_v<f32_px>);
 
@@ -44,16 +69,16 @@ template<typename TLeft, typename TRight>
 using can_le = decltype(std::declval<TLeft>() <= std::declval<TRight>());
 
 #define HUT_CHECK_CMP(OP)                                                                                              \
-  static_assert(boost::is_detected_v<OP, f32_px, f32_px>);                                                             \
-  static_assert(boost::is_detected_v<OP, f32_px, f64_px>);                                                             \
-  static_assert(boost::is_detected_v<OP, f32_px, i32_px>);                                                             \
-  static_assert(boost::is_detected_v<OP, f32_px, u32_px>);                                                             \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32>);                                                               \
-  static_assert(!boost::is_detected_v<OP, f32_px, i32>);                                                               \
-  static_assert(!boost::is_detected_v<OP, f32_px, u32>);                                                               \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32_pt>);                                                            \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32_in>);                                                            \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32_mm>);
+  static_assert(IS_DETECTED_V<OP, f32_px, f32_px>);                                                                    \
+  static_assert(IS_DETECTED_V<OP, f32_px, f64_px>);                                                                    \
+  static_assert(IS_DETECTED_V<OP, f32_px, i32_px>);                                                                    \
+  static_assert(IS_DETECTED_V<OP, f32_px, u32_px>);                                                                    \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32>);                                                                      \
+  static_assert(!IS_DETECTED_V<OP, f32_px, i32>);                                                                      \
+  static_assert(!IS_DETECTED_V<OP, f32_px, u32>);                                                                      \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32_pt>);                                                                   \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32_in>);                                                                   \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32_mm>);
 
 HUT_CHECK_CMP(can_eq)
 HUT_CHECK_CMP(can_ne)
@@ -76,12 +101,12 @@ using can_div = decltype(std::declval<TLeft>() / std::declval<TRight>());
   static_assert(std::is_same_v<HUT_PACK(OP) < f32_px, f64_px>, f64_px >);                                              \
   static_assert(std::is_same_v<HUT_PACK(OP) < f32_px, i32_px>, f32_px >);                                              \
   static_assert(std::is_same_v<HUT_PACK(OP) < f32_px, u32_px>, f32_px >);                                              \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32>);                                                               \
-  static_assert(!boost::is_detected_v<OP, f32_px, i32>);                                                               \
-  static_assert(!boost::is_detected_v<OP, f32_px, u32>);                                                               \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32_pt>);                                                            \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32_in>);                                                            \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32_mm>);
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32>);                                                                      \
+  static_assert(!IS_DETECTED_V<OP, f32_px, i32>);                                                                      \
+  static_assert(!IS_DETECTED_V<OP, f32_px, u32>);                                                                      \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32_pt>);                                                                   \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32_in>);                                                                   \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32_mm>);
 
 HUT_CHECK_ARITHMETICS_BINARY(can_add)
 HUT_CHECK_ARITHMETICS_BINARY(can_sub)
@@ -91,12 +116,12 @@ HUT_CHECK_ARITHMETICS_BINARY(can_sub)
   static_assert(std::is_same_v<HUT_PACK(OP) < f32_px, f64>, f64_px >);                                                 \
   static_assert(std::is_same_v<HUT_PACK(OP) < f32_px, i32>, f32_px >);                                                 \
   static_assert(std::is_same_v<HUT_PACK(OP) < f32_px, u32>, f32_px >);                                                 \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32_px>);                                                            \
-  static_assert(!boost::is_detected_v<OP, f32_px, i32_px>);                                                            \
-  static_assert(!boost::is_detected_v<OP, f32_px, u32_px>);                                                            \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32_pt>);                                                            \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32_in>);                                                            \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32_mm>);
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32_px>);                                                                   \
+  static_assert(!IS_DETECTED_V<OP, f32_px, i32_px>);                                                                   \
+  static_assert(!IS_DETECTED_V<OP, f32_px, u32_px>);                                                                   \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32_pt>);                                                                   \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32_in>);                                                                   \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32_mm>);
 
 HUT_CHECK_ARITHMETICS_SCALAR(can_mul)
 HUT_CHECK_ARITHMETICS_SCALAR(can_div)
@@ -111,31 +136,31 @@ template<typename TLeft, typename TRight>
 using can_divassign = decltype(std::declval<TLeft>() /= std::declval<TRight>());
 
 #define HUT_CHECK_ASSIGN_BINARY(OP)                                                                                    \
-  static_assert(boost::is_detected_v<OP, f32_px, f32_px>);                                                             \
-  static_assert(boost::is_detected_v<OP, f32_px, f64_px>);                                                             \
-  static_assert(boost::is_detected_v<OP, f32_px, i32_px>);                                                             \
-  static_assert(boost::is_detected_v<OP, f32_px, u32_px>);                                                             \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32>);                                                               \
-  static_assert(!boost::is_detected_v<OP, f32_px, i32>);                                                               \
-  static_assert(!boost::is_detected_v<OP, f32_px, u32>);                                                               \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32_pt>);                                                            \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32_in>);                                                            \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32_mm>);
+  static_assert(IS_DETECTED_V<OP, f32_px, f32_px>);                                                                    \
+  static_assert(IS_DETECTED_V<OP, f32_px, f64_px>);                                                                    \
+  static_assert(IS_DETECTED_V<OP, f32_px, i32_px>);                                                                    \
+  static_assert(IS_DETECTED_V<OP, f32_px, u32_px>);                                                                    \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32>);                                                                      \
+  static_assert(!IS_DETECTED_V<OP, f32_px, i32>);                                                                      \
+  static_assert(!IS_DETECTED_V<OP, f32_px, u32>);                                                                      \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32_pt>);                                                                   \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32_in>);                                                                   \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32_mm>);
 
 HUT_CHECK_ASSIGN_BINARY(can_addassign)
 HUT_CHECK_ASSIGN_BINARY(can_subassign)
 
 #define HUT_CHECK_ASSIGN_SCALAR(OP)                                                                                    \
-  static_assert(boost::is_detected_v<OP, f32_px, f32>);                                                                \
-  static_assert(boost::is_detected_v<OP, f32_px, f64>);                                                                \
-  static_assert(boost::is_detected_v<OP, f32_px, i32>);                                                                \
-  static_assert(boost::is_detected_v<OP, f32_px, u32>);                                                                \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32_px>);                                                            \
-  static_assert(!boost::is_detected_v<OP, f32_px, i32_px>);                                                            \
-  static_assert(!boost::is_detected_v<OP, f32_px, u32_px>);                                                            \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32_pt>);                                                            \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32_in>);                                                            \
-  static_assert(!boost::is_detected_v<OP, f32_px, f32_mm>);
+  static_assert(IS_DETECTED_V<OP, f32_px, f32>);                                                                       \
+  static_assert(IS_DETECTED_V<OP, f32_px, f64>);                                                                       \
+  static_assert(IS_DETECTED_V<OP, f32_px, i32>);                                                                       \
+  static_assert(IS_DETECTED_V<OP, f32_px, u32>);                                                                       \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32_px>);                                                                   \
+  static_assert(!IS_DETECTED_V<OP, f32_px, i32_px>);                                                                   \
+  static_assert(!IS_DETECTED_V<OP, f32_px, u32_px>);                                                                   \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32_pt>);                                                                   \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32_in>);                                                                   \
+  static_assert(!IS_DETECTED_V<OP, f32_px, f32_mm>);
 
 HUT_CHECK_ASSIGN_SCALAR(can_mulassign)
 HUT_CHECK_ASSIGN_SCALAR(can_divassign)
@@ -213,6 +238,10 @@ static_assert(std::is_constructible_v<vec2_px, f32_px, f32_px>);
 TEST(length, vec2) {
   EXPECT_NE(u16vec2_px(0_px, 0_px), u16vec2_px(0_px, 1_px));
   EXPECT_EQ(u16vec2_px(0, 0), u16vec2_px(0_px, 0_px));
+
+  EXPECT_EQ(min(u32vec2_px{1_px}, u32vec2_px{0_px}), u32vec2_px{0_px});
+  EXPECT_EQ(max(u32vec2_px{1_px}, u32vec2_px{0_px}), u32vec2_px{1_px});
+
   EXPECT_EQ(u16vec2_px(1, 1) + u16vec2_px(2, 2), u16vec2_px(3_px, 3_px));
   EXPECT_EQ(u16vec2_px(2, 2) * u16(3), u16vec2_px(6_px, 6_px));
   EXPECT_EQ(u16vec2_px(2, 2) / u16(2), u16vec2_px(1_px, 1_px));

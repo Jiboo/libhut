@@ -31,6 +31,7 @@
 #include "hut/ui/root.hpp"
 
 #include "tst_events.hpp"
+#include "tst_woff2.hpp"
 
 using namespace hut;
 
@@ -43,6 +44,10 @@ int main(int /*unused*/, char ** /*unused*/) {
   window win(dsp, buf, wp);
   win.title(u8"hut ui playground");
   win.clear_color({0, 0, 0, 1});
+
+  auto fnt = std::make_shared<text::font>(tst_woff2::Roboto_Regular_woff2, 16_px);
+
+  ui::root top(dsp, win, buf, fnt);
 
   install_test_events(dsp, win);
 

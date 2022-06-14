@@ -30,6 +30,7 @@
 #endif
 
 #include "hut/utils/profiling.hpp"
+#include "hut/utils/vulkan.hpp"
 
 #include "hut/buffer.hpp"
 #include "hut/display.hpp"
@@ -71,9 +72,7 @@ buffer_page_data::buffer_page_data(buffer &_parent, uint _size)
   create_info.sharingMode        = VK_SHARING_MODE_EXCLUSIVE;
 
   auto *device = _parent.display_.device();
-  if (HUT_PVK(vkCreateBuffer, device, &create_info, nullptr, &buffer_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create buffer!");
-  }
+  HUT_VVK(HUT_PVK(vkCreateBuffer, device, &create_info, nullptr, &buffer_));
 
   VkMemoryRequirements requirements;
   HUT_PVK(vkGetBufferMemoryRequirements, device, buffer_, &requirements);
@@ -85,15 +84,11 @@ buffer_page_data::buffer_page_data(buffer &_parent, uint _size)
   alloc_info.allocationSize       = requirements.size;
   alloc_info.memoryTypeIndex      = type.first;
 
-  auto aresult = HUT_PVK(vkAllocateMemory, device, &alloc_info, nullptr, &memory_);
-  if (aresult != VK_SUCCESS) {
-    HUT_PVK(vkDestroyBuffer, device, buffer_, nullptr);
-    throw std::runtime_error("failed to allocate buffer memory!");
-  }
-  HUT_PVK(vkBindBufferMemory, device, buffer_, memory_, 0);
+  HUT_VVK(HUT_PVK(vkAllocateMemory, device, &alloc_info, nullptr, &memory_));
+  HUT_VVK(HUT_PVK(vkBindBufferMemory, device, buffer_, memory_, 0));
 
   if (parent_->params_.permanent_map_) {
-    HUT_PVK(vkMapMemory, device, memory_, 0, _size, 0, reinterpret_cast<void **>(&permanent_map_));
+    HUT_VVK(HUT_PVK(vkMapMemory, device, memory_, 0, _size, 0, reinterpret_cast<void **>(&permanent_map_)));
     assert(permanent_map_);
   } else {
     permanent_map_ = nullptr;

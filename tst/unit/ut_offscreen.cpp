@@ -1,14 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "hut/utils/color.hpp"
-#include "hut/utils/length.hpp"
 
 #include "hut/offscreen.hpp"
 #include "hut/pipeline.hpp"
-
-#ifdef HUT_ENABLE_RENDERDOC
-#  include "hut/renderdoc/renderdoc.hpp"
-#endif
 
 #include "tst_pipelines.hpp"
 
@@ -93,7 +88,8 @@ TEST(offscreen, offscreen_download) {
       I, I, I, I, I,
       // clang-format on
   };
-  ofs.download(std::span<u8>(&pixel_data[0].x, sizeof(pixel_data)), 5 * 4, image::subresource{{0, 0, 4, 4}});
+  ofs.download(std::span<u8>(&pixel_data[0].x, sizeof(pixel_data)), 5 * sizeof(u8vec4_rgba),
+               image::subresource{{0, 0, 4, 4}});
 
   // 4*4 copy into a 5*5 buffer, extra pixel should be untouched, the rest is default initialized to transparent on image creation
   u8vec4_rgba pixel_ref[5 * 5] = {
@@ -144,7 +140,7 @@ TEST(offscreen, offscreen_basic) {
   ofs.draw([&](VkCommandBuffer _cb) { rgb_pipeline->draw(_cb, 0, indices, instances, vertices); });
 
   u8vec4_rgba pixel_data[4 * 4];
-  ofs.download(std::span<u8>(&pixel_data[0].x, sizeof(pixel_data)), 4 * 4);
+  ofs.download(std::span<u8>(&pixel_data[0].x, sizeof(pixel_data)), 4 * sizeof(u8vec4_rgba));
 
   u8vec4_rgba pixel_ref[4 * 4] = {
       // clang-format off
@@ -189,7 +185,8 @@ TEST(offscreen, offscreen_download_offset) {
       I, I, I, I, I,
       // clang-format on
   };
-  ofs.download(std::span<u8>(&pixel_data[0].x, sizeof(pixel_data)), 5 * 4, image::subresource{{2, 2, 4, 4}});
+  ofs.download(std::span<u8>(&pixel_data[0].x, sizeof(pixel_data)), 5 * sizeof(u8vec4_rgba),
+               image::subresource{{2, 2, 4, 4}});
 
   u8vec4_rgba pixel_ref[5 * 5] = {
       // clang-format off
@@ -208,10 +205,6 @@ TEST(offscreen, offscreen_download_offset) {
 TEST(offscreen, offscreen_render_offset) {
   display d("offscreen_render_offset");
   auto    b = std::make_shared<buffer>(d);
-
-#ifdef HUT_ENABLE_RENDERDOC
-  renderdoc::frame_begin();
-#endif
 
   image_params iparams;
   iparams.size_   = {4, 4};
@@ -254,7 +247,8 @@ TEST(offscreen, offscreen_render_offset) {
       I, I, I, I,
       // clang-format on
   };
-  ofs.download(std::span<u8>(&pixel_data[0].x, sizeof(pixel_data)), 4 * 4, image::subresource{{0, 0, 4, 4}});
+  ofs.download(std::span<u8>(&pixel_data[0].x, sizeof(pixel_data)), 4 * sizeof(u8vec4_rgba),
+               image::subresource{{0, 0, 4, 4}});
 
   // Draw one white pixel at [2,2] (W), rest of the 3*3 offscreen should have been cleared (C), rest of the 4*4 image should be untouched,
   u8vec4_rgba pixel_ref[4 * 4] = {
@@ -268,8 +262,4 @@ TEST(offscreen, offscreen_render_offset) {
 
   dump(pixel_data, {0, 0, 4, 4});
   EXPECT_TRUE(std::equal(std::begin(pixel_ref), std::end(pixel_ref), std::begin(pixel_data)));
-
-#ifdef HUT_ENABLE_RENDERDOC
-  renderdoc::frame_end("offscreen_render_offset");
-#endif
 }

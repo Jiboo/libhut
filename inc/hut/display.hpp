@@ -228,12 +228,16 @@ class display {
   void roundtrip();
   int  dispatch();
 
-  VkInstance                        instance() { return instance_; }
-  VkPhysicalDevice                  pdevice() { return pdevice_; }
-  VkDevice                          device() { return device_; }
-  const VkPhysicalDeviceFeatures   &features() const { return device_features_; }
-  const VkPhysicalDeviceProperties &properties() const { return device_props_; }
-  const VkPhysicalDeviceLimits     &limits() const { return device_props_.limits; }
+  VkInstance                                instance() { return instance_; }
+  VkPhysicalDevice                          pdevice() { return pdevice_; }
+  VkDevice                                  device() { return device_; }
+  const VkPhysicalDeviceFeatures           &features() const { return device_features_.features; }
+  const VkPhysicalDeviceProperties         &properties() const { return device_props_.properties; }
+  const VkPhysicalDeviceLimits             &limits() const { return properties().limits; }
+  const VkPhysicalDeviceVulkan11Features   &features11() const { return device_features11_; }
+  const VkPhysicalDeviceVulkan11Properties &properties11() const { return device_props11_; }
+  const VkPhysicalDeviceVulkan12Features   &features12() const { return device_features12_; }
+  const VkPhysicalDeviceVulkan12Properties &properties21() const { return device_props12_; }
 
   void post(const callback &_callback);
 
@@ -242,7 +246,7 @@ class display {
 
   template<typename TSignature>
   TSignature get_proc(const std::string &_name) {
-    return (TSignature)get_proc_impl(_name);
+    return reinterpret_cast<TSignature>(get_proc_impl(_name));
   }
 
   [[nodiscard]] u16vec2_px max_tex_size() const {
@@ -257,15 +261,19 @@ class display {
   VkInstance               instance_ = VK_NULL_HANDLE;
   VkDebugReportCallbackEXT debug_cb_ = VK_NULL_HANDLE;
 
-  VkPhysicalDevice                 pdevice_;
-  u32                              iqueueg_, iqueuec_, iqueuet_, iqueuep_;
-  VkDevice                         device_ = VK_NULL_HANDLE;
-  VkSurfaceFormatKHR               surface_format_;
-  VkPhysicalDeviceFeatures         device_features_;
-  VkPhysicalDeviceProperties       device_props_;
-  VkQueue                          queueg_, queuec_, queuet_, queuep_;
-  VkCommandPool                    commandg_pool_ = VK_NULL_HANDLE;
-  VkPhysicalDeviceMemoryProperties mem_props_;
+  VkPhysicalDevice                   pdevice_;
+  u32                                iqueueg_, iqueuec_, iqueuet_, iqueuep_;
+  VkDevice                           device_ = VK_NULL_HANDLE;
+  VkSurfaceFormatKHR                 surface_format_;
+  VkPhysicalDeviceFeatures2          device_features_;
+  VkPhysicalDeviceProperties2        device_props_;
+  VkPhysicalDeviceVulkan11Features   device_features11_;
+  VkPhysicalDeviceVulkan11Properties device_props11_;
+  VkPhysicalDeviceVulkan12Features   device_features12_;
+  VkPhysicalDeviceVulkan12Properties device_props12_;
+  VkQueue                            queueg_, queuec_, queuet_, queuep_;
+  VkCommandPool                      commandg_pool_ = VK_NULL_HANDLE;
+  VkPhysicalDeviceMemoryProperties   mem_props_;
 
   void init_vulkan_instance(const char *_app_name, u32 _app_version, std::vector<const char *> &_extensions);
   void init_vulkan_device(VkSurfaceKHR _dummy);
