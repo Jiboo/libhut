@@ -352,6 +352,11 @@ const std::vector<const char *> G_ENABLED_LAYERS = {
 
 void display::init_vulkan_instance(const char *_app_name, u32 _app_version, std::vector<const char *> &_extensions) {
   HUT_PROFILE_FUN(PDISPLAY)
+
+#ifdef HUT_ENABLE_VOLK
+  HUT_VVK(HUT_PVK(volkInitialize));
+#endif
+
   _extensions.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);
 
   u32 extension_count;
@@ -401,6 +406,9 @@ void display::init_vulkan_instance(const char *_app_name, u32 _app_version, std:
 #endif
 
   HUT_VVK(HUT_PVK(vkCreateInstance, &info, nullptr, &instance_));
+#ifdef HUT_ENABLE_VOLK
+  HUT_PVK(volkLoadInstanceOnly, instance_);
+#endif
 
 #ifdef HUT_ENABLE_VALIDATION
   if (std::find(_extensions.cbegin(), _extensions.cend(), VK_EXT_DEBUG_REPORT_EXTENSION_NAME) != _extensions.cend()) {
@@ -538,6 +546,10 @@ void display::init_vulkan_device(VkSurfaceKHR _dummy) {
   device_info.ppEnabledLayerNames     = G_ENABLED_LAYERS.data();
 
   HUT_VVK(HUT_PVK(vkCreateDevice, pdevice_, &device_info, nullptr, &device_));
+#ifdef HUT_ENABLE_VOLK
+  HUT_PVK(volkLoadDevice, device_);
+#endif
+
   HUT_PVK(vkGetDeviceQueue, device_, prefered_rate.iqueueg_, 0, &queueg_);
   HUT_PVK(vkGetDeviceQueue, device_, prefered_rate.iqueuec_, 0, &queuec_);
   HUT_PVK(vkGetDeviceQueue, device_, prefered_rate.iqueuet_, 0, &queuet_);

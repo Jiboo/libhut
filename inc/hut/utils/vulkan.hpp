@@ -28,13 +28,17 @@
 #pragma once
 
 #if defined(__has_include) && __has_include(<source_location>)
-#include <source_location>
+#  include <source_location>
 #endif
 #include <stdexcept>
 #include <system_error>
 #include <version>
 
-#include <vulkan/vulkan.h>
+#ifdef HUT_ENABLE_VOLK
+#  include "volk.h"
+#else
+#  include <vulkan/vulkan.h>
+#endif
 
 #include "hut/utils/color.hpp"
 #include "hut/utils/length.hpp"
@@ -99,19 +103,23 @@ class vulkan_exception : public std::system_error {
  public:
   explicit vulkan_exception(VkResult _result
 #ifdef __cpp_lib_source_location
-                            , const std::source_location _location = std::source_location::current()
+                            ,
+                            const std::source_location _location = std::source_location::current()
 #endif
-                            )
+                                )
       : std::system_error(make_vk_result_error_code(_result))
 #ifdef __cpp_lib_source_location
       , location_(_location)
 #endif
-  {}
+  {
+  }
 
   ~vulkan_exception() noexcept override = default;
 
 #ifdef __cpp_lib_source_location
-  [[nodiscard]] const std::source_location &location() const noexcept { return location_; }
+  [[nodiscard]] const std::source_location &location() const noexcept {
+    return location_;
+  }
 
  protected:
   std::source_location location_;

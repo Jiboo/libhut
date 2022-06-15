@@ -6,4 +6,10 @@
 	url = git@github.com:KhronosGroup/SPIRV-Reflect.git
 [submodule "dep/libspng"]
 	path = dep/libspng
-	url = https://github.com/randy408/libspng/
+	url = git@github.com:randy408/libspng.git
+[submodule "dep/entt"]
+	path = dep/entt
+	url = git@github.com:skypjack/entt.git
+[submodule "dep/volk"]
+	path = dep/volk
+	url = git@github.com:zeux/volk.git

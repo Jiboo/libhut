@@ -49,8 +49,6 @@ int main(int /*unused*/, char ** /*unused*/) {
 
   ui::root top(dsp, win, buf, fnt);
 
-  install_test_events(dsp, win);
-
   dsp.dispatch();
 
   return EXIT_SUCCESS;

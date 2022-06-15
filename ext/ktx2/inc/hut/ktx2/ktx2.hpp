@@ -30,10 +30,9 @@
 #include <optional>
 #include <span>
 
-#include <vulkan/vulkan.h>
-
 #include "hut/utils/fwd.hpp"
 #include "hut/utils/math.hpp"
+#include "hut/utils/vulkan.hpp"
 
 #include "hut/image.hpp"
 

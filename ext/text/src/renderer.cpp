@@ -140,7 +140,7 @@ details::batch &renderer::grow(uint _mesh_store_size, uint _draw_store_size) {
   auto draw_store_size = std::max(_draw_store_size, draw_back_size * 2);
 
   assert(mesh_store_size > 0 && draw_store_size > 0);
-  return batches_.emplace_back(details::batch{this, mesh_store_size, draw_store_size});
+  return batches_.emplace_back(this, mesh_store_size, draw_store_size);
 }
 
 words_holder renderer::allocate(std::span<const std::u8string_view> _words) {

@@ -124,7 +124,9 @@ class buffer {
 
   std::list<details::buffer_page_data> pages_;
 
-  details::buffer_page_data &grow(uint _new_size) { return pages_.emplace_back(*this, _new_size); }
+  details::buffer_page_data &grow(uint _new_size) {
+    return pages_.emplace_back(*this, _new_size);
+  }
 };
 
 }  // namespace hut

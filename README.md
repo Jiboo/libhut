@@ -1,5 +1,4 @@
 libhut is a vulkan & wayland wrapper library.
-You can use optional extensions, that can be configured at build time with cmake options.
 
 This is a hobby project, expect building nightmare, runtime crashes, missing features/documentation/tests,
 although contributions are welcome.
@@ -19,6 +18,7 @@ Dependencies (Fedora):
 - common: mesa-vulkan-devel, glm-devel.
 - wayland: wayland-devel, wayland-protocols-devel, libwayland-cursor, libxkbcommon-devel.
 - build time: glslang (KhronosGroup/glslang), KhronosGroup/SPIRV-Reflect (via submodule).
+- volk (optional): zeux/volk (via submodule)
 - testing (optional): gtest-devel.
 - profiling (optional): fmt-devel, boost-devel.
 
@@ -28,3 +28,4 @@ Extensions dependencies (all optional):
 - imgui: ocornut/imgui (via submodule).
 - renderdoc: renderdoc-devel.
 - text extension: freetype-devel, harfbuzz-devel.
+- ui: entt (via submodule).

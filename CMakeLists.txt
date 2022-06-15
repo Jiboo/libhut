@@ -9,9 +9,11 @@ option(HUT_ENABLE_IMGDEC "Enable the image loading extension" TRUE)
 option(HUT_ENABLE_IMGUI "Enable the imgui extension, which is used for some tests and playgrounds" TRUE)
 option(HUT_ENABLE_KTX2 "Enable the ktx2 io extension library" TRUE)
 option(HUT_ENABLE_RENDER2D "Enable the imgui extension, which is used for some tests and playgrounds" TRUE)
-option(HUT_ENABLE_RENDERDOC "Enable the renderdoc extension allowing to trigger captures from code" FALSE)
+option(HUT_ENABLE_RENDERDOC "Enable the renderdoc extension allowing to trigger captures from code" TRUE)
 option(HUT_ENABLE_TEXT "Enable the text extension allowing to raster glyphs with freetype and layout text with harfbuzz" TRUE)
 option(HUT_ENABLE_UI "Enable the text extension for UI, requires the render2d and text extensions" TRUE)
+
+option(HUT_ENABLE_VOLK "Enable the usage of volk, instead of the default vulkan loader" TRUE)
 
 option(HUT_COMPILE_SAMPLES "Compile all samples/demos, can take some time due to shader/resources pipelines" TRUE)
 option(HUT_COMPILE_PLAYGROUNDS "Compile all test playgrounds" TRUE)
@@ -51,6 +53,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/de
 include(dep/spng.cmake)
 include(dep/imgui.cmake)
 include(dep/spirv_reflect.cmake)
+include(dep/entt.cmake)
+include(dep/volk.cmake)
 
 find_program(GLSLANG_VALIDATOR glslangValidator REQUIRED)
 
@@ -59,7 +63,6 @@ set(HUT_LIBS ${HUT_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
 find_package(Vulkan REQUIRED)
 set(HUT_INCLUDES ${HUT_INCLUDES} ${Vulkan_INCLUDE_DIRS})
-set(HUT_LIBS ${HUT_LIBS} ${Vulkan_LIBRARIES})
 
 find_package(GLM REQUIRED)
 set(HUT_INCLUDES ${HUT_INCLUDES} ${GLM_INCLUDE_DIRS})
@@ -129,6 +132,13 @@ if (NOT HUT_ENABLE_PROFILING EQUAL -1)
     message(WARNING "Defaulting to addr2line, which is slow to generate backtraces, please install https://github.com/ianlancetaylor/libbacktrace")
     set(HUT_DEFINITIONS ${HUT_DEFINITIONS} -DBOOST_STACKTRACE_USE_ADDR2LINE)
   endif ()
+endif ()
+
+if (HUT_ENABLE_VOLK)
+  set(HUT_LIBS ${HUT_LIBS} volk)
+  set(HUT_DEFINITIONS ${HUT_DEFINITIONS} HUT_ENABLE_VOLK)
+else ()
+  set(HUT_LIBS ${HUT_LIBS} ${Vulkan_LIBRARIES})
 endif ()
 
 ###########################################################
@@ -282,7 +292,7 @@ hut_add_extension(NAME ktx2)
 hut_add_extension(NAME render2d)
 hut_add_extension(NAME renderdoc DEPENDENCIES Renderdoc EXTRA_LIBS ${CMAKE_DL_LIBS})
 hut_add_extension(NAME text DEPENDENCIES Freetype HarfBuzz)
-hut_add_extension(NAME ui DEPENDENCIES hut_render2d hut_text)
+hut_add_extension(NAME ui DEPENDENCIES hut_render2d hut_text EnTT)
 
 ###########################################################
 # hut test data
@@ -356,7 +366,7 @@ if (HUT_COMPILE_PLAYGROUNDS)
   hut_add_test(NAME hut_playground_clipboard PATH tst/playgrounds/playground_clipboard.cpp DEPENDENCIES hut_imgui hut_tst_data_png)
   hut_add_test(NAME hut_playground_text PATH tst/playgrounds/playground_text.cpp DEPENDENCIES hut_imgui hut_text hut_tst_data_woff2 hut_tst_data_shaders)
   hut_add_test(NAME hut_playground_render2d PATH tst/playgrounds/playground_render2d.cpp DEPENDENCIES hut_render2d hut_imgui hut_imgdec hut_tst_data_png)
-  hut_add_test(NAME hut_playground_ui PATH tst/playgrounds/playground_ui.cpp DEPENDENCIES hut_ui hut_text)
+  hut_add_test(NAME hut_playground_ui PATH tst/playgrounds/playground_ui.cpp DEPENDENCIES hut_ui hut_text hut_tst_data_woff2)
 endif ()
 
 if (HUT_COMPILE_UNITTESTS AND GTEST_FOUND)

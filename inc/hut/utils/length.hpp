@@ -168,10 +168,8 @@ struct length {
   }
 
   constexpr length operator+() { return length{+value_}; }
-  length           operator-()
-    requires(!std::is_unsigned_v<TUnderlying>)
-  {
-    // NOTE: -800_px; uses the ull literal, operator- overflows, use -800._px instead for better sign handling
+  length           operator-() requires(!std::is_unsigned_v<TUnderlying>) {
+              // NOTE: -800_px; uses the ull literal, operator- overflows, use -800._px instead for better sign handling
     return length{-value_};
   }
 

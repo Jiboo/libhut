@@ -40,7 +40,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include <vulkan/vulkan.h>
 #include <wayland-client.h>
 #include <wayland-cursor.h>
 #include <xkbcommon/xkbcommon.h>
@@ -50,6 +49,7 @@
 #include "hut/utils/length.hpp"
 #include "hut/utils/math.hpp"
 #include "hut/utils/sstream.hpp"
+#include "hut/utils/vulkan.hpp"
 
 #include "xdg-shell-client-protocol.h"
 

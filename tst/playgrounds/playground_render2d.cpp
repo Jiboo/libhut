@@ -64,7 +64,7 @@ int main(int /*unused*/, char ** /*unused*/) {
   ImGui::StyleColorsDark();
   if (!imgui::init(&dsp, &win, buf, true))
     return EXIT_FAILURE;
-  install_test_events<common_ubo>(dsp, win, ubo);
+  install_test_events(dsp, win, ubo);
 
   std::mt19937 gen;
   auto         rand_norm = [&]() {
