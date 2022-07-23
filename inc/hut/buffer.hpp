@@ -96,8 +96,8 @@ struct buffer_params {
   uint                  initial_byte_size_ = 32 * 1024 * 1024;
   VkMemoryPropertyFlags type_              = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
   VkBufferUsageFlagBits usage_             = VkBufferUsageFlagBits(
-                  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT
-                  | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
+      VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT
+      | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
 };
 
 class buffer {
@@ -124,9 +124,7 @@ class buffer {
 
   std::list<details::buffer_page_data> pages_;
 
-  details::buffer_page_data &grow(uint _new_size) {
-    return pages_.emplace_back(*this, _new_size);
-  }
+  details::buffer_page_data &grow(uint _new_size) { return pages_.emplace_back(*this, _new_size); }
 };
 
 }  // namespace hut

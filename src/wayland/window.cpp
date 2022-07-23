@@ -51,9 +51,8 @@ void window::handle_toplevel_configure(void *_data, xdg_toplevel * /*unused*/, i
   if (_width > 0 && _height > 0) {
     u16vec2_px new_size{_width, _height};
     if (new_size != w->size_) {
-      w->size_ = new_size;
-      w->init_vulkan_surface();
-      HUT_PROFILE_EVENT(w, on_resize_, new_size, w->scale_);
+      u32 scale = w->on_resize_.pending() ? std::get<1>(*w->on_resize_.args_) : w->scale_;
+      w->on_resize_.buffer(new_size, scale);
     }
   }
   std::span<xdg_toplevel_state> states{reinterpret_cast<xdg_toplevel_state *>(_states->data),
@@ -62,10 +61,10 @@ void window::handle_toplevel_configure(void *_data, xdg_toplevel * /*unused*/, i
   // FIXME: This doesn't really represents minimized state, loosing focus also lose this state
   if (!minimized && w->minimized_) {
     w->minimized_ = false;
-    HUT_PROFILE_EVENT(w, on_resume_);
+    w->on_resume_.buffer();
   } else if (minimized && !w->minimized_) {
     w->minimized_ = true;
-    HUT_PROFILE_EVENT(w, on_pause_);
+    w->on_pause_.buffer();
   }
 }
 
@@ -87,11 +86,8 @@ void window::trigger_scale() {
     }
   }
   if (scale != scale_ && scale != NUMAX<u32>) {
-    scale_ = scale;
-    display_.cursor(current_cursor_type_, scale);
-    wl_surface_set_buffer_scale(wayland_surface_, int(scale));
-    init_vulkan_surface();
-    HUT_PROFILE_EVENT(this, on_resize_, size_, scale);
+    u16vec2_px size = on_resize_.pending() ? std::get<0>(*on_resize_.args_) : size_;
+    on_resize_.buffer(size, scale);
   }
 }
 

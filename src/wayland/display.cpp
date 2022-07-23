@@ -748,6 +748,21 @@ int display::dispatch() {
       loop_ = false;
     for (auto wpair : windows_) {
       window *w = wpair.second;
+
+      if (w->on_pause_.pending())
+        HUT_PROFILE_FLUSH_BEVENT(w, on_pause_);
+      if (w->on_resume_.pending())
+        HUT_PROFILE_FLUSH_BEVENT(w, on_resume_);
+
+      if (w->on_resize_.pending()) {
+        w->size_ = std::get<0>(*w->on_resize_.args_);
+        w->scale_ = std::get<1>(*w->on_resize_.args_);
+        cursor(w->current_cursor_type_, w->scale_);
+        wl_surface_set_buffer_scale(w->wayland_surface_, int(w->scale_));
+        w->init_vulkan_surface();
+        HUT_PROFILE_FLUSH_BEVENT(w, on_resize_);
+      }
+
       if (w->invalidated_) {
         w->redraw(display::clock::now());
         w->invalidated_ = false;

@@ -27,34 +27,28 @@
 
 #pragma once
 
-#include "hut/pipeline.hpp"
+#include <entt/entity/entity.hpp>
 
-#include "tst_shaders_refl.hpp"
+#include "hut/utils/bbox.hpp"
+#include "hut/utils/length.hpp"
 
-namespace hut {
+namespace hut::ui {
 
-struct proj_ubo {
-  mat4  proj_{1};
-  float dpi_scale_ = 1;
+using namespace entt;
 
-  explicit proj_ubo(u16vec2_px _size) { proj_ = ortho<float>(0.f, float(_size.x), 0.f, float(_size.y)); }
-};
-using shared_proj_ubo = shared_buffer_suballoc<proj_ubo>;
+using bbox_px  = u16bbox_px;
+using point_px = u16vec2_px;
+using size_px  = u16vec2_px;
 
-struct vp_ubo {
-  mat4  proj_{1};
-  mat4  view_{1};
-  float dpi_scale_ = 1;
-};
-using shared_vp_ubo = shared_buffer_suballoc<vp_ubo>;
+template<typename TComponent>
+constexpr TComponent &assert_get(registry &_r, entity _e) {
+#ifdef NDEBUG
+  return _r.get<TComponent>(_e);
+#else
+  TComponent *ptr = _r.try_get<TComponent>(_e);
+  assert(ptr);
+  return *ptr;
+#endif
+}
 
-using pipeline_rgb
-    = pipeline<u16, tst_shaders::rgb_vert_spv_refl, tst_shaders::rgb_frag_spv_refl, const shared_proj_ubo &>;
-
-using pipeline_rgb3d
-    = pipeline<u16, tst_shaders::rgb3d_vert_spv_refl, tst_shaders::rgb_frag_spv_refl, const shared_vp_ubo &>;
-
-using pipeline_skybox = pipeline<u16, tst_shaders::skybox_vert_spv_refl, tst_shaders::skybox_frag_spv_refl,
-                                 const shared_vp_ubo &, const shared_image &, const shared_sampler &>;
-
-}  // namespace hut
+}  // namespace hut::ui

@@ -27,6 +27,8 @@
 
 #include "hut/ui/root.hpp"
 
+#include "hut/ui/components.hpp"
+
 namespace hut::ui {
 
 static shared_buffer default_buffer(display &_dsp, const buffer_params &_params) {
@@ -37,19 +39,15 @@ static shared_atlas default_atlas(display &_dsp, const shared_buffer &_buf, cons
   return std::make_shared<atlas>(_dsp, _buf, _params);
 }
 
-static shared_ubo default_ubo(display &_dsp, const shared_buffer &_buffer) {
-  return _buffer->allocate<common_ubo>(1, _dsp.ubo_align());
-}
-
 static shared_sampler default_sampler(display &_dsp, const sampler_params &_params) {
   return std::make_shared<sampler>(_dsp, _params);
 }
 
-root::root(display &_dsp, window &_parent, shared_buffer _buf, text::shared_font _font, const root_params &_params)
+root::root(display &_dsp, window &_parent, shared_buffer _buf, shared_ubo _ubo, text::shared_font _font, const root_params &_params)
     : display_(_dsp)
     , parent_(_parent)
     , buffer_(std::move(_buf))
-    , ubo_(_params.ubo_ ? _params.ubo_ : default_ubo(_dsp, buffer_))
+    , ubo_(std::move(_ubo))
     , boxes_sampler_(_params.boxes_sampler_ ? _params.boxes_sampler_ : default_sampler(_dsp, _params.boxes_sampler_dparams_))
     , boxes_atlas_(_params.boxes_atlas_ ? _params.boxes_atlas_ : default_atlas(_dsp, buffer_, _params.boxes_atlas_dparams_))
     , boxes_renderer_(_parent, buffer_, ubo_, boxes_atlas_, boxes_sampler_, _params.boxes_params_)
@@ -61,6 +59,7 @@ root::root(display &_dsp, window &_parent, shared_buffer _buf, text::shared_font
   _parent.on_frame_.connect(std::bind_front(&ui::root::frame, this));
   _parent.on_mouse_.connect(std::bind_front(&ui::root::mouse, this));
   _parent.on_resize_.connect(std::bind_front(&ui::root::resize, this));
+  entity_ = create_root();
 }
 
 bool root::frame(display::duration _dur) {
@@ -108,7 +107,153 @@ bool root::resize(const u16vec2_px &_size, u32 _scale) {
 
   float dpi_scale{static_cast<float>(_scale)};
   ubo_->set_subone(0, offsetof(common_ubo, dpi_scale_), sizeof(dpi_scale), &dpi_scale);
+
+  bbox_px bounds = {0, 0, _size};
+  layout(entity_, bounds);
   return false;
+}
+
+entity root::create_root() {
+  entt::entity result = registry_.create();
+  registry_.emplace<neighbors>(result);
+  registry_.emplace<container>(result);
+  registry_.emplace<bounds>(result);
+  registry_.emplace<rectcut_ratio>(result, LEFT, 1.f);
+  return result;
+}
+
+void root::inject_back_child(entity _parent, entity _child) {
+  assert(registry_.valid(_parent));
+  auto &parent_container = assert_get<container>(_parent);
+  auto &child_neighbors   = registry_.get_or_emplace<neighbors>(_child);
+  child_neighbors.parent_ = _parent;
+
+  if (parent_container.last_ == null) {
+    assert(parent_container.first_ == null);
+    parent_container.first_ = parent_container.last_ = _child;
+  }
+  else {
+    assert(registry_.valid(parent_container.last_));
+    child_neighbors.prev_ = parent_container.last_;
+    auto &last_neighbors  = assert_get<neighbors>(parent_container.last_);
+    assert(last_neighbors.next_ == null);
+    last_neighbors.next_ = _child;
+    parent_container.last_ = _child;
+  }
+}
+
+void root::inject_front_child(entity _parent, entity _child) {
+  assert(registry_.valid(_parent));
+  auto &parent_container = assert_get<container>(_parent);
+  auto &child_neighbors   = registry_.get_or_emplace<neighbors>(_child);
+  child_neighbors.parent_ = _parent;
+
+  if (parent_container.first_ == null) {
+    assert(parent_container.last_ == null);
+    parent_container.first_ = parent_container.last_ = _child;
+  }
+  else {
+    assert(registry_.valid(parent_container.first_));
+    child_neighbors.next_ = parent_container.first_;
+    auto &first_neighbors = assert_get<neighbors>(parent_container.first_);
+    assert(first_neighbors.prev_ == null);
+    first_neighbors.prev_ = _child;
+    parent_container.first_ = _child;
+  }
+}
+
+void root::inject_after(entity _lsibling, entity _child) {
+  assert(registry_.valid(_lsibling));
+  auto &sibling_neighbors = assert_get<neighbors>(_lsibling);
+  auto &parent_container  = assert_get<container>(sibling_neighbors.parent_);
+  auto &child_neighbors   = registry_.get_or_emplace<neighbors>(_child);
+
+  child_neighbors.parent_ = sibling_neighbors.parent_;
+  child_neighbors.next_ = sibling_neighbors.next_;
+  if (child_neighbors.next_ != null)
+    assert_get<neighbors>(child_neighbors.next_).prev_ = _child;
+  child_neighbors.prev_ = _lsibling;
+  sibling_neighbors.next_ = _child;
+
+  if (parent_container.last_ == _lsibling)
+    parent_container.last_ = _child;
+}
+
+void root::inject_before(entity _rsibling, entity _child) {
+  assert(registry_.valid(_rsibling));
+  auto &sibling_neighbors = assert_get<neighbors>(_rsibling);
+  auto &parent_container  = assert_get<container>(sibling_neighbors.parent_);
+  auto &child_neighbors   = registry_.get_or_emplace<neighbors>(_child);
+
+  child_neighbors.parent_ = sibling_neighbors.parent_;
+  child_neighbors.prev_ = sibling_neighbors.prev_;
+  if (child_neighbors.prev_ != null)
+    assert_get<neighbors>(child_neighbors.prev_).next_ = _child;
+  child_neighbors.next_ = _rsibling;
+  sibling_neighbors.prev_ = _child;
+
+  if (parent_container.first_ == _rsibling)
+    parent_container.first_ = _child;
+}
+
+struct widget {};
+
+struct rect {};
+
+void root::make_rect(entity _e, const render2d::box_params &_params) {
+  assert(!registry_.any_of<widget>(_e));
+  registry_.emplace<widget>(_e);
+  registry_.emplace<rect>(_e);
+  registry_.emplace<dirty>(_e);
+  registry_.emplace<bounds>(_e);
+  registry_.emplace<boxes>(_e, boxes_renderer_.allocate(1));
+  registry_.emplace<layout_handler>(_e, [this, _params, _e](bbox_px _l) {
+    auto copy = _params;
+    copy.bbox_ = _l;
+    auto &b = ui::assert_get<boxes>(registry_, _e);
+    auto updator = b.update();
+    render2d::set(updator[0], copy);
+  });
+}
+
+void root::layout_container(entity _e, const container &_c, bbox_px &_bbox) {
+  bbox_px copy = _bbox;
+  entity child = _c.first_;
+  while(child != null) {
+    const auto &n = assert_get<neighbors>(child);
+    layout(child, copy);
+    child = n.next_;
+  }
+}
+
+bbox_px root::layout_widget(entity _e, bbox_px &_bbox) {
+  bbox_px cutted{0_px};
+  if (auto *rl = registry_.try_get<rectcut_length>(_e))
+    cutted = _bbox.cut(rl->side_, rl->length_);
+  else if (auto *rr = registry_.try_get<rectcut_ratio>(_e))
+    cutted = _bbox.cut(rr->side_, rr->ratio_);
+
+  registry_.replace<bounds>(_e, cutted);
+  if (auto *l = registry_.try_get<layout_handler>(_e))
+    (*l)(cutted);
+  return cutted;
+}
+
+void root::layout(entity _e, bbox_px &_bbox) {
+  HUT_PROFILE_FUN(PLAYOUT, (ENTT_ID_TYPE)_e);
+  if (auto *c = registry_.try_get<container>(_e)) {
+    bbox_px size = layout_widget(_e, _bbox);
+    layout_container(_e, *c, size);
+  }
+  else {
+    layout_widget(_e, _bbox);
+  }
+}
+
+void root::invalidate() {
+  bbox_px bounds = {0, 0, parent_.size()};
+  layout(entity_, bounds);
+  parent_.invalidate(true);
 }
 
 }  //namespace hut::ui

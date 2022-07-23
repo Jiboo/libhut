@@ -28,6 +28,8 @@
 #pragma once
 
 #include <functional>
+#include <optional>
+#include <tuple>
 #include <vector>
 
 namespace hut {
@@ -36,6 +38,7 @@ template<typename... TArgTypes>
 class event {
  public:
   using callback = std::function<bool(TArgTypes...)>;
+  std::vector<callback> cbs_;
 
   void connect(const callback &_callback) { cbs_.emplace_back(_callback); }
 
@@ -52,9 +55,26 @@ class event {
   }
 
   void clear() { cbs_.clear(); }
+};
 
- protected:
-  std::vector<callback> cbs_;
+template<typename... TArgTypes>
+class buffered_event : public event<TArgTypes...> {
+ public:
+  std::optional<std::tuple<TArgTypes...>> args_;
+
+  template<typename... TBufferArgTypes>
+  void buffer(TBufferArgTypes &&..._args) {
+    args_.emplace(std::forward<TBufferArgTypes>(_args)...);
+  }
+
+  bool pending() { return args_.has_value(); }
+
+  bool flush() {
+    assert(pending());
+    bool result = std::apply(std::bind_front(&buffered_event::fire, this), *args_);
+    args_.reset();
+    return result;
+  }
 };
 
 }  // namespace hut

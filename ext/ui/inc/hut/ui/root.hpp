@@ -27,15 +27,14 @@
 
 #pragma once
 
-#include <entt/entt.hpp>
+#include <entt/entity/entity.hpp>
+#include <entt/entity/registry.hpp>
 
 #include "hut/ui/components.hpp"
 
 namespace hut::ui {
 
 struct root_params {
-  shared_ubo ubo_;
-
   shared_atlas   words_atlas_;
   image_params   words_atlas_dparams_{.size_ = u16vec2_px{u16_px{(1 << 15) - 1}}, .format_ = VK_FORMAT_R8_UNORM};
   shared_sampler words_sampler_;
@@ -53,13 +52,37 @@ struct root_params {
 
 class root {
  public:
-  root(display &_dsp, window &_parent, shared_buffer _buf, text::shared_font _font, const root_params &_params = {});
+  root(display &_dsp, window &_parent, shared_buffer _buf, shared_ubo _ubo, text::shared_font _font,
+       const root_params &_params = {});
 
- private:
+  registry &reg() { return registry_; }
+  entity   &ent() { return entity_; }
+
+  void inject_back_child(entity _parent, entity _child);
+  void inject_front_child(entity _parent, entity _child);
+  void inject_after(entity _lsibling, entity _child);
+  void inject_before(entity _rsibling, entity _child);
+
+  void make_rect(entity _e, const render2d::box_params &_params);
+
+  void invalidate();
+
+ protected:
   bool mouse(u8 _button, mouse_event_type _type, vec2 _coords);
   bool resize(const u16vec2_px &_size, u32 _scale);
   bool frame(display::duration _dur);
   bool draw(VkCommandBuffer _buff);
+
+  entity create_root();
+
+  template<typename TComponent>
+  TComponent &assert_get(entity _e) {
+    return ui::assert_get<TComponent>(registry_, _e);
+  }
+
+  void    layout(entity _e, bbox_px &_bbox);
+  void    layout_container(entity _e, const container &_c, bbox_px &_bbox);
+  bbox_px layout_widget(entity _e, bbox_px &_bbox);
 
   display &display_;
   window  &parent_;
@@ -76,7 +99,8 @@ class root {
   text::shared_font font_;
   text::renderer    words_renderer_;
 
-  entt::registry registry_;
+  registry registry_;
+  entity   entity_;
 };
 
 }  // namespace hut::ui

@@ -117,9 +117,7 @@ class vulkan_exception : public std::system_error {
   ~vulkan_exception() noexcept override = default;
 
 #ifdef __cpp_lib_source_location
-  [[nodiscard]] const std::source_location &location() const noexcept {
-    return location_;
-  }
+  [[nodiscard]] const std::source_location &location() const noexcept { return location_; }
 
  protected:
   std::source_location location_;

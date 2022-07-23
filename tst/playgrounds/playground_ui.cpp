@@ -31,6 +31,7 @@
 #include "hut/ui/root.hpp"
 
 #include "tst_events.hpp"
+#include "tst_utils.hpp"
 #include "tst_woff2.hpp"
 
 using namespace hut;
@@ -39,16 +40,35 @@ int main(int /*unused*/, char ** /*unused*/) {
   display       dsp("hut ui playground");
   shared_buffer buf = std::make_shared<buffer>(dsp);
 
-  window_params wp;
-  wp.flags_.set(window_params::FTRANSPARENT);
-  window win(dsp, buf, wp);
+  window win(dsp, buf, window_params{.flags_{window_params::FTRANSPARENT, window_params::FVSYNC}});
   win.title(u8"hut ui playground");
-  win.clear_color({0, 0, 0, 1});
+  win.clear_color({0, 0, 0, 0});
 
+  auto ubo  = buf->allocate<common_ubo>(1, dsp.ubo_align());
+  ubo->set(common_ubo{win.size()});
   auto fnt = std::make_shared<text::font>(tst_woff2::Roboto_Regular_woff2, 16_px);
 
-  ui::root top(dsp, win, buf, fnt);
+  ui::root top(dsp, win, buf, ubo, fnt);
 
+  {
+    HUT_PROFILE_SCOPE(PLAYOUT, "create widgets");
+    constexpr int GRID_SIZE = 64;
+    for (int i = 0; i < GRID_SIZE; i++) {
+      ui::entity e = top.reg().create();
+      top.make_rect(e, render2d::box_params{.from_ = tst::rand::color(), .to_ = tst::rand::color()});
+      top.reg().emplace<ui::rectcut_ratio>(e, LEFT, 1.f / (GRID_SIZE - i));
+      top.inject_back_child(top.ent(), e);
+      top.reg().emplace<ui::container>(e);
+      for (int j = 0; j < GRID_SIZE; j++) {
+        ui::entity c = top.reg().create();
+        top.make_rect(c, render2d::box_params{.from_ = tst::rand::color(), .to_ = tst::rand::color()});
+        top.reg().emplace<ui::rectcut_ratio>(c, TOP, 1.f / (GRID_SIZE - j));
+        top.inject_back_child(e, c);
+      }
+    }
+  }
+
+  top.invalidate();
   dsp.dispatch();
 
   return EXIT_SUCCESS;

@@ -2,10 +2,12 @@ Checks: ",\
 bugprone-*,\
 -bugprone-easily-swappable-parameters,\
 -bugprone-narrowing-conversions,\
+-bugprone-unchecked-optional-access,\
 clang-analyzer-*,\
 misc-*,\
 -misc-non-private-member-variables-in-classes,\
 -misc-unused-parameters,\
+-misc-no-recursion,\
 modernize-*,\
 -modernize-use-trailing-return-type,\
 -modernize-avoid-c-arrays,\

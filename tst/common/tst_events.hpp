@@ -25,6 +25,8 @@
  * SOFTWARE.
  */
 
+#pragma once
+
 #include "hut/pipeline.hpp"
 #include "hut/window.hpp"
 

@@ -27,44 +27,27 @@
 
 #pragma once
 
-#include "hut/render2d/renderer.hpp"
-#include "hut/text/renderer.hpp"
-#include "hut/ui/common.hpp"
+#include <random>
 
-namespace hut::ui {
+#include "hut/utils/color.hpp"
 
-struct dirty {};
+namespace hut::tst::rand {
 
-struct neighbors {
-  entt::entity parent_ = entt::null;
-  entt::entity next_   = entt::null;
-  entt::entity prev_   = entt::null;
+static inline std::mt19937 g_generator;
+
+inline void reset() {
+  g_generator.seed(std::mt19937::default_seed);
+}
+
+inline float norm() {
+  std::uniform_real_distribution<> dis(0.0, 1.0);
+  return dis(g_generator);
 };
 
-struct container {
-  entt::entity first_ = entt::null;
-  entt::entity last_  = entt::null;
+inline u8vec4_rgba color(float _min_alpha = 0.25f) {
+  auto hsv  = vec3{norm() * 360, 0.99, 0.95};
+  auto rgba = f32vec4_rgba(rgbColor(hsv), norm() * (1 - _min_alpha) + _min_alpha);
+  return u8vec4_rgba(rgba);
 };
 
-struct bounds {
-  bbox_px bbox_{0_px};
-};
-
-struct rectcut_length {
-  side   side_;
-  u16_px length_;
-};
-
-struct rectcut_ratio {
-  side  side_;
-  float ratio_;
-};
-
-using boxes = render2d::boxes_holder;
-using words = text::words_holder;
-
-using layout_handler = std::function<void(bbox_px)>;
-using frame_handler  = std::function<bool(display::duration)>;
-using mouse_handler  = std::function<bool(u8, mouse_event_type, vec2)>;
-
-}  // namespace hut::ui
+}  // namespace hut::tst::rand

@@ -32,6 +32,8 @@
 
 namespace hut {
 
+enum side : u16 { TOP, BOTTOM, LEFT, RIGHT, LAST_SIDE = RIGHT };
+
 template<unit TUnit, typename TUnderlying>
 struct bbox : vec<4, length<TUnit, TUnderlying>> {
   template<typename TOtherUnderlying>
@@ -96,7 +98,7 @@ struct bbox : vec<4, length<TUnit, TUnderlying>> {
   }
 
   template<typename TOtherUnderlying>
-  constexpr common_vec4_t<TOtherUnderlying> cut_left(compat_length_t<TOtherUnderlying> _l) {
+  constexpr compat_t<TOtherUnderlying> cut_left(compat_length_t<TOtherUnderlying> _l) {
     assert(width() >= _l);
     const u16_px prev_left = left();
     left() += _l;
@@ -104,7 +106,7 @@ struct bbox : vec<4, length<TUnit, TUnderlying>> {
   }
 
   template<typename TOtherUnderlying>
-  constexpr common_vec4_t<TOtherUnderlying> cut_top(compat_length_t<TOtherUnderlying> _l) {
+  constexpr compat_t<TOtherUnderlying> cut_top(compat_length_t<TOtherUnderlying> _l) {
     assert(height() >= _l);
     auto prev_top = top();
     top() += _l;
@@ -112,7 +114,7 @@ struct bbox : vec<4, length<TUnit, TUnderlying>> {
   }
 
   template<typename TOtherUnderlying>
-  constexpr common_vec4_t<TOtherUnderlying> cut_right(compat_length_t<TOtherUnderlying> _l) {
+  constexpr compat_t<TOtherUnderlying> cut_right(compat_length_t<TOtherUnderlying> _l) {
     assert(width() >= _l);
     auto prev_right = right();
     right() -= _l;
@@ -120,11 +122,44 @@ struct bbox : vec<4, length<TUnit, TUnderlying>> {
   }
 
   template<typename TOtherUnderlying>
-  constexpr common_vec4_t<TOtherUnderlying> cut_bottom(compat_length_t<TOtherUnderlying> _l) {
+  constexpr compat_t<TOtherUnderlying> cut_bottom(compat_length_t<TOtherUnderlying> _l) {
     assert(height() >= _l);
     auto prev_bottom = bottom();
     bottom() -= _l;
     return {left(), bottom(), right(), prev_bottom};
+  }
+
+  template<typename TOtherUnderlying>
+  constexpr compat_t<TOtherUnderlying> cut(side _s, compat_length_t<TOtherUnderlying> _l) {
+    switch (_s) {
+      case side::TOP: return cut_top(_l);
+      case side::LEFT: return cut_left(_l);
+      case side::BOTTOM: return cut_bottom(_l);
+      case side::RIGHT: return cut_right(_l);
+    }
+    assert(false);
+    return {};
+  }
+
+  template<typename TRatio>
+  constexpr bbox cut(side _s, TRatio _r) {
+    switch (_s) {
+      case side::TOP: return cut_top(height() * _r);
+      case side::LEFT: return cut_left(width() * _r);
+      case side::BOTTOM: return cut_bottom(height() * _r);
+      case side::RIGHT: return cut_right(width() * _r);
+    }
+    assert(false);
+    return {};
+  }
+
+  template<typename TOtherUnderlying>
+  constexpr bbox &feather(side _s, compat_vec4_t<TOtherUnderlying> _l) {
+    cut_left(_l.x);
+    cut_top(_l.y);
+    cut_right(_l.z);
+    cut_bottom(_l.w);
+    return *this;
   }
 };
 

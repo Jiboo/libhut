@@ -85,6 +85,7 @@ enum profiling_category : u8 {
   PEVENT,
   PPIPELINE,
   PWAYLAND,
+  PLAYOUT,
 };
 
 inline std::ostream &operator<<(std::ostream &_os, const profiling_category &_in) {
@@ -103,6 +104,7 @@ inline std::ostream &operator<<(std::ostream &_os, const profiling_category &_in
     case PEVENT: return _os << "event";
     case PPIPELINE: return _os << "pipeline";
     case PWAYLAND: return _os << "wayland";
+    case PLAYOUT: return _os << "layout";
     default: assert(false); return _os;
   }
 }
@@ -685,6 +687,11 @@ auto make_complete_event_scope(std::vector<TEventType> &_buffer, std::tuple<TEve
                                                                   BOOST_PP_TUPLE_ENUM(MArgValues));                    \
       return MTarget->MEvent.fire(__VA_ARGS__);                                                                        \
     }()
+#  define HUT_PROFILE_FLUSH_BEVENT(MTarget, MEvent)                                                                    \
+    [&]() -> bool {                                                                                                    \
+      HUT_PROFILE_SCOPE(PEVENT, "Buffered event " BOOST_PP_STRINGIZE(MEvent));                                         \
+      return MTarget->MEvent.flush();                                                                                  \
+    }()
 
 #  define HUT_PVK(MName, ...)                                                                                          \
     [&]() {                                                                                                            \
@@ -709,6 +716,7 @@ auto make_complete_event_scope(std::vector<TEventType> &_buffer, std::tuple<TEve
 #  define HUT_PROFILE_EVENT(MTarget, MEvent, ...)                                      MTarget->MEvent.fire(__VA_ARGS__)
 #  define HUT_PROFILE_EVENT_NAMED(MTarget, MEvent, MArgNames, ...)                     MTarget->MEvent.fire(__VA_ARGS__)
 #  define HUT_PROFILE_EVENT_NAMED_ALIASED(MTarget, MEvent, MArgNames, MArgValues, ...) MTarget->MEvent.fire(__VA_ARGS__)
+#  define HUT_PROFILE_FLUSH_BEVENT(MTarget, MEvent)                                    MTarget->MEvent.flush()
 
 #  define HUT_PVK(MName, ...) MName(__VA_ARGS__)
 

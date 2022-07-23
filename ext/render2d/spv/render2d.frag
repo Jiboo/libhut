@@ -26,7 +26,7 @@ float border_distance(float _radius) {
   vec2 top_left = vec2(in_box.x, in_box.y);
   vec2 bot_right = vec2(in_box.z, in_box.w);
   vec2 half_size = (bot_right - top_left) / 2;
-  vec2 center = half_size + top_left;
+  vec2 center = top_left + half_size;
   return udRoundBox(gl_FragCoord.xy - center, half_size, _radius);
 }
 

@@ -54,11 +54,11 @@ struct format_info {
 
   [[nodiscard]] constexpr bool valid() const { return components_ > 0; }
   [[nodiscard]] constexpr u8   components_bits() const {
-      u8 total = 0;
-      for (u8 channel = 0; channel < components_; channel++)
+    u8 total = 0;
+    for (u8 channel = 0; channel < components_; channel++)
       total += component_bits_[channel];
     assert(total > 0);
-      return total;
+    return total;
   }
   [[nodiscard]] constexpr u8 max_component_bits() const {
     u8 max = 0;

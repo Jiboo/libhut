@@ -40,13 +40,6 @@
 
 namespace hut {
 
-enum side {
-  TOP,
-  BOTTOM,
-  LEFT,
-  RIGHT,
-  LAST_SIDE = RIGHT,
-};
 using edge = flagged<side, LAST_SIDE>;
 cursor_type edge_cursor(edge _edge);
 
@@ -83,14 +76,15 @@ class window final : public render_target {
   friend class display;
 
  public:
-  event<>                          on_pause_;   // sys asked win to stop rendering
-  event<>                          on_resume_;  // sys asked win to resume rendering
-  event<bool>                      on_focus_;   // sys gave keyboard focus to win
-  event<>                          on_close_;   // overridable, sys requested win to close
-  event<u16bbox_px>                on_expose_;  // sys request win to redraw this rect
-  event<VkCommandBuffer>           on_draw_;    // win is dirty, needs to rebuild command buffer
-  event<display::duration>         on_frame_;   // win will soon be drawn (use this to animate values)
-  event<u16vec2_px, u32 /*scale*/> on_resize_;  // sys changed win size or scaling
+  buffered_event<>                          on_pause_;   // sys asked win to stop rendering
+  buffered_event<>                          on_resume_;  // sys asked win to resume rendering
+  buffered_event<u16vec2_px, u32 /*scale*/> on_resize_;  // sys changed win size or scaling
+
+  event<bool>              on_focus_;   // sys gave keyboard focus to win
+  event<>                  on_close_;   // overridable, sys requested win to close
+  event<u16bbox_px>        on_expose_;  // sys request win to redraw this rect
+  event<VkCommandBuffer>   on_draw_;    // win is dirty, needs to rebuild command buffer
+  event<display::duration> on_frame_;   // win will soon be drawn (use this to animate values)
 
 #if defined(HUT_ENABLE_TIME_EVENTS)
   event<u32> on_time_;  // contains timestamps of sys events, to measure hut latency
@@ -122,12 +116,8 @@ class window final : public render_target {
   void maximize(bool _set = true);
   void fullscreen(bool _set = true);
 
-  u16vec2_px size() const {
-    return size_;
-  }
-  u32 scale() const {
-    return scale_;
-  }
+  u16vec2_px size() const { return size_; }
+  u32        scale() const { return scale_; }
 
   void interactive_resize(edge _edge);
   void interactive_move();
@@ -145,9 +135,7 @@ class window final : public render_target {
   using receive_clipboard_data = std::function<void(clipboard_format /*selected_format*/, clipboard_receiver &)>;
   bool clipboard_receive(clipboard_formats _supported_formats, receive_clipboard_data &&_callback);
 
-  void dragndrop_target(const std::shared_ptr<drop_target_interface> &_received) {
-    drop_target_interface_ = _received;
-  }
+  void dragndrop_target(const std::shared_ptr<drop_target_interface> &_received) { drop_target_interface_ = _received; }
 
   using send_dragndrop_data
       = std::function<void(dragndrop_action /*_action*/, clipboard_format /*_selected_format*/, clipboard_sender &)>;
@@ -174,10 +162,13 @@ class window final : public render_target {
   VkSemaphore sem_available_ = VK_NULL_HANDLE;
   VkSemaphore sem_rendered_  = VK_NULL_HANDLE;
 
-  u16vec2_px          size_, pos_;
-  display::time_point last_frame_ = display::clock::now();
-  bool                minimized_  = false;
-  u32                 scale_      = 1;
+  u16vec2_px          size_{0_px};
+  u16vec2_px          pos_{0_px};
+  u32                 scale_          = 1;
+  display::time_point last_frame_     = display::clock::now();
+  std::atomic_bool    invalidated_    = true;
+  vec2                mouse_lastmove_ = {0, 0};
+  bool                minimized_      = false;
 
   std::shared_ptr<drop_target_interface> drop_target_interface_;
 
@@ -207,9 +198,7 @@ class window final : public render_target {
   xdg_surface  *window_;
   xdg_toplevel *toplevel_;
 
-  std::atomic_bool invalidated_         = true;
-  vec2             mouse_lastmove_      = {0, 0};
-  cursor_type      current_cursor_type_ = CDEFAULT;
+  cursor_type current_cursor_type_ = CDEFAULT;
 
   struct dragndrop_async_writer {
     send_dragndrop_data callback_;

@@ -30,6 +30,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/packing.hpp>
+#include <glm/gtx/color_space.hpp>
 #include <glm/gtx/hash.hpp>
 #include <glm/gtx/io.hpp>
 #include <glm/gtx/scalar_multiplication.hpp>
@@ -43,17 +44,20 @@ namespace hut {
 using namespace glm;
 
 template<length_t TSize, arithmetic TVec, arithmetic TScalar>
-requires(!std::is_same_v<TVec, TScalar>) constexpr auto operator*(vec<TSize, TVec> _v, TScalar _s) {
+  requires(!std::is_same_v<TVec, TScalar>)
+constexpr auto operator*(vec<TSize, TVec> _v, TScalar _s) {
   return _v *= _s;
 }
 
 template<length_t TSize, arithmetic TVec, arithmetic TScalar>
-requires(!std::is_same_v<TVec, TScalar>) constexpr auto operator*(TScalar _s, vec<TSize, TVec> _v) {
+  requires(!std::is_same_v<TVec, TScalar>)
+constexpr auto operator*(TScalar _s, vec<TSize, TVec> _v) {
   return _v *= _s;
 }
 
 template<length_t TSize, arithmetic TVec, arithmetic TScalar>
-requires(!std::is_same_v<TVec, TScalar>) constexpr auto operator/(vec<TSize, TVec> _v, TScalar _s) {
+  requires(!std::is_same_v<TVec, TScalar>)
+constexpr auto operator/(vec<TSize, TVec> _v, TScalar _s) {
   return _v /= _s;
 }
 

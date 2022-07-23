@@ -25,10 +25,6 @@
  * SOFTWARE.
  */
 
-#include <random>
-
-#include <glm/gtx/color_space.hpp>
-
 #include "hut/atlas.hpp"
 #include "hut/display.hpp"
 #include "hut/window.hpp"
@@ -39,6 +35,7 @@
 
 #include "tst_events.hpp"
 #include "tst_png.hpp"
+#include "tst_utils.hpp"
 
 using namespace hut;
 
@@ -46,7 +43,7 @@ int main(int /*unused*/, char ** /*unused*/) {
   display       dsp("hut render2d playground");
   shared_buffer buf = std::make_shared<buffer>(dsp);
 
-  window win(dsp, buf);
+  window win(dsp, buf, window_params{.flags_{window_params::FTRANSPARENT, window_params::FVSYNC}});
   win.title(u8"hut render2d playground");
   win.clear_color({0, 0, 0, 1});
 
@@ -66,19 +63,7 @@ int main(int /*unused*/, char ** /*unused*/) {
     return EXIT_FAILURE;
   install_test_events(dsp, win, ubo);
 
-  std::mt19937 gen;
-  auto         rand_norm = [&]() {
-    std::uniform_real_distribution<> dis(0.0, 1.0);
-    return dis(gen);
-  };
-
-  auto rand_color = [&](bool _rand_alpha = true) {
-    auto hsv  = vec3{rand_norm() * 360, 0.99, 0.95};
-    auto rgba = f32vec4_rgba(rgbColor(hsv), _rand_alpha ? (rand_norm() * 0.75 + 0.25) : 1.0f);
-    return u8vec4_rgba(rgba);
-  };
-
-  auto quads = box_renderer.allocate(15 * 15 + 1);
+  auto quads = box_renderer.allocate(1);
 
   u16_px       bbox_min        = 0_px;
   u16_px       bbox_max        = 1000_px;
@@ -115,7 +100,7 @@ int main(int /*unused*/, char ** /*unused*/) {
     ImGui::NewFrame();
 
     if (ImGui::Begin("renderer2d")) {
-      gen.seed(std::mt19937::default_seed);
+      tst::rand::reset();
 
       if (ImGui::ColorEdit4("Window clear color", &clear_color.x))
         win.clear_color(clear_color);
@@ -177,8 +162,8 @@ int main(int /*unused*/, char ** /*unused*/) {
             iupdator[i],
             render2d::box_params{
                 .bbox_          = bbox * scale,
-                .from_          = grid_fixed_colors ? custom_col_from : rand_color(grid_rand_transparency),
-                .to_            = grid_fixed_colors ? custom_col_to : rand_color(grid_rand_transparency),
+                .from_          = grid_fixed_colors ? custom_col_from : tst::rand::color(grid_rand_transparency ? .2 : 1),
+                .to_            = grid_fixed_colors ? custom_col_to : tst::rand::color(grid_rand_transparency ? .2 : 1),
                 .gradient_      = grid_fixed_gradient ? render2d::gradient(custom_gradient) : render2d::gradient(i % 4),
                 .mode_          = grid_fixed_mode ? render2d::mode(custom_mode) : render2d::mode(i % 3),
                 .corner_radius_ = grid_no_params ? 0 : col,
