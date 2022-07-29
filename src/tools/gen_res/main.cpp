@@ -1,11 +1,11 @@
 #include <cstring>
 
-#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 
+#include "hut/utils/chrono.hpp"
 #include "hut/utils/glm.hpp"
 #include "hut/utils/sstream.hpp"
 

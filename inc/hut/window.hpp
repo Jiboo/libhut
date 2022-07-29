@@ -27,12 +27,12 @@
 
 #pragma once
 
-#include <chrono>
 #include <string>
 #include <unordered_set>
 
 #include <wayland-client.h>
 
+#include "hut/utils/chrono.hpp"
 #include "hut/utils/event.hpp"
 
 #include "hut/display.hpp"

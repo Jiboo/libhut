@@ -27,9 +27,9 @@
 
 #pragma once
 
-#include <chrono>
 #include <string>
 
+#include "hut/utils/chrono.hpp"
 #include "hut/utils/bbox.hpp"
 
 #include "hut/display.hpp"

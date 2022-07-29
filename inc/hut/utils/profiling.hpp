@@ -35,7 +35,6 @@
 #  include <array>
 #  include <atomic>
 #  include <charconv>
-#  include <chrono>
 #  include <filesystem>
 #  include <fstream>
 #  include <iomanip>

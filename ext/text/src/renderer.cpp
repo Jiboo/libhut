@@ -28,11 +28,14 @@
 #include "hut/text/renderer.hpp"
 
 #include <iostream>
+#include <memory>
+#include <span>
 #include <string_view>
 #include <utility>
 
 #include "hut/utils/utf.hpp"
 
+#include "hut/suballoc.hpp"
 #include "hut/display.hpp"
 
 namespace hut::text {
@@ -119,7 +122,7 @@ void renderer::draw(VkCommandBuffer _buff) {
     const uint     lower    = OPTIMIZE ? batch.dstore_.suballocator_.lower_bound() : 0;
     const uint upper = OPTIMIZE ? batch.dstore_.suballocator_.upper_bound() : batch.dstore_.suballocator_.capacity();
     assert(upper >= lower);
-    if (use_indirect_fallback_) {
+    if (!use_indirect_fallback_) {
       pipeline_.draw_indexed(_buff, batch.dstore_.commands_, upper - lower, lower,
                              sizeof(VkDrawIndexedIndirectCommand));
     } else {
@@ -150,7 +153,7 @@ words_holder renderer::allocate(std::span<const std::u8string_view> _words) {
   auto draw_alloc = best_batch.dstore_.suballocator_.pack(_words.size());
   assert(draw_alloc);
 
-  if (use_indirect_fallback_) {
+  if (!use_indirect_fallback_) {
     auto  cupdator     = best_batch.dstore_.commands_->update(*draw_alloc, _words.size());
     auto *commands_ptr = reinterpret_cast<VkDrawIndexedIndirectCommand *>(cupdator.staging().data());
     return prepare_commands(_words, winfo, best_batch, *draw_alloc, commands_ptr);
@@ -220,6 +223,21 @@ details::batch &renderer::find_best_fit(const words_info &_winfo) {
   return grow(_winfo.total_codepoints_, _winfo.size());
 }
 
+std::span<instance> batch_updators::locate(const words_holder &_holder) {
+  auto &batch_updator = updators_.at(_holder.instances_.parent());
+  return std::span<instance>{batch_updator.begin(), batch_updator.end()};
+}
+
+batch_updators renderer::update_all() {
+  batch_updators result;
+  result.updators_.reserve(batches_.size());
+
+  for (auto &batch : batches_)
+    result.updators_.emplace(&batch, batch.dstore_.instances_->update());
+
+  return result;
+}
+
 namespace details {
 
 mesh_store::mesh_store(renderer *_parent, uint _size)
@@ -231,7 +249,7 @@ mesh_store::mesh_store(renderer *_parent, uint _size)
 draw_store::draw_store(renderer *_parent, uint _size)
     : instances_(_parent->buffer_->allocate<instance>(_size))
     , suballocator_(_size) {
-  if (_parent->use_indirect_fallback_) {
+  if (!_parent->use_indirect_fallback_) {
     commands_ = _parent->buffer_->allocate<VkDrawIndexedIndirectCommand>(_size);
     commands_->zero();
   } else {
@@ -277,7 +295,7 @@ word::word(renderer *_parent, batch &_batch, uint _alloc, uint _codepoints, std:
 }
 
 void batch::release(text_suballoc *_suballoc) {
-  if (parent_->use_indirect_fallback_) {
+  if (!parent_->use_indirect_fallback_) {
     dstore_.commands_->zero(_suballoc->offset(), _suballoc->size());
   } else {
     std::fill(dstore_.commands_fallback_.get() + _suballoc->offset(),

@@ -30,6 +30,7 @@
 #include <entt/entity/entity.hpp>
 #include <entt/entity/registry.hpp>
 
+#include "hut/ui/common.hpp"
 #include "hut/ui/components.hpp"
 
 namespace hut::ui {
@@ -80,9 +81,10 @@ class root {
     return ui::assert_get<TComponent>(registry_, _e);
   }
 
-  void    layout(entity _e, bbox_px &_bbox);
-  void    layout_container(entity _e, const container &_c, bbox_px &_bbox);
-  bbox_px layout_widget(entity _e, bbox_px &_bbox);
+  void    relayout(const bbox_px &_b);
+  void    layout(entity _e, bbox_px &_b, updators &_u);
+  void    layout_container(entity _e, const container &_c, bbox_px &_b, updators &_u);
+  bbox_px layout_widget(entity _e, bbox_px &_b, updators &_u);
 
   display &display_;
   window  &parent_;

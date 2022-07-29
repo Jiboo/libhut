@@ -60,10 +60,15 @@ struct rectcut_ratio {
   float ratio_;
 };
 
+struct updators {
+  render2d::batch_updators boxes_updators_;
+  text::batch_updators words_updators_;
+};
+
 using boxes = render2d::boxes_holder;
 using words = text::words_holder;
 
-using layout_handler = std::function<void(bbox_px)>;
+using layout_handler = std::function<void(bbox_px, updators&)>;
 using frame_handler  = std::function<bool(display::duration)>;
 using mouse_handler  = std::function<bool(u8, mouse_event_type, vec2)>;
 

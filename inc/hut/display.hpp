@@ -28,7 +28,6 @@
 #pragma once
 
 #include <atomic>
-#include <chrono>
 #include <condition_variable>
 #include <functional>
 #include <list>
@@ -44,6 +43,7 @@
 #include <wayland-cursor.h>
 #include <xkbcommon/xkbcommon.h>
 
+#include "hut/utils/chrono.hpp"
 #include "hut/utils/flagged.hpp"
 #include "hut/utils/fwd.hpp"
 #include "hut/utils/length.hpp"

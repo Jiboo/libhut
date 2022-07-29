@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <unordered_map>
 #include <utility>
 
 #include "hut/utils/color.hpp"
@@ -42,6 +43,7 @@
 namespace hut::render2d {
 
 class renderer;
+class batch_updators;
 
 using index = u32;
 
@@ -100,6 +102,7 @@ inline void set(instance &_target, box_params _params) {
 }
 
 namespace details {
+
 struct batch;
 using render2d_suballoc = suballoc<instance, batch>;
 using render2d_updator  = buffer_updator<instance>;
@@ -127,6 +130,15 @@ struct batch {
 
 using boxes_holder = suballoc<instance, details::batch>;
 
+class batch_updators {
+  friend class renderer;
+
+  std::unordered_map<details::batch*, buffer_updator<instance>> updators_;
+
+public:
+  std::span<instance> locate(const boxes_holder&);
+};
+
 struct renderer_params : pipeline_params {
   uint initial_batch_size_instances_ = 1024;
 };
@@ -139,6 +151,8 @@ class renderer {
   void draw(VkCommandBuffer _buffer);
 
   boxes_holder allocate(uint _count);
+
+  batch_updators update_all();
 
  private:
   std::list<details::batch> batches_;

@@ -1,6 +1,8 @@
 *build*
 .idea
 .vs
+.cache
+.vscode
 
 #renderdoc
 *.cap

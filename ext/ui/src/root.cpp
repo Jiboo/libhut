@@ -27,6 +27,11 @@
 
 #include "hut/ui/root.hpp"
 
+#include <iostream>
+
+#include "hut/display.hpp"
+
+#include "hut/ui/common.hpp"
 #include "hut/ui/components.hpp"
 
 namespace hut::ui {
@@ -108,8 +113,8 @@ bool root::resize(const u16vec2_px &_size, u32 _scale) {
   float dpi_scale{static_cast<float>(_scale)};
   ubo_->set_subone(0, offsetof(common_ubo, dpi_scale_), sizeof(dpi_scale), &dpi_scale);
 
-  bbox_px bounds = {0, 0, _size};
-  layout(entity_, bounds);
+  relayout({0, 0, _size});
+
   return false;
 }
 
@@ -207,53 +212,62 @@ void root::make_rect(entity _e, const render2d::box_params &_params) {
   registry_.emplace<dirty>(_e);
   registry_.emplace<bounds>(_e);
   registry_.emplace<boxes>(_e, boxes_renderer_.allocate(1));
-  registry_.emplace<layout_handler>(_e, [this, _params, _e](bbox_px _l) {
+  registry_.emplace<layout_handler>(_e, [this, _params, _e](bbox_px _b, updators &_u) {
     auto copy = _params;
-    copy.bbox_ = _l;
+    copy.bbox_ = _b;
     auto &b = ui::assert_get<boxes>(registry_, _e);
-    auto updator = b.update();
-    render2d::set(updator[0], copy);
+    auto rects = _u.boxes_updators_.locate(b);
+    render2d::set(rects[0], copy);
   });
 }
 
-void root::layout_container(entity _e, const container &_c, bbox_px &_bbox) {
-  bbox_px copy = _bbox;
+void root::layout_container(entity _e, const container &_c, bbox_px &_b, updators &_u) {
+  bbox_px copy = _b;
   entity child = _c.first_;
   while(child != null) {
     const auto &n = assert_get<neighbors>(child);
-    layout(child, copy);
+    layout(child, copy, _u);
     child = n.next_;
   }
 }
 
-bbox_px root::layout_widget(entity _e, bbox_px &_bbox) {
+bbox_px root::layout_widget(entity _e, bbox_px &_b, updators &_u) {
   bbox_px cutted{0_px};
   if (auto *rl = registry_.try_get<rectcut_length>(_e))
-    cutted = _bbox.cut(rl->side_, rl->length_);
+    cutted = _b.cut(rl->side_, rl->length_);
   else if (auto *rr = registry_.try_get<rectcut_ratio>(_e))
-    cutted = _bbox.cut(rr->side_, rr->ratio_);
+    cutted = _b.cut(rr->side_, rr->ratio_);
 
   registry_.replace<bounds>(_e, cutted);
   if (auto *l = registry_.try_get<layout_handler>(_e))
-    (*l)(cutted);
+    (*l)(cutted, _u);
   return cutted;
 }
 
-void root::layout(entity _e, bbox_px &_bbox) {
+void root::layout(entity _e, bbox_px &_b, updators &_u) {
   HUT_PROFILE_FUN(PLAYOUT, (ENTT_ID_TYPE)_e);
   if (auto *c = registry_.try_get<container>(_e)) {
-    bbox_px size = layout_widget(_e, _bbox);
-    layout_container(_e, *c, size);
+    bbox_px size = layout_widget(_e, _b, _u);
+    layout_container(_e, *c, size, _u);
   }
   else {
-    layout_widget(_e, _bbox);
+    layout_widget(_e, _b, _u);
   }
 }
 
 void root::invalidate() {
-  bbox_px bounds = {0, 0, parent_.size()};
-  layout(entity_, bounds);
+  relayout({0, 0, parent_.size()});
   parent_.invalidate(true);
+}
+
+void root::relayout(const bbox_px &_bbox) {
+  updators ctx {
+    boxes_renderer_.update_all(),
+    words_renderer_.update_all()
+  };
+
+  bbox_px copy = _bbox;
+  layout(entity_, copy, ctx);
 }
 
 }  //namespace hut::ui

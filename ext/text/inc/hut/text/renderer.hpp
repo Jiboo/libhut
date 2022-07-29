@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include <unordered_map>
+
 #include "hut/text/font.hpp"
 #include "hut/text/shaper.hpp"
 
@@ -35,6 +37,7 @@
 namespace hut::text {
 
 class renderer;
+class batch_updators;
 
 using index_t     = uint16;
 using string_hash = size_t;
@@ -109,6 +112,7 @@ struct batch {
 
 class words_holder {
   friend class text::renderer;
+  friend class text::batch_updators;
   friend struct batch;
 
   text_suballoc                  instances_;
@@ -154,6 +158,15 @@ class words_holder {
 
 using words_holder = details::words_holder;
 
+class batch_updators {
+  friend class renderer;
+
+  std::unordered_map<details::batch*, buffer_updator<instance>> updators_;
+
+public:
+  std::span<instance> locate(const words_holder&);
+};
+
 struct renderer_params : pipeline_params {
   uint initial_mesh_store_size_ = 8 * 1024;
   uint initial_draw_store_size_ = 1024;
@@ -172,6 +185,8 @@ class renderer {
   words_holder allocate(std::span<const std::u8string_view> _words);
 
   void draw(VkCommandBuffer _buff);
+
+  batch_updators update_all();
 
  private:
   glyph_pipeline pipeline_;

@@ -172,6 +172,7 @@ class updator {
     return reinterpret_cast<updator<TOtherContained, TParent> *>(this);
   }
 
+  [[nodiscard]] TParent *parent() { return parent_; }
   [[nodiscard]] std::span<u8> staging() { return staging_; };
   [[nodiscard]] uint          total_offset_bytes() const { return parent_->offset_bytes() + offset_bytes_; }
 
@@ -181,9 +182,9 @@ class updator {
   [[nodiscard]] uint offset() const { return offset_bytes() / sizeof(TContained); }
   [[nodiscard]] uint size() const { return size_bytes() / sizeof(TContained); }
 
-  TContained &operator[](uint _index) { return *(reinterpret_cast<TContained *>(staging_.data()) + _index); }
-  TContained *begin() { return reinterpret_cast<TContained *>(staging_.data()); }
-  TContained *end() { return reinterpret_cast<TContained *>(staging_.data() + staging_.size()); }
+  [[nodiscard]] TContained &operator[](uint _index) { return *(reinterpret_cast<TContained *>(staging_.data()) + _index); }
+  [[nodiscard]] TContained *begin() { return reinterpret_cast<TContained *>(staging_.data()); }
+  [[nodiscard]] TContained *end() { return reinterpret_cast<TContained *>(staging_.data() + staging_.size()); }
 
   void set(std::span<const TContained> _input) {
     assert(_input.size_bytes() == size_bytes());

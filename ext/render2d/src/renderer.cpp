@@ -84,6 +84,21 @@ boxes_holder renderer::allocate(uint _instances_count) {
   return {&new_batch, uint(*fit * sizeof(instance)), size_bytes};
 }
 
+std::span<instance> batch_updators::locate(const boxes_holder &_holder) {
+  auto &batch_updator = updators_.at(_holder.parent());
+  return std::span<instance>{batch_updator.begin() + _holder.offset(), _holder.size()};
+}
+
+batch_updators renderer::update_all() {
+  batch_updators result;
+  result.updators_.reserve(batches_.size());
+
+  for (auto &batch : batches_)
+    result.updators_.emplace(&batch, batch.buffer_->update());
+
+  return result;
+}
+
 namespace details {
 
 void batch::release(render2d_suballoc *_suballoc) {
